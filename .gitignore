@@ -6,6 +6,20 @@
 *.swp
 .buildlog/
 .history
+.DS_Store
+.dart-appdata/
+.env
+.env.*
+!.env.example
+
+# Node.js
+node_modules/
+dist/
+.npm-cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 
 

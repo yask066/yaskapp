@@ -1,0 +1,23 @@
+{
+  "name": "yaskapp",
+  "private": true,
+  "workspaces": [
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "api:dev": "npm run dev -w @yaskapp/api",
+    "api:build": "npm run build -w @yaskapp/api",
+    "api:test": "npm run test -w @yaskapp/api",
+    "api:typecheck": "npm run typecheck -w @yaskapp/api",
+    "db:migrate": "npm run db:migrate -w @yaskapp/api",
+    "db:check": "npm run db:check -w @yaskapp/api",
+    "shared:build": "npm run build -w @yaskapp/shared"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3"
+  }
+}
