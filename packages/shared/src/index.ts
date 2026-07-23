@@ -14,6 +14,29 @@ export type PollOption = {
   votesCount: number;
 };
 
+export type PollComment = {
+  id: string;
+  pollId: string;
+  author: PollAuthor;
+  body: string;
+  likesCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ListPollCommentsResponse = {
+  items: PollComment[];
+};
+
+export type CreatePollCommentRequest = {
+  body: string;
+};
+
+export type CreatePollCommentResponse = {
+  comment: PollComment;
+  poll: Poll;
+};
+
 export type Poll = {
   id: string;
   authorId: string;
@@ -27,6 +50,7 @@ export type Poll = {
   votesCount: number;
   commentsCount: number;
   likesCount: number;
+  viewerHasLiked: boolean;
   createdAt: string;
   updatedAt: string;
   endsAt: string | null;
@@ -66,9 +90,12 @@ export type RealtimeEvent =
   | {
       type: 'poll.vote.created';
       payload: {
-        pollId: string;
-        optionId: string;
-        votesCount: number;
+        poll: Poll;
+        vote: {
+          pollId: string;
+          optionId: string;
+          votesCount: number;
+        };
       };
     }
   | {

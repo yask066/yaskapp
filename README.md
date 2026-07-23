@@ -66,3 +66,21 @@ Use the returned access token as a bearer token:
 ```http
 Authorization: Bearer <accessToken>
 ```
+
+## Flutter API Environment
+
+The mobile app reads backend addresses at compile time. For a local phone run:
+
+```bash
+flutter run \
+  --dart-define=API_BASE_URL=http://192.168.0.5:3000 \
+  --dart-define=API_WEBSOCKET_URL=ws://192.168.0.5:3000/realtime
+```
+
+In PowerShell, use one line:
+
+```powershell
+flutter run --dart-define=API_BASE_URL=http://192.168.0.5:3000 --dart-define=API_WEBSOCKET_URL=ws://192.168.0.5:3000/realtime
+```
+
+Both values should point to the same backend environment.

@@ -1,13 +1,19 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
+import { broadcastPollVoteCreated } from '../../realtime/realtime.hub.js';
 import { authenticate } from '../auth/auth.utils.js';
 import {
   PollAlreadyVotedError,
   PollClosedError,
   PollNotFoundError,
   createPoll,
+  createPollComment,
+  likePoll,
+  listPollComments,
   listPublicPolls,
+  unlikePoll,
   voteOnPoll
 } from './polls.service.js';
 
@@ -42,6 +48,22 @@ const voteParamsSchema = z.object({
   pollId: uuidSchema
 });
 
+const likeParamsSchema = z.object({
+  pollId: uuidSchema
+});
+
+const commentsParamsSchema = z.object({
+  pollId: uuidSchema
+});
+
+const commentsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(50)
+});
+
+const createCommentSchema = z.object({
+  body: z.string().trim().min(1).max(1000)
+});
+
 const voteBodySchema = z.object({
   optionId: uuidSchema
 });
@@ -52,6 +74,23 @@ function validationError(reply: FastifyReply, error: z.ZodError) {
     message: 'Request input is invalid.',
     details: error.flatten()
   });
+}
+
+async function optionalAuthenticate(request: FastifyRequest, reply: FastifyReply) {
+  const authorization = request.headers.authorization;
+
+  if (!authorization) {
+    return;
+  }
+
+  try {
+    await request.jwtVerify();
+  } catch {
+    return reply.status(401).send({
+      error: 'unauthorized',
+      message: 'Authentication is required.'
+    });
+  }
 }
 
 function pollError(reply: FastifyReply, error: unknown) {
@@ -80,19 +119,25 @@ function pollError(reply: FastifyReply, error: unknown) {
 }
 
 export function registerPollRoutes(app: FastifyInstance) {
-  app.get('/polls', async (request, reply) => {
+  app.get(
+    '/polls',
+    {
+      preHandler: optionalAuthenticate
+    },
+    async (request, reply) => {
     const parsedQuery = listPollsQuerySchema.safeParse(request.query);
 
     if (!parsedQuery.success) {
       return validationError(reply, parsedQuery.error);
     }
 
-    const items = await listPublicPolls(parsedQuery.data.limit);
+    const items = await listPublicPolls(parsedQuery.data.limit, request.user?.sub);
 
     return {
       items
     };
-  });
+    }
+  );
 
   app.post(
     '/polls',
@@ -114,6 +159,111 @@ export function registerPollRoutes(app: FastifyInstance) {
       return reply.status(201).send({
         poll
       });
+    }
+  );
+
+  app.get('/polls/:pollId/comments', async (request, reply) => {
+    const parsedParams = commentsParamsSchema.safeParse(request.params);
+
+    if (!parsedParams.success) {
+      return validationError(reply, parsedParams.error);
+    }
+
+    const parsedQuery = commentsQuerySchema.safeParse(request.query);
+
+    if (!parsedQuery.success) {
+      return validationError(reply, parsedQuery.error);
+    }
+
+    try {
+      return await listPollComments({
+        pollId: parsedParams.data.pollId,
+        limit: parsedQuery.data.limit
+      });
+    } catch (error) {
+      return pollError(reply, error);
+    }
+  });
+
+  app.post(
+    '/polls/:pollId/comments',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      const parsedParams = commentsParamsSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      const parsedBody = createCommentSchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        return validationError(reply, parsedBody.error);
+      }
+
+      try {
+        const result = await createPollComment({
+          pollId: parsedParams.data.pollId,
+          authorId: request.user.sub,
+          body: parsedBody.data.body
+        });
+
+        return reply.status(201).send(result);
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
+
+  app.post(
+    '/polls/:pollId/likes',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      const parsedParams = likeParamsSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      try {
+        const result = await likePoll({
+          pollId: parsedParams.data.pollId,
+          userId: request.user.sub
+        });
+
+        return reply.status(201).send(result);
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
+
+  app.delete(
+    '/polls/:pollId/likes',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      const parsedParams = likeParamsSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      try {
+        const result = await unlikePoll({
+          pollId: parsedParams.data.pollId,
+          userId: request.user.sub
+        });
+
+        return reply.send(result);
+      } catch (error) {
+        return pollError(reply, error);
+      }
     }
   );
 
@@ -140,6 +290,11 @@ export function registerPollRoutes(app: FastifyInstance) {
           pollId: parsedParams.data.pollId,
           optionId: parsedBody.data.optionId,
           voterId: request.user.sub
+        });
+
+        broadcastPollVoteCreated({
+          poll: result.poll,
+          vote: result.vote
         });
 
         return reply.status(201).send(result);

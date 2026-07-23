@@ -3,9 +3,18 @@ import 'package:flutter/material.dart';
 import 'poll_summary.dart';
 
 class PollCard extends StatelessWidget {
-  const PollCard({required this.poll, super.key});
+  const PollCard({
+    required this.poll,
+    this.onVote,
+    this.onOpenComments,
+    this.onToggleLike,
+    super.key,
+  });
 
   final PollSummary poll;
+  final ValueChanged<PollOptionSummary>? onVote;
+  final VoidCallback? onOpenComments;
+  final VoidCallback? onToggleLike;
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +40,7 @@ class PollCard extends StatelessWidget {
                   radius: 20,
                   backgroundColor: colors.primaryContainer,
                   child: Text(
-                    poll.authorName.substring(0, 1).toUpperCase(),
+                    poll.author.displayName.substring(0, 1).toUpperCase(),
                     style: TextStyle(color: colors.onPrimaryContainer),
                   ),
                 ),
@@ -41,13 +50,13 @@ class PollCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        poll.authorName,
+                        poll.author.displayName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: textTheme.labelLarge,
                       ),
                       Text(
-                        '@${poll.authorUsername} - ${poll.createdLabel}',
+                        '@${poll.author.username} - ${poll.createdLabel}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: textTheme.bodySmall?.copyWith(
@@ -77,6 +86,8 @@ class PollCard extends StatelessWidget {
                 option: poll.options[index],
                 totalVotes: poll.votesCount,
                 isSelected: poll.votedOptionIndex == index,
+                onTap:
+                    onVote == null ? null : () => onVote!(poll.options[index]),
               ),
               const SizedBox(height: 8),
             ],
@@ -86,16 +97,25 @@ class PollCard extends StatelessWidget {
                 _Metric(
                   icon: Icons.how_to_vote,
                   label: '${poll.votesCount} votes',
+                  animatedValue: poll.votesCount,
                 ),
                 const SizedBox(width: 16),
                 _Metric(
                   icon: Icons.mode_comment_outlined,
                   label: '${poll.commentsCount}',
+                  tooltip: 'Comments',
+                  onTap: onOpenComments,
                 ),
                 const SizedBox(width: 16),
                 _Metric(
-                  icon: Icons.favorite_border,
+                  icon: poll.viewerHasLiked
+                      ? Icons.favorite
+                      : Icons.favorite_border,
                   label: '${poll.likesCount}',
+                  animatedValue: poll.likesCount,
+                  isActive: poll.viewerHasLiked,
+                  tooltip: poll.viewerHasLiked ? 'Unlike' : 'Like',
+                  onTap: onToggleLike,
                 ),
               ],
             ),
@@ -111,17 +131,18 @@ class _PollOptionButton extends StatelessWidget {
     required this.option,
     required this.totalVotes,
     required this.isSelected,
+    this.onTap,
   });
 
   final PollOptionSummary option;
   final int totalVotes;
   final bool isSelected;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final percent = totalVotes == 0 ? 0.0 : option.votesCount / totalVotes;
-    final percentLabel = '${(percent * 100).round()}%';
 
     return Material(
       color: isSelected ? colors.primaryContainer : colors.surface,
@@ -133,15 +154,25 @@ class _PollOptionButton extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {},
+        onTap: onTap,
         child: Stack(
           children: [
             Positioned.fill(
-              child: FractionallySizedBox(
-                alignment: Alignment.centerLeft,
-                widthFactor: percent.clamp(0, 1),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween<double>(end: percent.clamp(0, 1)),
+                duration: const Duration(milliseconds: 350),
+                curve: Curves.easeOutCubic,
+                builder: (context, animatedPercent, child) {
+                  return FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: animatedPercent,
+                    child: child,
+                  );
+                },
                 child: ColoredBox(
-                  color: colors.primary.withOpacity(isSelected ? 0.18 : 0.08),
+                  color: colors.primary.withValues(
+                    alpha: isSelected ? 0.18 : 0.08,
+                  ),
                 ),
               ),
             ),
@@ -155,19 +186,25 @@ class _PollOptionButton extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontWeight: isSelected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w500,
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text(
-                    percentLabel,
-                    style: TextStyle(
-                      color: colors.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  TweenAnimationBuilder<double>(
+                    tween: Tween<double>(end: percent * 100),
+                    duration: const Duration(milliseconds: 350),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, animatedPercent, child) {
+                      return Text(
+                        '${animatedPercent.round()}%',
+                        style: TextStyle(
+                          color: colors.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -180,27 +217,75 @@ class _PollOptionButton extends StatelessWidget {
 }
 
 class _Metric extends StatelessWidget {
-  const _Metric({required this.icon, required this.label});
+  const _Metric({
+    required this.icon,
+    required this.label,
+    this.isActive = false,
+    this.animatedValue,
+    this.tooltip,
+    this.onTap,
+  });
 
   final IconData icon;
   final String label;
+  final bool isActive;
+  final int? animatedValue;
+  final String? tooltip;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    return Row(
+    final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 18, color: colors.onSurfaceVariant),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+        Icon(
+          icon,
+          size: 18,
+          color: isActive ? colors.error : colors.onSurfaceVariant,
         ),
+        const SizedBox(width: 6),
+        if (animatedValue == null)
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+          )
+        else
+          TweenAnimationBuilder<int>(
+            tween: IntTween(end: animatedValue!),
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) {
+              final suffix = label.endsWith(' votes') ? ' votes' : '';
+              return Text(
+                '$value$suffix',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: colors.onSurfaceVariant),
+              );
+            },
+          ),
       ],
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return Tooltip(
+      message: tooltip ?? label,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: content,
+        ),
+      ),
     );
   }
 }

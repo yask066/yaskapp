@@ -1,7 +1,11 @@
 import {
+  createPollCommentRecord,
   createPollRecord,
   createVoteRecord,
-  listPublicPollRecords
+  likePollRecord,
+  listPollCommentRecords,
+  listPublicPollRecords,
+  unlikePollRecord
 } from './polls.repository.js';
 import type { PollVisibility } from './polls.repository.js';
 
@@ -27,6 +31,27 @@ export type CreateVoteInput = {
   voterId: string;
 };
 
+export type LikePollInput = {
+  pollId: string;
+  userId: string;
+};
+
+export type UnlikePollInput = {
+  pollId: string;
+  userId: string;
+};
+
+export type ListPollCommentsInput = {
+  pollId: string;
+  limit: number;
+};
+
+export type CreatePollCommentInput = {
+  pollId: string;
+  authorId: string;
+  body: string;
+};
+
 function normalizeOptionalText(value: string | undefined) {
   const normalized = value?.trim();
 
@@ -45,8 +70,41 @@ export async function createPoll(input: CreatePollInput) {
   });
 }
 
-export async function listPublicPolls(limit: number) {
-  return listPublicPollRecords(limit);
+export async function listPublicPolls(limit: number, viewerId?: string) {
+  return listPublicPollRecords(limit, viewerId);
+}
+
+export async function listPollComments(input: ListPollCommentsInput) {
+  const result = await listPollCommentRecords(input);
+
+  if (result.status === 'not_found') {
+    throw new PollNotFoundError('Poll was not found.');
+  }
+
+  return {
+    items: result.items
+  };
+}
+
+export async function createPollComment(input: CreatePollCommentInput) {
+  const result = await createPollCommentRecord({
+    pollId: input.pollId,
+    authorId: input.authorId,
+    body: input.body.trim()
+  });
+
+  if (result.status === 'not_found') {
+    throw new PollNotFoundError('Poll was not found.');
+  }
+
+  if (!result.poll) {
+    throw new Error('Updated poll could not be loaded.');
+  }
+
+  return {
+    comment: result.comment,
+    poll: result.poll
+  };
 }
 
 export async function voteOnPoll(input: CreateVoteInput) {
@@ -75,5 +133,37 @@ export async function voteOnPoll(input: CreateVoteInput) {
       optionId: input.optionId,
       votesCount: result.optionVotesCount
     }
+  };
+}
+
+export async function likePoll(input: LikePollInput) {
+  const result = await likePollRecord(input);
+
+  if (result.status === 'not_found') {
+    throw new PollNotFoundError('Poll was not found.');
+  }
+
+  if (!result.poll) {
+    throw new Error('Updated poll could not be loaded.');
+  }
+
+  return {
+    poll: result.poll
+  };
+}
+
+export async function unlikePoll(input: UnlikePollInput) {
+  const result = await unlikePollRecord(input);
+
+  if (result.status === 'not_found') {
+    throw new PollNotFoundError('Poll was not found.');
+  }
+
+  if (!result.poll) {
+    throw new Error('Updated poll could not be loaded.');
+  }
+
+  return {
+    poll: result.poll
   };
 }

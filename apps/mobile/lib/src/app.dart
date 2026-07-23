@@ -1,12 +1,127 @@
 import 'package:flutter/material.dart';
 
-import 'features/feed/feed_screen.dart';
+import 'features/auth/auth_api_client.dart';
+import 'features/auth/auth_screen.dart';
+import 'features/auth/auth_session.dart';
+import 'features/auth/auth_session_store.dart';
+import 'features/home/home_screen.dart';
+import 'features/polls/polls_api_client.dart';
 
-class YaskappApp extends StatelessWidget {
-  const YaskappApp({super.key});
+class YaskappApp extends StatefulWidget {
+  const YaskappApp({
+    super.key,
+    this.authApiClient,
+    this.authSessionStore,
+    this.pollsApiClient,
+  });
+
+  final AuthApiClient? authApiClient;
+  final AuthSessionStore? authSessionStore;
+  final PollsApiClient? pollsApiClient;
+
+  @override
+  State<YaskappApp> createState() => _YaskappAppState();
+}
+
+class _YaskappAppState extends State<YaskappApp> {
+  late final AuthApiClient _authApiClient;
+  late final AuthSessionStore _authSessionStore;
+  late final bool _ownsAuthApiClient;
+  AuthSession? _session;
+  var _isBootstrapping = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _ownsAuthApiClient = widget.authApiClient == null;
+    _authApiClient = widget.authApiClient ?? AuthApiClient();
+    _authSessionStore =
+        widget.authSessionStore ?? const SecureAuthSessionStore();
+    _bootstrapSession();
+  }
+
+  @override
+  void dispose() {
+    if (_ownsAuthApiClient) {
+      _authApiClient.close();
+    }
+
+    super.dispose();
+  }
+
+  Future<void> _bootstrapSession() async {
+    try {
+      final accessToken = await _authSessionStore.readAccessToken();
+
+      if (accessToken == null || accessToken.isEmpty) {
+        return;
+      }
+
+      final user = await _authApiClient.me(accessToken: accessToken);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _session = AuthSession(
+          user: user,
+          accessToken: accessToken,
+          tokenType: 'Bearer',
+          expiresIn: 'persisted',
+        );
+      });
+    } catch (_) {
+      await _authSessionStore.clear();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isBootstrapping = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _setSession(AuthSession session) async {
+    await _authSessionStore.saveAccessToken(session.accessToken);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _session = session;
+    });
+  }
+
+  Future<void> _clearSession() async {
+    await _authSessionStore.clear();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _session = null;
+    });
+  }
+
+  void _updateUser(AuthUser user) {
+    final session = _session;
+
+    if (session == null) {
+      return;
+    }
+
+    setState(() {
+      _session = session.copyWith(user: user);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final session = _session;
+
     return MaterialApp(
       title: 'Yaskapp',
       theme: ThemeData(
@@ -15,7 +130,38 @@ class YaskappApp extends StatelessWidget {
         useMaterial3: true,
       ),
       debugShowCheckedModeBanner: false,
-      home: const FeedScreen(),
+      home: _isBootstrapping
+          ? const _AuthBootstrapScreen()
+          : session == null
+              ? AuthScreen(
+                  authApiClient: _authApiClient,
+                  onAuthenticated: _setSession,
+                )
+              : HomeScreen(
+                  session: session,
+                  authApiClient: _authApiClient,
+                  onLogout: _clearSession,
+                  onUserUpdated: _updateUser,
+                  pollsApiClient: widget.pollsApiClient,
+                ),
+    );
+  }
+}
+
+class _AuthBootstrapScreen extends StatelessWidget {
+  const _AuthBootstrapScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SizedBox.square(
+            dimension: 32,
+            child: CircularProgressIndicator(strokeWidth: 3),
+          ),
+        ),
+      ),
     );
   }
 }

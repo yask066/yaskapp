@@ -8,6 +8,7 @@ import { registerAuthRoutes } from './modules/auth/auth.routes.js';
 import { getCurrentUser } from './modules/auth/auth.utils.js';
 import { registerHealthRoutes } from './modules/health/health.routes.js';
 import { registerPollRoutes } from './modules/polls/polls.routes.js';
+import { registerProfileRoutes } from './modules/profiles/profiles.routes.js';
 import { registerRealtimeRoutes } from './realtime/realtime.routes.js';
 
 export function buildApp() {
@@ -33,6 +34,7 @@ export function buildApp() {
   registerAuthRoutes(app);
   registerHealthRoutes(app);
   registerPollRoutes(app);
+  registerProfileRoutes(app);
   registerRealtimeRoutes(app);
 
   return app;

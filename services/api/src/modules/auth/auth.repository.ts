@@ -15,6 +15,9 @@ export type UserWithProfileRow = {
   display_name: string;
   bio: string | null;
   avatar_object_key: string | null;
+  polls_count: number;
+  followers_count: number;
+  following_count: number;
 };
 
 export type PublicUser = {
@@ -28,6 +31,9 @@ export type PublicUser = {
     displayName: string;
     bio: string | null;
     avatarObjectKey: string | null;
+    pollsCount: number;
+    followersCount: number;
+    followingCount: number;
   };
 };
 
@@ -49,7 +55,10 @@ function mapUser(row: UserWithProfileRow): PublicUser {
     profile: {
       displayName: row.display_name,
       bio: row.bio,
-      avatarObjectKey: row.avatar_object_key
+      avatarObjectKey: row.avatar_object_key,
+      pollsCount: row.polls_count,
+      followersCount: row.followers_count,
+      followingCount: row.following_count
     }
   };
 }
@@ -74,7 +83,10 @@ async function findUserByIdWithClient(client: PoolClient, userId: string) {
         u.updated_at,
         p.display_name,
         p.bio,
-        p.avatar_object_key
+        p.avatar_object_key,
+        p.polls_count,
+        p.followers_count,
+        p.following_count
       FROM users u
       JOIN profiles p ON p.user_id = u.id
       WHERE u.id = $1
@@ -148,7 +160,10 @@ export async function findUserByEmailOrUsername(login: string) {
         u.updated_at,
         p.display_name,
         p.bio,
-        p.avatar_object_key
+        p.avatar_object_key,
+        p.polls_count,
+        p.followers_count,
+        p.following_count
       FROM users u
       JOIN profiles p ON p.user_id = u.id
       WHERE (u.email = $1 OR u.username = $1)
@@ -176,7 +191,10 @@ export async function findUserById(userId: string) {
         u.updated_at,
         p.display_name,
         p.bio,
-        p.avatar_object_key
+        p.avatar_object_key,
+        p.polls_count,
+        p.followers_count,
+        p.following_count
       FROM users u
       JOIN profiles p ON p.user_id = u.id
       WHERE u.id = $1

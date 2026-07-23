@@ -18,6 +18,16 @@ export type PollOption = {
   votesCount: number;
 };
 
+export type PollComment = {
+  id: string;
+  pollId: string;
+  author: PollAuthor;
+  body: string;
+  likesCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type Poll = {
   id: string;
   authorId: string;
@@ -30,6 +40,7 @@ export type Poll = {
   votesCount: number;
   commentsCount: number;
   likesCount: number;
+  viewerHasLiked: boolean;
   options: PollOption[];
   createdAt: string;
   updatedAt: string;
@@ -44,6 +55,12 @@ export type CreatePollRecordInput = {
   visibility: PollVisibility;
   options: string[];
   endsAt?: Date;
+};
+
+export type CreatePollCommentRecordInput = {
+  pollId: string;
+  authorId: string;
+  body: string;
 };
 
 type PollRow = {
@@ -73,7 +90,20 @@ type PollOptionRow = {
   votes_count: number;
 };
 
-function mapPoll(row: PollRow, options: PollOption[]): Poll {
+type PollCommentRow = {
+  id: string;
+  poll_id: string;
+  author_id: string;
+  author_username: string;
+  author_display_name: string;
+  author_avatar_object_key: string | null;
+  body: string;
+  likes_count: number;
+  created_at: Date;
+  updated_at: Date;
+};
+
+function mapPoll(row: PollRow, options: PollOption[], viewerLikedPollIds: Set<string>): Poll {
   return {
     id: row.id,
     authorId: row.author_id,
@@ -91,6 +121,7 @@ function mapPoll(row: PollRow, options: PollOption[]): Poll {
     votesCount: row.votes_count,
     commentsCount: row.comments_count,
     likesCount: row.likes_count,
+    viewerHasLiked: viewerLikedPollIds.has(row.id),
     options,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
@@ -104,6 +135,23 @@ function mapOption(row: PollOptionRow): PollOption {
     text: row.text,
     position: row.position,
     votesCount: row.votes_count
+  };
+}
+
+function mapComment(row: PollCommentRow): PollComment {
+  return {
+    id: row.id,
+    pollId: row.poll_id,
+    author: {
+      id: row.author_id,
+      username: row.author_username,
+      displayName: row.author_display_name,
+      avatarObjectKey: row.author_avatar_object_key
+    },
+    body: row.body,
+    likesCount: row.likes_count,
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString()
   };
 }
 
@@ -162,9 +210,32 @@ async function findOptionRowsByPollIds(client: PoolClient, pollIds: string[]) {
   return result.rows;
 }
 
-async function hydratePolls(client: PoolClient, pollIds: string[]) {
+async function findViewerLikedPollIds(
+  client: PoolClient,
+  pollIds: string[],
+  viewerId: string | undefined
+) {
+  if (!viewerId || pollIds.length === 0) {
+    return new Set<string>();
+  }
+
+  const result = await client.query<{ poll_id: string }>(
+    `
+      SELECT poll_id
+      FROM likes
+      WHERE user_id = $1
+        AND poll_id = ANY($2::uuid[])
+    `,
+    [viewerId, pollIds]
+  );
+
+  return new Set(result.rows.map((row) => row.poll_id));
+}
+
+async function hydratePolls(client: PoolClient, pollIds: string[], viewerId?: string) {
   const pollRows = await findPollRowsByIds(client, pollIds);
   const optionRows = await findOptionRowsByPollIds(client, pollIds);
+  const viewerLikedPollIds = await findViewerLikedPollIds(client, pollIds, viewerId);
   const optionsByPollId = new Map<string, PollOption[]>();
 
   for (const optionRow of optionRows) {
@@ -173,7 +244,9 @@ async function hydratePolls(client: PoolClient, pollIds: string[]) {
     optionsByPollId.set(optionRow.poll_id, options);
   }
 
-  return pollRows.map((row) => mapPoll(row, optionsByPollId.get(row.id) ?? []));
+  return pollRows.map((row) =>
+    mapPoll(row, optionsByPollId.get(row.id) ?? [], viewerLikedPollIds)
+  );
 }
 
 export async function createPollRecord(input: CreatePollRecordInput) {
@@ -223,6 +296,15 @@ export async function createPollRecord(input: CreatePollRecordInput) {
       );
     }
 
+    await client.query(
+      `
+        UPDATE profiles
+        SET polls_count = polls_count + 1
+        WHERE user_id = $1
+      `,
+      [input.authorId]
+    );
+
     const [poll] = await hydratePolls(client, [pollId]);
 
     if (!poll) {
@@ -240,7 +322,7 @@ export async function createPollRecord(input: CreatePollRecordInput) {
   }
 }
 
-export async function listPublicPollRecords(limit: number) {
+export async function listPublicPollRecords(limit: number, viewerId?: string) {
   const client = await db.connect();
 
   try {
@@ -258,7 +340,38 @@ export async function listPublicPollRecords(limit: number) {
 
     return hydratePolls(
       client,
-      result.rows.map((row) => row.id)
+      result.rows.map((row) => row.id),
+      viewerId
+    );
+  } finally {
+    client.release();
+  }
+}
+
+export async function listPollRecordsByAuthor(
+  authorId: string,
+  limit: number,
+  viewerId?: string
+) {
+  const client = await db.connect();
+
+  try {
+    const result = await client.query<{ id: string }>(
+      `
+        SELECT id
+        FROM polls
+        WHERE author_id = $1
+          AND deleted_at IS NULL
+        ORDER BY created_at DESC
+        LIMIT $2
+      `,
+      [authorId, limit]
+    );
+
+    return hydratePolls(
+      client,
+      result.rows.map((row) => row.id),
+      viewerId
     );
   } finally {
     client.release();
@@ -272,6 +385,278 @@ export async function findPollRecordById(pollId: string) {
     const [poll] = await hydratePolls(client, [pollId]);
 
     return poll ?? null;
+  } finally {
+    client.release();
+  }
+}
+
+export async function listPollCommentRecords(input: { pollId: string; limit: number }) {
+  const client = await db.connect();
+
+  try {
+    const pollResult = await client.query<{ id: string }>(
+      `
+        SELECT id
+        FROM polls
+        WHERE id = $1
+          AND visibility = 'public'
+          AND deleted_at IS NULL
+      `,
+      [input.pollId]
+    );
+
+    if (pollResult.rowCount === 0) {
+      return { status: 'not_found' as const };
+    }
+
+    const commentsResult = await client.query<PollCommentRow>(
+      `
+        SELECT
+          c.id,
+          c.poll_id,
+          c.author_id,
+          u.username::text AS author_username,
+          pr.display_name AS author_display_name,
+          pr.avatar_object_key AS author_avatar_object_key,
+          c.body,
+          c.likes_count,
+          c.created_at,
+          c.updated_at
+        FROM comments c
+        JOIN users u ON u.id = c.author_id
+        JOIN profiles pr ON pr.user_id = c.author_id
+        WHERE c.poll_id = $1
+          AND c.parent_comment_id IS NULL
+          AND c.deleted_at IS NULL
+        ORDER BY c.created_at ASC
+        LIMIT $2
+      `,
+      [input.pollId, input.limit]
+    );
+
+    return {
+      status: 'found' as const,
+      items: commentsResult.rows.map(mapComment)
+    };
+  } finally {
+    client.release();
+  }
+}
+
+export async function createPollCommentRecord(input: CreatePollCommentRecordInput) {
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const pollResult = await client.query<{ id: string }>(
+      `
+        SELECT id
+        FROM polls
+        WHERE id = $1
+          AND visibility = 'public'
+          AND deleted_at IS NULL
+        FOR UPDATE
+      `,
+      [input.pollId]
+    );
+
+    if (pollResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    const commentResult = await client.query<PollCommentRow>(
+      `
+        WITH inserted_comment AS (
+          INSERT INTO comments (poll_id, author_id, body)
+          VALUES ($1, $2, $3)
+          RETURNING
+            id,
+            poll_id,
+            author_id,
+            body,
+            likes_count,
+            created_at,
+            updated_at
+        )
+        SELECT
+          c.id,
+          c.poll_id,
+          c.author_id,
+          u.username::text AS author_username,
+          pr.display_name AS author_display_name,
+          pr.avatar_object_key AS author_avatar_object_key,
+          c.body,
+          c.likes_count,
+          c.created_at,
+          c.updated_at
+        FROM inserted_comment c
+        JOIN users u ON u.id = c.author_id
+        JOIN profiles pr ON pr.user_id = c.author_id
+      `,
+      [input.pollId, input.authorId, input.body]
+    );
+
+    const comment = commentResult.rows[0];
+
+    if (!comment) {
+      await client.query('ROLLBACK');
+      throw new Error('Comment insert did not return a row.');
+    }
+
+    await client.query(
+      `
+        UPDATE polls
+        SET comments_count = comments_count + 1
+        WHERE id = $1
+      `,
+      [input.pollId]
+    );
+
+    const [poll] = await hydratePolls(client, [input.pollId], input.authorId);
+
+    if (!poll) {
+      await client.query('ROLLBACK');
+      throw new Error('Updated poll could not be loaded.');
+    }
+
+    await client.query('COMMIT');
+
+    return {
+      status: 'created' as const,
+      comment: mapComment(comment),
+      poll
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function likePollRecord(input: {
+  pollId: string;
+  userId: string;
+}) {
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const pollResult = await client.query<{ id: string }>(
+      `
+        SELECT id
+        FROM polls
+        WHERE id = $1
+          AND visibility = 'public'
+          AND deleted_at IS NULL
+        FOR UPDATE
+      `,
+      [input.pollId]
+    );
+
+    if (pollResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    const likeResult = await client.query<{ id: string }>(
+      `
+        INSERT INTO likes (user_id, poll_id)
+        VALUES ($1, $2)
+        ON CONFLICT DO NOTHING
+        RETURNING id
+      `,
+      [input.userId, input.pollId]
+    );
+
+    if (likeResult.rowCount === 1) {
+      await client.query(
+        `
+          UPDATE polls
+          SET likes_count = likes_count + 1
+          WHERE id = $1
+        `,
+        [input.pollId]
+      );
+    }
+
+    const [poll] = await hydratePolls(client, [input.pollId], input.userId);
+
+    await client.query('COMMIT');
+
+    return {
+      status: 'liked' as const,
+      poll
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function unlikePollRecord(input: {
+  pollId: string;
+  userId: string;
+}) {
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const pollResult = await client.query<{ id: string }>(
+      `
+        SELECT id
+        FROM polls
+        WHERE id = $1
+          AND visibility = 'public'
+          AND deleted_at IS NULL
+        FOR UPDATE
+      `,
+      [input.pollId]
+    );
+
+    if (pollResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    const unlikeResult = await client.query<{ id: string }>(
+      `
+        DELETE FROM likes
+        WHERE user_id = $1
+          AND poll_id = $2
+        RETURNING id
+      `,
+      [input.userId, input.pollId]
+    );
+
+    if (unlikeResult.rowCount === 1) {
+      await client.query(
+        `
+          UPDATE polls
+          SET likes_count = GREATEST(likes_count - 1, 0)
+          WHERE id = $1
+        `,
+        [input.pollId]
+      );
+    }
+
+    const [poll] = await hydratePolls(client, [input.pollId], input.userId);
+
+    await client.query('COMMIT');
+
+    return {
+      status: 'unliked' as const,
+      poll
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
   } finally {
     client.release();
   }
