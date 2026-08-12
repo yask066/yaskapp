@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/user_avatar.dart';
 import '../auth/auth_api_client.dart';
 import '../auth/auth_session.dart';
 import '../polls/poll_card.dart';
@@ -35,7 +36,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late Future<List<PollSummary>> _myPollsFuture;
   late final bool _ownsPollsApiClient;
   List<PollSummary> _myPolls = [];
+  List<PollSummary> _likedPolls = [];
   var _hasLoadedMyPolls = false;
+  var _hasLoadedLikedPolls = false;
+  var _selectedTab = 0;
+  Future<List<PollSummary>>? _likedPollsFuture;
   final Set<String> _likingPollIds = {};
 
   @override
@@ -57,6 +62,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<List<PollSummary>> _loadMyPolls() {
     return _pollsApiClient.listMyPolls(accessToken: widget.accessToken);
+  }
+
+  Future<List<PollSummary>> _loadLikedPolls() async {
+    final polls = await _pollsApiClient.listPolls(
+      limit: 50,
+      accessToken: widget.accessToken,
+    );
+    return polls.where((poll) => poll.viewerHasLiked).toList();
+  }
+
+  void _selectTab(int index) {
+    if (_selectedTab == index) {
+      return;
+    }
+
+    if (index == 1 && _likedPollsFuture == null) {
+      _likedPollsFuture = _loadLikedPolls();
+    }
+
+    setState(() {
+      _selectedTab = index;
+    });
   }
 
   void _syncMyPolls(List<PollSummary> polls) {
@@ -131,6 +158,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           user: widget.user,
           accessToken: widget.accessToken,
           authApiClient: widget.authApiClient,
+          onLogout: widget.onLogout,
         ),
       ),
     );
@@ -172,134 +200,209 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     final displayName = widget.user.profile.displayName;
     final bio = widget.user.profile.bio;
+    const navy = Color(0xFF08089A);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        actions: [
-          IconButton(
-            tooltip: 'Edit profile',
-            onPressed: () => _openEditProfile(context),
-            icon: const Icon(Icons.edit_outlined),
-          ),
-          IconButton(
-            tooltip: 'Logout',
-            onPressed: widget.onLogout,
-            icon: const Icon(Icons.logout),
-          ),
-        ],
-      ),
+      backgroundColor: const Color(0xFFF7F8FC),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 36,
-                  backgroundColor: colors.primaryContainer,
-                  child: Text(
-                    displayName.substring(0, 1).toUpperCase(),
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: colors.onPrimaryContainer,
-                          fontWeight: FontWeight.w800,
-                        ),
-                  ),
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              pinned: true,
+              toolbarHeight: 72,
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              titleSpacing: 20,
+              title: Semantics(
+                label: 'Yaskapp',
+                image: true,
+                child: Image.asset(
+                  'assets/branding/yaskapp_logo.png',
+                  width: 72,
+                  height: 40,
+                  fit: BoxFit.contain,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '@${widget.user.username}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: colors.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            if (bio != null && bio.trim().isNotEmpty) ...[
-              Text(
-                bio,
-                style: Theme.of(context).textTheme.bodyMedium,
               ),
-              const SizedBox(height: 20),
-            ],
-            _ProfileSection(
-              children: [
-                _ProfileRow(
-                  icon: Icons.mail_outline,
-                  label: 'Email',
-                  value: widget.user.email,
+              actions: [
+                PopupMenuButton<String>(
+                  tooltip: 'Settings',
+                  icon: const Icon(Icons.settings_outlined, size: 24),
+                  constraints: const BoxConstraints.tightFor(
+                    width: 40,
+                    height: 40,
+                  ),
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      _openEditProfile(context);
+                    } else if (value == 'logout') {
+                      widget.onLogout();
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Text('Edit profile'),
+                    ),
+                    PopupMenuItem(
+                      value: 'logout',
+                      child: Text('Logout'),
+                    ),
+                  ],
                 ),
-                _ProfileRow(
-                  icon: Icons.verified_user_outlined,
-                  label: 'Status',
-                  value: widget.user.status,
-                ),
+                const SizedBox(width: 20),
               ],
             ),
-            const SizedBox(height: 16),
-            _ProfileSection(
-              children: [
-                _ProfileMetric(
-                  label: 'Polls',
-                  value: widget.user.profile.pollsCount.toString(),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              UserAvatar(
+                                displayName: displayName,
+                                username: widget.user.username,
+                                imageUrl: widget.user.profile.avatarObjectKey,
+                                radius: 40,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      displayName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Color(0xFF10142D),
+                                        fontSize: 22,
+                                        height: 26 / 22,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '@${widget.user.username}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Color(0xFF667085),
+                                        fontSize: 15,
+                                        height: 20 / 15,
+                                      ),
+                                    ),
+                                    if (bio != null && bio.trim().isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        bio,
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Color(0xFF344054),
+                                          fontSize: 15,
+                                          height: 20 / 15,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            height: 56,
+                            child: Row(
+                              children: [
+                                _ProfileMetric(
+                                  label: 'Polls',
+                                  value: widget.user.profile.pollsCount.toString(),
+                                ),
+                                const _ProfileDivider(),
+                                _ProfileMetric(
+                                  label: 'Followers',
+                                  value: widget.user.profile.followersCount.toString(),
+                                ),
+                                const _ProfileDivider(),
+                                _ProfileMetric(
+                                  label: 'Following',
+                                  value: widget.user.profile.followingCount.toString(),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          SizedBox(
+                            height: 48,
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () => _openEditProfile(context),
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                              label: const Text('Edit profile'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: navy,
+                                side: const BorderSide(color: navy),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                textStyle: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      height: 52,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _ProfileTab(
+                              label: 'My polls',
+                              selected: _selectedTab == 0,
+                              onTap: () => _selectTab(0),
+                            ),
+                          ),
+                          Expanded(
+                            child: _ProfileTab(
+                              label: 'Liked polls',
+                              selected: _selectedTab == 1,
+                              onTap: () => _selectTab(1),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                _ProfileMetric(
-                  label: 'Followers',
-                  value: widget.user.profile.followersCount.toString(),
-                ),
-                _ProfileMetric(
-                  label: 'Following',
-                  value: widget.user.profile.followingCount.toString(),
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: () => _openEditProfile(context),
-              icon: const Icon(Icons.edit_outlined),
-              label: const Text('Edit profile'),
-            ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: widget.onLogout,
-              icon: const Icon(Icons.logout),
-              label: const Text('Logout'),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'My polls',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 12),
-            FutureBuilder<List<PollSummary>>(
-              future: _myPollsFuture,
-              builder: (context, snapshot) {
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                child: FutureBuilder<List<PollSummary>>(
+                  future: _selectedTab == 0
+                      ? _myPollsFuture
+                      : _likedPollsFuture!,
+                  builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting &&
-                    !_hasLoadedMyPolls) {
+                    (_selectedTab == 0
+                        ? !_hasLoadedMyPolls
+                        : !_hasLoadedLikedPolls)) {
                   return const Padding(
                     padding: EdgeInsets.symmetric(vertical: 24),
                     child: Center(
@@ -311,16 +414,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   );
                 }
 
-                if (snapshot.hasError && !_hasLoadedMyPolls) {
-                  return _MyPollsErrorState(onRetry: _retryMyPolls);
+                if (snapshot.hasError &&
+                    (_selectedTab == 0
+                        ? !_hasLoadedMyPolls
+                        : !_hasLoadedLikedPolls)) {
+                  return _MyPollsErrorState(
+                    onRetry: _selectedTab == 0
+                        ? _retryMyPolls
+                        : () {
+                            setState(() {
+                              _likedPollsFuture = _loadLikedPolls();
+                            });
+                          },
+                  );
                 }
 
-                if (!_hasLoadedMyPolls && snapshot.hasData) {
-                  _myPolls = snapshot.data ?? [];
-                  _hasLoadedMyPolls = true;
+                if (snapshot.hasData) {
+                  if (_selectedTab == 0) {
+                    _myPolls = snapshot.data ?? [];
+                    _hasLoadedMyPolls = true;
+                  } else {
+                    _likedPolls = snapshot.data ?? [];
+                    _hasLoadedLikedPolls = true;
+                  }
                 }
 
-                final polls = _myPolls;
+                final polls = _selectedTab == 0 ? _myPolls : _likedPolls;
 
                 if (polls.isEmpty) {
                   return const _MyPollsEmptyState();
@@ -331,16 +450,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     for (final poll in polls) ...[
                       PollCard(
                         poll: poll,
+                        compact: true,
                         onOpenComments: () => _openComments(poll),
                         onToggleLike: _likingPollIds.contains(poll.id)
                             ? null
                             : () => _toggleLike(poll),
+                        isLiking: _likingPollIds.contains(poll.id),
                       ),
                       const SizedBox(height: 12),
                     ],
                   ],
                 );
-              },
+                  },
+                ),
+              ),
             ),
           ],
         ),
@@ -424,24 +547,81 @@ class _ProfileMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(color: colors.onSurfaceVariant),
-            ),
-          ),
           Text(
             value,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.w800),
+            style: const TextStyle(
+              color: Color(0xFF10142D),
+              fontSize: 18,
+              height: 22 / 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF475467),
+              fontSize: 13,
+              height: 17 / 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileDivider extends StatelessWidget {
+  const _ProfileDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      height: 36,
+      child: VerticalDivider(
+        width: 1,
+        thickness: 1,
+        color: Color(0xFFE4E7EC),
+      ),
+    );
+  }
+}
+
+class _ProfileTab extends StatelessWidget {
+  const _ProfileTab({
+    required this.label,
+    required this.onTap,
+    this.selected = false,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: selected
+                  ? const Color(0xFF08089A)
+                  : const Color(0xFF475467),
+              fontSize: 14,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
+          const Spacer(),
+          Container(
+            height: 2,
+            color: selected ? const Color(0xFF08089A) : Colors.transparent,
           ),
         ],
       ),

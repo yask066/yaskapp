@@ -13,7 +13,28 @@ import { registerRealtimeRoutes } from './realtime/realtime.routes.js';
 
 export function buildApp() {
   const app = Fastify({
-    logger: env.NODE_ENV !== 'test'
+    logger:
+      env.NODE_ENV !== 'test'
+        ? {
+            redact: {
+              paths: [
+                'req.headers.authorization',
+                'req.headers.cookie',
+                'req.body.password',
+                'req.body.accessToken',
+                'req.body.refreshToken',
+                'req.body.token',
+                'password',
+                'accessToken',
+                'refreshToken',
+                'JWT_SECRET',
+                'S3_SECRET_ACCESS_KEY',
+                'MINIO_ROOT_PASSWORD'
+              ],
+              censor: '[REDACTED]'
+            }
+          }
+        : false
   });
 
   app.register(cors, {

@@ -109,163 +109,365 @@ class _AuthScreenState extends State<AuthScreen> {
     });
   }
 
+  void _showUnavailable(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    const accentColor = Color(0xFFE66F00);
+    const fieldFillColor = Color(0xFFE8EDF3);
 
     return Scaffold(
+      backgroundColor: const Color(0xFFEFF3F8),
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Icon(Icons.how_to_vote, color: colors.primary, size: 44),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Yaskapp',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineMedium
-                        ?.copyWith(fontWeight: FontWeight.w800),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight - 46,
+                    maxWidth: 520,
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Sign in to vote and create polls.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: colors.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 24),
-                  SegmentedButton<_AuthMode>(
-                    segments: const [
-                      ButtonSegment(
-                        value: _AuthMode.login,
-                        icon: Icon(Icons.login),
-                        label: Text('Login'),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                    Semantics(
+                      label: 'Yaskapp',
+                      image: true,
+                      child: Image.asset(
+                        'assets/branding/yaskapp_logo.png',
+                        width: 210,
+                        height: 112,
+                        fit: BoxFit.contain,
                       ),
-                      ButtonSegment(
-                        value: _AuthMode.register,
-                        icon: Icon(Icons.person_add_alt),
-                        label: Text('Register'),
-                      ),
-                    ],
-                    selected: {_mode},
-                    onSelectionChanged: (selection) {
-                      _setMode(selection.first);
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (_isRegistering) ...[
-                          TextFormField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            autofillHints: const [AutofillHints.email],
-                            decoration: const InputDecoration(
-                              labelText: 'Email',
-                              prefixIcon: Icon(Icons.mail_outline),
-                              border: OutlineInputBorder(),
-                            ),
-                            validator: _required,
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _usernameController,
-                            autofillHints: const [AutofillHints.username],
-                            decoration: const InputDecoration(
-                              labelText: 'Username',
-                              prefixIcon: Icon(Icons.alternate_email),
-                              border: OutlineInputBorder(),
-                            ),
-                            validator: _required,
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _displayNameController,
-                            decoration: const InputDecoration(
-                              labelText: 'Display name',
-                              prefixIcon: Icon(Icons.badge_outlined),
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                        ] else ...[
-                          TextFormField(
-                            controller: _loginController,
-                            autofillHints: const [
-                              AutofillHints.username,
-                              AutofillHints.email,
-                            ],
-                            decoration: const InputDecoration(
-                              labelText: 'Email or username',
-                              prefixIcon: Icon(Icons.person_outline),
-                              border: OutlineInputBorder(),
-                            ),
-                            validator: _required,
-                          ),
-                        ],
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _passwordController,
-                          obscureText: true,
-                          autofillHints: const [AutofillHints.password],
-                          decoration: const InputDecoration(
-                            labelText: 'Password',
-                            prefixIcon: Icon(Icons.lock_outline),
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Required';
-                            }
-
-                            if (_isRegistering && value.length < 8) {
-                              return 'Use at least 8 characters';
-                            }
-
-                            return null;
-                          },
-                        ),
-                        if (_errorMessage != null) ...[
-                          const SizedBox(height: 12),
-                          Text(
-                            _errorMessage!,
-                            style: TextStyle(color: colors.error),
-                          ),
-                        ],
-                        const SizedBox(height: 18),
-                        FilledButton.icon(
-                          onPressed: _isSubmitting ? null : _submit,
-                          icon: _isSubmitting
-                              ? const SizedBox.square(
-                                  dimension: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Icon(
-                                  _isRegistering
-                                      ? Icons.person_add_alt
-                                      : Icons.login,
-                                ),
-                          label: Text(_isRegistering ? 'Register' : 'Login'),
-                        ),
-                      ],
                     ),
+                    const SizedBox(height: 22),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(32, 34, 32, 30),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x22000000),
+                            blurRadius: 24,
+                            offset: Offset(0, 12),
+                          ),
+                        ],
+                      ),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              _isRegistering ? 'REGISTER' : 'LOGIN',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineMedium
+                                  ?.copyWith(
+                                    color: accentColor,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1.2,
+                                  ),
+                            ),
+                            const SizedBox(height: 28),
+                            if (_isRegistering) ...[
+                              TextFormField(
+                                controller: _emailController,
+                                keyboardType: TextInputType.emailAddress,
+                                autofillHints: const [AutofillHints.email],
+                                decoration: _fieldDecoration(
+                                  'Email',
+                                  Icons.mail_outline,
+                                  fieldFillColor,
+                                ),
+                                validator: _required,
+                              ),
+                              const SizedBox(height: 14),
+                              TextFormField(
+                                controller: _usernameController,
+                                autofillHints: const [AutofillHints.username],
+                                decoration: _fieldDecoration(
+                                  'Username',
+                                  Icons.alternate_email,
+                                  fieldFillColor,
+                                ),
+                                validator: _required,
+                              ),
+                              const SizedBox(height: 14),
+                              TextFormField(
+                                controller: _displayNameController,
+                                decoration: _fieldDecoration(
+                                  'Display name',
+                                  Icons.badge_outlined,
+                                  fieldFillColor,
+                                ),
+                              ),
+                            ] else ...[
+                              TextFormField(
+                                controller: _loginController,
+                                autofillHints: const [
+                                  AutofillHints.username,
+                                  AutofillHints.email,
+                                ],
+                                decoration: _fieldDecoration(
+                                  'Email or username',
+                                  Icons.person_outline,
+                                  fieldFillColor,
+                                ),
+                                validator: _required,
+                              ),
+                            ],
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: _passwordController,
+                              obscureText: true,
+                              autofillHints: const [AutofillHints.password],
+                              decoration: _fieldDecoration(
+                                'Password',
+                                Icons.lock_outline,
+                                fieldFillColor,
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Required';
+                                }
+
+                                if (_isRegistering && value.length < 8) {
+                                  return 'Use at least 8 characters';
+                                }
+
+                                return null;
+                              },
+                            ),
+                            if (!_isRegistering)
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: () => _showUnavailable(
+                                    'Password recovery is not available yet.',
+                                  ),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: const Color(0xFF9A775E),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 10,
+                                    ),
+                                  ),
+                                  child: const Text('Forgot password?'),
+                                ),
+                              ),
+                            if (_errorMessage != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                _errorMessage!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: colors.error),
+                              ),
+                            ],
+                            if (_isRegistering) ...[
+                              const SizedBox(height: 12),
+                              Text(
+                                'Log in with',
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                              const SizedBox(height: 12),
+                              const _SocialButtons(),
+                              const SizedBox(height: 20),
+                            ],
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: 56,
+                              child: FilledButton(
+                                onPressed: _isSubmitting ? null : _submit,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: accentColor,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(28),
+                                  ),
+                                  textStyle: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                child: _isSubmitting
+                                    ? const SizedBox.square(
+                                        dimension: 22,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : _isRegistering
+                                        ? const Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(Icons.person_add_alt),
+                                              SizedBox(width: 8),
+                                              Text('REGISTER'),
+                                            ],
+                                          )
+                                        : const Text('LOGIN'),
+                              ),
+                            ),
+                            if (!_isRegistering)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 28),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      'Log in with',
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    const _SocialButtons(),
+                                  ],
+                                ),
+                              ),
+                            const SizedBox(height: 20),
+                            TextButton(
+                              onPressed: () {
+                                _setMode(
+                                  _isRegistering
+                                      ? _AuthMode.login
+                                      : _AuthMode.register,
+                                );
+                              },
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.black87,
+                              ),
+                              child: Text(
+                                _isRegistering ? 'Back to Login' : 'Sign Up',
+                                style: const TextStyle(fontSize: 18),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
+    );
+  }
+}
+
+InputDecoration _fieldDecoration(
+  String label,
+  IconData icon,
+  Color fillColor,
+) {
+  final border = OutlineInputBorder(
+    borderRadius: BorderRadius.circular(28),
+    borderSide: BorderSide.none,
+  );
+
+  return InputDecoration(
+    labelText: label,
+    filled: true,
+    fillColor: fillColor,
+    prefixIcon: Icon(icon, color: Colors.black87),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+    border: border,
+    enabledBorder: border,
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(28),
+      borderSide: const BorderSide(color: Color(0xFFE66F00), width: 1.5),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(28),
+      borderSide: const BorderSide(color: Colors.redAccent),
+    ),
+    focusedErrorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(28),
+      borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+    ),
+  );
+}
+
+class _SocialButtons extends StatelessWidget {
+  const _SocialButtons();
+
+  @override
+  Widget build(BuildContext context) {
+    final showUnavailable = () {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Social login is not available yet.')),
+      );
+    };
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _SocialPlaceholder(
+          icon: Icons.facebook,
+          tooltip: 'Continue with Facebook',
+          onTap: showUnavailable,
+        ),
+        const SizedBox(width: 16),
+        _SocialPlaceholder(
+          icon: Icons.close,
+          tooltip: 'Continue with X',
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+          onTap: showUnavailable,
+        ),
+        const SizedBox(width: 16),
+        _SocialPlaceholder(
+          icon: Icons.g_mobiledata,
+          tooltip: 'Continue with Google',
+          onTap: showUnavailable,
+        ),
+      ],
+    );
+  }
+}
+
+class _SocialPlaceholder extends StatelessWidget {
+  const _SocialPlaceholder({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+    this.backgroundColor = const Color(0xFFE3E8EF),
+    this.foregroundColor = const Color(0xFF9AA5B1),
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  final Color backgroundColor;
+  final Color foregroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onTap,
+      tooltip: tooltip,
+      style: IconButton.styleFrom(
+        backgroundColor: backgroundColor,
+        foregroundColor: foregroundColor,
+        fixedSize: const Size(56, 56),
+      ),
+      icon: Icon(icon, size: 28),
     );
   }
 }

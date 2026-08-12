@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/user_avatar.dart';
 import 'poll_card.dart';
 import 'poll_summary.dart';
 import 'polls_api_client.dart';
@@ -131,59 +132,110 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
         _closeWithResult();
       },
       child: Scaffold(
-        appBar: AppBar(
-          leading: BackButton(onPressed: _closeWithResult),
-          title: const Text('Comments'),
-        ),
+        backgroundColor: Colors.white,
         body: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              PollCard(poll: _poll),
-              const SizedBox(height: 20),
-              Text(
-                'Comments',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 24, 8),
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'Back',
+                      onPressed: _closeWithResult,
+                      icon: const Icon(Icons.arrow_back_ios_new),
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      'Comments',
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        color: const Color(0xFF05008A),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              FutureBuilder<List<PollCommentSummary>>(
-                future: _commentsFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const _CommentsLoadingState();
-                  }
+              Expanded(
+                child: FutureBuilder<List<PollCommentSummary>>(
+                  future: _commentsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return ListView(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                        children: [
+                          PollCard(poll: _poll),
+                          const _CommentsLoadingState(),
+                        ],
+                      );
+                    }
 
-                  if (snapshot.hasError) {
-                    return _CommentsErrorState(onRetry: _retryComments);
-                  }
+                    if (snapshot.hasError) {
+                      return ListView(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                        children: [
+                          PollCard(poll: _poll),
+                          _CommentsErrorState(onRetry: _retryComments),
+                        ],
+                      );
+                    }
 
-                  final comments = _comments ?? snapshot.data ?? [];
+                    final comments = _comments ?? snapshot.data ?? [];
 
-                  if (comments.isEmpty) {
-                    return const _CommentsEmptyState();
-                  }
-
-                  return Column(
-                    children: [
-                      for (final comment in comments) ...[
-                        _CommentTile(comment: comment),
-                        const SizedBox(height: 12),
+                    return ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                      children: [
+                        PollCard(poll: _poll),
+                        const SizedBox(height: 26),
+                        Row(
+                          children: [
+                            Text(
+                              '${comments.length} comments',
+                              style: const TextStyle(
+                                color: Color(0xFF667085),
+                                fontSize: 18,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const Spacer(),
+                            const Text(
+                              'Newest',
+                              style: TextStyle(
+                                color: Color(0xFF667085),
+                                fontSize: 17,
+                              ),
+                            ),
+                            const Icon(
+                              Icons.keyboard_arrow_down,
+                              color: Color(0xFF667085),
+                            ),
+                          ],
+                        ),
+                        const Divider(
+                          height: 32,
+                          color: Color(0xFFE4E7EC),
+                        ),
+                        if (comments.isEmpty)
+                          const _CommentsEmptyState()
+                        else
+                          for (final comment in comments) ...[
+                            _CommentTile(comment: comment),
+                            const Divider(
+                              height: 1,
+                              color: Color(0xFFE4E7EC),
+                            ),
+                          ],
                       ],
-                    ],
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ],
           ),
         ),
         bottomNavigationBar: SafeArea(
-          minimum: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            bottom: 12 + MediaQuery.viewInsetsOf(context).bottom,
-          ),
+          top: false,
           child: _CommentComposer(
             controller: _commentController,
             isSubmitting: _isSubmittingComment,
@@ -212,13 +264,13 @@ class _CommentComposer extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colors.surface,
+        color: Colors.white,
         border: Border(top: BorderSide(color: colors.outlineVariant)),
       ),
       child: Padding(
-        padding: const EdgeInsets.only(top: 12),
+        padding: const EdgeInsets.fromLTRB(24, 14, 24, 16),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
               child: TextField(
@@ -228,24 +280,59 @@ class _CommentComposer extends StatelessWidget {
                 maxLines: 4,
                 maxLength: 1000,
                 textInputAction: TextInputAction.newline,
-                decoration: const InputDecoration(
-                  hintText: 'Add a comment',
+                decoration: InputDecoration(
+                  hintText: 'Add a comment...',
                   counterText: '',
-                  border: OutlineInputBorder(),
-                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 22,
+                    vertical: 16,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFD0D5DD),
+                      width: 2,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFD0D5DD),
+                      width: 2,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF05008A),
+                      width: 2,
+                    ),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            IconButton.filled(
+            const SizedBox(width: 12),
+            IconButton(
               tooltip: 'Post comment',
               onPressed: isSubmitting ? null : onSubmit,
+              style: IconButton.styleFrom(
+                backgroundColor: const Color(0xFF05008A),
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: const Color(0xFFBFC2D8),
+                disabledForegroundColor: Colors.white,
+                fixedSize: const Size(62, 62),
+              ),
               icon: isSubmitting
                   ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      dimension: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
-                  : const Icon(Icons.send),
+                  : const Icon(Icons.send_rounded, size: 28),
             ),
           ],
         ),
@@ -279,7 +366,7 @@ class _CommentsEmptyState extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
+      padding: const EdgeInsets.symmetric(vertical: 48),
       child: Column(
         children: [
           Icon(Icons.mode_comment_outlined, color: colors.onSurfaceVariant),
@@ -310,7 +397,7 @@ class _CommentsErrorState extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
       child: Column(
         children: [
           Icon(Icons.cloud_off_outlined, color: colors.onSurfaceVariant),
@@ -338,50 +425,94 @@ class _CommentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    const navy = Color(0xFF05008A);
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: colors.secondaryContainer,
-          child: Text(
-            comment.author.displayName.substring(0, 1).toUpperCase(),
-            style: TextStyle(color: colors.onSecondaryContainer),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 18, 0, 18),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          UserAvatar(
+            displayName: comment.author.displayName,
+            username: comment.author.username,
+            imageUrl: comment.author.avatarObjectKey,
+            radius: 24,
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      comment.author.displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.labelLarge,
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        comment.author.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: navy,
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    comment.createdLabel,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colors.onSurfaceVariant,
+                    const SizedBox(width: 8),
+                    Text(
+                      comment.createdLabel,
+                      style: const TextStyle(
+                        color: Color(0xFF6D7888),
+                        fontSize: 16,
+                      ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  comment.body,
+                  style: const TextStyle(
+                    color: navy,
+                    fontSize: 18,
+                    height: 1.2,
                   ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(comment.body, style: textTheme.bodyMedium),
-            ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.favorite_border,
+                      size: 22,
+                      color: Colors.blueGrey.shade600,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Like',
+                      style: TextStyle(
+                        color: Colors.blueGrey.shade700,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    Text(
+                      'Reply',
+                      style: TextStyle(
+                        color: Colors.blueGrey.shade700,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const Spacer(),
+                    const Icon(
+                      Icons.more_horiz,
+                      color: Color(0xFF101828),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

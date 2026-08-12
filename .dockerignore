@@ -1,0 +1,17 @@
+.git
+.idea
+.codex
+.agents
+node_modules
+**/node_modules
+**/dist
+**/build
+apps/mobile/.dart_tool
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/pubspec.lock
+services/api/.env
+services/api/.env.*
+!services/api/.env.staging.example
+**/*.test.ts
+**/test

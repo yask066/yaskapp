@@ -121,11 +121,37 @@ class _YaskappAppState extends State<YaskappApp> {
   @override
   Widget build(BuildContext context) {
     final session = _session;
+    const brandColor = Color(0xFF05008A);
 
     return MaterialApp(
       title: 'Yaskapp',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2F6FED)),
+        colorScheme: const ColorScheme.light(
+          primary: brandColor,
+          onPrimary: Colors.white,
+          primaryContainer: brandColor,
+          onPrimaryContainer: Colors.white,
+          secondary: brandColor,
+          onSecondary: Colors.white,
+          secondaryContainer: brandColor,
+          onSecondaryContainer: Colors.white,
+          tertiary: brandColor,
+          onTertiary: Colors.white,
+          tertiaryContainer: brandColor,
+          onTertiaryContainer: Colors.white,
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            backgroundColor: brandColor,
+            foregroundColor: Colors.white,
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: brandColor,
+            side: const BorderSide(color: brandColor),
+          ),
+        ),
         scaffoldBackgroundColor: const Color(0xFFF7F8FA),
         useMaterial3: true,
       ),

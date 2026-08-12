@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/user_avatar.dart';
 import 'poll_summary.dart';
 
 class PollCard extends StatelessWidget {
@@ -8,6 +9,9 @@ class PollCard extends StatelessWidget {
     this.onVote,
     this.onOpenComments,
     this.onToggleLike,
+    this.isVoting = false,
+    this.isLiking = false,
+    this.compact = false,
     super.key,
   });
 
@@ -15,34 +19,63 @@ class PollCard extends StatelessWidget {
   final ValueChanged<PollOptionSummary>? onVote;
   final VoidCallback? onOpenComments;
   final VoidCallback? onToggleLike;
+  final bool isVoting;
+  final bool isLiking;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final colors = Theme.of(context).colorScheme;
+    final rankedOptionIndices = List<int>.generate(
+      poll.options.length,
+      (index) => index,
+    )..sort(
+        (left, right) => poll.options[right].votesCount.compareTo(
+          poll.options[left].votesCount,
+        ),
+      );
+    final rankByOptionIndex = <int, int>{};
+
+    if (poll.votesCount > 0) {
+      var denseRank = -1;
+      int? previousVotes;
+
+      for (final optionIndex in rankedOptionIndices) {
+        final optionVotes = poll.options[optionIndex].votesCount;
+
+        if (optionVotes <= 0) {
+          break;
+        }
+
+        if (previousVotes != optionVotes) {
+          denseRank++;
+          previousVotes = optionVotes;
+        }
+
+        rankByOptionIndex[optionIndex] = denseRank;
+      }
+    }
 
     return Card(
       color: Colors.white,
       margin: EdgeInsets.zero,
-      elevation: 0,
+      elevation: 2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: colors.outlineVariant),
+      borderRadius: BorderRadius.circular(compact ? 20 : 22),
       ),
+      shadowColor: const Color(0x22000000),
+      clipBehavior: Clip.antiAlias,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: colors.primaryContainer,
-                  child: Text(
-                    poll.author.displayName.substring(0, 1).toUpperCase(),
-                    style: TextStyle(color: colors.onPrimaryContainer),
-                  ),
+                UserAvatar(
+                  displayName: poll.author.displayName,
+                  username: poll.author.username,
+                  imageUrl: poll.author.avatarObjectKey,
+                  radius: compact ? 22 : 22,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -53,60 +86,84 @@ class PollCard extends StatelessWidget {
                         poll.author.displayName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: textTheme.labelLarge,
+                        style: TextStyle(
+                          color: Color(0xFF10142D),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       Text(
-                        '@${poll.author.username} - ${poll.createdLabel}',
+                        '@${poll.author.username} \u00B7 ${poll.createdLabel}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
+                        style: TextStyle(
+                          color: Color(0xFF667085),
+                          fontSize: 13,
                         ),
                       ),
                     ],
                   ),
                 ),
-                IconButton(
+                SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: IconButton(
                   tooltip: 'More',
                   onPressed: () {},
-                  icon: const Icon(Icons.more_horiz),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 40,
+                    height: 40,
+                  ),
+                    icon: Icon(Icons.more_horiz, size: compact ? 20 : 22),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: compact ? 16 : 20),
             Text(
               poll.question,
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Color(0xFF10142D),
+                fontSize: 15,
+                height: compact ? 22 / 15 : 24 / 15,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: compact ? 14 : 16),
             for (var index = 0; index < poll.options.length; index++) ...[
               _PollOptionButton(
                 option: poll.options[index],
                 totalVotes: poll.votesCount,
                 isSelected: poll.votedOptionIndex == index,
+                rank: rankByOptionIndex[index],
+                compact: compact,
+                profileVariant: compact,
+                isLoading: isVoting,
                 onTap:
                     onVote == null ? null : () => onVote!(poll.options[index]),
               ),
               const SizedBox(height: 8),
             ],
-            const SizedBox(height: 8),
+            SizedBox(height: compact ? 16 : 18),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _Metric(
-                  icon: Icons.how_to_vote,
+                  icon: Icons.people_outline,
                   label: '${poll.votesCount} votes',
                   animatedValue: poll.votesCount,
+                  dense: compact,
                 ),
-                const SizedBox(width: 16),
                 _Metric(
                   icon: Icons.mode_comment_outlined,
                   label: '${poll.commentsCount}',
                   tooltip: 'Comments',
                   onTap: onOpenComments,
+                  dense: compact,
                 ),
-                const SizedBox(width: 16),
                 _Metric(
                   icon: poll.viewerHasLiked
                       ? Icons.favorite
@@ -114,8 +171,16 @@ class PollCard extends StatelessWidget {
                   label: '${poll.likesCount}',
                   animatedValue: poll.likesCount,
                   isActive: poll.viewerHasLiked,
+                  isLoading: isLiking,
                   tooltip: poll.viewerHasLiked ? 'Unlike' : 'Like',
                   onTap: onToggleLike,
+                  dense: compact,
+                ),
+                _Metric(
+                  icon: Icons.forward_outlined,
+                  label: '',
+                  tooltip: 'Share',
+                  dense: compact,
                 ),
               ],
             ),
@@ -131,86 +196,225 @@ class _PollOptionButton extends StatelessWidget {
     required this.option,
     required this.totalVotes,
     required this.isSelected,
+    required this.rank,
+    this.compact = false,
+    this.profileVariant = false,
+    this.isLoading = false,
     this.onTap,
   });
 
   final PollOptionSummary option;
   final int totalVotes;
   final bool isSelected;
+  final int? rank;
+  final bool compact;
+  final bool profileVariant;
+  final bool isLoading;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     final percent = totalVotes == 0 ? 0.0 : option.votesCount / totalVotes;
+    final optionRank = rank;
+    final rankColor = switch (optionRank) {
+      0 => const Color(0xFFFF7200),
+      1 => const Color(0xFFB9BEC7),
+      2 => const Color(0xFFB87333),
+      _ => const Color(0xFF08089A),
+    };
+    final accentColor = optionRank == null || optionRank > 2
+        ? const Color(0xFF08089A)
+        : rankColor;
 
-    return Material(
-      color: isSelected ? colors.primaryContainer : colors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(
-          color: isSelected ? colors.primary : colors.outlineVariant,
+    final optionMinHeight = profileVariant ? 40.0 : (compact ? 36.0 : 48.0);
+    final progressHeight = profileVariant || compact ? 8.0 : 10.0;
+    final numericOption = int.tryParse(option.text.trim()) != null;
+    final optionLabelWidth = numericOption ? 20.0 : 68.0;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: optionMinHeight),
+      child: Material(
+        color: optionRank == 0
+            ? const Color(0xFFFFF1E8)
+            : const Color(0xFFF5F6FA),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(compact ? 10 : 12),
+          side: BorderSide(
+            color: isSelected ? accentColor : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: numericOption
+                ? Row(
+                    children: [
+                      SizedBox(
+                        width: optionLabelWidth,
+                        child: _OptionLabel(
+                          text: option.text,
+                          compact: compact,
+                          color: accentColor,
+                        ),
+                      ),
+                      SizedBox(width: compact ? 8 : 12),
+                      Expanded(
+                        child: _OptionProgress(
+                          percent: percent,
+                          color: accentColor,
+                          height: progressHeight,
+                        ),
+                      ),
+                      SizedBox(width: compact ? 8 : 12),
+                      SizedBox(
+                        width: 42,
+                        child: _OptionPercentage(
+                          percent: percent,
+                          compact: compact,
+                          color: accentColor,
+                        ),
+                      ),
+                      if (isLoading) const _OptionLoading(),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _OptionLabel(
+                              text: option.text,
+                              compact: compact,
+                              color: accentColor,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _OptionPercentage(
+                            percent: percent,
+                            compact: compact,
+                            color: accentColor,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _OptionProgress(
+                        percent: percent,
+                        color: accentColor,
+                        height: progressHeight,
+                      ),
+                      if (isLoading) const _OptionLoading(),
+                    ],
+                  ),
+          ),
         ),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: TweenAnimationBuilder<double>(
-                tween: Tween<double>(end: percent.clamp(0, 1)),
-                duration: const Duration(milliseconds: 350),
-                curve: Curves.easeOutCubic,
-                builder: (context, animatedPercent, child) {
-                  return FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: animatedPercent,
-                    child: child,
-                  );
-                },
-                child: ColoredBox(
-                  color: colors.primary.withValues(
-                    alpha: isSelected ? 0.18 : 0.08,
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      option.text,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontWeight:
-                            isSelected ? FontWeight.w700 : FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  TweenAnimationBuilder<double>(
-                    tween: Tween<double>(end: percent * 100),
-                    duration: const Duration(milliseconds: 350),
-                    curve: Curves.easeOutCubic,
-                    builder: (context, animatedPercent, child) {
-                      return Text(
-                        '${animatedPercent.round()}%',
-                        style: TextStyle(
-                          color: colors.onSurfaceVariant,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+    );
+  }
+}
+
+class _OptionLabel extends StatelessWidget {
+  const _OptionLabel({
+    required this.text,
+    required this.compact,
+    required this.color,
+  });
+
+  final String text;
+  final bool compact;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      maxLines: compact ? 2 : 3,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: color,
+        fontWeight: compact ? FontWeight.w600 : FontWeight.w500,
+        fontSize: compact ? 14 : 15,
+      ),
+    );
+  }
+}
+
+class _OptionProgress extends StatelessWidget {
+  const _OptionProgress({
+    required this.percent,
+    required this.color,
+    required this.height,
+  });
+
+  final double percent;
+  final Color color;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(end: percent.clamp(0, 1)),
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+      builder: (context, animatedPercent, child) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(height / 2),
+          child: LinearProgressIndicator(
+            value: animatedPercent,
+            minHeight: height,
+            backgroundColor: const Color(0xFFE8EAF0),
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _OptionPercentage extends StatelessWidget {
+  const _OptionPercentage({
+    required this.percent,
+    required this.compact,
+    required this.color,
+  });
+
+  final double percent;
+  final bool compact;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(end: percent * 100),
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+      builder: (context, animatedPercent, child) {
+        return Text(
+          '${animatedPercent.round()}%',
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.w600,
+            fontSize: compact ? 14 : 15,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _OptionLoading extends StatelessWidget {
+  const _OptionLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox.square(
+      dimension: 18,
+      child: CircularProgressIndicator(
+        strokeWidth: 2,
+        color: Color(0xFF08089A),
       ),
     );
   }
@@ -218,20 +422,26 @@ class _PollOptionButton extends StatelessWidget {
 
 class _Metric extends StatelessWidget {
   const _Metric({
-    required this.icon,
+    this.icon,
+    this.assetPath,
     required this.label,
     this.isActive = false,
+    this.isLoading = false,
     this.animatedValue,
     this.tooltip,
     this.onTap,
+    this.dense = false,
   });
 
-  final IconData icon;
+  final IconData? icon;
+  final String? assetPath;
   final String label;
   final bool isActive;
+  final bool isLoading;
   final int? animatedValue;
   final String? tooltip;
   final VoidCallback? onTap;
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -240,18 +450,37 @@ class _Metric extends StatelessWidget {
     final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          icon,
-          size: 18,
-          color: isActive ? colors.error : colors.onSurfaceVariant,
+        SizedBox.square(
+          dimension: 22,
+          child: isLoading
+              ? CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: isActive ? colors.error : colors.primary,
+                )
+              : assetPath == null
+                  ? Icon(
+                      icon,
+                      size: 22,
+                      color: isActive ? colors.error : colors.onSurfaceVariant,
+                    )
+                  : Image.asset(
+                      assetPath!,
+                      width: 22,
+                      height: 22,
+                      fit: BoxFit.contain,
+                    ),
         ),
         const SizedBox(width: 6),
         if (animatedValue == null)
           Text(
             label,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(
+                  color: const Color(0xFF10142D),
+                  fontSize: 14,
+                ),
           )
         else
           TweenAnimationBuilder<int>(
@@ -264,8 +493,11 @@ class _Metric extends StatelessWidget {
                 '$value$suffix',
                 style: Theme.of(context)
                     .textTheme
-                    .bodySmall
-                    ?.copyWith(color: colors.onSurfaceVariant),
+                    .bodyMedium
+                    ?.copyWith(
+                      color: const Color(0xFF10142D),
+                      fontSize: 14,
+                    ),
               );
             },
           ),

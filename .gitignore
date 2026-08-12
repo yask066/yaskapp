@@ -11,6 +11,7 @@
 .env
 .env.*
 !.env.example
+backups/
 
 # Node.js
 node_modules/

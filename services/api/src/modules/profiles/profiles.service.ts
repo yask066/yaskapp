@@ -1,7 +1,14 @@
 import { updateProfileRecord } from './profiles.repository.js';
+import {
+  followUserRecord,
+  FollowRepositoryError,
+  unfollowUserRecord
+} from './follows.repository.js';
 import { listPollRecordsByAuthor } from '../polls/polls.repository.js';
 
 export class ProfileNotFoundError extends Error {}
+
+export { FollowRepositoryError };
 
 export type UpdateProfileInput = {
   userId: string;
@@ -39,4 +46,12 @@ export async function updateProfile(input: UpdateProfileInput) {
 
 export async function listMyPolls(userId: string, limit: number) {
   return listPollRecordsByAuthor(userId, limit, userId);
+}
+
+export async function followUser(followerId: string, followeeId: string) {
+  return followUserRecord({ followerId, followeeId });
+}
+
+export async function unfollowUser(followerId: string, followeeId: string) {
+  return unfollowUserRecord({ followerId, followeeId });
 }

@@ -1,6 +1,7 @@
 import { buildApp } from './app.js';
 import { closeDatabaseConnection } from './config/database.js';
 import { env } from './config/env.js';
+import { closeRedisConnection } from './config/redis.js';
 
 const app = buildApp();
 
@@ -9,6 +10,7 @@ async function shutdown(signal: NodeJS.Signals) {
 
   await app.close();
   await closeDatabaseConnection();
+  await closeRedisConnection();
 
   process.exit(0);
 }

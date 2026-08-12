@@ -5,10 +5,74 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yaskapp_mobile/src/features/auth/auth_session.dart';
 import 'package:yaskapp_mobile/src/features/feed/feed_screen.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
+import 'package:yaskapp_mobile/src/features/polls/poll_card.dart';
 import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
 import 'package:yaskapp_mobile/src/features/realtime/realtime_client.dart';
 
 void main() {
+  testWidgets('ties share medal colors and zero-vote options stay readable', (
+    tester,
+  ) async {
+    const navy = Color(0xFF00104F);
+    const orange = Color(0xFFF47B16);
+    const silver = Color(0xFFB9BEC7);
+
+    final poll = PollSummary(
+      id: 'ranked-poll',
+      author: const PollAuthorSummary(
+        id: 'author-1',
+        username: 'author',
+        displayName: 'Author',
+      ),
+      question: 'Which option wins?',
+      options: const [
+        PollOptionSummary(
+          id: 'option-1',
+          text: 'First',
+          position: 0,
+          votesCount: 5,
+        ),
+        PollOptionSummary(
+          id: 'option-2',
+          text: 'Tied first',
+          position: 1,
+          votesCount: 5,
+        ),
+        PollOptionSummary(
+          id: 'option-3',
+          text: 'Second',
+          position: 2,
+          votesCount: 2,
+        ),
+        PollOptionSummary(
+          id: 'option-4',
+          text: 'No votes',
+          position: 3,
+          votesCount: 0,
+        ),
+      ],
+      votesCount: 12,
+      commentsCount: 0,
+      likesCount: 0,
+      viewerHasLiked: false,
+      createdAt: DateTime(2026, 7, 17, 12),
+    );
+
+    await tester.pumpWidget(MaterialApp(home: PollCard(poll: poll)));
+    await tester.pumpAndSettle();
+
+    final progressColors = tester
+        .widgetList<ColoredBox>(find.byType(ColoredBox))
+        .map((box) => box.color)
+        .toList();
+
+    expect(progressColors, containsAllInOrder([orange, orange, silver, navy]));
+    expect(
+      tester.widget<Text>(find.text('No votes')).style?.color,
+      const Color(0xFF0A123F),
+    );
+  });
+
   testWidgets('updates vote counts without reloading the feed', (tester) async {
     final poll = _poll(
       viewerHasLiked: false,

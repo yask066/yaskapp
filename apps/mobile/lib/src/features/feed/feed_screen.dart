@@ -24,10 +24,10 @@ class FeedScreen extends StatefulWidget {
   final RealtimeClient? _realtimeClient;
 
   @override
-  State<FeedScreen> createState() => _FeedScreenState();
+  State<FeedScreen> createState() => FeedScreenState();
 }
 
-class _FeedScreenState extends State<FeedScreen> {
+class FeedScreenState extends State<FeedScreen> {
   late final PollsApiClient _pollsApiClient;
   late final RealtimeClient _realtimeClient;
   late Future<List<PollSummary>> _pollsFuture;
@@ -198,6 +198,8 @@ class _FeedScreenState extends State<FeedScreen> {
     _showSnackBar('Poll published.');
   }
 
+  Future<void> openCreatePoll() => _openCreatePoll();
+
   Future<void> _openComments(PollSummary poll) async {
     final updatedPoll = await Navigator.of(context).push<PollSummary>(
       MaterialPageRoute<PollSummary>(
@@ -237,6 +239,7 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF7F8FC),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _refreshPolls,
@@ -245,19 +248,80 @@ class _FeedScreenState extends State<FeedScreen> {
             slivers: [
               SliverAppBar(
                 pinned: true,
-                title: const Text('Yaskapp'),
+                backgroundColor: Colors.white,
+                surfaceTintColor: Colors.transparent,
+                elevation: 0,
+                toolbarHeight: 72,
+                titleSpacing: 20,
+                title: Semantics(
+                  label: 'Yaskapp',
+                  image: true,
+                  child: Image.asset(
+                    'assets/branding/yaskapp_logo.png',
+                    width: 72,
+                    height: 40,
+                    fit: BoxFit.contain,
+                  ),
+                ),
                 centerTitle: false,
                 actions: [
-                  IconButton(
+                  SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: IconButton(
                     tooltip: 'Search',
                     onPressed: () {},
-                    icon: const Icon(Icons.search),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 40,
+                      height: 40,
+                    ),
+                    icon: Image.asset(
+                      'assets/branding/search_icon.png',
+                      width: 28,
+                      height: 28,
+                      fit: BoxFit.contain,
+                    ),
                   ),
-                  IconButton(
+                  ),
+                  const SizedBox(width: 20),
+                  SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: IconButton(
                     tooltip: 'Notifications',
                     onPressed: () {},
-                    icon: const Icon(Icons.notifications_none),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 40,
+                      height: 40,
+                    ),
+                    icon: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Image.asset(
+                          'assets/branding/notification_icon.png',
+                          width: 28,
+                          height: 28,
+                          fit: BoxFit.contain,
+                        ),
+                        Positioned(
+                          top: -3,
+                          right: -2,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFFF7200),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                  ),
+                  const SizedBox(width: 20),
                 ],
               ),
               SliverToBoxAdapter(
@@ -302,7 +366,7 @@ class _FeedScreenState extends State<FeedScreen> {
                   }
 
                   return SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                     sliver: SliverList.separated(
                       itemBuilder: (context, index) {
                         final poll = polls[index];
@@ -312,10 +376,12 @@ class _FeedScreenState extends State<FeedScreen> {
                           onVote: _votingPollIds.contains(poll.id)
                               ? null
                               : (option) => _vote(poll, option),
+                          isVoting: _votingPollIds.contains(poll.id),
                           onOpenComments: () => _openComments(poll),
                           onToggleLike: _likingPollIds.contains(poll.id)
                               ? null
                               : () => _toggleLike(poll),
+                          isLiking: _likingPollIds.contains(poll.id),
                         );
                       },
                       separatorBuilder: (context, index) =>
@@ -329,11 +395,6 @@ class _FeedScreenState extends State<FeedScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openCreatePoll,
-        icon: const Icon(Icons.add_chart),
-        label: const Text('Create'),
-      ),
     );
   }
 }
@@ -345,27 +406,11 @@ class _HomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Home',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Vote on fresh questions and watch the results move.',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: colors.onSurfaceVariant),
-          ),
-          const SizedBox(height: 16),
           _CreatePrompt(onCreatePoll: onCreatePoll),
           const SizedBox(height: 12),
           const _FeedFilters(),
@@ -382,36 +427,62 @@ class _CreatePrompt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
     return Container(
       decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colors.outlineVariant),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x12050C3F),
+            blurRadius: 16,
+            offset: Offset(0, 6),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(12),
+        constraints: const BoxConstraints.tightFor(height: 64),
+        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+        clipBehavior: Clip.antiAlias,
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: colors.primary,
-            child: Icon(Icons.person, color: colors.onPrimary, size: 20),
+          const Icon(
+            Icons.chat_bubble_outline_rounded,
+            color: Color(0xFF566078),
+            size: 24,
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              'Ask the crowd something...',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: colors.onSurfaceVariant),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: const Text(
+                "What's on your mind?",
+                maxLines: 1,
+                style: TextStyle(
+                  color: Color(0xFF667085),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           FilledButton.icon(
             onPressed: onCreatePoll,
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('Poll'),
+            icon: const Icon(Icons.add, size: 21),
+            label: const Text('Create poll'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFFF7200),
+              foregroundColor: Colors.white,
+              fixedSize: const Size(127, 38),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -424,17 +495,27 @@ class _FeedFilters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F050C3F),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
       child: Row(
         children: [
-          _FilterChip(label: 'For you', selected: true),
-          SizedBox(width: 8),
-          _FilterChip(label: 'Following'),
-          SizedBox(width: 8),
-          _FilterChip(label: 'Trending'),
-          SizedBox(width: 8),
-          _FilterChip(label: 'Ending soon'),
+          Expanded(child: _FilterChip(label: 'For you', selected: true)),
+          const _FilterDivider(),
+          Expanded(child: _FilterChip(label: 'Following')),
+          const _FilterDivider(),
+          Expanded(child: _FilterChip(label: 'Trending')),
         ],
       ),
     );
@@ -449,10 +530,59 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChoiceChip(
-      label: Text(label),
+    return Semantics(
+      button: true,
       selected: selected,
-      onSelected: (_) {},
+      label: label,
+      child: Material(
+        color: selected ? const Color(0xFF08089A) : Colors.transparent,
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          onTap: () {},
+          borderRadius: BorderRadius.circular(24),
+          child: SizedBox(
+            height: 48,
+            child: Padding(
+              padding: EdgeInsets.zero,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (selected) ...[
+                    const Icon(Icons.check, color: Colors.white, size: 18),
+                    const SizedBox(width: 6),
+                  ],
+                  Flexible(
+                    child: Text(
+                      label,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: selected
+                            ? Colors.white
+                            : const Color(0xFF08089A),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterDivider extends StatelessWidget {
+  const _FilterDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 1,
+      height: 32,
+      child: ColoredBox(color: Color(0xFFE5E7EB)),
     );
   }
 }

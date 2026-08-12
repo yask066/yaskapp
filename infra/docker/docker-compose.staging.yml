@@ -1,0 +1,130 @@
+name: yaskapp-staging
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    env_file:
+      - ../../services/api/.env.staging
+    restart: unless-stopped
+    expose:
+      - "5432"
+    volumes:
+      - postgres-staging-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    env_file:
+      - ../../services/api/.env.staging
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - redis-staging-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    env_file:
+      - ../../services/api/.env.staging
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    expose:
+      - "9000"
+      - "9001"
+    volumes:
+      - minio-staging-data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    env_file:
+      - ../../services/api/.env.staging
+    depends_on:
+      - minio
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - >-
+        until mc alias set staging http://minio:9000 "$MINIO_ROOT_USER"
+        "$MINIO_ROOT_PASSWORD"; do sleep 2; done;
+        mc mb --ignore-existing "staging/$S3_BUCKET"
+
+  migrate:
+    image: yaskapp-api:staging
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    env_file:
+      - ../../services/api/.env.staging
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["node", "services/api/dist/db/migrate.js"]
+    restart: "no"
+
+  api:
+    image: yaskapp-api:staging
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    env_file:
+      - ../../services/api/.env.staging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+    restart: unless-stopped
+    expose:
+      - "3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch('http://127.0.0.1:3000/health/ready')
+          .then((response) => process.exit(response.ok ? 0 : 1))
+          .catch(() => process.exit(1))
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  https:
+    image: caddy:2-alpine
+    env_file:
+      - ../../services/api/.env.staging
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  postgres-staging-data:
+  redis-staging-data:
+  minio-staging-data:
+  caddy-data:
+  caddy-config:

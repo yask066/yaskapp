@@ -58,7 +58,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TextField), findsOneWidget);
-    expect(find.text('Add a comment'), findsOneWidget);
+    expect(find.text('Add a comment...'), findsOneWidget);
     expect(find.byTooltip('Post comment'), findsOneWidget);
   });
 

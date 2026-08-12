@@ -22,3 +22,13 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/branding/yaskapp_logo.png
+    - assets/branding/search_icon.png
+    - assets/branding/notification_icon.png
+    - assets/branding/like_icon.png
+    - assets/branding/dislike_icon.png
+    - assets/branding/comments_icon.png
+    - assets/branding/create_poll_icon.png
+    - assets/branding/home_icon.png
+    - assets/branding/subscriptions_icon.png

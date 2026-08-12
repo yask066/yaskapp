@@ -85,6 +85,12 @@ type VoteResponse = {
   };
 };
 
+type FollowResponse = {
+  following: boolean;
+  followerFollowingCount: number;
+  followeeFollowersCount: number;
+};
+
 function uniqueSuffix() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -908,4 +914,76 @@ test('unliking a poll without a prior like is safe', async () => {
   );
 
   assert.equal(likeRowResult.rows[0]?.count, '0');
+});
+
+test('users can follow and unfollow safely', async () => {
+  const follower = await registerTestUser();
+  const followee = await registerTestUser();
+
+  const unauthenticatedResponse = await app.inject({
+    method: 'POST',
+    url: `/users/${followee.user.id}/follow`
+  });
+
+  assert.equal(unauthenticatedResponse.statusCode, 401);
+
+  const followResponse = await app.inject({
+    method: 'POST',
+    url: `/users/${followee.user.id}/follow`,
+    headers: bearer(follower.accessToken)
+  });
+
+  assert.equal(followResponse.statusCode, 201, followResponse.body);
+  assert.deepEqual(followResponse.json<FollowResponse>(), {
+    following: true,
+    followerFollowingCount: 1,
+    followeeFollowersCount: 1
+  });
+
+  const duplicateFollowResponse = await app.inject({
+    method: 'POST',
+    url: `/users/${followee.user.id}/follow`,
+    headers: bearer(follower.accessToken)
+  });
+
+  assert.equal(duplicateFollowResponse.statusCode, 201);
+  assert.deepEqual(duplicateFollowResponse.json<FollowResponse>(), {
+    following: true,
+    followerFollowingCount: 1,
+    followeeFollowersCount: 1
+  });
+
+  const selfFollowResponse = await app.inject({
+    method: 'POST',
+    url: `/users/${follower.user.id}/follow`,
+    headers: bearer(follower.accessToken)
+  });
+
+  assert.equal(selfFollowResponse.statusCode, 400);
+
+  const unfollowResponse = await app.inject({
+    method: 'DELETE',
+    url: `/users/${followee.user.id}/follow`,
+    headers: bearer(follower.accessToken)
+  });
+
+  assert.equal(unfollowResponse.statusCode, 200, unfollowResponse.body);
+  assert.deepEqual(unfollowResponse.json<FollowResponse>(), {
+    following: false,
+    followerFollowingCount: 0,
+    followeeFollowersCount: 0
+  });
+
+  const duplicateUnfollowResponse = await app.inject({
+    method: 'DELETE',
+    url: `/users/${followee.user.id}/follow`,
+    headers: bearer(follower.accessToken)
+  });
+
+  assert.equal(duplicateUnfollowResponse.statusCode, 200);
+  assert.deepEqual(duplicateUnfollowResponse.json<FollowResponse>(), {
+    following: false,
+    followerFollowingCount: 0,
+    followeeFollowersCount: 0
+  });
 });
