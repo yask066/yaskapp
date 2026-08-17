@@ -216,15 +216,7 @@ class _PollOptionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final percent = totalVotes == 0 ? 0.0 : option.votesCount / totalVotes;
     final optionRank = rank;
-    final rankColor = switch (optionRank) {
-      0 => const Color(0xFFFF7200),
-      1 => const Color(0xFFB9BEC7),
-      2 => const Color(0xFFB87333),
-      _ => const Color(0xFF08089A),
-    };
-    final accentColor = optionRank == null || optionRank > 2
-        ? const Color(0xFF08089A)
-        : rankColor;
+    const accentColor = Color(0xFF566A9D);
 
     final optionMinHeight = profileVariant ? 40.0 : (compact ? 36.0 : 48.0);
     final progressHeight = profileVariant || compact ? 8.0 : 10.0;
@@ -235,7 +227,7 @@ class _PollOptionButton extends StatelessWidget {
       constraints: BoxConstraints(minHeight: optionMinHeight),
       child: Material(
         color: optionRank == 0
-            ? const Color(0xFFFFF1E8)
+            ? const Color(0xFFEFF2F8)
             : const Color(0xFFF5F6FA),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(compact ? 10 : 12),
@@ -414,7 +406,7 @@ class _OptionLoading extends StatelessWidget {
       dimension: 18,
       child: CircularProgressIndicator(
         strokeWidth: 2,
-        color: Color(0xFF08089A),
+        color: Color(0xFF566A9D),
       ),
     );
   }

@@ -202,7 +202,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final displayName = widget.user.profile.displayName;
     final bio = widget.user.profile.bio;
-    const navy = Color(0xFF08089A);
+    const navy = Color(0xFF566A9D);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FC),
@@ -210,20 +210,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: CustomScrollView(
           slivers: [
             SliverAppBar(
-              pinned: true,
-              toolbarHeight: 72,
+              toolbarHeight: 64,
               backgroundColor: Colors.white,
               surfaceTintColor: Colors.transparent,
               elevation: 0,
               titleSpacing: 20,
-              title: Semantics(
-                label: 'Yaskapp',
-                image: true,
-                child: Image.asset(
-                  'assets/branding/yaskapp_logo.png',
-                  width: 72,
-                  height: 40,
-                  fit: BoxFit.contain,
+              title: const Text(
+                'Profile',
+                style: TextStyle(
+                  color: Color(0xFF10142D),
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  height: 34 / 22,
                 ),
               ),
               actions: [
@@ -244,11 +242,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   itemBuilder: (context) => const [
                     PopupMenuItem(
                       value: 'edit',
-                      child: Text('Edit profile'),
+                      child: SizedBox(
+                        width: 144,
+                        child: Text(
+                          'Edit profile',
+                          maxLines: 1,
+                          softWrap: false,
+                        ),
+                      ),
                     ),
                     PopupMenuItem(
                       value: 'logout',
-                      child: Text('Logout'),
+                      child: SizedBox(
+                        width: 144,
+                        child: Text('Logout', maxLines: 1, softWrap: false),
+                      ),
                     ),
                   ],
                 ),
@@ -257,68 +265,68 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.only(top: 16),
+                padding: const EdgeInsets.only(top: 20),
                 child: Column(
                   children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Column(
                         children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              UserAvatar(
-                                displayName: displayName,
-                                username: widget.user.username,
-                                imageUrl: widget.user.profile.avatarObjectKey,
-                                radius: 40,
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      displayName,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Color(0xFF10142D),
-                                        fontSize: 22,
-                                        height: 26 / 22,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '@${widget.user.username}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Color(0xFF667085),
-                                        fontSize: 15,
-                                        height: 20 / 15,
-                                      ),
-                                    ),
-                                    if (bio != null && bio.trim().isNotEmpty) ...[
-                                      const SizedBox(height: 8),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                UserAvatar(
+                                  displayName: displayName,
+                                  username: widget.user.username,
+                                  imageUrl: widget.user.profile.avatarObjectKey,
+                                  radius: 40,
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
                                       Text(
-                                        bio,
-                                        maxLines: 3,
+                                        displayName,
+                                        maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
-                                          color: Color(0xFF344054),
-                                          fontSize: 15,
-                                          height: 20 / 15,
+                                          color: Color(0xFF10142D),
+                                          fontSize: 22,
+                                          height: 26 / 22,
+                                          fontWeight: FontWeight.w700,
                                         ),
                                       ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '@${widget.user.username}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Color(0xFF667085),
+                                          fontSize: 14,
+                                          height: 18 / 14,
+                                        ),
+                                      ),
+                                      if (bio != null && bio.trim().isNotEmpty) ...[
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          bio,
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Color(0xFF667085),
+                                            fontSize: 14,
+                                            height: 20 / 14,
+                                          ),
+                                        ),
+                                      ],
                                     ],
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
                           SizedBox(
                             height: 56,
                             child: Row(
@@ -344,10 +352,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           SizedBox(
                             height: 48,
                             width: double.infinity,
-                            child: OutlinedButton.icon(
+                            child: OutlinedButton(
                               onPressed: () => _openEditProfile(context),
-                              icon: const Icon(Icons.edit_outlined, size: 18),
-                              label: const Text('Edit profile'),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.person_outline, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('Edit profile'),
+                                ],
+                              ),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: navy,
                                 side: const BorderSide(color: navy),
@@ -366,25 +380,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    SizedBox(
-                      height: 52,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _ProfileTab(
-                              label: 'My polls',
-                              selected: _selectedTab == 0,
-                              onTap: () => _selectTab(0),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: SizedBox(
+                        height: 52,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _ProfileTab(
+                                label: 'My polls',
+                                selected: _selectedTab == 0,
+                                onTap: () => _selectTab(0),
+                              ),
                             ),
-                          ),
-                          Expanded(
-                            child: _ProfileTab(
-                              label: 'Liked polls',
-                              selected: _selectedTab == 1,
-                              onTap: () => _selectTab(1),
+                            Expanded(
+                              child: _ProfileTab(
+                                label: 'Liked polls',
+                                selected: _selectedTab == 1,
+                                onTap: () => _selectTab(1),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -393,7 +410,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                 child: FutureBuilder<List<PollSummary>>(
                   future: _selectedTab == 0
                       ? _myPollsFuture
@@ -554,17 +571,17 @@ class _ProfileMetric extends StatelessWidget {
           Text(
             value,
             style: const TextStyle(
-              color: Color(0xFF10142D),
+              color: Color(0xFF566A9D),
               fontSize: 18,
               height: 22 / 18,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: const TextStyle(
-              color: Color(0xFF475467),
+              color: Color(0xFF667085),
               fontSize: 13,
               height: 17 / 13,
             ),
@@ -612,16 +629,16 @@ class _ProfileTab extends StatelessWidget {
             label,
             style: TextStyle(
               color: selected
-                  ? const Color(0xFF08089A)
-                  : const Color(0xFF475467),
-              fontSize: 14,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                  ? const Color(0xFF566A9D)
+                  : const Color(0xFF667085),
+              fontSize: 15,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
             ),
           ),
           const Spacer(),
           Container(
             height: 2,
-            color: selected ? const Color(0xFF08089A) : Colors.transparent,
+            color: selected ? const Color(0xFF566A9D) : Colors.transparent,
           ),
         ],
       ),

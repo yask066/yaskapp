@@ -68,17 +68,18 @@ class _AuthScreenState extends State<AuthScreen> {
     });
 
     try {
-      final session = _isRegistering
-          ? await _authApiClient.register(
-              email: _emailController.text.trim(),
-              username: _usernameController.text.trim(),
-              password: _passwordController.text,
-              displayName: _displayNameController.text,
-            )
-          : await _authApiClient.login(
-              login: _loginController.text.trim(),
-              password: _passwordController.text,
-            );
+      final session = await (_isRegistering
+              ? _authApiClient.register(
+                  email: _emailController.text.trim(),
+                  username: _usernameController.text.trim(),
+                  password: _passwordController.text,
+                  displayName: _displayNameController.text,
+                )
+              : _authApiClient.login(
+                  login: _loginController.text.trim(),
+                  password: _passwordController.text,
+                ))
+          .timeout(const Duration(seconds: 10));
 
       if (!mounted) {
         return;
@@ -118,7 +119,7 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    const accentColor = Color(0xFFE66F00);
+    const accentColor = Color(0xFF566A9D);
     const fieldFillColor = Color(0xFFE8EDF3);
 
     return Scaffold(
@@ -257,7 +258,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                     'Password recovery is not available yet.',
                                   ),
                                   style: TextButton.styleFrom(
-                                    foregroundColor: const Color(0xFF9A775E),
+                                    foregroundColor: const Color(0xFF566A9D),
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 10,
                                     ),
@@ -391,7 +392,7 @@ InputDecoration _fieldDecoration(
     enabledBorder: border,
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(28),
-      borderSide: const BorderSide(color: Color(0xFFE66F00), width: 1.5),
+      borderSide: const BorderSide(color: Color(0xFF566A9D), width: 1.5),
     ),
     errorBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(28),

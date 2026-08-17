@@ -89,7 +89,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    const navy = Color(0xFF05008A);
+    const navy = Color(0xFF566A9D);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -243,7 +243,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF05008A), width: 1.5),
+        borderSide: const BorderSide(color: Color(0xFF566A9D), width: 1.5),
       ),
     );
   }

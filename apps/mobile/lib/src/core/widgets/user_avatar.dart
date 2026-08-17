@@ -33,7 +33,7 @@ class UserAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final fallback = CircleAvatar(
       radius: radius,
-      backgroundColor: const Color(0xFF05008A),
+      backgroundColor: const Color(0xFF566A9D),
       child: Text(
         _initial,
         style: TextStyle(

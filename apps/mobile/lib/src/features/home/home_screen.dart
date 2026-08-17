@@ -174,7 +174,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const navy = Color(0xFF08089A);
+    const navy = Color(0xFF566A9D);
     const secondary = Color(0xFF475467);
 
     return Expanded(
@@ -215,10 +215,10 @@ class _CreateNavigationIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 56,
-      height: 56,
+      width: 50,
+      height: 50,
       decoration: BoxDecoration(
-        color: const Color(0xFF08089A),
+        color: const Color(0xFF566A9D),
         borderRadius: BorderRadius.circular(16),
       ),
       child: const Icon(Icons.add, color: Colors.white, size: 30),
@@ -276,7 +276,7 @@ class _SimplePlaceholderScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 44, color: const Color(0xFF05008A)),
+            Icon(icon, size: 44, color: const Color(0xFF566A9D)),
             const SizedBox(height: 14),
             Text(message, style: const TextStyle(color: Color(0xFF667085))),
           ],

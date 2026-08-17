@@ -116,73 +116,143 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    const primary = Color(0xFF566A9D);
+    const primaryText = Color(0xFF10142D);
+    const secondaryText = Color(0xFF667085);
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF7F8FC),
       appBar: AppBar(
-        title: const Text('Create poll'),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        elevation: 0,
+        toolbarHeight: 64,
+        leadingWidth: 72,
+        leading: IconButton(
+          tooltip: 'Back',
+          onPressed: () => Navigator.of(context).pop(),
+          padding: const EdgeInsets.only(left: 16),
+          constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+          icon: const Icon(Icons.arrow_back, size: 24, color: primaryText),
+        ),
+        titleSpacing: 0,
+        title: const Text(
+          'Create poll',
+          style: TextStyle(
+            color: primaryText,
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            height: 26 / 22,
+          ),
+        ),
       ),
       body: SafeArea(
         child: Form(
           key: _formKey,
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
             children: [
-              TextFormField(
-                controller: _questionController,
-                minLines: 2,
-                maxLines: 4,
-                maxLength: 280,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Question',
-                  prefixIcon: Icon(Icons.help_outline),
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Required';
-                  }
+              _CreateFieldCard(
+                minHeight: 96,
+                child: TextFormField(
+                  controller: _questionController,
+                  minLines: 1,
+                  maxLines: 6,
+                  maxLength: 280,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: _fieldDecoration(
+                    hintText: 'Ask your question...',
+                    prefixIcon: const Icon(Icons.help_outline_rounded),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Required';
+                    }
 
-                  return null;
-                },
+                    return null;
+                  },
+                ),
               ),
-              const SizedBox(height: 12),
+              _CounterText(
+                controller: _questionController,
+                max: 280,
+                color: secondaryText,
+              ),
+              const SizedBox(height: 24),
               Text(
                 'Options',
-                style: Theme.of(context).textTheme.titleMedium,
+                style: const TextStyle(
+                  color: primaryText,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  height: 24 / 20,
+                ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
               for (var index = 0; index < _optionControllers.length; index++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: TextFormField(
-                    controller: _optionControllers[index],
-                    maxLength: 160,
-                    decoration: InputDecoration(
-                      labelText: 'Option ${index + 1}',
-                      prefixIcon: const Icon(Icons.radio_button_unchecked),
-                      suffixIcon: _optionControllers.length > 2
-                          ? IconButton(
-                              tooltip: 'Remove option',
-                              onPressed: () => _removeOption(index),
-                              icon: const Icon(Icons.close),
-                            )
-                          : null,
-                      border: const OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Required';
-                      }
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    _CreateFieldCard(
+                      minHeight: 64,
+                      child: TextFormField(
+                        controller: _optionControllers[index],
+                        maxLength: 160,
+                        decoration: _fieldDecoration(
+                          hintText: 'Option ${index + 1}',
+                          prefixIcon: const Icon(
+                            Icons.radio_button_unchecked,
+                            size: 24,
+                          ),
+                          suffixIcon: _optionControllers.length > 2
+                              ? IconButton(
+                                  tooltip: 'Remove option',
+                                  onPressed: () => _removeOption(index),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints.tightFor(
+                                    width: 36,
+                                    height: 36,
+                                  ),
+                                  icon: const Icon(Icons.close, size: 20),
+                                )
+                              : null,
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Required';
+                          }
 
-                      return null;
-                    },
+                          return null;
+                        },
+                      ),
+                    ),
+                    _CounterText(
+                      controller: _optionControllers[index],
+                      max: 160,
+                      color: secondaryText,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              SizedBox(
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed:
+                      _optionControllers.length >= 5 ? null : _addOption,
+                  icon: const Icon(Icons.add, size: 20),
+                  label: const Text('Add option'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: primary,
+                    side: const BorderSide(color: primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              OutlinedButton.icon(
-                onPressed: _optionControllers.length >= 5 ? null : _addOption,
-                icon: const Icon(Icons.add),
-                label: const Text('Add option'),
               ),
               if (_errorMessage != null) ...[
                 const SizedBox(height: 12),
@@ -191,21 +261,144 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
                   style: TextStyle(color: colors.error),
                 ),
               ],
-              const SizedBox(height: 18),
-              FilledButton.icon(
-                onPressed: _isSubmitting ? null : _submit,
-                icon: _isSubmitting
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.add_chart),
-                label: const Text('Publish poll'),
+              const SizedBox(height: 24),
+              SizedBox(
+                height: 52,
+                child: FilledButton.icon(
+                  onPressed: _isSubmitting ? null : _submit,
+                  icon: _isSubmitting
+                      ? const SizedBox.square(
+                          dimension: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.post_add_outlined, size: 22),
+                  label: const Text('Publish poll'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(26),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  InputDecoration _fieldDecoration({
+    required String hintText,
+    required Widget prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: const TextStyle(
+        color: Color(0xFF667085),
+        fontSize: 16,
+        height: 22 / 16,
+      ),
+      prefixIcon: Padding(
+        padding: const EdgeInsets.only(left: 16, right: 16),
+        child: IconTheme(
+          data: const IconThemeData(
+            color: Color(0xFF566A9D),
+            size: 24,
+          ),
+          child: prefixIcon,
+        ),
+      ),
+      prefixIconConstraints: const BoxConstraints(minWidth: 56),
+      suffixIcon: suffixIcon,
+      suffixIconConstraints: const BoxConstraints.tightFor(width: 36),
+      filled: true,
+      fillColor: Colors.white,
+      counterText: '',
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Color(0xFF566A9D), width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Colors.redAccent),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+      ),
+    );
+  }
+}
+
+class _CreateFieldCard extends StatelessWidget {
+  const _CreateFieldCard({required this.child, required this.minHeight});
+
+  final Widget child;
+  final double minHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(minHeight: minHeight),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x14050C3F),
+            blurRadius: 12,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+class _CounterText extends StatelessWidget {
+  const _CounterText({
+    required this.controller,
+    required this.max,
+    required this.color,
+  });
+
+  final TextEditingController controller;
+  final int max;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (context, value, child) {
+        return Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            '${value.text.length}/$max',
+            style: TextStyle(color: color, fontSize: 13),
+          ),
+        );
+      },
     );
   }
 }

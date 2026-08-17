@@ -5,6 +5,11 @@ import 'poll_card.dart';
 import 'poll_summary.dart';
 import 'polls_api_client.dart';
 
+const _commentsNavy = Color(0xFF566A9D);
+const _commentsPrimaryText = Color(0xFF10142D);
+const _commentsSecondaryText = Color(0xFF667085);
+const _commentsDivider = Color(0xFFEAECF0);
+
 class PollCommentsScreen extends StatefulWidget {
   const PollCommentsScreen({
     required this.poll,
@@ -137,24 +142,30 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 24, 8),
-                child: Row(
+              SizedBox(
+                height: 64,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
                   children: [
                     IconButton(
                       tooltip: 'Back',
                       onPressed: _closeWithResult,
-                      icon: const Icon(Icons.arrow_back_ios_new),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints.tightFor(width: 24, height: 24),
+                      icon: const Icon(Icons.arrow_back_ios_new, size: 24),
                     ),
-                    const SizedBox(width: 2),
-                    Text(
+                    const SizedBox(width: 16),
+                    const Text(
                       'Comments',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: const Color(0xFF05008A),
-                        fontWeight: FontWeight.w800,
+                      style: TextStyle(
+                        color: _commentsPrimaryText,
+                        fontSize: 23,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
+                ),
                 ),
               ),
               Expanded(
@@ -193,8 +204,8 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                             Text(
                               '${comments.length} comments',
                               style: const TextStyle(
-                                color: Color(0xFF667085),
-                                fontSize: 18,
+                                color: _commentsSecondaryText,
+                                fontSize: 15,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -202,19 +213,20 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                             const Text(
                               'Newest',
                               style: TextStyle(
-                                color: Color(0xFF667085),
-                                fontSize: 17,
+                                color: _commentsSecondaryText,
+                                fontSize: 15,
                               ),
                             ),
                             const Icon(
                               Icons.keyboard_arrow_down,
-                              color: Color(0xFF667085),
+                              color: _commentsSecondaryText,
+                              size: 18,
                             ),
                           ],
                         ),
                         const Divider(
                           height: 32,
-                          color: Color(0xFFE4E7EC),
+                          color: _commentsDivider,
                         ),
                         if (comments.isEmpty)
                           const _CommentsEmptyState()
@@ -223,7 +235,8 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                             _CommentTile(comment: comment),
                             const Divider(
                               height: 1,
-                              color: Color(0xFFE4E7EC),
+                              indent: 76,
+                              color: _commentsDivider,
                             ),
                           ],
                       ],
@@ -260,69 +273,62 @@ class _CommentComposer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: colors.outlineVariant)),
+        border: const Border(top: BorderSide(color: _commentsDivider)),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 14, 24, 16),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
-              child: TextField(
-                controller: controller,
-                enabled: !isSubmitting,
-                minLines: 1,
-                maxLines: 4,
-                maxLength: 1000,
-                textInputAction: TextInputAction.newline,
-                decoration: InputDecoration(
+              child: SizedBox(
+                height: 48,
+                child: TextField(
+                  controller: controller,
+                  enabled: !isSubmitting,
+                  minLines: 1,
+                  maxLines: 1,
+                  maxLength: 1000,
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
                   hintText: 'Add a comment...',
                   counterText: '',
                   filled: true,
                   fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 22,
-                    vertical: 16,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                  hintStyle: const TextStyle(
+                    color: _commentsSecondaryText,
+                    fontSize: 16,
                   ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFD0D5DD),
-                      width: 2,
-                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: const BorderSide(color: _commentsDivider),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFD0D5DD),
-                      width: 2,
-                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: const BorderSide(color: _commentsDivider),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF05008A),
-                      width: 2,
-                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: const BorderSide(color: _commentsNavy),
+                  ),
+                ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             IconButton(
               tooltip: 'Post comment',
               onPressed: isSubmitting ? null : onSubmit,
               style: IconButton.styleFrom(
-                backgroundColor: const Color(0xFF05008A),
+                backgroundColor: _commentsNavy,
                 foregroundColor: Colors.white,
                 disabledBackgroundColor: const Color(0xFFBFC2D8),
                 disabledForegroundColor: Colors.white,
-                fixedSize: const Size(62, 62),
+                fixedSize: const Size(48, 48),
               ),
               icon: isSubmitting
                   ? const SizedBox.square(
@@ -332,7 +338,7 @@ class _CommentComposer extends StatelessWidget {
                         color: Colors.white,
                       ),
                     )
-                  : const Icon(Icons.send_rounded, size: 28),
+                  : const Icon(Icons.send_rounded, size: 24),
             ),
           ],
         ),
@@ -425,10 +431,8 @@ class _CommentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const navy = Color(0xFF05008A);
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 18, 0, 18),
+      padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -436,9 +440,9 @@ class _CommentTile extends StatelessWidget {
             displayName: comment.author.displayName,
             username: comment.author.username,
             imageUrl: comment.author.avatarObjectKey,
-            radius: 24,
+            radius: 22,
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -452,59 +456,60 @@ class _CommentTile extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: navy,
-                          fontSize: 21,
-                          fontWeight: FontWeight.w800,
+                          color: _commentsPrimaryText,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Text(
                       comment.createdLabel,
                       style: const TextStyle(
-                        color: Color(0xFF6D7888),
-                        fontSize: 16,
+                        color: _commentsSecondaryText,
+                        fontSize: 13,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                 Text(
                   comment.body,
                   style: const TextStyle(
-                    color: navy,
-                    fontSize: 18,
-                    height: 1.2,
+                    color: _commentsPrimaryText,
+                    fontSize: 16,
+                    height: 21 / 16,
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
                 Row(
                   children: [
                     Icon(
                       Icons.favorite_border,
-                      size: 22,
-                      color: Colors.blueGrey.shade600,
+                      size: 18,
+                      color: _commentsSecondaryText,
                     ),
-                    const SizedBox(width: 10),
-                    Text(
+                    const SizedBox(width: 8),
+                    const Text(
                       'Like',
-                      style: TextStyle(
-                        color: Colors.blueGrey.shade700,
-                        fontSize: 16,
-                      ),
+                      style: TextStyle(color: _commentsSecondaryText, fontSize: 14),
                     ),
-                    const SizedBox(width: 24),
-                    Text(
+                    const SizedBox(width: 20),
+                    const Text(
                       'Reply',
-                      style: TextStyle(
-                        color: Colors.blueGrey.shade700,
-                        fontSize: 16,
-                      ),
+                      style: TextStyle(color: _commentsSecondaryText, fontSize: 14),
                     ),
                     const Spacer(),
-                    const Icon(
-                      Icons.more_horiz,
-                      color: Color(0xFF101828),
+                    const SizedBox(
+                      width: 36,
+                      height: 36,
+                      child: Center(
+                        child: Icon(
+                          Icons.more_horiz,
+                          color: _commentsPrimaryText,
+                          size: 20,
+                        ),
+                      ),
                     ),
                   ],
                 ),

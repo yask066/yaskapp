@@ -1,4 +1,4 @@
-{$STAGING_API_DOMAIN} {
-    # Caddy forwards WebSocket upgrade requests to the Fastify realtime route.
+:80 {
+    # Temporary IP-based staging access. Caddy also forwards WebSocket upgrades.
     reverse_proxy api:3000
 }

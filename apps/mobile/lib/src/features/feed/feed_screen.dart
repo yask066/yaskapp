@@ -68,19 +68,31 @@ class FeedScreenState extends State<FeedScreen> {
   }
 
   Future<List<PollSummary>> _loadPolls() {
-    return _pollsApiClient.listPolls(accessToken: widget.session.accessToken);
+    return _pollsApiClient
+        .listPolls(accessToken: widget.session.accessToken)
+        .timeout(const Duration(seconds: 10));
   }
 
   Future<void> _refreshPolls() async {
-    final nextPolls = await _loadPolls();
+    try {
+      final nextPolls = await _loadPolls();
 
-    if (!mounted) {
-      return;
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _polls = nextPolls;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not refresh the feed.')),
+      );
     }
-
-    setState(() {
-      _polls = nextPolls;
-    });
   }
 
   void _handleRealtimeVote(PollVoteRealtimeEvent event) {
@@ -312,7 +324,7 @@ class FeedScreenState extends State<FeedScreen> {
                             width: 8,
                             height: 8,
                             decoration: const BoxDecoration(
-                              color: Color(0xFFFF7200),
+                               color: Color(0xFFFA7F2D),
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -471,7 +483,7 @@ class _CreatePrompt extends StatelessWidget {
             icon: const Icon(Icons.add, size: 21),
             label: const Text('Create poll'),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFFF7200),
+              backgroundColor: const Color(0xFFFA7F2D),
               foregroundColor: Colors.white,
               fixedSize: const Size(127, 38),
               padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -535,7 +547,7 @@ class _FilterChip extends StatelessWidget {
       selected: selected,
       label: label,
       child: Material(
-        color: selected ? const Color(0xFF08089A) : Colors.transparent,
+        color: selected ? const Color(0xFF566A9D) : Colors.transparent,
         borderRadius: BorderRadius.circular(24),
         child: InkWell(
           onTap: () {},
@@ -558,7 +570,7 @@ class _FilterChip extends StatelessWidget {
                       style: TextStyle(
                         color: selected
                             ? Colors.white
-                            : const Color(0xFF08089A),
+                            : const Color(0xFF566A9D),
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),

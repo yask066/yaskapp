@@ -51,13 +51,17 @@ class _YaskappAppState extends State<YaskappApp> {
 
   Future<void> _bootstrapSession() async {
     try {
-      final accessToken = await _authSessionStore.readAccessToken();
+      final accessToken = await _authSessionStore
+          .readAccessToken()
+          .timeout(const Duration(seconds: 5));
 
       if (accessToken == null || accessToken.isEmpty) {
         return;
       }
 
-      final user = await _authApiClient.me(accessToken: accessToken);
+      final user = await _authApiClient
+          .me(accessToken: accessToken)
+          .timeout(const Duration(seconds: 8));
 
       if (!mounted) {
         return;
@@ -121,7 +125,7 @@ class _YaskappAppState extends State<YaskappApp> {
   @override
   Widget build(BuildContext context) {
     final session = _session;
-    const brandColor = Color(0xFF05008A);
+    const brandColor = Color(0xFF566A9D);
 
     return MaterialApp(
       title: 'Yaskapp',
