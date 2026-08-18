@@ -4,6 +4,7 @@ import websocket from '@fastify/websocket';
 import Fastify from 'fastify';
 
 import { env } from './config/env.js';
+import { rateLimit } from './config/rate-limit.js';
 import { registerAuthRoutes } from './modules/auth/auth.routes.js';
 import { getCurrentUser } from './modules/auth/auth.utils.js';
 import { registerHealthRoutes } from './modules/health/health.routes.js';
@@ -13,6 +14,7 @@ import { registerRealtimeRoutes } from './realtime/realtime.routes.js';
 
 export function buildApp() {
   const app = Fastify({
+    trustProxy: true,
     logger:
       env.NODE_ENV !== 'test'
         ? {
@@ -97,6 +99,15 @@ export function buildApp() {
   });
 
   app.register(websocket);
+
+  app.addHook(
+    'onRequest',
+    rateLimit({
+      keyPrefix: 'api',
+      limit: 120,
+      windowMs: 60_000
+    })
+  );
 
   registerAuthRoutes(app);
   registerHealthRoutes(app);

@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
+import { rateLimit } from '../../config/rate-limit.js';
 import {
   AuthenticationError,
   ConflictError,
@@ -50,7 +51,11 @@ function authError(reply: FastifyReply, error: unknown) {
 }
 
 export function registerAuthRoutes(app: FastifyInstance) {
-  app.post('/auth/register', async (request, reply) => {
+  app.post('/auth/register', { preHandler: rateLimit({
+    keyPrefix: 'auth-register',
+    limit: 5,
+    windowMs: 15 * 60_000
+  }) }, async (request, reply) => {
     const parsedBody = registerSchema.safeParse(request.body);
 
     if (!parsedBody.success) {
@@ -66,7 +71,11 @@ export function registerAuthRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/auth/login', async (request, reply) => {
+  app.post('/auth/login', { preHandler: rateLimit({
+    keyPrefix: 'auth-login',
+    limit: 10,
+    windowMs: 15 * 60_000
+  }) }, async (request, reply) => {
     const parsedBody = loginSchema.safeParse(request.body);
 
     if (!parsedBody.success) {
