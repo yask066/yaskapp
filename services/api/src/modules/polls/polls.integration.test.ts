@@ -3,9 +3,16 @@ import { after, test } from 'node:test';
 
 process.env.NODE_ENV = 'test';
 
-const [{ buildApp }, { closeDatabaseConnection, db }] = await Promise.all([
+const [
+  { buildApp },
+  { closeDatabaseConnection, db },
+  { closeRedisConnection },
+  { closeStorageConnection }
+] = await Promise.all([
   import('../../app.js'),
-  import('../../config/database.js')
+  import('../../config/database.js'),
+  import('../../config/redis.js'),
+  import('../../config/storage.js')
 ]);
 
 const app = buildApp();
@@ -170,6 +177,111 @@ test('global error handler returns safe and consistent errors', async () => {
   });
 });
 
+test('health endpoints report service status', async () => {
+  const healthResponse = await app.inject({
+    method: 'GET',
+    url: '/health'
+  });
+
+  assert.equal(healthResponse.statusCode, 200, healthResponse.body);
+  assert.deepEqual(healthResponse.json(), {
+    status: 'ok',
+    service: 'api'
+  });
+
+  const databaseHealthResponse = await app.inject({
+    method: 'GET',
+    url: '/health/db'
+  });
+
+  assert.equal(databaseHealthResponse.statusCode, 200, databaseHealthResponse.body);
+  assert.equal(databaseHealthResponse.json<{ status: string }>().status, 'ok');
+
+  const readinessResponse = await app.inject({
+    method: 'GET',
+    url: '/health/ready'
+  });
+
+  assert.ok([200, 503].includes(readinessResponse.statusCode), readinessResponse.body);
+
+  if (readinessResponse.statusCode === 503) {
+    assert.deepEqual(readinessResponse.json(), {
+      status: 'unavailable',
+      service: 'api'
+    });
+    return;
+  }
+
+  const readiness = readinessResponse.json<{
+    status: string;
+    database: { connected: boolean };
+    redis: { connected: boolean };
+    storage: { connected: boolean };
+  }>();
+  assert.equal(readiness.status, 'ready');
+  assert.equal(readiness.database.connected, true);
+  assert.equal(readiness.redis.connected, true);
+  assert.equal(readiness.storage.connected, true);
+});
+
+test('authentication rejects invalid credentials and duplicate registration', async () => {
+  const registered = await registerTestUser();
+
+  const duplicateResponse = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: `${registered.user.username}@yaskapp.test`,
+      username: registered.user.username,
+      password: registered.password
+    }
+  });
+
+  assert.equal(duplicateResponse.statusCode, 409, duplicateResponse.body);
+  assert.equal(duplicateResponse.json<{ error: string }>().error, 'conflict');
+
+  const wrongPasswordResponse = await app.inject({
+    method: 'POST',
+    url: '/auth/login',
+    payload: {
+      login: registered.user.username,
+      password: 'wrong-password'
+    }
+  });
+
+  assert.equal(wrongPasswordResponse.statusCode, 401, wrongPasswordResponse.body);
+  assert.equal(wrongPasswordResponse.json<{ error: string }>().error, 'unauthorized');
+});
+
+test('poll creation rejects invalid dates and option counts', async () => {
+  const registered = await registerTestUser();
+
+  const pastPollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(registered.accessToken),
+    payload: {
+      question: 'This poll should be rejected.',
+      options: ['Yes', 'No'],
+      endsAt: '2020-01-01T00:00:00.000Z'
+    }
+  });
+
+  assert.equal(pastPollResponse.statusCode, 400, pastPollResponse.body);
+
+  const tooManyOptionsResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(registered.accessToken),
+    payload: {
+      question: 'This poll has too many options.',
+      options: ['1', '2', '3', '4', '5', '6']
+    }
+  });
+
+  assert.equal(tooManyOptionsResponse.statusCode, 400, tooManyOptionsResponse.body);
+});
+
 after(async () => {
   for (const userId of createdUserIds) {
     await db.query('DELETE FROM users WHERE id = $1', [userId]);
@@ -177,6 +289,8 @@ after(async () => {
 
   await app.close();
   await closeDatabaseConnection();
+  await closeRedisConnection();
+  closeStorageConnection();
 });
 
 test('auth and polls happy path works end to end', async () => {

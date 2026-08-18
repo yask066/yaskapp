@@ -15,10 +15,25 @@ export const storage = new S3Client({
 export const mediaBucket = env.S3_BUCKET;
 
 export async function checkStorageConnection() {
-  await storage.send(new HeadBucketCommand({ Bucket: mediaBucket }));
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort(), 2_000);
+  timeout.unref();
+
+  try {
+    await storage.send(
+      new HeadBucketCommand({ Bucket: mediaBucket }),
+      { abortSignal: abortController.signal }
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
 
   return {
     connected: true,
     bucket: mediaBucket
   };
+}
+
+export function closeStorageConnection() {
+  storage.destroy();
 }
