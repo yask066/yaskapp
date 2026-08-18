@@ -21,8 +21,8 @@ flutter run `
 
 ## Checklist
 
-- [ ] `GET $baseUrl/health/ready` returns HTTP `200` with database and Redis
-      status set to connected.
+- [ ] `GET $baseUrl/health/ready` returns HTTP `200` with database, Redis, and
+      storage status set to connected.
 - [ ] Register a fresh staging user.
 - [ ] Log in and confirm the Flutter home screen loads the feed.
 - [ ] Create a public poll from Flutter and confirm it appears in the feed.
@@ -38,6 +38,18 @@ flutter run `
       returns a safe error without exposing secrets.
 - [ ] Review API logs and confirm authorization headers, passwords, tokens,
       JWT secrets, and storage secrets are redacted.
+
+## Operations
+
+Inspect recent service logs from the staging host:
+
+```bash
+docker compose -f infra/docker/docker-compose.staging.yml logs --tail=100 api
+docker compose -f infra/docker/docker-compose.staging.yml logs --tail=100 https
+```
+
+Docker rotates each service's JSON logs at 10 MB per file and keeps five files.
+The API readiness endpoint checks PostgreSQL, Redis, and the MinIO bucket.
 
 ## Release Record
 

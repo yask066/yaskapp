@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 
 import { checkDatabaseConnection } from '../../config/database.js';
 import { checkRedisConnection } from '../../config/redis.js';
+import { checkStorageConnection } from '../../config/storage.js';
 
 export function registerHealthRoutes(app: FastifyInstance) {
   app.get('/health', async () => ({
@@ -21,16 +22,18 @@ export function registerHealthRoutes(app: FastifyInstance) {
 
   app.get('/health/ready', async (request, reply) => {
     try {
-      const [database, redis] = await Promise.all([
+      const [database, redis, storage] = await Promise.all([
         checkDatabaseConnection(),
-        checkRedisConnection()
+        checkRedisConnection(),
+        checkStorageConnection()
       ]);
 
       return {
         status: 'ready',
         service: 'api',
         database,
-        redis
+        redis,
+        storage
       };
     } catch (error) {
       request.log.error(error, 'API readiness check failed');

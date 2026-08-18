@@ -20,6 +20,21 @@ docker compose -f infra/docker/docker-compose.staging.yml exec -T postgres \
 pg_restore --list "$backup_file" > "$backup_file.list"
 ```
 
+For the VPS, use the repository script so the dump is validated and old local
+dumps are removed according to retention:
+
+```bash
+sudo install -m 0750 infra/docker/backup-postgres.sh /usr/local/sbin/yaskapp-backup-postgres
+sudo BACKUP_DIR=/var/backups/yaskapp BACKUP_RETENTION_DAYS=30 \
+  /usr/local/sbin/yaskapp-backup-postgres
+```
+
+Run it daily with root's cron (`sudo crontab -e`):
+
+```cron
+15 3 * * * /usr/local/sbin/yaskapp-backup-postgres >> /var/log/yaskapp-backup.log 2>&1
+```
+
 The dump must be copied to protected backup storage and removed from the host
 according to the staging retention policy. Never commit `backups/` to Git.
 
@@ -48,3 +63,5 @@ endpoint before allowing test traffic.
 - Test one restore regularly; a dump that was never restored is unverified.
 - Record the backup timestamp, migration version, and restore result.
 - Do not use staging dumps as a substitute for production backups.
+- Copy backups to storage outside the VPS; local retention does not protect
+  against VPS loss.

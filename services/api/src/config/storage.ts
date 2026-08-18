@@ -1,4 +1,4 @@
-import { S3Client } from '@aws-sdk/client-s3';
+import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 
 import { env } from './env.js';
 
@@ -13,3 +13,12 @@ export const storage = new S3Client({
 });
 
 export const mediaBucket = env.S3_BUCKET;
+
+export async function checkStorageConnection() {
+  await storage.send(new HeadBucketCommand({ Bucket: mediaBucket }));
+
+  return {
+    connected: true,
+    bucket: mediaBucket
+  };
+}
