@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-readonly compose_file="$project_root/infra/docker/docker-compose.staging.yml"
+readonly project_root="${PROJECT_ROOT:-/opt/yaskapp}"
+readonly compose_file="${COMPOSE_FILE:-$project_root/infra/docker/docker-compose.staging.yml}"
 readonly backup_dir="${BACKUP_DIR:-/var/backups/yaskapp}"
 readonly retention_days="${BACKUP_RETENTION_DAYS:-30}"
 
