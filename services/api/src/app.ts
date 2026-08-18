@@ -37,6 +37,52 @@ export function buildApp() {
         : false
   });
 
+  app.setNotFoundHandler((_request, reply) => {
+    return reply.status(404).send({
+      error: 'not_found',
+      message: 'Route was not found.'
+    });
+  });
+
+  app.setErrorHandler((error, request, reply) => {
+    const errorStatusCode =
+      typeof error === 'object' &&
+      error !== null &&
+      'statusCode' in error &&
+      typeof error.statusCode === 'number'
+        ? error.statusCode
+        : undefined;
+    const statusCode = errorStatusCode && errorStatusCode >= 400 ? errorStatusCode : 500;
+
+    if (statusCode >= 500) {
+      request.log.error({ err: error }, 'Unhandled request error');
+
+      return reply.status(500).send({
+        error: 'internal_server_error',
+        message: 'An unexpected error occurred.'
+      });
+    }
+
+    if (statusCode === 404) {
+      return reply.status(404).send({
+        error: 'not_found',
+        message: 'Route was not found.'
+      });
+    }
+
+    if (statusCode === 400) {
+      return reply.status(400).send({
+        error: 'validation_error',
+        message: 'Request input is invalid.'
+      });
+    }
+
+    return reply.status(statusCode).send({
+      error: 'request_error',
+      message: 'The request could not be processed.'
+    });
+  });
+
   app.register(cors, {
     origin: true,
     credentials: true

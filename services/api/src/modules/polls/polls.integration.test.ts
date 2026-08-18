@@ -9,6 +9,9 @@ const [{ buildApp }, { closeDatabaseConnection, db }] = await Promise.all([
 ]);
 
 const app = buildApp();
+app.get('/test-error-handler', async () => {
+  throw new Error('sensitive internal detail');
+});
 const createdUserIds = new Set<string>();
 
 type AuthResponse = {
@@ -127,6 +130,45 @@ function bearer(accessToken: string) {
     authorization: `Bearer ${accessToken}`
   };
 }
+
+test('global error handler returns safe and consistent errors', async () => {
+  const notFoundResponse = await app.inject({
+    method: 'GET',
+    url: '/route-that-does-not-exist'
+  });
+
+  assert.equal(notFoundResponse.statusCode, 404, notFoundResponse.body);
+  assert.deepEqual(notFoundResponse.json(), {
+    error: 'not_found',
+    message: 'Route was not found.'
+  });
+
+  const malformedJsonResponse = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    headers: {
+      'content-type': 'application/json'
+    },
+    payload: '{"email":'
+  });
+
+  assert.equal(malformedJsonResponse.statusCode, 400, malformedJsonResponse.body);
+  assert.deepEqual(malformedJsonResponse.json(), {
+    error: 'validation_error',
+    message: 'Request input is invalid.'
+  });
+
+  const internalErrorResponse = await app.inject({
+    method: 'GET',
+    url: '/test-error-handler'
+  });
+
+  assert.equal(internalErrorResponse.statusCode, 500, internalErrorResponse.body);
+  assert.deepEqual(internalErrorResponse.json(), {
+    error: 'internal_server_error',
+    message: 'An unexpected error occurred.'
+  });
+});
 
 after(async () => {
   for (const userId of createdUserIds) {
