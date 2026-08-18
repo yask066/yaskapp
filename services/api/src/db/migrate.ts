@@ -1,77 +1,143 @@
+import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { PoolClient } from 'pg';
 
-import { db, closeDatabaseConnection } from '../config/database.js';
+import { closeDatabaseConnection, db } from '../config/database.js';
 
 const migrationsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'migrations');
 
 type MigrationRow = {
   name: string;
+  checksum: string | null;
 };
 
-async function ensureMigrationsTable() {
-  await db.query(`
+type MigrationFile = {
+  name: string;
+  checksum: string;
+  sql: string;
+};
+
+const migrationLockId = 7_455_291;
+
+async function ensureMigrationsTable(client: PoolClient) {
+  await client.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       name TEXT PRIMARY KEY,
-      applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      applied_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      checksum TEXT
     );
+  `);
+
+  await client.query(`
+    ALTER TABLE schema_migrations
+      ADD COLUMN IF NOT EXISTS checksum TEXT;
   `);
 }
 
-async function getAppliedMigrations() {
-  const result = await db.query<MigrationRow>(
-    'SELECT name FROM schema_migrations ORDER BY name ASC'
+async function getAppliedMigrations(client: PoolClient) {
+  const result = await client.query<MigrationRow>(
+    'SELECT name, checksum FROM schema_migrations ORDER BY name ASC'
   );
 
-  return new Set(result.rows.map((row) => row.name));
+  return new Map(result.rows.map((row) => [row.name, row.checksum]));
 }
 
-async function listMigrationFiles() {
+async function listMigrationFiles(): Promise<MigrationFile[]> {
   const entries = await readdir(migrationsDir, { withFileTypes: true });
 
-  return entries
+  const names = entries
     .filter((entry) => entry.isFile() && entry.name.endsWith('.sql'))
     .map((entry) => entry.name)
     .sort((left, right) => left.localeCompare(right));
+
+  return Promise.all(
+    names.map(async (name) => {
+      const sql = await readFile(path.join(migrationsDir, name), 'utf8');
+      return {
+        name,
+        checksum: createHash('sha256').update(sql).digest('hex'),
+        sql
+      };
+    })
+  );
 }
 
-async function applyMigration(fileName: string) {
-  const filePath = path.join(migrationsDir, fileName);
-  const sql = await readFile(filePath, 'utf8');
-  const client = await db.connect();
-
+async function applyMigration(client: PoolClient, migration: MigrationFile) {
+  await client.query('BEGIN');
   try {
-    await client.query('BEGIN');
-    await client.query(sql);
-    await client.query('INSERT INTO schema_migrations (name) VALUES ($1)', [fileName]);
+    await client.query(migration.sql);
+    await client.query(
+      'INSERT INTO schema_migrations (name, checksum) VALUES ($1, $2)',
+      [migration.name, migration.checksum]
+    );
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
-  } finally {
-    client.release();
   }
 }
 
 async function migrate() {
-  await ensureMigrationsTable();
+  const client = await db.connect();
 
-  const appliedMigrations = await getAppliedMigrations();
-  const migrationFiles = await listMigrationFiles();
-  const pendingMigrations = migrationFiles.filter((fileName) => !appliedMigrations.has(fileName));
+  try {
+    await client.query('SELECT pg_advisory_lock($1::bigint)', [migrationLockId]);
+    await ensureMigrationsTable(client);
 
-  if (pendingMigrations.length === 0) {
-    console.log('No pending database migrations.');
-    return;
+    const appliedMigrations = await getAppliedMigrations(client);
+    const migrationFiles = await listMigrationFiles();
+
+    for (const migration of migrationFiles) {
+      const appliedChecksum = appliedMigrations.get(migration.name);
+      if (appliedChecksum === undefined) {
+        continue;
+      }
+
+      // Populate checksums for databases created before checksum tracking existed.
+      if (appliedChecksum === null) {
+        await client.query('UPDATE schema_migrations SET checksum = $1 WHERE name = $2', [
+          migration.checksum,
+          migration.name
+        ]);
+        continue;
+      }
+
+      if (appliedChecksum !== migration.checksum) {
+        throw new Error(
+          `Applied migration ${migration.name} was modified. Restore the original file or create a new migration.`
+        );
+      }
+    }
+
+    const knownMigrationNames = new Set(migrationFiles.map((migration) => migration.name));
+    const missingFiles = [...appliedMigrations.keys()].filter(
+      (name) => !knownMigrationNames.has(name)
+    );
+    if (missingFiles.length > 0) {
+      throw new Error(`Applied migration files are missing: ${missingFiles.join(', ')}`);
+    }
+
+    const pendingMigrations = migrationFiles.filter(
+      (migration) => !appliedMigrations.has(migration.name)
+    );
+
+    if (pendingMigrations.length === 0) {
+      console.log('No pending database migrations.');
+      return;
+    }
+
+    for (const migration of pendingMigrations) {
+      console.log(`Applying migration: ${migration.name}`);
+      await applyMigration(client, migration);
+    }
+
+    console.log(`Applied ${pendingMigrations.length} database migration(s).`);
+  } finally {
+    await client.query('SELECT pg_advisory_unlock($1::bigint)', [migrationLockId]);
+    client.release();
   }
-
-  for (const fileName of pendingMigrations) {
-    console.log(`Applying migration: ${fileName}`);
-    await applyMigration(fileName);
-  }
-
-  console.log(`Applied ${pendingMigrations.length} database migration(s).`);
 }
 
 try {
