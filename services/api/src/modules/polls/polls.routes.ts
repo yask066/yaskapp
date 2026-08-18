@@ -21,7 +21,7 @@ const uuidSchema = z.string().uuid();
 
 const listPollsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20)
-});
+}).strict();
 
 const createPollSchema = z.object({
   question: z.string().trim().min(1).max(280),
@@ -42,31 +42,31 @@ const createPollSchema = z.object({
     .datetime({ offset: true })
     .refine((value) => new Date(value) > new Date(), 'Poll end date must be in the future.')
     .optional()
-});
+}).strict();
 
 const voteParamsSchema = z.object({
   pollId: uuidSchema
-});
+}).strict();
 
 const likeParamsSchema = z.object({
   pollId: uuidSchema
-});
+}).strict();
 
 const commentsParamsSchema = z.object({
   pollId: uuidSchema
-});
+}).strict();
 
 const commentsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(50)
-});
+}).strict();
 
 const createCommentSchema = z.object({
   body: z.string().trim().min(1).max(1000)
-});
+}).strict();
 
 const voteBodySchema = z.object({
   optionId: uuidSchema
-});
+}).strict();
 
 function validationError(reply: FastifyReply, error: z.ZodError) {
   return reply.status(400).send({

@@ -16,15 +16,18 @@ const updateProfileSchema = z.object({
   bio: z
     .union([z.string().trim().max(500), z.null()])
     .optional()
-});
+}).strict().refine(
+  (profile) => profile.displayName !== undefined || profile.bio !== undefined,
+  'At least one profile field is required.'
+);
 
 const listMyPollsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20)
-});
+}).strict();
 
 const followParamsSchema = z.object({
   userId: z.string().uuid()
-});
+}).strict();
 
 function validationError(reply: FastifyReply, error: z.ZodError) {
   return reply.status(400).send({

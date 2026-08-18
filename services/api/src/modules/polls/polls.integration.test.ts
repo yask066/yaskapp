@@ -253,6 +253,28 @@ test('poll creation validates request body', async () => {
   assert.equal(response.statusCode, 400, response.body);
 });
 
+test('request validation rejects unknown fields', async () => {
+  const registerResponse = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: `strict_${uniqueSuffix()}@yaskapp.test`,
+      username: `strict_${uniqueSuffix()}`,
+      password: 'password123',
+      unexpected: 'field'
+    }
+  });
+
+  assert.equal(registerResponse.statusCode, 400, registerResponse.body);
+
+  const pollsResponse = await app.inject({
+    method: 'GET',
+    url: '/polls?limit=5&unexpected=field'
+  });
+
+  assert.equal(pollsResponse.statusCode, 400, pollsResponse.body);
+});
+
 test('profile can be updated by the current user', async () => {
   const registered = await registerTestUser();
 
@@ -312,6 +334,28 @@ test('profile update requires authentication and validates body', async () => {
   });
 
   assert.equal(invalidResponse.statusCode, 400, invalidResponse.body);
+});
+
+test('profile update requires at least one known field', async () => {
+  const registered = await registerTestUser();
+
+  const emptyResponse = await app.inject({
+    method: 'PATCH',
+    url: '/profiles/me',
+    headers: bearer(registered.accessToken),
+    payload: {}
+  });
+
+  assert.equal(emptyResponse.statusCode, 400, emptyResponse.body);
+
+  const unknownResponse = await app.inject({
+    method: 'PATCH',
+    url: '/profiles/me',
+    headers: bearer(registered.accessToken),
+    payload: { headline: 'Unknown field' }
+  });
+
+  assert.equal(unknownResponse.statusCode, 400, unknownResponse.body);
 });
 
 test('current user can list their own polls and see poll counter', async () => {

@@ -16,12 +16,12 @@ const registerSchema = z.object({
   username: z.string().trim().min(3).max(30).regex(usernamePattern),
   password: z.string().min(8).max(128),
   displayName: z.string().trim().min(1).max(80).optional()
-});
+}).strict();
 
 const loginSchema = z.object({
   login: z.string().trim().min(3).max(320),
   password: z.string().min(1).max(128)
-});
+}).strict();
 
 function validationError(reply: FastifyReply, error: z.ZodError) {
   return reply.status(400).send({
