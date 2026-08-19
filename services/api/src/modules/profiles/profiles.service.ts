@@ -1,4 +1,4 @@
-import { updateProfileRecord } from './profiles.repository.js';
+import { findPublicProfileRecord, updateProfileRecord } from './profiles.repository.js';
 import {
   followUserRecord,
   FollowRepositoryError,
@@ -42,6 +42,16 @@ export async function updateProfile(input: UpdateProfileInput) {
   }
 
   return user;
+}
+
+export async function getPublicProfile(userId: string, viewerId?: string) {
+  const profile = await findPublicProfileRecord(userId, viewerId);
+
+  if (!profile) {
+    throw new ProfileNotFoundError('Profile was not found.');
+  }
+
+  return profile;
 }
 
 export async function listMyPolls(userId: string, limit: number) {

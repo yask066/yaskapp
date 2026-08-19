@@ -3,7 +3,7 @@ import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { broadcastPollVoteCreated } from '../../realtime/realtime.hub.js';
-import { authenticate } from '../auth/auth.utils.js';
+import { authenticate, optionalAuthenticate } from '../auth/auth.utils.js';
 import {
   PollAlreadyVotedError,
   PollClosedError,
@@ -74,23 +74,6 @@ function validationError(reply: FastifyReply, error: z.ZodError) {
     message: 'Request input is invalid.',
     details: error.flatten()
   });
-}
-
-async function optionalAuthenticate(request: FastifyRequest, reply: FastifyReply) {
-  const authorization = request.headers.authorization;
-
-  if (!authorization) {
-    return;
-  }
-
-  try {
-    await request.jwtVerify();
-  } catch {
-    return reply.status(401).send({
-      error: 'unauthorized',
-      message: 'Authentication is required.'
-    });
-  }
 }
 
 function pollError(reply: FastifyReply, error: unknown) {

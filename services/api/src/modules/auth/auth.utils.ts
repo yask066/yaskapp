@@ -13,6 +13,24 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
   }
 }
 
+export async function optionalAuthenticate(
+  request: FastifyRequest,
+  reply: FastifyReply
+) {
+  if (!request.headers.authorization) {
+    return;
+  }
+
+  try {
+    await request.jwtVerify();
+  } catch {
+    return reply.status(401).send({
+      error: 'unauthorized',
+      message: 'Authentication is required.'
+    });
+  }
+}
+
 export async function getCurrentUser(request: FastifyRequest) {
   const userId = request.user.sub;
 

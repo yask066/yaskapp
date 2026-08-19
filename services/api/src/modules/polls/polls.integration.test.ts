@@ -514,6 +514,64 @@ test('profile update requires at least one known field', async () => {
   assert.equal(unknownResponse.statusCode, 400, unknownResponse.body);
 });
 
+test('public profile returns safe data and viewer relationship state', async () => {
+  const viewer = await registerTestUser();
+  const target = await registerTestUser();
+
+  const anonymousResponse = await app.inject({
+    method: 'GET',
+    url: `/users/${target.user.id}`
+  });
+
+  assert.equal(anonymousResponse.statusCode, 200, anonymousResponse.body);
+  const anonymousProfile = anonymousResponse.json<{
+    user: {
+      id: string;
+      username: string;
+      viewerIsFollowing: boolean;
+      profile: { followersCount: number };
+      email?: string;
+    };
+  }>().user;
+  assert.equal(anonymousProfile.id, target.user.id);
+  assert.equal(anonymousProfile.username, target.user.username);
+  assert.equal(anonymousProfile.viewerIsFollowing, false);
+  assert.equal(anonymousProfile.profile.followersCount, 0);
+  assert.equal(anonymousProfile.email, undefined);
+
+  const followResponse = await app.inject({
+    method: 'POST',
+    url: `/users/${target.user.id}/follow`,
+    headers: bearer(viewer.accessToken)
+  });
+  assert.equal(followResponse.statusCode, 201, followResponse.body);
+
+  const authenticatedResponse = await app.inject({
+    method: 'GET',
+    url: `/users/${target.user.id}`,
+    headers: bearer(viewer.accessToken)
+  });
+
+  assert.equal(authenticatedResponse.statusCode, 200, authenticatedResponse.body);
+  const authenticatedProfile = authenticatedResponse.json<{
+    user: { viewerIsFollowing: boolean; profile: { followersCount: number } };
+  }>().user;
+  assert.equal(authenticatedProfile.viewerIsFollowing, true);
+  assert.equal(authenticatedProfile.profile.followersCount, 1);
+
+  const missingResponse = await app.inject({
+    method: 'GET',
+    url: '/users/00000000-0000-0000-0000-000000000000'
+  });
+  assert.equal(missingResponse.statusCode, 404, missingResponse.body);
+
+  const invalidParamsResponse = await app.inject({
+    method: 'GET',
+    url: '/users/not-a-uuid'
+  });
+  assert.equal(invalidParamsResponse.statusCode, 400, invalidParamsResponse.body);
+});
+
 test('current user can list their own polls and see poll counter', async () => {
   const registered = await registerTestUser();
 

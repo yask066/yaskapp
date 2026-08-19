@@ -7,6 +7,23 @@ type UpdateProfileInput = {
   bio?: string | null;
 };
 
+export type PublicProfile = {
+  id: string;
+  username: string;
+  status: 'active';
+  createdAt: string;
+  updatedAt: string;
+  viewerIsFollowing: boolean;
+  profile: {
+    displayName: string;
+    bio: string | null;
+    avatarObjectKey: string | null;
+    pollsCount: number;
+    followersCount: number;
+    followingCount: number;
+  };
+};
+
 function mapUser(row: UserWithProfileRow): PublicUser {
   return {
     id: row.id,
@@ -24,6 +41,68 @@ function mapUser(row: UserWithProfileRow): PublicUser {
       followingCount: row.following_count
     }
   };
+}
+
+type PublicProfileRow = Omit<UserWithProfileRow, 'email' | 'password_hash'> & {
+  viewer_is_following: boolean;
+};
+
+function mapPublicProfile(row: PublicProfileRow): PublicProfile {
+  return {
+    id: row.id,
+    username: row.username,
+    status: 'active',
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+    viewerIsFollowing: row.viewer_is_following,
+    profile: {
+      displayName: row.display_name,
+      bio: row.bio,
+      avatarObjectKey: row.avatar_object_key,
+      pollsCount: row.polls_count,
+      followersCount: row.followers_count,
+      followingCount: row.following_count
+    }
+  };
+}
+
+export async function findPublicProfileRecord(userId: string, viewerId?: string) {
+  const result = await db.query<PublicProfileRow>(
+    `
+      SELECT
+        u.id,
+        u.username::text AS username,
+        u.status,
+        u.created_at,
+        u.updated_at,
+        p.display_name,
+        p.bio,
+        p.avatar_object_key,
+        p.polls_count,
+        p.followers_count,
+        p.following_count,
+        CASE
+          WHEN $2::uuid IS NULL THEN false
+          ELSE EXISTS (
+            SELECT 1
+            FROM follows f
+            WHERE f.follower_id = $2::uuid
+              AND f.followee_id = u.id
+          )
+        END AS viewer_is_following
+      FROM users u
+      JOIN profiles p ON p.user_id = u.id
+      WHERE u.id = $1
+        AND u.status = 'active'
+        AND u.deleted_at IS NULL
+      LIMIT 1
+    `,
+    [userId, viewerId ?? null]
+  );
+
+  const row = result.rows[0];
+
+  return row ? mapPublicProfile(row) : null;
 }
 
 export async function updateProfileRecord(input: UpdateProfileInput) {

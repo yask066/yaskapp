@@ -1,11 +1,12 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
-import { authenticate } from '../auth/auth.utils.js';
+import { authenticate, optionalAuthenticate } from '../auth/auth.utils.js';
 import {
   FollowRepositoryError,
   ProfileNotFoundError,
   followUser,
+  getPublicProfile,
   listMyPolls,
   unfollowUser,
   updateProfile
@@ -63,6 +64,28 @@ function profileError(reply: FastifyReply, error: unknown) {
 }
 
 export function registerProfileRoutes(app: FastifyInstance) {
+  app.get(
+    '/users/:userId',
+    {
+      preHandler: optionalAuthenticate
+    },
+    async (request, reply) => {
+      const parsedParams = followParamsSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      try {
+        return {
+          user: await getPublicProfile(parsedParams.data.userId, request.user?.sub)
+        };
+      } catch (error) {
+        return profileError(reply, error);
+      }
+    }
+  );
+
   app.post(
     '/users/:userId/follow',
     {
