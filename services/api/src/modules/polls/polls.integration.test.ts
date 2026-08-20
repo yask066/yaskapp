@@ -1245,3 +1245,71 @@ test('users can follow and unfollow safely', async () => {
     followeeFollowersCount: 0
   });
 });
+
+test('concurrent follow and unfollow requests keep counters consistent', async () => {
+  const follower = await registerTestUser();
+  const followee = await registerTestUser();
+  const followUrl = `/users/${followee.user.id}/follow`;
+
+  const followResponses = await Promise.all(
+    Array.from({ length: 8 }, () =>
+      app.inject({
+        method: 'POST',
+        url: followUrl,
+        headers: bearer(follower.accessToken)
+      })
+    )
+  );
+
+  assert.ok(followResponses.every((response) => response.statusCode === 201));
+
+  const followedCounts = await db.query<{
+    follower_following_count: number;
+    followee_followers_count: number;
+    relationship_count: string;
+  }>(
+    `
+      SELECT
+        (SELECT following_count FROM profiles WHERE user_id = $1) AS follower_following_count,
+        (SELECT followers_count FROM profiles WHERE user_id = $2) AS followee_followers_count,
+        (SELECT count(*)::text FROM follows WHERE follower_id = $1 AND followee_id = $2)
+          AS relationship_count
+    `,
+    [follower.user.id, followee.user.id]
+  );
+
+  assert.equal(followedCounts.rows[0]?.follower_following_count, 1);
+  assert.equal(followedCounts.rows[0]?.followee_followers_count, 1);
+  assert.equal(followedCounts.rows[0]?.relationship_count, '1');
+
+  const unfollowResponses = await Promise.all(
+    Array.from({ length: 8 }, () =>
+      app.inject({
+        method: 'DELETE',
+        url: followUrl,
+        headers: bearer(follower.accessToken)
+      })
+    )
+  );
+
+  assert.ok(unfollowResponses.every((response) => response.statusCode === 200));
+
+  const unfollowedCounts = await db.query<{
+    follower_following_count: number;
+    followee_followers_count: number;
+    relationship_count: string;
+  }>(
+    `
+      SELECT
+        (SELECT following_count FROM profiles WHERE user_id = $1) AS follower_following_count,
+        (SELECT followers_count FROM profiles WHERE user_id = $2) AS followee_followers_count,
+        (SELECT count(*)::text FROM follows WHERE follower_id = $1 AND followee_id = $2)
+          AS relationship_count
+    `,
+    [follower.user.id, followee.user.id]
+  );
+
+  assert.equal(unfollowedCounts.rows[0]?.follower_following_count, 0);
+  assert.equal(unfollowedCounts.rows[0]?.followee_followers_count, 0);
+  assert.equal(unfollowedCounts.rows[0]?.relationship_count, '0');
+});
