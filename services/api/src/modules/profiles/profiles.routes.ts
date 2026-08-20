@@ -7,6 +7,8 @@ import {
   ProfileNotFoundError,
   followUser,
   getPublicProfile,
+  listFollowers,
+  listFollowing,
   listMyPolls,
   unfollowUser,
   updateProfile
@@ -24,6 +26,10 @@ const updateProfileSchema = z.object({
 
 const listMyPollsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20)
+}).strict();
+
+const listProfilesQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(50)
 }).strict();
 
 const followParamsSchema = z.object({
@@ -108,6 +114,55 @@ export function registerProfileRoutes(app: FastifyInstance) {
       } catch (error) {
         return profileError(reply, error);
       }
+    }
+  );
+
+  app.get(
+    '/users/:userId/followers',
+    {
+      preHandler: optionalAuthenticate
+    },
+    async (request, reply) => {
+      const parsedParams = followParamsSchema.safeParse(request.params);
+      const parsedQuery = listProfilesQuerySchema.safeParse(request.query);
+
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      if (!parsedQuery.success) {
+        return validationError(reply, parsedQuery.error);
+      }
+
+      try {
+        return {
+          items: await listFollowers(
+            parsedParams.data.userId,
+            request.user?.sub,
+            parsedQuery.data.limit
+          )
+        };
+      } catch (error) {
+        return profileError(reply, error);
+      }
+    }
+  );
+
+  app.get(
+    '/profiles/me/following',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      const parsedQuery = listProfilesQuerySchema.safeParse(request.query);
+
+      if (!parsedQuery.success) {
+        return validationError(reply, parsedQuery.error);
+      }
+
+      return {
+        items: await listFollowing(request.user.sub, parsedQuery.data.limit)
+      };
     }
   );
 

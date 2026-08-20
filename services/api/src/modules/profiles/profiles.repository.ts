@@ -66,6 +66,15 @@ function mapPublicProfile(row: PublicProfileRow): PublicProfile {
   };
 }
 
+async function listPublicProfiles(
+  query: string,
+  values: unknown[]
+): Promise<PublicProfile[]> {
+  const result = await db.query<PublicProfileRow>(query, values);
+
+  return result.rows.map(mapPublicProfile);
+}
+
 export async function findPublicProfileRecord(userId: string, viewerId?: string) {
   const result = await db.query<PublicProfileRow>(
     `
@@ -103,6 +112,76 @@ export async function findPublicProfileRecord(userId: string, viewerId?: string)
   const row = result.rows[0];
 
   return row ? mapPublicProfile(row) : null;
+}
+
+export async function listFollowingRecords(userId: string, limit: number) {
+  return listPublicProfiles(
+    `
+      SELECT
+        u.id,
+        u.username::text AS username,
+        u.status,
+        u.created_at,
+        u.updated_at,
+        p.display_name,
+        p.bio,
+        p.avatar_object_key,
+        p.polls_count,
+        p.followers_count,
+        p.following_count,
+        true AS viewer_is_following
+      FROM follows f
+      JOIN users u ON u.id = f.followee_id
+      JOIN profiles p ON p.user_id = u.id
+      WHERE f.follower_id = $1
+        AND u.status = 'active'
+        AND u.deleted_at IS NULL
+      ORDER BY f.created_at DESC, f.followee_id DESC
+      LIMIT $2
+    `,
+    [userId, limit]
+  );
+}
+
+export async function listFollowerRecords(
+  userId: string,
+  viewerId: string | undefined,
+  limit: number
+) {
+  return listPublicProfiles(
+    `
+      SELECT
+        u.id,
+        u.username::text AS username,
+        u.status,
+        u.created_at,
+        u.updated_at,
+        p.display_name,
+        p.bio,
+        p.avatar_object_key,
+        p.polls_count,
+        p.followers_count,
+        p.following_count,
+        CASE
+          WHEN $2::uuid IS NULL THEN false
+          ELSE EXISTS (
+            SELECT 1
+            FROM follows viewer_follow
+            WHERE viewer_follow.follower_id = $2::uuid
+              AND viewer_follow.followee_id = u.id
+          )
+        END AS viewer_is_following
+      FROM follows f
+      JOIN users u ON u.id = f.follower_id
+      JOIN profiles p ON p.user_id = u.id
+      WHERE f.followee_id = $1
+        AND u.status = 'active'
+        AND u.deleted_at IS NULL
+      ORDER BY f.created_at DESC, f.follower_id DESC
+      LIMIT $3
+    `,
+    [userId, viewerId ?? null, limit]
+  );
 }
 
 export async function updateProfileRecord(input: UpdateProfileInput) {

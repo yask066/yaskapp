@@ -1,4 +1,9 @@
-import { findPublicProfileRecord, updateProfileRecord } from './profiles.repository.js';
+import {
+  findPublicProfileRecord,
+  listFollowerRecords,
+  listFollowingRecords,
+  updateProfileRecord
+} from './profiles.repository.js';
 import {
   followUserRecord,
   FollowRepositoryError,
@@ -52,6 +57,24 @@ export async function getPublicProfile(userId: string, viewerId?: string) {
   }
 
   return profile;
+}
+
+export async function listFollowing(userId: string, limit: number) {
+  return listFollowingRecords(userId, limit);
+}
+
+export async function listFollowers(
+  userId: string,
+  viewerId: string | undefined,
+  limit: number
+) {
+  const profile = await findPublicProfileRecord(userId, viewerId);
+
+  if (!profile) {
+    throw new ProfileNotFoundError('Profile was not found.');
+  }
+
+  return listFollowerRecords(userId, viewerId, limit);
 }
 
 export async function listMyPolls(userId: string, limit: number) {

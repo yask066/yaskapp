@@ -572,6 +572,80 @@ test('public profile returns safe data and viewer relationship state', async () 
   assert.equal(invalidParamsResponse.statusCode, 400, invalidParamsResponse.body);
 });
 
+test('following and followers lists return stable public profiles', async () => {
+  const viewer = await registerTestUser();
+  const followedUser = await registerTestUser();
+  const secondFollower = await registerTestUser();
+
+  const followViewerResponse = await app.inject({
+    method: 'POST',
+    url: `/users/${followedUser.user.id}/follow`,
+    headers: bearer(viewer.accessToken)
+  });
+  assert.equal(followViewerResponse.statusCode, 201, followViewerResponse.body);
+
+  const followSecondResponse = await app.inject({
+    method: 'POST',
+    url: `/users/${followedUser.user.id}/follow`,
+    headers: bearer(secondFollower.accessToken)
+  });
+  assert.equal(followSecondResponse.statusCode, 201, followSecondResponse.body);
+
+  const followingResponse = await app.inject({
+    method: 'GET',
+    url: '/profiles/me/following?limit=10',
+    headers: bearer(viewer.accessToken)
+  });
+
+  assert.equal(followingResponse.statusCode, 200, followingResponse.body);
+  const following = followingResponse.json<{
+    items: Array<{ id: string; username: string; viewerIsFollowing: boolean; email?: string }>;
+  }>();
+  assert.equal(following.items.length, 1);
+  assert.equal(following.items[0]?.id, followedUser.user.id);
+  assert.equal(following.items[0]?.username, followedUser.user.username);
+  assert.equal(following.items[0]?.viewerIsFollowing, true);
+  assert.equal(following.items[0]?.email, undefined);
+
+  const followersResponse = await app.inject({
+    method: 'GET',
+    url: `/users/${followedUser.user.id}/followers?limit=10`,
+    headers: bearer(viewer.accessToken)
+  });
+
+  assert.equal(followersResponse.statusCode, 200, followersResponse.body);
+  const followers = followersResponse.json<{
+    items: Array<{ id: string; viewerIsFollowing: boolean }>;
+  }>();
+  assert.equal(followers.items.length, 2);
+  assert.ok(followers.items.some((item) => item.id === viewer.user.id));
+  assert.ok(followers.items.some((item) => item.id === secondFollower.user.id));
+  assert.equal(
+    followers.items.find((item) => item.id === viewer.user.id)?.viewerIsFollowing,
+    false
+  );
+
+  const unauthenticatedFollowersResponse = await app.inject({
+    method: 'GET',
+    url: `/users/${followedUser.user.id}/followers?limit=1`
+  });
+  assert.equal(unauthenticatedFollowersResponse.statusCode, 200);
+  assert.equal(unauthenticatedFollowersResponse.json<{ items: unknown[] }>().items.length, 1);
+
+  const invalidLimitResponse = await app.inject({
+    method: 'GET',
+    url: '/profiles/me/following?limit=0',
+    headers: bearer(viewer.accessToken)
+  });
+  assert.equal(invalidLimitResponse.statusCode, 400, invalidLimitResponse.body);
+
+  const missingFollowersResponse = await app.inject({
+    method: 'GET',
+    url: '/users/00000000-0000-0000-0000-000000000000/followers'
+  });
+  assert.equal(missingFollowersResponse.statusCode, 404, missingFollowersResponse.body);
+});
+
 test('current user can list their own polls and see poll counter', async () => {
   const registered = await registerTestUser();
 
