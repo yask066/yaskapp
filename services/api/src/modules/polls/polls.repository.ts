@@ -184,7 +184,7 @@ async function findPollRowsByIds(client: PoolClient, pollIds: string[]) {
       JOIN profiles pr ON pr.user_id = p.author_id
       WHERE p.id = ANY($1::uuid[])
         AND p.deleted_at IS NULL
-      ORDER BY p.created_at DESC
+      ORDER BY p.created_at DESC, p.id DESC
     `,
     [pollIds]
   );
@@ -332,7 +332,7 @@ export async function listPublicPollRecords(limit: number, viewerId?: string) {
         FROM polls
         WHERE visibility = 'public'
           AND deleted_at IS NULL
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, id DESC
         LIMIT $1
       `,
       [limit]
@@ -342,6 +342,37 @@ export async function listPublicPollRecords(limit: number, viewerId?: string) {
       client,
       result.rows.map((row) => row.id),
       viewerId
+    );
+  } finally {
+    client.release();
+  }
+}
+
+export async function listSubscriptionPollRecords(
+  followerId: string,
+  limit: number
+) {
+  const client = await db.connect();
+
+  try {
+    const result = await client.query<{ id: string }>(
+      `
+        SELECT p.id
+        FROM polls p
+        JOIN follows f ON f.followee_id = p.author_id
+        WHERE f.follower_id = $1
+          AND p.visibility = 'public'
+          AND p.deleted_at IS NULL
+        ORDER BY p.created_at DESC, p.id DESC
+        LIMIT $2
+      `,
+      [followerId, limit]
+    );
+
+    return hydratePolls(
+      client,
+      result.rows.map((row) => row.id),
+      followerId
     );
   } finally {
     client.release();

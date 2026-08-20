@@ -13,6 +13,7 @@ import {
   likePoll,
   listPollComments,
   listPublicPolls,
+  listSubscriptionPolls,
   unlikePoll,
   voteOnPoll
 } from './polls.service.js';
@@ -142,6 +143,29 @@ export function registerPollRoutes(app: FastifyInstance) {
       return reply.status(201).send({
         poll
       });
+    }
+  );
+
+  app.get(
+    '/polls/subscriptions',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      const parsedQuery = listPollsQuerySchema.safeParse(request.query);
+
+      if (!parsedQuery.success) {
+        return validationError(reply, parsedQuery.error);
+      }
+
+      const items = await listSubscriptionPolls(
+        request.user.sub,
+        parsedQuery.data.limit
+      );
+
+      return {
+        items
+      };
     }
   );
 

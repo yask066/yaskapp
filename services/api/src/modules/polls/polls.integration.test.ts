@@ -646,6 +646,84 @@ test('following and followers lists return stable public profiles', async () => 
   assert.equal(missingFollowersResponse.statusCode, 404, missingFollowersResponse.body);
 });
 
+test('subscription feed returns only public polls from followed users', async () => {
+  const viewer = await registerTestUser();
+  const followedAuthor = await registerTestUser();
+  const unfollowedAuthor = await registerTestUser();
+
+  const followResponse = await app.inject({
+    method: 'POST',
+    url: `/users/${followedAuthor.user.id}/follow`,
+    headers: bearer(viewer.accessToken)
+  });
+
+  assert.equal(followResponse.statusCode, 201, followResponse.body);
+
+  async function createPoll(author: AuthResponse, question: string, visibility?: string) {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/polls',
+      headers: bearer(author.accessToken),
+      payload: {
+        question,
+        options: ['Yes', 'No'],
+        ...(visibility ? { visibility } : {})
+      }
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    return response.json<PollResponse>().poll;
+  }
+
+  const followedPublicPoll = await createPoll(followedAuthor, 'Followed public poll');
+  const followedPrivatePoll = await createPoll(
+    followedAuthor,
+    'Followed private poll',
+    'private'
+  );
+  const unfollowedPublicPoll = await createPoll(
+    unfollowedAuthor,
+    'Unfollowed public poll'
+  );
+
+  const unauthenticatedResponse = await app.inject({
+    method: 'GET',
+    url: '/polls/subscriptions'
+  });
+  assert.equal(unauthenticatedResponse.statusCode, 401, unauthenticatedResponse.body);
+
+  const emptyFeedResponse = await app.inject({
+    method: 'GET',
+    url: '/polls/subscriptions?limit=10',
+    headers: bearer(unfollowedAuthor.accessToken)
+  });
+  assert.equal(emptyFeedResponse.statusCode, 200, emptyFeedResponse.body);
+  assert.deepEqual(emptyFeedResponse.json<ListPollsResponse>().items, []);
+
+  const subscriptionResponse = await app.inject({
+    method: 'GET',
+    url: '/polls/subscriptions?limit=10',
+    headers: bearer(viewer.accessToken)
+  });
+  assert.equal(subscriptionResponse.statusCode, 200, subscriptionResponse.body);
+
+  const subscriptionPolls = subscriptionResponse.json<ListPollsResponse>().items;
+  assert.deepEqual(
+    subscriptionPolls.map((poll) => poll.id),
+    [followedPublicPoll.id]
+  );
+  assert.equal(subscriptionPolls[0]?.viewerHasLiked, false);
+  assert.equal(subscriptionPolls.some((poll) => poll.id === followedPrivatePoll.id), false);
+  assert.equal(subscriptionPolls.some((poll) => poll.id === unfollowedPublicPoll.id), false);
+
+  const invalidLimitResponse = await app.inject({
+    method: 'GET',
+    url: '/polls/subscriptions?limit=51',
+    headers: bearer(viewer.accessToken)
+  });
+  assert.equal(invalidLimitResponse.statusCode, 400, invalidLimitResponse.body);
+});
+
 test('current user can list their own polls and see poll counter', async () => {
   const registered = await registerTestUser();
 

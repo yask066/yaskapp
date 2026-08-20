@@ -5,6 +5,7 @@ import {
   likePollRecord,
   listPollCommentRecords,
   listPublicPollRecords,
+  listSubscriptionPollRecords,
   unlikePollRecord
 } from './polls.repository.js';
 import type { PollVisibility } from './polls.repository.js';
@@ -72,6 +73,10 @@ export async function createPoll(input: CreatePollInput) {
 
 export async function listPublicPolls(limit: number, viewerId?: string) {
   return listPublicPollRecords(limit, viewerId);
+}
+
+export async function listSubscriptionPolls(followerId: string, limit: number) {
+  return listSubscriptionPollRecords(followerId, limit);
 }
 
 export async function listPollComments(input: ListPollCommentsInput) {
