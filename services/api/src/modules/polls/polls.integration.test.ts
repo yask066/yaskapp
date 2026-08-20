@@ -716,6 +716,21 @@ test('subscription feed returns only public polls from followed users', async ()
   assert.equal(subscriptionPolls.some((poll) => poll.id === followedPrivatePoll.id), false);
   assert.equal(subscriptionPolls.some((poll) => poll.id === unfollowedPublicPoll.id), false);
 
+  const unfollowResponse = await app.inject({
+    method: 'DELETE',
+    url: `/users/${followedAuthor.user.id}/follow`,
+    headers: bearer(viewer.accessToken)
+  });
+  assert.equal(unfollowResponse.statusCode, 200, unfollowResponse.body);
+
+  const refreshedResponse = await app.inject({
+    method: 'GET',
+    url: '/polls/subscriptions?limit=10',
+    headers: bearer(viewer.accessToken)
+  });
+  assert.equal(refreshedResponse.statusCode, 200, refreshedResponse.body);
+  assert.deepEqual(refreshedResponse.json<ListPollsResponse>().items, []);
+
   const invalidLimitResponse = await app.inject({
     method: 'GET',
     url: '/polls/subscriptions?limit=51',
@@ -1396,6 +1411,29 @@ test('users can follow and unfollow safely', async () => {
     followerFollowingCount: 0,
     followeeFollowersCount: 0
   });
+});
+
+test('follow graph hides deleted targets consistently', async () => {
+  const follower = await registerTestUser();
+  const deletedTarget = await registerTestUser();
+
+  await db.query('UPDATE users SET deleted_at = now() WHERE id = $1', [deletedTarget.user.id]);
+
+  const followResponse = await app.inject({
+    method: 'POST',
+    url: `/users/${deletedTarget.user.id}/follow`,
+    headers: bearer(follower.accessToken)
+  });
+  assert.equal(followResponse.statusCode, 404, followResponse.body);
+  assert.equal(followResponse.json<{ error: string }>().error, 'not_found');
+
+  const unfollowResponse = await app.inject({
+    method: 'DELETE',
+    url: `/users/${deletedTarget.user.id}/follow`,
+    headers: bearer(follower.accessToken)
+  });
+  assert.equal(unfollowResponse.statusCode, 404, unfollowResponse.body);
+  assert.equal(unfollowResponse.json<{ error: string }>().error, 'not_found');
 });
 
 test('concurrent follow and unfollow requests keep counters consistent', async () => {
