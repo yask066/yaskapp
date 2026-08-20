@@ -101,6 +101,33 @@ class PollsApiClient {
         .toList();
   }
 
+  Future<List<PollSummary>> listUserPolls({
+    required String userId,
+    String? accessToken,
+    int limit = 20,
+  }) async {
+    final uri = Uri.parse(_config.baseUrl).replace(
+      path: '/users/$userId/polls',
+      queryParameters: {'limit': limit.toString()},
+    );
+    final response = await _httpClient.get(
+      uri,
+      headers: {
+        if (accessToken != null) 'authorization': 'Bearer $accessToken',
+      },
+    );
+    final body = _decodeObject(response);
+    final items = body['items'];
+
+    if (items is! List<dynamic>) {
+      throw const PollsApiException('User polls response is invalid.');
+    }
+
+    return items
+        .map((item) => PollSummary.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<PollSummary>> listSubscriptions({
     required String accessToken,
     int limit = 20,

@@ -16,7 +16,9 @@ void main() {
       httpClient: MockClient((incoming) async {
         request = incoming;
         return http.Response(
-          jsonEncode({'items': [_pollJson(commentsCount: 2)]}),
+          jsonEncode({
+            'items': [_pollJson(commentsCount: 2)]
+          }),
           200,
         );
       }),
@@ -29,6 +31,33 @@ void main() {
 
     expect(request.method, 'GET');
     expect(request.url.path, '/polls/subscriptions');
+    expect(request.url.queryParameters['limit'], '10');
+    expect(request.headers['authorization'], 'Bearer access-token');
+    expect(polls.single.id, 'poll-1');
+  });
+
+  test('lists public polls for a user', () async {
+    late http.Request request;
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(
+          jsonEncode({
+            'items': [_pollJson(commentsCount: 0)]
+          }),
+          200,
+        );
+      }),
+    );
+
+    final polls = await client.listUserPolls(
+      userId: 'user-2',
+      accessToken: 'access-token',
+      limit: 10,
+    );
+
+    expect(request.url.path, '/users/user-2/polls');
     expect(request.url.queryParameters['limit'], '10');
     expect(request.headers['authorization'], 'Bearer access-token');
     expect(polls.single.id, 'poll-1');

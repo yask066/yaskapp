@@ -10,6 +10,7 @@ import {
   listFollowers,
   listFollowing,
   listMyPolls,
+  listUserPolls,
   unfollowUser,
   updateProfile
 } from './profiles.service.js';
@@ -208,6 +209,37 @@ export function registerProfileRoutes(app: FastifyInstance) {
       return {
         items
       };
+    }
+  );
+
+  app.get(
+    '/users/:userId/polls',
+    {
+      preHandler: optionalAuthenticate
+    },
+    async (request, reply) => {
+      const parsedParams = followParamsSchema.safeParse(request.params);
+      const parsedQuery = listMyPollsQuerySchema.safeParse(request.query);
+
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      if (!parsedQuery.success) {
+        return validationError(reply, parsedQuery.error);
+      }
+
+      try {
+        return {
+          items: await listUserPolls(
+            parsedParams.data.userId,
+            parsedQuery.data.limit,
+            request.user?.sub
+          )
+        };
+      } catch (error) {
+        return profileError(reply, error);
+      }
     }
   );
 

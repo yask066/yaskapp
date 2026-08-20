@@ -409,6 +409,37 @@ export async function listPollRecordsByAuthor(
   }
 }
 
+export async function listPublicPollRecordsByAuthor(
+  authorId: string,
+  limit: number,
+  viewerId?: string
+) {
+  const client = await db.connect();
+
+  try {
+    const result = await client.query<{ id: string }>(
+      `
+        SELECT id
+        FROM polls
+        WHERE author_id = $1
+          AND visibility = 'public'
+          AND deleted_at IS NULL
+        ORDER BY created_at DESC, id DESC
+        LIMIT $2
+      `,
+      [authorId, limit]
+    );
+
+    return hydratePolls(
+      client,
+      result.rows.map((row) => row.id),
+      viewerId
+    );
+  } finally {
+    client.release();
+  }
+}
+
 export async function findPollRecordById(pollId: string) {
   const client = await db.connect();
 

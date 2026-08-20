@@ -231,6 +231,7 @@ class FeedScreenState extends State<FeedScreen> {
           currentUserId: widget.session.user.id,
           accessToken: widget.session.accessToken,
           profilesApiClient: _profilesApiClient,
+          pollsApiClient: _pollsApiClient,
         ),
       ),
     );

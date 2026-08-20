@@ -518,6 +518,18 @@ test('public profile returns safe data and viewer relationship state', async () 
   const viewer = await registerTestUser();
   const target = await registerTestUser();
 
+  const createdPollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(target.accessToken),
+    payload: {
+      question: 'A poll visible on a public profile?',
+      options: ['Yes', 'Not yet']
+    }
+  });
+  assert.equal(createdPollResponse.statusCode, 201, createdPollResponse.body);
+  const createdPoll = createdPollResponse.json<PollResponse>().poll;
+
   const anonymousResponse = await app.inject({
     method: 'GET',
     url: `/users/${target.user.id}`
@@ -538,6 +550,14 @@ test('public profile returns safe data and viewer relationship state', async () 
   assert.equal(anonymousProfile.viewerIsFollowing, false);
   assert.equal(anonymousProfile.profile.followersCount, 0);
   assert.equal(anonymousProfile.email, undefined);
+
+  const publicPollsResponse = await app.inject({
+    method: 'GET',
+    url: `/users/${target.user.id}/polls`
+  });
+  assert.equal(publicPollsResponse.statusCode, 200, publicPollsResponse.body);
+  const publicPolls = publicPollsResponse.json<{ items: PollResponse['poll'][] }>();
+  assert.ok(publicPolls.items.some((poll) => poll.id === createdPoll.id));
 
   const followResponse = await app.inject({
     method: 'POST',

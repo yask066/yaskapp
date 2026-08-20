@@ -9,7 +9,10 @@ import {
   FollowRepositoryError,
   unfollowUserRecord
 } from './follows.repository.js';
-import { listPollRecordsByAuthor } from '../polls/polls.repository.js';
+import {
+  listPollRecordsByAuthor,
+  listPublicPollRecordsByAuthor
+} from '../polls/polls.repository.js';
 
 export class ProfileNotFoundError extends Error {}
 
@@ -79,6 +82,20 @@ export async function listFollowers(
 
 export async function listMyPolls(userId: string, limit: number) {
   return listPollRecordsByAuthor(userId, limit, userId);
+}
+
+export async function listUserPolls(
+  userId: string,
+  limit: number,
+  viewerId?: string
+) {
+  const profile = await findPublicProfileRecord(userId, viewerId);
+
+  if (!profile) {
+    throw new ProfileNotFoundError('Profile was not found.');
+  }
+
+  return listPublicPollRecordsByAuthor(userId, limit, viewerId);
 }
 
 export async function followUser(followerId: string, followeeId: string) {

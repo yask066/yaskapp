@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/user_avatar.dart';
+import '../polls/poll_card.dart';
+import '../polls/polls_api_client.dart';
+import '../polls/poll_summary.dart';
 import 'profiles_api_client.dart';
 import 'public_profile.dart';
 
@@ -10,6 +13,7 @@ class PublicProfileScreen extends StatefulWidget {
     required this.currentUserId,
     required this.accessToken,
     required this.profilesApiClient,
+    this.pollsApiClient,
     super.key,
   });
 
@@ -17,6 +21,7 @@ class PublicProfileScreen extends StatefulWidget {
   final String currentUserId;
   final String accessToken;
   final ProfilesApiClient profilesApiClient;
+  final PollsApiClient? pollsApiClient;
 
   @override
   State<PublicProfileScreen> createState() => _PublicProfileScreenState();
@@ -24,6 +29,7 @@ class PublicProfileScreen extends StatefulWidget {
 
 class _PublicProfileScreenState extends State<PublicProfileScreen> {
   late Future<PublicProfile> _profileFuture;
+  Future<List<PollSummary>>? _pollsFuture;
   PublicProfile? _profile;
   var _isFollowing = false;
   var _isFollowSubmitting = false;
@@ -34,6 +40,16 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   void initState() {
     super.initState();
     _profileFuture = _loadProfile();
+    if (widget.pollsApiClient != null) {
+      _pollsFuture = _loadPolls();
+    }
+  }
+
+  Future<List<PollSummary>> _loadPolls() {
+    return widget.pollsApiClient!.listUserPolls(
+      userId: widget.userId,
+      accessToken: widget.accessToken,
+    );
   }
 
   Future<PublicProfile> _loadProfile() async {
@@ -138,8 +154,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
             onRefresh: () async {
               setState(() {
                 _profileFuture = _loadProfile();
+                if (_pollsFuture != null) {
+                  _pollsFuture = _loadPolls();
+                }
               });
-              await _profileFuture;
+              await Future.wait([
+                _profileFuture,
+                if (_pollsFuture != null) _pollsFuture!,
+              ]);
             },
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
@@ -221,11 +243,70 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                           ),
                   ),
                 ],
+                if (_pollsFuture != null) ...[
+                  const SizedBox(height: 28),
+                  const Text(
+                    'Polls',
+                    style: TextStyle(
+                      color: Color(0xFF10142D),
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _PublicPollsList(future: _pollsFuture!),
+                ],
               ],
             ),
           );
         },
       ),
+    );
+  }
+}
+
+class _PublicPollsList extends StatelessWidget {
+  const _PublicPollsList({required this.future});
+
+  final Future<List<PollSummary>> future;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<PollSummary>>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Text('Could not load polls.'),
+          );
+        }
+
+        final polls = snapshot.data ?? const <PollSummary>[];
+
+        if (polls.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Text('No public polls yet.'),
+          );
+        }
+
+        return Column(
+          children: [
+            for (var index = 0; index < polls.length; index++) ...[
+              PollCard(poll: polls[index], compact: true),
+              if (index != polls.length - 1) const SizedBox(height: 12),
+            ],
+          ],
+        );
+      },
     );
   }
 }
