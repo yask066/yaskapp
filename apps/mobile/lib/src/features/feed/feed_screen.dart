@@ -8,6 +8,8 @@ import '../polls/poll_card.dart';
 import '../polls/poll_comments_screen.dart';
 import '../polls/poll_summary.dart';
 import '../polls/polls_api_client.dart';
+import '../profile/profiles_api_client.dart';
+import '../profile/public_profile_screen.dart';
 import '../realtime/realtime_client.dart';
 
 class FeedScreen extends StatefulWidget {
@@ -15,12 +17,15 @@ class FeedScreen extends StatefulWidget {
     required this.session,
     super.key,
     PollsApiClient? pollsApiClient,
+    ProfilesApiClient? profilesApiClient,
     RealtimeClient? realtimeClient,
   })  : _pollsApiClient = pollsApiClient,
+        _profilesApiClient = profilesApiClient,
         _realtimeClient = realtimeClient;
 
   final AuthSession session;
   final PollsApiClient? _pollsApiClient;
+  final ProfilesApiClient? _profilesApiClient;
   final RealtimeClient? _realtimeClient;
 
   @override
@@ -32,6 +37,8 @@ class FeedScreenState extends State<FeedScreen> {
   late final RealtimeClient _realtimeClient;
   late Future<List<PollSummary>> _pollsFuture;
   late final bool _ownsPollsApiClient;
+  late final ProfilesApiClient _profilesApiClient;
+  late final bool _ownsProfilesApiClient;
   late final bool _ownsRealtimeClient;
   StreamSubscription<PollVoteRealtimeEvent>? _pollVoteSubscription;
   List<PollSummary> _polls = [];
@@ -43,8 +50,10 @@ class FeedScreenState extends State<FeedScreen> {
   void initState() {
     super.initState();
     _ownsPollsApiClient = widget._pollsApiClient == null;
+    _ownsProfilesApiClient = widget._profilesApiClient == null;
     _ownsRealtimeClient = widget._realtimeClient == null;
     _pollsApiClient = widget._pollsApiClient ?? PollsApiClient();
+    _profilesApiClient = widget._profilesApiClient ?? ProfilesApiClient();
     _realtimeClient = widget._realtimeClient ?? RealtimeClient();
     _pollsFuture = _loadPolls();
     _pollVoteSubscription =
@@ -62,6 +71,10 @@ class FeedScreenState extends State<FeedScreen> {
 
     if (_ownsPollsApiClient) {
       _pollsApiClient.close();
+    }
+
+    if (_ownsProfilesApiClient) {
+      _profilesApiClient.close();
     }
 
     super.dispose();
@@ -210,6 +223,19 @@ class FeedScreenState extends State<FeedScreen> {
     _showSnackBar('Poll published.');
   }
 
+  Future<void> _openAuthorProfile(PollSummary poll) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) => PublicProfileScreen(
+          userId: poll.author.id,
+          currentUserId: widget.session.user.id,
+          accessToken: widget.session.accessToken,
+          profilesApiClient: _profilesApiClient,
+        ),
+      ),
+    );
+  }
+
   Future<void> openCreatePoll() => _openCreatePoll();
 
   Future<void> _openComments(PollSummary poll) async {
@@ -281,57 +307,57 @@ class FeedScreenState extends State<FeedScreen> {
                     width: 40,
                     height: 40,
                     child: IconButton(
-                    tooltip: 'Search',
-                    onPressed: () {},
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints.tightFor(
-                      width: 40,
-                      height: 40,
+                      tooltip: 'Search',
+                      onPressed: () {},
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 40,
+                        height: 40,
+                      ),
+                      icon: Image.asset(
+                        'assets/branding/search_icon.png',
+                        width: 28,
+                        height: 28,
+                        fit: BoxFit.contain,
+                      ),
                     ),
-                    icon: Image.asset(
-                      'assets/branding/search_icon.png',
-                      width: 28,
-                      height: 28,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
                   ),
                   const SizedBox(width: 20),
                   SizedBox(
                     width: 40,
                     height: 40,
                     child: IconButton(
-                    tooltip: 'Notifications',
-                    onPressed: () {},
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints.tightFor(
-                      width: 40,
-                      height: 40,
-                    ),
-                    icon: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Image.asset(
-                          'assets/branding/notification_icon.png',
-                          width: 28,
-                          height: 28,
-                          fit: BoxFit.contain,
-                        ),
-                        Positioned(
-                          top: -3,
-                          right: -2,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                               color: Color(0xFFFA7F2D),
-                              shape: BoxShape.circle,
+                      tooltip: 'Notifications',
+                      onPressed: () {},
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 40,
+                        height: 40,
+                      ),
+                      icon: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Image.asset(
+                            'assets/branding/notification_icon.png',
+                            width: 28,
+                            height: 28,
+                            fit: BoxFit.contain,
+                          ),
+                          Positioned(
+                            top: -3,
+                            right: -2,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFFA7F2D),
+                                shape: BoxShape.circle,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
                   ),
                   const SizedBox(width: 20),
                 ],
@@ -385,6 +411,7 @@ class FeedScreenState extends State<FeedScreen> {
 
                         return PollCard(
                           poll: poll,
+                          onOpenAuthor: () => _openAuthorProfile(poll),
                           onVote: _votingPollIds.contains(poll.id)
                               ? null
                               : (option) => _vote(poll, option),
@@ -451,9 +478,9 @@ class _CreatePrompt extends StatelessWidget {
           ),
         ],
       ),
-        constraints: const BoxConstraints.tightFor(height: 64),
-        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-        clipBehavior: Clip.antiAlias,
+      constraints: const BoxConstraints.tightFor(height: 64),
+      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+      clipBehavior: Clip.antiAlias,
       child: Row(
         children: [
           const Icon(
@@ -568,9 +595,8 @@ class _FilterChip extends StatelessWidget {
                       label,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: selected
-                            ? Colors.white
-                            : const Color(0xFF566A9D),
+                        color:
+                            selected ? Colors.white : const Color(0xFF566A9D),
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),

@@ -12,4 +12,11 @@ class ApiConfig {
 
   final String baseUrl;
   final String websocketUrl;
+
+  Uri uri(String path, {Map<String, String>? queryParameters}) {
+    return Uri.parse(baseUrl).replace(
+      path: path,
+      queryParameters: queryParameters,
+    );
+  }
 }

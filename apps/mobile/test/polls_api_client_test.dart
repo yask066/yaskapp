@@ -9,6 +9,31 @@ import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
 void main() {
   const config = ApiConfig(baseUrl: 'http://api.test');
 
+  test('lists subscription polls with authorization and limit', () async {
+    late http.Request request;
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(
+          jsonEncode({'items': [_pollJson(commentsCount: 2)]}),
+          200,
+        );
+      }),
+    );
+
+    final polls = await client.listSubscriptions(
+      accessToken: 'access-token',
+      limit: 10,
+    );
+
+    expect(request.method, 'GET');
+    expect(request.url.path, '/polls/subscriptions');
+    expect(request.url.queryParameters['limit'], '10');
+    expect(request.headers['authorization'], 'Bearer access-token');
+    expect(polls.single.id, 'poll-1');
+  });
+
   test('lists poll comments', () async {
     late Uri requestedUri;
     final client = PollsApiClient(

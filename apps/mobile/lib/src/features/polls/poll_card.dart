@@ -7,6 +7,7 @@ class PollCard extends StatelessWidget {
   const PollCard({
     required this.poll,
     this.onVote,
+    this.onOpenAuthor,
     this.onOpenComments,
     this.onToggleLike,
     this.isVoting = false,
@@ -17,6 +18,7 @@ class PollCard extends StatelessWidget {
 
   final PollSummary poll;
   final ValueChanged<PollOptionSummary>? onVote;
+  final VoidCallback? onOpenAuthor;
   final VoidCallback? onOpenComments;
   final VoidCallback? onToggleLike;
   final bool isVoting;
@@ -60,61 +62,72 @@ class PollCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       elevation: 2,
       shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(compact ? 20 : 22),
+        borderRadius: BorderRadius.circular(compact ? 20 : 22),
       ),
       shadowColor: const Color(0x22000000),
       clipBehavior: Clip.antiAlias,
       child: Padding(
-      padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                UserAvatar(
-                  displayName: poll.author.displayName,
-                  username: poll.author.username,
-                  imageUrl: poll.author.avatarObjectKey,
-                  radius: compact ? 22 : 22,
+                InkWell(
+                  onTap: onOpenAuthor,
+                  borderRadius: BorderRadius.circular(24),
+                  child: UserAvatar(
+                    displayName: poll.author.displayName,
+                    username: poll.author.username,
+                    imageUrl: poll.author.avatarObjectKey,
+                    radius: compact ? 22 : 22,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        poll.author.displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Color(0xFF10142D),
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
+                  child: InkWell(
+                    onTap: onOpenAuthor,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            poll.author.displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF10142D),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            '@${poll.author.username} \u00B7 ${poll.createdLabel}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF667085),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        '@${poll.author.username} \u00B7 ${poll.createdLabel}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Color(0xFF667085),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
                 SizedBox(
                   width: 40,
                   height: 40,
                   child: IconButton(
-                  tooltip: 'More',
-                  onPressed: () {},
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 40,
-                    height: 40,
-                  ),
+                    tooltip: 'More',
+                    onPressed: () {},
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 40,
+                      height: 40,
+                    ),
                     icon: Icon(Icons.more_horiz, size: compact ? 20 : 22),
                   ),
                 ),
@@ -226,9 +239,8 @@ class _PollOptionButton extends StatelessWidget {
     return ConstrainedBox(
       constraints: BoxConstraints(minHeight: optionMinHeight),
       child: Material(
-        color: optionRank == 0
-            ? const Color(0xFFEFF2F8)
-            : const Color(0xFFF5F6FA),
+        color:
+            optionRank == 0 ? const Color(0xFFEFF2F8) : const Color(0xFFF5F6FA),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(compact ? 10 : 12),
           side: BorderSide(
@@ -466,10 +478,7 @@ class _Metric extends StatelessWidget {
         if (animatedValue == null)
           Text(
             label,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: const Color(0xFF10142D),
                   fontSize: 14,
                 ),
@@ -483,10 +492,7 @@ class _Metric extends StatelessWidget {
               final suffix = label.endsWith(' votes') ? ' votes' : '';
               return Text(
                 '$value$suffix',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: const Color(0xFF10142D),
                       fontSize: 14,
                     ),

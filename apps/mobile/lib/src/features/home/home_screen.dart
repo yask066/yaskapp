@@ -5,6 +5,7 @@ import '../auth/auth_session.dart';
 import '../feed/feed_screen.dart';
 import '../polls/polls_api_client.dart';
 import '../profile/profile_screen.dart';
+import '../subscriptions/subscriptions_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -67,7 +68,10 @@ class _HomeScreenState extends State<HomeScreen> {
             session: widget.session,
             pollsApiClient: _pollsApiClient,
           ),
-          const _ExplorePlaceholder(),
+          SubscriptionsScreen(
+            session: widget.session,
+            pollsApiClient: _pollsApiClient,
+          ),
           const SizedBox.shrink(),
           const _NotificationsPlaceholder(),
           ProfileScreen(
@@ -124,9 +128,9 @@ class _MainBottomNavigation extends StatelessWidget {
               onTap: () => onSelected(0),
             ),
             _NavItem(
-              label: 'Explore',
-              icon: Icons.explore_outlined,
-              selectedIcon: Icons.explore,
+              label: 'Subscriptions',
+              icon: Icons.people_outline,
+              selectedIcon: Icons.people,
               selected: selectedIndex == 1,
               onTap: () => onSelected(1),
             ),
@@ -222,19 +226,6 @@ class _CreateNavigationIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: const Icon(Icons.add, color: Colors.white, size: 30),
-    );
-  }
-}
-
-class _ExplorePlaceholder extends StatelessWidget {
-  const _ExplorePlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return const _SimplePlaceholderScreen(
-      title: 'Explore',
-      icon: Icons.explore_outlined,
-      message: 'Explore polls from the Yask community.',
     );
   }
 }
