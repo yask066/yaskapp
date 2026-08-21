@@ -1,4 +1,5 @@
 import {
+  findProfileCountryCode,
   findPublicProfileRecord,
   listFollowerRecords,
   listFollowingRecords,
@@ -15,6 +16,7 @@ import {
 } from '../polls/polls.repository.js';
 
 export class ProfileNotFoundError extends Error {}
+export class CountryClearNotAllowedError extends Error {}
 
 export { FollowRepositoryError };
 
@@ -22,6 +24,7 @@ export type UpdateProfileInput = {
   userId: string;
   displayName?: string;
   bio?: string | null;
+  countryCode?: string | null;
 };
 
 function normalizeOptionalText(value: string | undefined) {
@@ -38,11 +41,36 @@ function normalizeNullableText(value: string | null | undefined) {
   return normalizeOptionalText(value);
 }
 
+function normalizeCountryCode(value: string | null | undefined) {
+  if (value === null) {
+    return null;
+  }
+
+  return value?.trim().toUpperCase();
+}
+
 export async function updateProfile(input: UpdateProfileInput) {
+  if ('countryCode' in input && input.countryCode === null) {
+    const currentCountryCode = await findProfileCountryCode(input.userId);
+
+    if (currentCountryCode === undefined) {
+      throw new ProfileNotFoundError('Profile was not found.');
+    }
+
+    if (currentCountryCode !== null) {
+      throw new CountryClearNotAllowedError(
+        'Country cannot be cleared after it has been selected.'
+      );
+    }
+  }
+
   const user = await updateProfileRecord({
     userId: input.userId,
     displayName: normalizeOptionalText(input.displayName),
-    ...('bio' in input ? { bio: normalizeNullableText(input.bio) ?? null } : {})
+    ...('bio' in input ? { bio: normalizeNullableText(input.bio) ?? null } : {}),
+    ...('countryCode' in input
+      ? { countryCode: normalizeCountryCode(input.countryCode) ?? null }
+      : {})
   });
 
   if (!user) {

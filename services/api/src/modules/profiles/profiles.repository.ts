@@ -5,6 +5,7 @@ type UpdateProfileInput = {
   userId: string;
   displayName?: string;
   bio?: string | null;
+  countryCode?: string | null;
 };
 
 export type PublicProfile = {
@@ -17,12 +18,29 @@ export type PublicProfile = {
   profile: {
     displayName: string;
     bio: string | null;
+    countryCode: string | null;
     avatarObjectKey: string | null;
     pollsCount: number;
     followersCount: number;
     followingCount: number;
   };
 };
+
+export async function findProfileCountryCode(userId: string) {
+  const result = await db.query<{ country_code: string | null }>(
+    `
+      SELECT p.country_code
+      FROM profiles p
+      JOIN users u ON u.id = p.user_id
+      WHERE p.user_id = $1
+        AND u.deleted_at IS NULL
+      LIMIT 1
+    `,
+    [userId]
+  );
+
+  return result.rows[0]?.country_code;
+}
 
 function mapUser(row: UserWithProfileRow): PublicUser {
   return {
@@ -35,6 +53,7 @@ function mapUser(row: UserWithProfileRow): PublicUser {
     profile: {
       displayName: row.display_name,
       bio: row.bio,
+      countryCode: row.country_code,
       avatarObjectKey: row.avatar_object_key,
       pollsCount: row.polls_count,
       followersCount: row.followers_count,
@@ -58,6 +77,7 @@ function mapPublicProfile(row: PublicProfileRow): PublicProfile {
     profile: {
       displayName: row.display_name,
       bio: row.bio,
+      countryCode: row.country_code,
       avatarObjectKey: row.avatar_object_key,
       pollsCount: row.polls_count,
       followersCount: row.followers_count,
@@ -86,6 +106,7 @@ export async function findPublicProfileRecord(userId: string, viewerId?: string)
         u.updated_at,
         p.display_name,
         p.bio,
+        p.country_code,
         p.avatar_object_key,
         p.polls_count,
         p.followers_count,
@@ -125,6 +146,7 @@ export async function listFollowingRecords(userId: string, limit: number) {
         u.updated_at,
         p.display_name,
         p.bio,
+        p.country_code,
         p.avatar_object_key,
         p.polls_count,
         p.followers_count,
@@ -158,6 +180,7 @@ export async function listFollowerRecords(
         u.updated_at,
         p.display_name,
         p.bio,
+        p.country_code,
         p.avatar_object_key,
         p.polls_count,
         p.followers_count,
@@ -191,12 +214,14 @@ export async function updateProfileRecord(input: UpdateProfileInput) {
         UPDATE profiles
         SET
           display_name = COALESCE($2, display_name),
-          bio = CASE WHEN $4 THEN $3 ELSE bio END
+          bio = CASE WHEN $4 THEN $3 ELSE bio END,
+          country_code = CASE WHEN $6 THEN $5 ELSE country_code END
         WHERE user_id = $1
         RETURNING
           user_id,
           display_name,
           bio,
+          country_code,
           avatar_object_key,
           polls_count,
           followers_count,
@@ -212,6 +237,7 @@ export async function updateProfileRecord(input: UpdateProfileInput) {
         u.updated_at,
         p.display_name,
         p.bio,
+        p.country_code,
         p.avatar_object_key,
         p.polls_count,
         p.followers_count,
@@ -222,7 +248,14 @@ export async function updateProfileRecord(input: UpdateProfileInput) {
         AND u.deleted_at IS NULL
       LIMIT 1
     `,
-    [input.userId, input.displayName ?? null, input.bio ?? null, 'bio' in input]
+    [
+      input.userId,
+      input.displayName ?? null,
+      input.bio ?? null,
+      'bio' in input,
+      input.countryCode ?? null,
+      'countryCode' in input
+    ]
   );
 
   const row = result.rows[0];

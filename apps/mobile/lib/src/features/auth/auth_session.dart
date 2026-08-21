@@ -4,6 +4,7 @@ class AuthUserProfile {
     required this.pollsCount,
     required this.followersCount,
     required this.followingCount,
+    this.countryCode,
     this.bio,
     this.avatarObjectKey,
   });
@@ -14,6 +15,7 @@ class AuthUserProfile {
       pollsCount: json['pollsCount'] as int? ?? 0,
       followersCount: json['followersCount'] as int? ?? 0,
       followingCount: json['followingCount'] as int? ?? 0,
+      countryCode: json['countryCode'] as String?,
       bio: json['bio'] as String?,
       avatarObjectKey: json['avatarObjectKey'] as String?,
     );
@@ -23,6 +25,7 @@ class AuthUserProfile {
   final int pollsCount;
   final int followersCount;
   final int followingCount;
+  final String? countryCode;
   final String? bio;
   final String? avatarObjectKey;
 }

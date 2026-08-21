@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/user_avatar.dart';
+import '../auth/country_selector.dart';
 import '../polls/poll_card.dart';
 import '../polls/polls_api_client.dart';
 import '../polls/poll_summary.dart';
@@ -150,6 +151,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
             return const Center(child: Text('Profile is unavailable.'));
           }
 
+          final countryName = countryNameForCode(profile.countryCode);
+
           return RefreshIndicator(
             onRefresh: () async {
               setState(() {
@@ -197,6 +200,17 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                               color: Color(0xFF667085),
                             ),
                           ),
+                          if (countryName != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                countryName,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF667085),
+                                ),
+                              ),
+                            ),
                           if (profile.bio?.isNotEmpty == true) ...[
                             const SizedBox(height: 8),
                             Text(
@@ -254,7 +268,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  _PublicPollsList(future: _pollsFuture!),
+                  _PublicPollsList(
+                    future: _pollsFuture!,
+                    onRetry: () {
+                      setState(() {
+                        _pollsFuture = _loadPolls();
+                      });
+                    },
+                  ),
                 ],
               ],
             ),
@@ -266,9 +287,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
 }
 
 class _PublicPollsList extends StatelessWidget {
-  const _PublicPollsList({required this.future});
+  const _PublicPollsList({required this.future, required this.onRetry});
 
   final Future<List<PollSummary>> future;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -283,9 +305,18 @@ class _PublicPollsList extends StatelessWidget {
         }
 
         if (snapshot.hasError) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Text('Could not load polls.'),
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              children: [
+                const Text('Could not load polls.'),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: onRetry,
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
           );
         }
 

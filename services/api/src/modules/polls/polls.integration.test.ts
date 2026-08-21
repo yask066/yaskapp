@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
+import {
+  countryCatalogVersion,
+  supportedCountryCodes
+} from '../countries.js';
 
 process.env.NODE_ENV = 'test';
 
@@ -21,6 +25,12 @@ app.get('/test-error-handler', async () => {
 });
 const createdUserIds = new Set<string>();
 
+test('country catalog contains unique uppercase ISO alpha-2 codes', () => {
+  assert.equal(countryCatalogVersion, 1);
+  assert.equal(new Set(supportedCountryCodes).size, supportedCountryCodes.length);
+  assert.ok(supportedCountryCodes.every((code) => /^[A-Z]{2}$/.test(code)));
+});
+
 type AuthResponse = {
   user: {
     id: string;
@@ -28,6 +38,7 @@ type AuthResponse = {
     profile: {
       displayName: string;
       bio: string | null;
+      countryCode: string | null;
       pollsCount: number;
     };
   };
@@ -40,6 +51,7 @@ type ProfileResponse = {
     profile: {
       displayName: string;
       bio: string | null;
+      countryCode: string | null;
     };
   };
 };
@@ -117,13 +129,15 @@ async function registerTestUser() {
       email: `${username}@yaskapp.test`,
       username,
       password,
-      displayName: 'Test User'
+      displayName: 'Test User',
+      countryCode: 'BY'
     }
   });
 
   assert.equal(response.statusCode, 201, response.body);
 
   const auth = response.json<AuthResponse>();
+  assert.equal(auth.user.profile.countryCode, 'BY');
   createdUserIds.add(auth.user.id);
 
   return {
@@ -233,7 +247,8 @@ test('authentication rejects invalid credentials and duplicate registration', as
     payload: {
       email: `${registered.user.username}@yaskapp.test`,
       username: registered.user.username,
-      password: registered.password
+      password: registered.password,
+      countryCode: 'BY'
     }
   });
 
@@ -309,7 +324,20 @@ test('auth and polls happy path works end to end', async () => {
 
   const login = loginResponse.json<AuthResponse>();
   assert.equal(login.user.id, registered.user.id);
+  assert.equal(login.user.profile.countryCode, 'BY');
   assert.ok(login.accessToken);
+
+  const meResponse = await app.inject({
+    method: 'GET',
+    url: '/auth/me',
+    headers: bearer(login.accessToken)
+  });
+
+  assert.equal(meResponse.statusCode, 200, meResponse.body);
+  assert.equal(
+    meResponse.json<AuthResponse>().user.profile.countryCode,
+    'BY'
+  );
 
   const createPollResponse = await app.inject({
     method: 'POST',
@@ -440,7 +468,8 @@ test('profile can be updated by the current user', async () => {
     headers: bearer(registered.accessToken),
     payload: {
       displayName: 'Updated Tester',
-      bio: 'I test profile updates.'
+      bio: 'I test profile updates.',
+      countryCode: 'pl'
     }
   });
 
@@ -450,6 +479,18 @@ test('profile can be updated by the current user', async () => {
   assert.equal(updatedProfile.user.id, registered.user.id);
   assert.equal(updatedProfile.user.profile.displayName, 'Updated Tester');
   assert.equal(updatedProfile.user.profile.bio, 'I test profile updates.');
+  assert.equal(updatedProfile.user.profile.countryCode, 'PL');
+
+  const clearCountryResponse = await app.inject({
+    method: 'PATCH',
+    url: '/profiles/me',
+    headers: bearer(registered.accessToken),
+    payload: {
+      countryCode: null
+    }
+  });
+
+  assert.equal(clearCountryResponse.statusCode, 400, clearCountryResponse.body);
 
   const clearBioResponse = await app.inject({
     method: 'PATCH',
@@ -490,6 +531,21 @@ test('profile update requires authentication and validates body', async () => {
   });
 
   assert.equal(invalidResponse.statusCode, 400, invalidResponse.body);
+
+  const unsupportedCountryResponse = await app.inject({
+    method: 'PATCH',
+    url: '/profiles/me',
+    headers: bearer(registered.accessToken),
+    payload: {
+      countryCode: 'ZZ'
+    }
+  });
+
+  assert.equal(
+    unsupportedCountryResponse.statusCode,
+    400,
+    unsupportedCountryResponse.body
+  );
 });
 
 test('profile update requires at least one known field', async () => {
@@ -541,7 +597,7 @@ test('public profile returns safe data and viewer relationship state', async () 
       id: string;
       username: string;
       viewerIsFollowing: boolean;
-      profile: { followersCount: number };
+      profile: { followersCount: number; countryCode: string | null };
       email?: string;
     };
   }>().user;
@@ -549,6 +605,7 @@ test('public profile returns safe data and viewer relationship state', async () 
   assert.equal(anonymousProfile.username, target.user.username);
   assert.equal(anonymousProfile.viewerIsFollowing, false);
   assert.equal(anonymousProfile.profile.followersCount, 0);
+  assert.equal(anonymousProfile.profile.countryCode, 'BY');
   assert.equal(anonymousProfile.email, undefined);
 
   const publicPollsResponse = await app.inject({
@@ -590,6 +647,38 @@ test('public profile returns safe data and viewer relationship state', async () 
     url: '/users/not-a-uuid'
   });
   assert.equal(invalidParamsResponse.statusCode, 400, invalidParamsResponse.body);
+});
+
+test('legacy users without a country remain compatible', async () => {
+  const registered = await registerTestUser();
+
+  await db.query(
+    'UPDATE profiles SET country_code = NULL WHERE user_id = $1',
+    [registered.user.id]
+  );
+
+  const legacyUpdateResponse = await app.inject({
+    method: 'PATCH',
+    url: '/profiles/me',
+    headers: bearer(registered.accessToken),
+    payload: {
+      countryCode: null
+    }
+  });
+
+  assert.equal(legacyUpdateResponse.statusCode, 200, legacyUpdateResponse.body);
+
+  const meResponse = await app.inject({
+    method: 'GET',
+    url: '/auth/me',
+    headers: bearer(registered.accessToken)
+  });
+
+  assert.equal(meResponse.statusCode, 200, meResponse.body);
+  assert.equal(
+    meResponse.json<AuthResponse>().user.profile.countryCode,
+    null
+  );
 });
 
 test('following and followers lists return stable public profiles', async () => {

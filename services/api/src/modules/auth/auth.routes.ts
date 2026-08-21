@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { rateLimit } from '../../config/rate-limit.js';
+import { supportedCountryCodeSchema } from '../countries.js';
 import {
   AuthenticationError,
   ConflictError,
@@ -11,11 +12,11 @@ import {
 import { authenticate } from './auth.utils.js';
 
 const usernamePattern = /^[a-z0-9_][a-z0-9_.]{2,29}$/i;
-
 const registerSchema = z.object({
   email: z.string().trim().email().max(320),
   username: z.string().trim().min(3).max(30).regex(usernamePattern),
   password: z.string().min(8).max(128),
+  countryCode: z.string().trim().toUpperCase().pipe(supportedCountryCodeSchema),
   displayName: z.string().trim().min(1).max(80).optional()
 }).strict();
 

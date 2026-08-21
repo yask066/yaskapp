@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'auth_api_client.dart';
 import 'auth_session.dart';
+import 'country_selector.dart';
 
 enum _AuthMode { login, register }
 
@@ -26,6 +27,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final _loginController = TextEditingController();
   final _displayNameController = TextEditingController();
   final _passwordController = TextEditingController();
+  String? _selectedCountryCode;
 
   late final AuthApiClient _authApiClient;
   late final bool _ownsAuthApiClient;
@@ -73,6 +75,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   email: _emailController.text.trim(),
                   username: _usernameController.text.trim(),
                   password: _passwordController.text,
+                  countryCode: _selectedCountryCode!,
                   displayName: _displayNameController.text,
                 )
               : _authApiClient.login(
@@ -138,228 +141,254 @@ class _AuthScreenState extends State<AuthScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                    Semantics(
-                      label: 'Yaskapp',
-                      image: true,
-                      child: Image.asset(
-                        'assets/branding/yaskapp_logo.png',
-                        width: 210,
-                        height: 112,
-                        fit: BoxFit.contain,
+                      Semantics(
+                        label: 'Yaskapp',
+                        image: true,
+                        child: Image.asset(
+                          'assets/branding/yaskapp_logo.png',
+                          width: 210,
+                          height: 112,
+                          fit: BoxFit.contain,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 22),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(32, 34, 32, 30),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x22000000),
-                            blurRadius: 24,
-                            offset: Offset(0, 12),
-                          ),
-                        ],
-                      ),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              _isRegistering ? 'REGISTER' : 'LOGIN',
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineMedium
-                                  ?.copyWith(
-                                    color: accentColor,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 1.2,
-                                  ),
-                            ),
-                            const SizedBox(height: 28),
-                            if (_isRegistering) ...[
-                              TextFormField(
-                                controller: _emailController,
-                                keyboardType: TextInputType.emailAddress,
-                                autofillHints: const [AutofillHints.email],
-                                decoration: _fieldDecoration(
-                                  'Email',
-                                  Icons.mail_outline,
-                                  fieldFillColor,
-                                ),
-                                validator: _required,
-                              ),
-                              const SizedBox(height: 14),
-                              TextFormField(
-                                controller: _usernameController,
-                                autofillHints: const [AutofillHints.username],
-                                decoration: _fieldDecoration(
-                                  'Username',
-                                  Icons.alternate_email,
-                                  fieldFillColor,
-                                ),
-                                validator: _required,
-                              ),
-                              const SizedBox(height: 14),
-                              TextFormField(
-                                controller: _displayNameController,
-                                decoration: _fieldDecoration(
-                                  'Display name',
-                                  Icons.badge_outlined,
-                                  fieldFillColor,
-                                ),
-                              ),
-                            ] else ...[
-                              TextFormField(
-                                controller: _loginController,
-                                autofillHints: const [
-                                  AutofillHints.username,
-                                  AutofillHints.email,
-                                ],
-                                decoration: _fieldDecoration(
-                                  'Email or username',
-                                  Icons.person_outline,
-                                  fieldFillColor,
-                                ),
-                                validator: _required,
-                              ),
-                            ],
-                            const SizedBox(height: 14),
-                            TextFormField(
-                              controller: _passwordController,
-                              obscureText: true,
-                              autofillHints: const [AutofillHints.password],
-                              decoration: _fieldDecoration(
-                                'Password',
-                                Icons.lock_outline,
-                                fieldFillColor,
-                              ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Required';
-                                }
-
-                                if (_isRegistering && value.length < 8) {
-                                  return 'Use at least 8 characters';
-                                }
-
-                                return null;
-                              },
-                            ),
-                            if (!_isRegistering)
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: TextButton(
-                                  onPressed: () => _showUnavailable(
-                                    'Password recovery is not available yet.',
-                                  ),
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: const Color(0xFF566A9D),
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 10,
-                                    ),
-                                  ),
-                                  child: const Text('Forgot password?'),
-                                ),
-                              ),
-                            if (_errorMessage != null) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                _errorMessage!,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: colors.error),
-                              ),
-                            ],
-                            if (_isRegistering) ...[
-                              const SizedBox(height: 12),
-                              Text(
-                                'Log in with',
-                                textAlign: TextAlign.center,
-                                style: Theme.of(context).textTheme.bodyLarge,
-                              ),
-                              const SizedBox(height: 12),
-                              const _SocialButtons(),
-                              const SizedBox(height: 20),
-                            ],
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              height: 56,
-                              child: FilledButton(
-                                onPressed: _isSubmitting ? null : _submit,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: accentColor,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(28),
-                                  ),
-                                  textStyle: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                child: _isSubmitting
-                                    ? const SizedBox.square(
-                                        dimension: 22,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : _isRegistering
-                                        ? const Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(Icons.person_add_alt),
-                                              SizedBox(width: 8),
-                                              Text('REGISTER'),
-                                            ],
-                                          )
-                                        : const Text('LOGIN'),
-                              ),
-                            ),
-                            if (!_isRegistering)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 28),
-                                child: Column(
-                                  children: [
-                                    Text(
-                                      'Log in with',
-                                      textAlign: TextAlign.center,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge,
-                                    ),
-                                    const SizedBox(height: 12),
-                                    const _SocialButtons(),
-                                  ],
-                                ),
-                              ),
-                            const SizedBox(height: 20),
-                            TextButton(
-                              onPressed: () {
-                                _setMode(
-                                  _isRegistering
-                                      ? _AuthMode.login
-                                      : _AuthMode.register,
-                                );
-                              },
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.black87,
-                              ),
-                              child: Text(
-                                _isRegistering ? 'Back to Login' : 'Sign Up',
-                                style: const TextStyle(fontSize: 18),
-                              ),
+                      const SizedBox(height: 22),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.fromLTRB(32, 34, 32, 30),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x22000000),
+                              blurRadius: 24,
+                              offset: Offset(0, 12),
                             ),
                           ],
                         ),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                _isRegistering ? 'REGISTER' : 'LOGIN',
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineMedium
+                                    ?.copyWith(
+                                      color: accentColor,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1.2,
+                                    ),
+                              ),
+                              const SizedBox(height: 28),
+                              if (_isRegistering) ...[
+                                TextFormField(
+                                  controller: _emailController,
+                                  keyboardType: TextInputType.emailAddress,
+                                  autofillHints: const [AutofillHints.email],
+                                  decoration: _fieldDecoration(
+                                    'Email',
+                                    Icons.mail_outline,
+                                    fieldFillColor,
+                                  ),
+                                  validator: _required,
+                                ),
+                                const SizedBox(height: 14),
+                                TextFormField(
+                                  controller: _usernameController,
+                                  autofillHints: const [AutofillHints.username],
+                                  decoration: _fieldDecoration(
+                                    'Username',
+                                    Icons.alternate_email,
+                                    fieldFillColor,
+                                  ),
+                                  validator: _required,
+                                ),
+                                const SizedBox(height: 14),
+                                TextFormField(
+                                  controller: _displayNameController,
+                                  decoration: _fieldDecoration(
+                                    'Display name',
+                                    Icons.badge_outlined,
+                                    fieldFillColor,
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                CountrySelectorField(
+                                  value: _selectedCountryCode,
+                                  enabled: !_isSubmitting,
+                                  decoration: _fieldDecoration(
+                                    'Country',
+                                    Icons.public,
+                                    fieldFillColor,
+                                  ),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _selectedCountryCode = value;
+                                    });
+                                  },
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Select your country';
+                                    }
+
+                                    return null;
+                                  },
+                                ),
+                              ] else ...[
+                                TextFormField(
+                                  controller: _loginController,
+                                  autofillHints: const [
+                                    AutofillHints.username,
+                                    AutofillHints.email,
+                                  ],
+                                  decoration: _fieldDecoration(
+                                    'Email or username',
+                                    Icons.person_outline,
+                                    fieldFillColor,
+                                  ),
+                                  validator: _required,
+                                ),
+                              ],
+                              const SizedBox(height: 14),
+                              TextFormField(
+                                controller: _passwordController,
+                                obscureText: true,
+                                autofillHints: const [AutofillHints.password],
+                                decoration: _fieldDecoration(
+                                  'Password',
+                                  Icons.lock_outline,
+                                  fieldFillColor,
+                                ),
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Required';
+                                  }
+
+                                  if (_isRegistering && value.length < 8) {
+                                    return 'Use at least 8 characters';
+                                  }
+
+                                  return null;
+                                },
+                              ),
+                              if (!_isRegistering)
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton(
+                                    onPressed: () => _showUnavailable(
+                                      'Password recovery is not available yet.',
+                                    ),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: const Color(0xFF566A9D),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                      ),
+                                    ),
+                                    child: const Text('Forgot password?'),
+                                  ),
+                                ),
+                              if (_errorMessage != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  _errorMessage!,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: colors.error),
+                                ),
+                              ],
+                              if (_isRegistering) ...[
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Log in with',
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context).textTheme.bodyLarge,
+                                ),
+                                const SizedBox(height: 12),
+                                const _SocialButtons(),
+                                const SizedBox(height: 20),
+                              ],
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                height: 56,
+                                child: FilledButton(
+                                  onPressed: _isSubmitting ||
+                                          (_isRegistering &&
+                                              _selectedCountryCode == null)
+                                      ? null
+                                      : _submit,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: accentColor,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(28),
+                                    ),
+                                    textStyle: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  child: _isSubmitting
+                                      ? const SizedBox.square(
+                                          dimension: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : _isRegistering
+                                          ? const Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(Icons.person_add_alt),
+                                                SizedBox(width: 8),
+                                                Text('REGISTER'),
+                                              ],
+                                            )
+                                          : const Text('LOGIN'),
+                                ),
+                              ),
+                              if (!_isRegistering)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 28),
+                                  child: Column(
+                                    children: [
+                                      Text(
+                                        'Log in with',
+                                        textAlign: TextAlign.center,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyLarge,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      const _SocialButtons(),
+                                    ],
+                                  ),
+                                ),
+                              const SizedBox(height: 20),
+                              TextButton(
+                                onPressed: () {
+                                  _setMode(
+                                    _isRegistering
+                                        ? _AuthMode.login
+                                        : _AuthMode.register,
+                                  );
+                                },
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.black87,
+                                ),
+                                child: Text(
+                                  _isRegistering ? 'Back to Login' : 'Sign Up',
+                                  style: const TextStyle(fontSize: 18),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
                     ],
                   ),
                 ),

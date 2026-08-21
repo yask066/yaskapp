@@ -43,6 +43,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('ada'), findsOneWidget);
+    expect(find.text('Belarus'), findsOneWidget);
     expect(find.text('Follow'), findsOneWidget);
 
     await tester.tap(find.text('Follow'));
@@ -85,7 +86,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('A public poll'), findsOneWidget);
-    expect(find.text('A public poll'), findsOneWidget);
   });
 }
 
@@ -100,6 +100,7 @@ Map<String, dynamic> _profileJson(bool following) {
     'profile': {
       'displayName': 'Ada Lovelace',
       'bio': 'Polls and conversations.',
+      'countryCode': 'BY',
       'avatarObjectKey': null,
       'pollsCount': 3,
       'followersCount': following ? 1 : 0,

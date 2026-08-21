@@ -14,6 +14,7 @@ export type UserWithProfileRow = {
   updated_at: Date;
   display_name: string;
   bio: string | null;
+  country_code: string | null;
   avatar_object_key: string | null;
   polls_count: number;
   followers_count: number;
@@ -30,6 +31,7 @@ export type PublicUser = {
   profile: {
     displayName: string;
     bio: string | null;
+    countryCode: string | null;
     avatarObjectKey: string | null;
     pollsCount: number;
     followersCount: number;
@@ -42,6 +44,7 @@ export type CreateUserInput = {
   username: string;
   passwordHash: string;
   displayName: string;
+  countryCode: string;
 };
 
 function mapUser(row: UserWithProfileRow): PublicUser {
@@ -55,6 +58,7 @@ function mapUser(row: UserWithProfileRow): PublicUser {
     profile: {
       displayName: row.display_name,
       bio: row.bio,
+      countryCode: row.country_code,
       avatarObjectKey: row.avatar_object_key,
       pollsCount: row.polls_count,
       followersCount: row.followers_count,
@@ -83,6 +87,7 @@ async function findUserByIdWithClient(client: PoolClient, userId: string) {
         u.updated_at,
         p.display_name,
         p.bio,
+        p.country_code,
         p.avatar_object_key,
         p.polls_count,
         p.followers_count,
@@ -124,10 +129,10 @@ export async function createUser(input: CreateUserInput) {
 
     await client.query(
       `
-        INSERT INTO profiles (user_id, display_name)
-        VALUES ($1, $2)
+        INSERT INTO profiles (user_id, display_name, country_code)
+        VALUES ($1, $2, $3)
       `,
-      [userId, input.displayName]
+      [userId, input.displayName, input.countryCode]
     );
 
     const createdUser = await findUserByIdWithClient(client, userId);
@@ -160,6 +165,7 @@ export async function findUserByEmailOrUsername(login: string) {
         u.updated_at,
         p.display_name,
         p.bio,
+        p.country_code,
         p.avatar_object_key,
         p.polls_count,
         p.followers_count,
@@ -191,6 +197,7 @@ export async function findUserById(userId: string) {
         u.updated_at,
         p.display_name,
         p.bio,
+        p.country_code,
         p.avatar_object_key,
         p.polls_count,
         p.followers_count,

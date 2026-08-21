@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../auth/auth_api_client.dart';
 import '../auth/auth_session.dart';
+import '../auth/country_selector.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({
@@ -26,6 +27,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _displayNameController;
   late final TextEditingController _bioController;
+  String? _countryCode;
   var _isSubmitting = false;
   String? _errorMessage;
 
@@ -36,6 +38,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       text: widget.user.profile.displayName,
     );
     _bioController = TextEditingController(text: widget.user.profile.bio ?? '');
+    _countryCode = widget.user.profile.countryCode;
   }
 
   @override
@@ -62,6 +65,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         bio: _bioController.text.trim().isEmpty
             ? null
             : _bioController.text.trim(),
+        countryCode: _countryCode,
       );
 
       if (!mounted) {
@@ -178,6 +182,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   }
 
                   return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              CountrySelectorField(
+                value: _countryCode,
+                decoration: _fieldDecoration('Country'),
+                emptyLabel: 'Not selected',
+                onChanged: (value) {
+                  setState(() {
+                    _countryCode = value;
+                  });
                 },
               ),
               const SizedBox(height: 16),

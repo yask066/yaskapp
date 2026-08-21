@@ -51,6 +51,7 @@ class AuthApiClient {
     required String email,
     required String username,
     required String password,
+    required String countryCode,
     String? displayName,
   }) async {
     final response = await _httpClient.post(
@@ -62,6 +63,7 @@ class AuthApiClient {
         'email': email,
         'username': username,
         'password': password,
+        'countryCode': countryCode,
         if (displayName != null && displayName.trim().isNotEmpty)
           'displayName': displayName.trim(),
       }),
@@ -91,6 +93,7 @@ class AuthApiClient {
     required String accessToken,
     String? displayName,
     String? bio,
+    String? countryCode,
   }) async {
     final response = await _httpClient.patch(
       _uri('/profiles/me'),
@@ -101,6 +104,7 @@ class AuthApiClient {
       body: jsonEncode({
         if (displayName != null) 'displayName': displayName,
         'bio': bio,
+        if (countryCode != null) 'countryCode': countryCode,
       }),
     );
     final body = _decodeObject(response);

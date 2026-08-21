@@ -2,8 +2,10 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
 import { authenticate, optionalAuthenticate } from '../auth/auth.utils.js';
+import { supportedCountryCodeSchema } from '../countries.js';
 import {
   FollowRepositoryError,
+  CountryClearNotAllowedError,
   ProfileNotFoundError,
   followUser,
   getPublicProfile,
@@ -19,9 +21,15 @@ const updateProfileSchema = z.object({
   displayName: z.string().trim().min(1).max(80).optional(),
   bio: z
     .union([z.string().trim().max(500), z.null()])
+    .optional(),
+  countryCode: z
+    .union([z.string().trim().toUpperCase().pipe(supportedCountryCodeSchema), z.null()])
     .optional()
 }).strict().refine(
-  (profile) => profile.displayName !== undefined || profile.bio !== undefined,
+  (profile) =>
+    profile.displayName !== undefined ||
+    profile.bio !== undefined ||
+    profile.countryCode !== undefined,
   'At least one profile field is required.'
 );
 
@@ -46,6 +54,13 @@ function validationError(reply: FastifyReply, error: z.ZodError) {
 }
 
 function profileError(reply: FastifyReply, error: unknown) {
+  if (error instanceof CountryClearNotAllowedError) {
+    return reply.status(400).send({
+      error: 'country_clear_not_allowed',
+      message: error.message
+    });
+  }
+
   if (error instanceof ProfileNotFoundError) {
     return reply.status(404).send({
       error: 'not_found',

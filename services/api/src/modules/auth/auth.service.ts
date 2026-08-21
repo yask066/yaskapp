@@ -19,6 +19,7 @@ type RegisterInput = {
   email: string;
   username: string;
   password: string;
+  countryCode: string;
   displayName?: string;
 };
 
@@ -77,6 +78,7 @@ export async function registerUser(app: FastifyInstance, input: RegisterInput) {
       email,
       username,
       passwordHash,
+      countryCode: input.countryCode,
       displayName: input.displayName?.trim() || username
     });
 
