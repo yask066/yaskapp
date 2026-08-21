@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "countries": [
+    { "code": "BY", "name": "Belarus" },
+    { "code": "LT", "name": "Lithuania" },
+    { "code": "LV", "name": "Latvia" },
+    { "code": "PL", "name": "Poland" },
+    { "code": "RU", "name": "Russia" },
+    { "code": "UA", "name": "Ukraine" },
+    { "code": "DE", "name": "Germany" },
+    { "code": "GB", "name": "United Kingdom" },
+    { "code": "US", "name": "United States" }
+  ]
+}

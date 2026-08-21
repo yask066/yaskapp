@@ -8,11 +8,12 @@
   "scripts": {
     "api:dev": "npm run dev -w @yaskapp/api",
     "api:build": "npm run build -w @yaskapp/api",
-    "api:test": "npm run test -w @yaskapp/api",
     "api:typecheck": "npm run typecheck -w @yaskapp/api",
     "db:migrate": "npm run db:migrate -w @yaskapp/api",
     "db:check": "npm run db:check -w @yaskapp/api",
-    "shared:build": "npm run build -w @yaskapp/shared"
+    "shared:build": "npm run build -w @yaskapp/shared",
+    "countries:check": "node scripts/check-country-catalog.mjs",
+    "api:test": "npm run countries:check && npm run test -w @yaskapp/api"
   },
   "engines": {
     "node": ">=20"

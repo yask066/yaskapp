@@ -225,6 +225,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                     Icons.public,
                                     fieldFillColor,
                                   ),
+                                  emptyLabel: '',
                                   onChanged: (value) {
                                     setState(() {
                                       _selectedCountryCode = value;

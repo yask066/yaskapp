@@ -6,8 +6,8 @@ const countryCatalogVersion = 1;
 
 class CountryOption {
   const CountryOption(this.code, this.name)
-      : assert(code.isNotEmpty),
-        assert(name.isNotEmpty);
+      : assert(code.length > 0),
+        assert(name.length > 0);
 
   final IsoAlpha2CountryCode code;
   final String name;
