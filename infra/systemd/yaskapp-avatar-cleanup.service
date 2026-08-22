@@ -1,0 +1,9 @@
+[Unit]
+Description=Yaskapp orphan avatar cleanup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/yaskapp
+ExecStart=/usr/bin/docker compose -f /opt/yaskapp/infra/docker/docker-compose.staging.yml run --rm --no-deps api node services/api/dist/jobs/cleanup-avatar-objects.js --grace-period-hours=24

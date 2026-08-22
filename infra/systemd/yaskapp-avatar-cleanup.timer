@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Yaskapp orphan avatar cleanup daily
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=15m
+Persistent=true
+Unit=yaskapp-avatar-cleanup.service
+
+[Install]
+WantedBy=timers.target
