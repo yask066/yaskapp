@@ -439,7 +439,7 @@ class _CommentTile extends StatelessWidget {
           UserAvatar(
             displayName: comment.author.displayName,
             username: comment.author.username,
-            imageUrl: comment.author.avatarObjectKey,
+            imageUrl: comment.author.avatarUrl,
             radius: 22,
           ),
           const SizedBox(width: 12),

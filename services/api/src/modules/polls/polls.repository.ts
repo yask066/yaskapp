@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
+import { avatarUrlForUser } from '../profiles/avatar-url.js';
 
 export type PollVisibility = 'public' | 'followers' | 'private';
 
@@ -9,6 +10,7 @@ export type PollAuthor = {
   username: string;
   displayName: string;
   avatarObjectKey: string | null;
+  avatarUrl: string | null;
 };
 
 export type PollOption = {
@@ -111,7 +113,8 @@ function mapPoll(row: PollRow, options: PollOption[], viewerLikedPollIds: Set<st
       id: row.author_id,
       username: row.author_username,
       displayName: row.author_display_name,
-      avatarObjectKey: row.author_avatar_object_key
+      avatarObjectKey: row.author_avatar_object_key,
+      avatarUrl: avatarUrlForUser(row.author_id, row.author_avatar_object_key)
     },
     question: row.question,
     description: row.description,
@@ -146,7 +149,8 @@ function mapComment(row: PollCommentRow): PollComment {
       id: row.author_id,
       username: row.author_username,
       displayName: row.author_display_name,
-      avatarObjectKey: row.author_avatar_object_key
+      avatarObjectKey: row.author_avatar_object_key,
+      avatarUrl: avatarUrlForUser(row.author_id, row.author_avatar_object_key)
     },
     body: row.body,
     likesCount: row.likes_count,

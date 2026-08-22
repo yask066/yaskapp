@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../../core/config/api_config.dart';
 import 'auth_session.dart';
@@ -117,8 +119,68 @@ class AuthApiClient {
     return AuthUser.fromJson(user);
   }
 
+  Future<AuthUser> uploadAvatar({
+    required String accessToken,
+    required Uint8List bytes,
+    required String filename,
+    required String contentType,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      _uri('/profiles/me/avatar'),
+    )
+      ..headers['authorization'] = 'Bearer $accessToken'
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'avatar',
+          bytes,
+          filename: filename,
+          contentType: _mediaType(contentType),
+        ),
+      );
+
+    final response = await http.Response.fromStream(
+      await _httpClient.send(request),
+    );
+    final body = _decodeObject(response);
+    final user = body['user'];
+
+    if (user is! Map<String, dynamic>) {
+      throw const AuthApiException('Avatar upload response is invalid.');
+    }
+
+    return AuthUser.fromJson(user);
+  }
+
+  Future<AuthUser> deleteAvatar({required String accessToken}) async {
+    final response = await _httpClient.delete(
+      _uri('/profiles/me/avatar'),
+      headers: {
+        'authorization': 'Bearer $accessToken',
+      },
+    );
+    final body = _decodeObject(response);
+    final user = body['user'];
+
+    if (user is! Map<String, dynamic>) {
+      throw const AuthApiException('Avatar delete response is invalid.');
+    }
+
+    return AuthUser.fromJson(user);
+  }
+
   Uri _uri(String path) {
     return Uri.parse(_config.baseUrl).replace(path: path);
+  }
+
+  MediaType? _mediaType(String contentType) {
+    final parts = contentType.split('/');
+
+    if (parts.length != 2 || parts.any((part) => part.isEmpty)) {
+      return null;
+    }
+
+    return MediaType(parts[0], parts[1]);
   }
 
   Map<String, dynamic> _decodeObject(http.Response response) {

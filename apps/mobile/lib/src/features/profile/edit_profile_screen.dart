@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/widgets/user_avatar.dart';
 import '../auth/auth_api_client.dart';
@@ -11,6 +14,7 @@ class EditProfileScreen extends StatefulWidget {
     required this.accessToken,
     required this.authApiClient,
     required this.onLogout,
+    this.onUserChanged,
     super.key,
   });
 
@@ -18,6 +22,7 @@ class EditProfileScreen extends StatefulWidget {
   final String accessToken;
   final AuthApiClient authApiClient;
   final VoidCallback onLogout;
+  final ValueChanged<AuthUser>? onUserChanged;
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -30,6 +35,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? _countryCode;
   var _isSubmitting = false;
   String? _errorMessage;
+  AuthUser? _avatarUser;
+  Uint8List? _localAvatarBytes;
+  var _isAvatarSubmitting = false;
+  final _imagePicker = ImagePicker();
 
   @override
   void initState() {
@@ -39,6 +48,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
     _bioController = TextEditingController(text: widget.user.profile.bio ?? '');
     _countryCode = widget.user.profile.countryCode;
+    _avatarUser = widget.user;
   }
 
   @override
@@ -90,10 +100,158 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Future<void> _pickAvatar() async {
+    if (_isSubmitting || _isAvatarSubmitting) {
+      return;
+    }
+
+    final file = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 2048,
+      maxHeight: 2048,
+      imageQuality: 90,
+    );
+
+    if (file == null || !mounted) {
+      return;
+    }
+
+    final contentType = _contentTypeFor(file);
+    if (contentType == null) {
+      setState(() {
+        _errorMessage = 'Choose a JPEG, PNG, or WebP image.';
+      });
+      return;
+    }
+
+    final bytes = await file.readAsBytes();
+    if (!mounted) {
+      return;
+    }
+
+    if (bytes.length > 5 * 1024 * 1024) {
+      setState(() {
+        _errorMessage = 'Avatar must be 5 MB or smaller.';
+      });
+      return;
+    }
+
+    setState(() {
+      _localAvatarBytes = bytes;
+      _isAvatarSubmitting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final updatedUser = await widget.authApiClient.uploadAvatar(
+        accessToken: widget.accessToken,
+        bytes: bytes,
+        filename: file.name,
+        contentType: contentType,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _avatarUser = updatedUser;
+        _localAvatarBytes = null;
+      });
+      widget.onUserChanged?.call(updatedUser);
+    } on AuthApiException catch (error) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = error.message;
+          _localAvatarBytes = null;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Could not upload avatar.';
+          _localAvatarBytes = null;
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAvatarSubmitting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _removeAvatar() async {
+    if (_isSubmitting || _isAvatarSubmitting || !_hasAvatar) {
+      return;
+    }
+
+    setState(() {
+      _isAvatarSubmitting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final updatedUser = await widget.authApiClient.deleteAvatar(
+        accessToken: widget.accessToken,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _avatarUser = updatedUser;
+      });
+      widget.onUserChanged?.call(updatedUser);
+    } on AuthApiException catch (error) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = error.message;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Could not remove avatar.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAvatarSubmitting = false;
+        });
+      }
+    }
+  }
+
+  String? _contentTypeFor(XFile file) {
+    final mimeType = file.mimeType?.toLowerCase();
+    if (mimeType == 'image/jpeg' ||
+        mimeType == 'image/png' ||
+        mimeType == 'image/webp') {
+      return mimeType;
+    }
+
+    final extension = file.name.split('.').last.toLowerCase();
+    return switch (extension) {
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      _ => null,
+    };
+  }
+
+  bool get _hasAvatar =>
+      _localAvatarBytes != null || _avatarUser?.profile.avatarUrl != null;
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     const navy = Color(0xFF566A9D);
+    final avatarUser = _avatarUser ?? widget.user;
+    final avatarBusy = _isSubmitting || _isAvatarSubmitting;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -107,7 +265,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 children: [
                   IconButton(
                     tooltip: 'Back',
-                    onPressed: _isSubmitting
+                    onPressed: _isSubmitting || _isAvatarSubmitting
                         ? null
                         : () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.arrow_back_ios_new),
@@ -125,7 +283,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                   ),
                   TextButton(
-                    onPressed: _isSubmitting ? null : _submit,
+                    onPressed: _isSubmitting || _isAvatarSubmitting ? null : _submit,
                     child: const Text('Save'),
                   ),
                 ],
@@ -136,9 +294,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   clipBehavior: Clip.none,
                   children: [
                     UserAvatar(
-                      displayName: widget.user.profile.displayName,
-                      username: widget.user.username,
-                      imageUrl: widget.user.profile.avatarObjectKey,
+                      displayName: avatarUser.profile.displayName,
+                      username: avatarUser.username,
+                      imageUrl: avatarUser.profile.avatarUrl,
+                      localImageBytes: _localAvatarBytes,
                       radius: 56,
                     ),
                     Positioned(
@@ -150,7 +309,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         elevation: 2,
                         child: IconButton(
                           tooltip: 'Change photo',
-                          onPressed: () {},
+                          onPressed: avatarBusy ? null : _pickAvatar,
                           icon: const Icon(Icons.camera_alt_outlined),
                           color: navy,
                         ),
@@ -170,6 +329,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                 ),
               ),
+              if (_hasAvatar) ...[
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: avatarBusy ? null : _removeAvatar,
+                  child: const Text('Remove photo'),
+                ),
+              ],
               const SizedBox(height: 38),
               TextFormField(
                 controller: _displayNameController,
@@ -229,7 +395,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ],
               const SizedBox(height: 42),
               TextButton(
-                onPressed: _isSubmitting ? null : widget.onLogout,
+                onPressed: _isSubmitting || _isAvatarSubmitting
+                    ? null
+                    : widget.onLogout,
                 style: TextButton.styleFrom(
                   foregroundColor: Colors.red,
                   textStyle: const TextStyle(fontSize: 17),

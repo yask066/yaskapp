@@ -4,6 +4,7 @@ class PollAuthorSummary {
     required this.username,
     required this.displayName,
     this.avatarObjectKey,
+    this.avatarUrl,
   });
 
   factory PollAuthorSummary.fromJson(Map<String, dynamic> json) {
@@ -12,6 +13,7 @@ class PollAuthorSummary {
       username: json['username'] as String,
       displayName: json['displayName'] as String,
       avatarObjectKey: json['avatarObjectKey'] as String?,
+      avatarUrl: json['avatarUrl'] as String?,
     );
   }
 
@@ -19,6 +21,7 @@ class PollAuthorSummary {
   final String username;
   final String displayName;
   final String? avatarObjectKey;
+  final String? avatarUrl;
 }
 
 class PollOptionSummary {

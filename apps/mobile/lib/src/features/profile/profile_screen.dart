@@ -159,6 +159,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           accessToken: widget.accessToken,
           authApiClient: widget.authApiClient,
           onLogout: widget.onLogout,
+          onUserChanged: widget.onUserUpdated,
         ),
       ),
     );
@@ -278,7 +279,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 UserAvatar(
                                   displayName: displayName,
                                   username: widget.user.username,
-                                  imageUrl: widget.user.profile.avatarObjectKey,
+                                  imageUrl: widget.user.profile.avatarUrl,
                                   radius: 40,
                                 ),
                                 const SizedBox(width: 16),

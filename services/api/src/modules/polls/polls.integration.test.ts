@@ -39,6 +39,8 @@ type AuthResponse = {
       displayName: string;
       bio: string | null;
       countryCode: string | null;
+      avatarObjectKey: string | null;
+      avatarUrl: string | null;
       pollsCount: number;
     };
   };
@@ -150,6 +152,35 @@ function bearer(accessToken: string) {
   return {
     authorization: `Bearer ${accessToken}`
   };
+}
+
+function multipartFileBody(
+  boundary: string,
+  fieldName: string,
+  content: string | Buffer
+) {
+  const header = Buffer.from(
+    `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="${fieldName}"; filename="avatar.png"\r\n` +
+      'Content-Type: image/png\r\n\r\n'
+  );
+  const body = typeof content === 'string' ? Buffer.from(content) : content;
+  const footer = Buffer.from(`\r\n--${boundary}--\r\n`);
+
+  return Buffer.concat([header, body, footer]);
+}
+
+function animatedWebpBody() {
+  const body = Buffer.alloc(12 + 8 + 10);
+
+  body.write('RIFF', 0, 'ascii');
+  body.writeUInt32LE(body.length - 8, 4);
+  body.write('WEBP', 8, 'ascii');
+  body.write('VP8X', 12, 'ascii');
+  body.writeUInt32LE(10, 16);
+  body[20] = 0x02;
+
+  return body;
 }
 
 test('global error handler returns safe and consistent errors', async () => {
@@ -508,6 +539,172 @@ test('profile can be updated by the current user', async () => {
   assert.equal(clearedProfile.user.profile.bio, null);
 });
 
+test('avatar upload requires authentication and a multipart file', async () => {
+  const unauthorizedResponse = await app.inject({
+    method: 'POST',
+    url: '/profiles/me/avatar'
+  });
+
+  assert.equal(unauthorizedResponse.statusCode, 401, unauthorizedResponse.body);
+
+  const invalidTokenResponse = await app.inject({
+    method: 'POST',
+    url: '/profiles/me/avatar',
+    headers: bearer('invalid-token')
+  });
+
+  assert.equal(invalidTokenResponse.statusCode, 401, invalidTokenResponse.body);
+
+  const registered = await registerTestUser();
+  const missingFileResponse = await app.inject({
+    method: 'POST',
+    url: '/profiles/me/avatar',
+    headers: {
+      ...bearer(registered.accessToken),
+      'content-type': 'multipart/form-data; boundary=avatar-test'
+    },
+    payload: '--avatar-test--\r\n'
+  });
+
+  assert.equal(missingFileResponse.statusCode, 400, missingFileResponse.body);
+
+  const wrongFieldBoundary = 'wrong-avatar-field';
+  const wrongFieldResponse = await app.inject({
+    method: 'POST',
+    url: '/profiles/me/avatar',
+    headers: {
+      ...bearer(registered.accessToken),
+      'content-type': `multipart/form-data; boundary=${wrongFieldBoundary}`
+    },
+    payload: multipartFileBody(wrongFieldBoundary, 'file', 'not-an-avatar')
+  });
+
+  assert.equal(wrongFieldResponse.statusCode, 400, wrongFieldResponse.body);
+
+  const tooLargeBoundary = 'too-large-avatar';
+  const tooLargeResponse = await app.inject({
+    method: 'POST',
+    url: '/profiles/me/avatar',
+    headers: {
+      ...bearer(registered.accessToken),
+      'content-type': `multipart/form-data; boundary=${tooLargeBoundary}`
+    },
+    payload: multipartFileBody(
+      tooLargeBoundary,
+      'avatar',
+      'x'.repeat(5 * 1024 * 1024 + 1)
+    )
+  });
+
+  assert.equal(tooLargeResponse.statusCode, 400, tooLargeResponse.body);
+  assert.equal(tooLargeResponse.json<{ error: string }>().error, 'avatar_too_large');
+
+  const unsupportedTypeBoundary = 'unsupported-avatar-type';
+  const unsupportedTypeResponse = await app.inject({
+    method: 'POST',
+    url: '/profiles/me/avatar',
+    headers: {
+      ...bearer(registered.accessToken),
+      'content-type': `multipart/form-data; boundary=${unsupportedTypeBoundary}`
+    },
+    payload: multipartFileBody(
+      unsupportedTypeBoundary,
+      'avatar',
+      'not-an-image'
+    ).toString().replace('Content-Type: image/png', 'Content-Type: text/plain')
+  });
+
+  assert.equal(unsupportedTypeResponse.statusCode, 400, unsupportedTypeResponse.body);
+  assert.equal(
+    unsupportedTypeResponse.json<{ error: string }>().error,
+    'avatar_upload_invalid'
+  );
+
+  const invalidSignatureBoundary = 'invalid-avatar-signature';
+  const invalidSignatureResponse = await app.inject({
+    method: 'POST',
+    url: '/profiles/me/avatar',
+    headers: {
+      ...bearer(registered.accessToken),
+      'content-type': `multipart/form-data; boundary=${invalidSignatureBoundary}`
+    },
+    payload: multipartFileBody(
+      invalidSignatureBoundary,
+      'avatar',
+      'not-a-png-file'
+    )
+  });
+
+  assert.equal(invalidSignatureResponse.statusCode, 400, invalidSignatureResponse.body);
+  assert.equal(
+    invalidSignatureResponse.json<{ error: string }>().error,
+    'avatar_upload_invalid'
+  );
+
+  const animatedBoundary = 'animated-avatar';
+  const animatedResponse = await app.inject({
+    method: 'POST',
+    url: '/profiles/me/avatar',
+    headers: {
+      ...bearer(registered.accessToken),
+      'content-type': `multipart/form-data; boundary=${animatedBoundary}`
+    },
+    payload: multipartFileBody(animatedBoundary, 'avatar', animatedWebpBody())
+  });
+
+  assert.equal(animatedResponse.statusCode, 400, animatedResponse.body);
+  assert.equal(
+    animatedResponse.json<{ error: string }>().error,
+    'avatar_upload_invalid'
+  );
+});
+
+test('avatar deletion requires authentication and is idempotent', async () => {
+  const unauthorizedResponse = await app.inject({
+    method: 'DELETE',
+    url: '/profiles/me/avatar'
+  });
+
+  assert.equal(unauthorizedResponse.statusCode, 401, unauthorizedResponse.body);
+
+  const invalidTokenResponse = await app.inject({
+    method: 'DELETE',
+    url: '/profiles/me/avatar',
+    headers: bearer('invalid-token')
+  });
+
+  assert.equal(invalidTokenResponse.statusCode, 401, invalidTokenResponse.body);
+
+  const registered = await registerTestUser();
+  const firstDeleteResponse = await app.inject({
+    method: 'DELETE',
+    url: '/profiles/me/avatar',
+    headers: bearer(registered.accessToken)
+  });
+
+  assert.equal(firstDeleteResponse.statusCode, 200, firstDeleteResponse.body);
+  assert.doesNotMatch(
+    firstDeleteResponse.body,
+    /passwordHash|password_hash|JWT_SECRET|S3_ACCESS_KEY_ID|S3_SECRET_ACCESS_KEY|secretAccessKey/
+  );
+  assert.equal(
+    firstDeleteResponse.json<AuthResponse>().user.profile.avatarObjectKey,
+    null
+  );
+
+  const secondDeleteResponse = await app.inject({
+    method: 'DELETE',
+    url: '/profiles/me/avatar',
+    headers: bearer(registered.accessToken)
+  });
+
+  assert.equal(secondDeleteResponse.statusCode, 200, secondDeleteResponse.body);
+  assert.equal(
+    secondDeleteResponse.json<AuthResponse>().user.profile.avatarObjectKey,
+    null
+  );
+});
+
 test('profile update requires authentication and validates body', async () => {
   const unauthorizedResponse = await app.inject({
     method: 'PATCH',
@@ -574,6 +771,27 @@ test('public profile returns safe data and viewer relationship state', async () 
   const viewer = await registerTestUser();
   const target = await registerTestUser();
 
+  const emptyAvatarProfileResponse = await app.inject({
+    method: 'GET',
+    url: `/users/${target.user.id}`
+  });
+  const emptyAvatarProfile = emptyAvatarProfileResponse.json<{
+    user: { profile: { avatarObjectKey: string | null; avatarUrl: string | null } };
+  }>().user;
+  assert.equal(emptyAvatarProfile.profile.avatarObjectKey, null);
+  assert.equal(emptyAvatarProfile.profile.avatarUrl, null);
+
+  const missingAvatarResponse = await app.inject({
+    method: 'GET',
+    url: `/media/avatars/${target.user.id}`
+  });
+  assert.equal(missingAvatarResponse.statusCode, 404, missingAvatarResponse.body);
+
+  await db.query(
+    'UPDATE profiles SET avatar_object_key = $2 WHERE user_id = $1',
+    [target.user.id, 'avatars/target/opaque-key.webp']
+  );
+
   const createdPollResponse = await app.inject({
     method: 'POST',
     url: '/polls',
@@ -597,7 +815,12 @@ test('public profile returns safe data and viewer relationship state', async () 
       id: string;
       username: string;
       viewerIsFollowing: boolean;
-      profile: { followersCount: number; countryCode: string | null };
+      profile: {
+        followersCount: number;
+        countryCode: string | null;
+        avatarObjectKey: string | null;
+        avatarUrl: string | null;
+      };
       email?: string;
     };
   }>().user;
@@ -606,6 +829,11 @@ test('public profile returns safe data and viewer relationship state', async () 
   assert.equal(anonymousProfile.viewerIsFollowing, false);
   assert.equal(anonymousProfile.profile.followersCount, 0);
   assert.equal(anonymousProfile.profile.countryCode, 'BY');
+  assert.equal(anonymousProfile.profile.avatarObjectKey, 'avatars/target/opaque-key.webp');
+  assert.equal(
+    anonymousProfile.profile.avatarUrl,
+    `/media/avatars/${target.user.id}`
+  );
   assert.equal(anonymousProfile.email, undefined);
 
   const publicPollsResponse = await app.inject({

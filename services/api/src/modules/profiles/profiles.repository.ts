@@ -1,4 +1,5 @@
 import { db } from '../../config/database.js';
+import { avatarUrlForUser } from './avatar-url.js';
 import type { PublicUser, UserWithProfileRow } from '../auth/auth.repository.js';
 
 type UpdateProfileInput = {
@@ -20,6 +21,7 @@ export type PublicProfile = {
     bio: string | null;
     countryCode: string | null;
     avatarObjectKey: string | null;
+    avatarUrl: string | null;
     pollsCount: number;
     followersCount: number;
     followingCount: number;
@@ -42,6 +44,50 @@ export async function findProfileCountryCode(userId: string) {
   return result.rows[0]?.country_code;
 }
 
+export async function updateAvatarObjectKey(userId: string, objectKey: string) {
+  const result = await db.query(
+    `
+      UPDATE profiles
+      SET avatar_object_key = $2
+      WHERE user_id = $1
+      RETURNING user_id
+    `,
+    [userId, objectKey]
+  );
+
+  return result.rowCount === 1;
+}
+
+export async function clearAvatarObjectKey(userId: string) {
+  const result = await db.query(
+    `
+      UPDATE profiles
+      SET avatar_object_key = NULL
+      WHERE user_id = $1
+      RETURNING user_id
+    `,
+    [userId]
+  );
+
+  return result.rowCount === 1;
+}
+
+export async function findAvatarObjectKey(userId: string) {
+  const result = await db.query<{ avatar_object_key: string | null }>(
+    `
+      SELECT p.avatar_object_key
+      FROM profiles p
+      JOIN users u ON u.id = p.user_id
+      WHERE p.user_id = $1
+        AND u.deleted_at IS NULL
+      LIMIT 1
+    `,
+    [userId]
+  );
+
+  return result.rows[0]?.avatar_object_key;
+}
+
 function mapUser(row: UserWithProfileRow): PublicUser {
   return {
     id: row.id,
@@ -55,6 +101,7 @@ function mapUser(row: UserWithProfileRow): PublicUser {
       bio: row.bio,
       countryCode: row.country_code,
       avatarObjectKey: row.avatar_object_key,
+      avatarUrl: avatarUrlForUser(row.id, row.avatar_object_key),
       pollsCount: row.polls_count,
       followersCount: row.followers_count,
       followingCount: row.following_count
@@ -79,6 +126,7 @@ function mapPublicProfile(row: PublicProfileRow): PublicProfile {
       bio: row.bio,
       countryCode: row.country_code,
       avatarObjectKey: row.avatar_object_key,
+      avatarUrl: avatarUrlForUser(row.id, row.avatar_object_key),
       pollsCount: row.polls_count,
       followersCount: row.followers_count,
       followingCount: row.following_count

@@ -7,6 +7,7 @@ class PublicProfile {
     required this.bio,
     required this.countryCode,
     required this.avatarObjectKey,
+    this.avatarUrl,
     required this.pollsCount,
     required this.followersCount,
     required this.followingCount,
@@ -28,6 +29,7 @@ class PublicProfile {
       bio: profile['bio'] as String?,
       countryCode: profile['countryCode'] as String?,
       avatarObjectKey: profile['avatarObjectKey'] as String?,
+      avatarUrl: profile['avatarUrl'] as String?,
       pollsCount: profile['pollsCount'] as int,
       followersCount: profile['followersCount'] as int,
       followingCount: profile['followingCount'] as int,
@@ -42,6 +44,7 @@ class PublicProfile {
   final String? bio;
   final String? countryCode;
   final String? avatarObjectKey;
+  final String? avatarUrl;
   final int pollsCount;
   final int followersCount;
   final int followingCount;
@@ -59,6 +62,7 @@ class PublicProfile {
       bio: bio,
       countryCode: countryCode,
       avatarObjectKey: avatarObjectKey,
+      avatarUrl: avatarUrl,
       pollsCount: pollsCount,
       followersCount: followersCount ?? this.followersCount,
       followingCount: followingCount,

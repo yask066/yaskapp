@@ -175,7 +175,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                     UserAvatar(
                       displayName: profile.displayName,
                       username: profile.username,
-                      imageUrl: profile.avatarObjectKey,
+                      imageUrl: profile.avatarUrl,
                       radius: 40,
                     ),
                     const SizedBox(width: 16),

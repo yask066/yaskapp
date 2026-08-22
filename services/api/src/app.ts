@@ -1,5 +1,6 @@
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
+import multipart from '@fastify/multipart';
 import websocket from '@fastify/websocket';
 import Fastify from 'fastify';
 
@@ -88,6 +89,13 @@ export function buildApp() {
   app.register(cors, {
     origin: true,
     credentials: true
+  });
+
+  app.register(multipart, {
+    limits: {
+      files: 1,
+      fileSize: 5 * 1024 * 1024
+    }
   });
 
   app.register(jwt, {

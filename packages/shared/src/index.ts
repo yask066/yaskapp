@@ -5,6 +5,7 @@ export type PollAuthor = {
   username: string;
   displayName: string;
   avatarObjectKey: string | null;
+  avatarUrl: string | null;
 };
 
 export type PollOption = {

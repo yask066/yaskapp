@@ -7,6 +7,7 @@ class AuthUserProfile {
     this.countryCode,
     this.bio,
     this.avatarObjectKey,
+    this.avatarUrl,
   });
 
   factory AuthUserProfile.fromJson(Map<String, dynamic> json) {
@@ -18,6 +19,7 @@ class AuthUserProfile {
       countryCode: json['countryCode'] as String?,
       bio: json['bio'] as String?,
       avatarObjectKey: json['avatarObjectKey'] as String?,
+      avatarUrl: json['avatarUrl'] as String?,
     );
   }
 
@@ -28,6 +30,7 @@ class AuthUserProfile {
   final String? countryCode;
   final String? bio;
   final String? avatarObjectKey;
+  final String? avatarUrl;
 }
 
 class AuthUser {

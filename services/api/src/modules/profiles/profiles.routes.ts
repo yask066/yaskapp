@@ -4,6 +4,13 @@ import { z } from 'zod';
 import { authenticate, optionalAuthenticate } from '../auth/auth.utils.js';
 import { supportedCountryCodeSchema } from '../countries.js';
 import {
+  AvatarUploadError,
+  deleteAvatar,
+  uploadAvatar
+} from './avatars.service.js';
+import { getObject } from '../../config/storage.js';
+import { findAvatarObjectKey } from './profiles.repository.js';
+import {
   FollowRepositoryError,
   CountryClearNotAllowedError,
   ProfileNotFoundError,
@@ -54,6 +61,13 @@ function validationError(reply: FastifyReply, error: z.ZodError) {
 }
 
 function profileError(reply: FastifyReply, error: unknown) {
+  if (error instanceof AvatarUploadError) {
+    return reply.status(400).send({
+      error: 'avatar_upload_invalid',
+      message: error.message
+    });
+  }
+
   if (error instanceof CountryClearNotAllowedError) {
     return reply.status(400).send({
       error: 'country_clear_not_allowed',
@@ -86,6 +100,86 @@ function profileError(reply: FastifyReply, error: unknown) {
 }
 
 export function registerProfileRoutes(app: FastifyInstance) {
+  app.get('/media/avatars/:userId', async (request, reply) => {
+    const parsedParams = followParamsSchema.safeParse(request.params);
+
+    if (!parsedParams.success) {
+      return validationError(reply, parsedParams.error);
+    }
+
+    const objectKey = await findAvatarObjectKey(parsedParams.data.userId);
+
+    if (!objectKey) {
+      return reply.status(404).send({
+        error: 'not_found',
+        message: 'Avatar not found.'
+      });
+    }
+
+    try {
+      const object = await getObject(objectKey);
+
+      reply.header('content-type', object.ContentType ?? 'image/webp');
+      reply.header('cache-control', 'public, max-age=300');
+
+      if (object.ContentLength !== undefined) {
+        reply.header('content-length', object.ContentLength);
+      }
+
+      return reply.send(object.Body);
+    } catch (_) {
+      return reply.status(404).send({
+        error: 'not_found',
+        message: 'Avatar not found.'
+      });
+    }
+  });
+
+  app.post(
+    '/profiles/me/avatar',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      try {
+        const part = await request.file();
+
+        if (!part) {
+          throw new AvatarUploadError('The avatar field is required.');
+        }
+
+        const user = await uploadAvatar(request.user.sub, part);
+
+        return { user };
+      } catch (error) {
+        if (error instanceof app.multipartErrors.RequestFileTooLargeError) {
+          return reply.status(400).send({
+            error: 'avatar_too_large',
+            message: 'Avatar file must be 5 MB or smaller.'
+          });
+        }
+
+        return profileError(reply, error);
+      }
+    }
+  );
+
+  app.delete(
+    '/profiles/me/avatar',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      try {
+        const user = await deleteAvatar(request.user.sub);
+
+        return { user };
+      } catch (error) {
+        return profileError(reply, error);
+      }
+    }
+  );
+
   app.get(
     '/users/:userId',
     {

@@ -79,7 +79,7 @@ class PollCard extends StatelessWidget {
                   child: UserAvatar(
                     displayName: poll.author.displayName,
                     username: poll.author.username,
-                    imageUrl: poll.author.avatarObjectKey,
+                    imageUrl: poll.author.avatarUrl,
                     radius: compact ? 22 : 22,
                   ),
                 ),

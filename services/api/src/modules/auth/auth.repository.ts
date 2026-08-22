@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
+import { avatarUrlForUser } from '../profiles/avatar-url.js';
 
 export type UserStatus = 'active' | 'blocked' | 'deleted';
 
@@ -33,6 +34,7 @@ export type PublicUser = {
     bio: string | null;
     countryCode: string | null;
     avatarObjectKey: string | null;
+    avatarUrl: string | null;
     pollsCount: number;
     followersCount: number;
     followingCount: number;
@@ -60,6 +62,7 @@ function mapUser(row: UserWithProfileRow): PublicUser {
       bio: row.bio,
       countryCode: row.country_code,
       avatarObjectKey: row.avatar_object_key,
+      avatarUrl: avatarUrlForUser(row.id, row.avatar_object_key),
       pollsCount: row.polls_count,
       followersCount: row.followers_count,
       followingCount: row.following_count
