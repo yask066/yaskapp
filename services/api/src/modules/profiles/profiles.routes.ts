@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { authenticate, optionalAuthenticate } from '../auth/auth.utils.js';
 import { supportedCountryCodeSchema } from '../countries.js';
+import { rateLimit } from '../../config/rate-limit.js';
 import {
   AvatarUploadError,
   deleteAvatar,
@@ -138,7 +139,14 @@ export function registerProfileRoutes(app: FastifyInstance) {
   app.post(
     '/profiles/me/avatar',
     {
-      preHandler: authenticate
+      preHandler: [
+        authenticate,
+        rateLimit({
+          keyPrefix: 'avatar-upload',
+          limit: 5,
+          windowMs: 15 * 60_000
+        })
+      ]
     },
     async (request, reply) => {
       try {
@@ -167,7 +175,14 @@ export function registerProfileRoutes(app: FastifyInstance) {
   app.delete(
     '/profiles/me/avatar',
     {
-      preHandler: authenticate
+      preHandler: [
+        authenticate,
+        rateLimit({
+          keyPrefix: 'avatar-delete',
+          limit: 10,
+          windowMs: 15 * 60_000
+        })
+      ]
     },
     async (request, reply) => {
       try {
