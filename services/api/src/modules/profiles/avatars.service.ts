@@ -10,7 +10,21 @@ import {
   updateAvatarObjectKey
 } from './profiles.repository.js';
 
-export class AvatarUploadError extends Error {}
+export type AvatarErrorCode =
+  | 'avatar_invalid'
+  | 'avatar_unsupported_type'
+  | 'avatar_processing_failed'
+  | 'avatar_storage_unavailable';
+
+export class AvatarUploadError extends Error {
+  constructor(message: string, readonly code: AvatarErrorCode = 'avatar_invalid') {
+    super(message);
+  }
+}
+
+export class AvatarProcessingError extends Error {}
+
+export class AvatarStorageError extends Error {}
 
 export const allowedAvatarMimeTypes = new Set([
   'image/jpeg',
@@ -129,7 +143,8 @@ export async function uploadAvatar(userId: string, part: MultipartFile) {
 
   if (!allowedAvatarMimeTypes.has(part.mimetype)) {
     throw new AvatarUploadError(
-      'Avatar file must be a JPEG, PNG, or WebP image.'
+      'Avatar file must be a JPEG, PNG, or WebP image.',
+      'avatar_unsupported_type'
     );
   }
 
@@ -143,22 +158,35 @@ export async function uploadAvatar(userId: string, part: MultipartFile) {
 
   if (!matchesAvatarSignature(part.mimetype, body)) {
     throw new AvatarUploadError(
-      'Avatar file content does not match its declared image type.'
+      'Avatar file content does not match its declared image type.',
+      'avatar_unsupported_type'
     );
   }
 
   if (isAnimatedAvatar(part.mimetype, body)) {
-    throw new AvatarUploadError('Animated avatar images are not supported.');
+    throw new AvatarUploadError(
+      'Animated avatar images are not supported.',
+      'avatar_unsupported_type'
+    );
   }
 
-  const normalizedBody = await normalizeAvatar(body);
+  let normalizedBody: Buffer;
+  try {
+    normalizedBody = await normalizeAvatar(body);
+  } catch (_) {
+    throw new AvatarProcessingError('Avatar image could not be processed safely.');
+  }
   const objectKey = createAvatarObjectKey(userId);
 
-  await putObject({
-    key: objectKey,
-    body: normalizedBody,
-    contentType: 'image/webp'
-  });
+  try {
+    await putObject({
+      key: objectKey,
+      body: normalizedBody,
+      contentType: 'image/webp'
+    });
+  } catch (_) {
+    throw new AvatarStorageError('Avatar storage is temporarily unavailable.');
+  }
 
   const updated = await updateAvatarObjectKey(userId, objectKey);
 
@@ -169,7 +197,11 @@ export async function uploadAvatar(userId: string, part: MultipartFile) {
 
   // Keep the old object until the new key is safely persisted in the profile.
   if (previousObjectKey !== null) {
-    await deleteObject(previousObjectKey);
+    try {
+      await deleteObject(previousObjectKey);
+    } catch (_) {
+      throw new AvatarStorageError('Avatar storage is temporarily unavailable.');
+    }
   }
 
   const user = await findUserById(userId);
@@ -191,7 +223,11 @@ export async function deleteAvatar(userId: string) {
   // A missing avatar is a successful no-op for repeated DELETE requests.
   // Clear the database pointer only after the storage object is deleted.
   if (objectKey !== null) {
-    await deleteObject(objectKey);
+    try {
+      await deleteObject(objectKey);
+    } catch (_) {
+      throw new AvatarStorageError('Avatar storage is temporarily unavailable.');
+    }
   }
 
   const cleared = await clearAvatarObjectKey(userId);

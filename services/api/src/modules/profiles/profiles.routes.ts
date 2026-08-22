@@ -5,6 +5,8 @@ import { authenticate, optionalAuthenticate } from '../auth/auth.utils.js';
 import { supportedCountryCodeSchema } from '../countries.js';
 import { rateLimit } from '../../config/rate-limit.js';
 import {
+  AvatarProcessingError,
+  AvatarStorageError,
   AvatarUploadError,
   deleteAvatar,
   uploadAvatar
@@ -64,7 +66,21 @@ function validationError(reply: FastifyReply, error: z.ZodError) {
 function profileError(reply: FastifyReply, error: unknown) {
   if (error instanceof AvatarUploadError) {
     return reply.status(400).send({
-      error: 'avatar_upload_invalid',
+      error: error.code,
+      message: error.message
+    });
+  }
+
+  if (error instanceof AvatarProcessingError) {
+    return reply.status(400).send({
+      error: 'avatar_processing_failed',
+      message: error.message
+    });
+  }
+
+  if (error instanceof AvatarStorageError) {
+    return reply.status(503).send({
+      error: 'avatar_storage_unavailable',
       message: error.message
     });
   }
@@ -144,7 +160,8 @@ export function registerProfileRoutes(app: FastifyInstance) {
         rateLimit({
           keyPrefix: 'avatar-upload',
           limit: 5,
-          windowMs: 15 * 60_000
+          windowMs: 15 * 60_000,
+          errorCode: 'avatar_rate_limited'
         })
       ]
     },
@@ -180,7 +197,8 @@ export function registerProfileRoutes(app: FastifyInstance) {
         rateLimit({
           keyPrefix: 'avatar-delete',
           limit: 10,
-          windowMs: 15 * 60_000
+          windowMs: 15 * 60_000,
+          errorCode: 'avatar_rate_limited'
         })
       ]
     },

@@ -14,6 +14,7 @@ export type RateLimitOptions = {
   keyPrefix: string;
   limit: number;
   windowMs: number;
+  errorCode?: string;
 };
 
 type RateLimitResult = {
@@ -66,7 +67,7 @@ export function rateLimit(options: RateLimitOptions) {
         reply.header('Retry-After', result.retryAfterSeconds);
 
         return reply.status(429).send({
-          error: 'rate_limit_exceeded',
+          error: options.errorCode ?? 'rate_limit_exceeded',
           message: 'Too many requests. Try again later.'
         });
       }

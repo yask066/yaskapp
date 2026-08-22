@@ -617,7 +617,7 @@ test('avatar upload requires authentication and a multipart file', async () => {
   assert.equal(unsupportedTypeResponse.statusCode, 400, unsupportedTypeResponse.body);
   assert.equal(
     unsupportedTypeResponse.json<{ error: string }>().error,
-    'avatar_upload_invalid'
+    'avatar_unsupported_type'
   );
 
   const invalidSignatureBoundary = 'invalid-avatar-signature';
@@ -638,7 +638,7 @@ test('avatar upload requires authentication and a multipart file', async () => {
   assert.equal(invalidSignatureResponse.statusCode, 400, invalidSignatureResponse.body);
   assert.equal(
     invalidSignatureResponse.json<{ error: string }>().error,
-    'avatar_upload_invalid'
+    'avatar_unsupported_type'
   );
 
   const animatedBoundary = 'animated-avatar';
@@ -655,7 +655,7 @@ test('avatar upload requires authentication and a multipart file', async () => {
   assert.equal(animatedResponse.statusCode, 400, animatedResponse.body);
   assert.equal(
     animatedResponse.json<{ error: string }>().error,
-    'avatar_upload_invalid'
+    'avatar_unsupported_type'
   );
 });
 
