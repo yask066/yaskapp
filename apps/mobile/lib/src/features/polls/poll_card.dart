@@ -131,10 +131,12 @@ class PollCard extends StatelessWidget {
                     tooltip: 'More',
                     enabled: canCancelVote,
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints.tightFor(
-                      width: 40,
-                      height: 40,
+                    constraints: const BoxConstraints(minWidth: 190),
+                    menuPadding: const EdgeInsets.symmetric(vertical: 6),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
                     ),
+                    elevation: 4,
                     icon: Icon(Icons.more_vert, size: compact ? 20 : 22),
                     onSelected: (action) {
                       if (action == _PollAction.cancelVote) {
@@ -145,7 +147,14 @@ class PollCard extends StatelessWidget {
                       if (canCancelVote)
                         const PopupMenuItem<_PollAction>(
                           value: _PollAction.cancelVote,
-                          child: Text('Cancel vote'),
+                          height: 48,
+                          child: Row(
+                            children: [
+                              Icon(Icons.clear, size: 20),
+                              SizedBox(width: 12),
+                              Text('Cancel vote'),
+                            ],
+                          ),
                         ),
                     ],
                   ),
