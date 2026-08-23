@@ -184,6 +184,7 @@ class PollCard extends StatelessWidget {
               const SizedBox(height: 8),
             ],
             if (!poll.isClosed &&
+                poll.allowVoteCancellation &&
                 poll.selectedOptionIndex != null &&
                 onCancelVote != null)
               Align(

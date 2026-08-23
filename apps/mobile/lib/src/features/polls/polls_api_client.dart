@@ -13,6 +13,10 @@ class PollsApiException implements Exception {
   final String? code;
 
   String get userMessage {
+    if (code == 'vote_cancellation_not_allowed') {
+      return 'The poll author does not allow vote cancellation.';
+    }
+
     if (code == 'poll_closed' || statusCode == 422) {
       return 'This poll is closed. Voting changes are no longer available.';
     }
@@ -177,6 +181,7 @@ class PollsApiClient {
     required String question,
     required List<String> options,
     required String accessToken,
+    bool allowVoteCancellation = false,
   }) async {
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls',
@@ -190,6 +195,7 @@ class PollsApiClient {
       body: jsonEncode({
         'question': question,
         'options': options,
+        'allowVoteCancellation': allowVoteCancellation,
       }),
     );
     final body = _decodeObject(response);

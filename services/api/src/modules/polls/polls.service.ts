@@ -18,6 +18,8 @@ export class PollClosedError extends Error {}
 
 export class PollAlreadyVotedError extends Error {}
 
+export class PollCancellationNotAllowedError extends Error {}
+
 export type CreatePollInput = {
   authorId: string;
   question: string;
@@ -26,6 +28,7 @@ export type CreatePollInput = {
   imageObjectKey?: string;
   visibility?: PollVisibility;
   endsAt?: string;
+  allowVoteCancellation?: boolean;
 };
 
 export type CreateVoteInput = {
@@ -74,6 +77,7 @@ export async function createPoll(input: CreatePollInput) {
     options: input.options.map((option) => option.trim()),
     imageObjectKey: normalizeOptionalText(input.imageObjectKey),
     visibility: input.visibility ?? 'public',
+    allowVoteCancellation: input.allowVoteCancellation ?? false,
     endsAt: input.endsAt ? new Date(input.endsAt) : undefined
   });
 }
@@ -157,6 +161,12 @@ export async function cancelVote(input: CancelVoteInput) {
 
   if (result.status === 'closed') {
     throw new PollClosedError('Poll is closed.');
+  }
+
+  if (result.status === 'cancellation_not_allowed') {
+    throw new PollCancellationNotAllowedError(
+      'The poll author does not allow vote cancellation.'
+    );
   }
 
   if (!result.poll) {

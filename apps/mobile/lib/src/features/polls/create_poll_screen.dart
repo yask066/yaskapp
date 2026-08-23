@@ -26,6 +26,7 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
   ];
 
   var _isSubmitting = false;
+  var _allowVoteCancellation = false;
   String? _errorMessage;
 
   @override
@@ -88,6 +89,7 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
       final poll = await widget.pollsApiClient.createPoll(
         question: _questionController.text.trim(),
         options: options,
+        allowVoteCancellation: _allowVoteCancellation,
         accessToken: widget.accessToken,
       );
 
@@ -177,6 +179,16 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
                 controller: _questionController,
                 max: 280,
                 color: secondaryText,
+              ),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Allow voters to cancel their vote'),
+                value: _allowVoteCancellation,
+                onChanged: _isSubmitting
+                    ? null
+                    : (value) => setState(() {
+                          _allowVoteCancellation = value;
+                        }),
               ),
               const SizedBox(height: 24),
               Text(

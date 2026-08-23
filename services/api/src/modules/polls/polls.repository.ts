@@ -42,6 +42,7 @@ export type Poll = {
   votesCount: number;
   commentsCount: number;
   likesCount: number;
+  allowVoteCancellation: boolean;
   viewerHasLiked: boolean;
   viewerVoteOptionId: string | null;
   options: PollOption[];
@@ -58,6 +59,7 @@ export type CreatePollRecordInput = {
   visibility: PollVisibility;
   options: string[];
   endsAt?: Date;
+  allowVoteCancellation: boolean;
 };
 
 export type CreatePollCommentRecordInput = {
@@ -80,6 +82,7 @@ type PollRow = {
   votes_count: number;
   comments_count: number;
   likes_count: number;
+  allow_vote_cancellation: boolean;
   created_at: Date;
   updated_at: Date;
   ends_at: Date | null;
@@ -130,6 +133,7 @@ function mapPoll(
     votesCount: row.votes_count,
     commentsCount: row.comments_count,
     likesCount: row.likes_count,
+    allowVoteCancellation: row.allow_vote_cancellation,
     viewerHasLiked: viewerLikedPollIds.has(row.id),
     viewerVoteOptionId: viewerVoteOptionIds.get(row.id) ?? null,
     options,
@@ -187,6 +191,7 @@ async function findPollRowsByIds(client: PoolClient, pollIds: string[]) {
         p.votes_count,
         p.comments_count,
         p.likes_count,
+        p.allow_vote_cancellation,
         p.created_at,
         p.updated_at,
         p.ends_at
@@ -303,9 +308,10 @@ export async function createPollRecord(input: CreatePollRecordInput) {
           image_object_key,
           visibility,
           options_count,
+          allow_vote_cancellation,
           ends_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING id
       `,
       [
@@ -315,6 +321,7 @@ export async function createPollRecord(input: CreatePollRecordInput) {
         input.imageObjectKey ?? null,
         input.visibility,
         input.options.length,
+        input.allowVoteCancellation,
         input.endsAt ?? null
       ]
     );
@@ -867,9 +874,10 @@ export async function cancelVoteRecord(input: {
     const pollResult = await client.query<{
       id: string;
       ends_at: Date | null;
+      allow_vote_cancellation: boolean;
     }>(
       `
-        SELECT p.id, p.ends_at
+        SELECT p.id, p.ends_at, p.allow_vote_cancellation
         FROM polls p
         WHERE p.id = $1
           AND p.visibility = 'public'
@@ -889,6 +897,11 @@ export async function cancelVoteRecord(input: {
     if (poll.ends_at && poll.ends_at <= new Date()) {
       await client.query('ROLLBACK');
       return { status: 'closed' as const };
+    }
+
+    if (!poll.allow_vote_cancellation) {
+      await client.query('ROLLBACK');
+      return { status: 'cancellation_not_allowed' as const };
     }
 
     const voteResult = await client.query<{ option_id: string }>(

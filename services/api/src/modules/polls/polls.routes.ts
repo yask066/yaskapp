@@ -10,6 +10,7 @@ import { authenticate, optionalAuthenticate } from '../auth/auth.utils.js';
 import {
   PollAlreadyVotedError,
   PollClosedError,
+  PollCancellationNotAllowedError,
   PollNotFoundError,
   cancelVote,
   createPoll,
@@ -47,7 +48,8 @@ const createPollSchema = z.object({
     .string()
     .datetime({ offset: true })
     .refine((value) => new Date(value) > new Date(), 'Poll end date must be in the future.')
-    .optional()
+    .optional(),
+  allowVoteCancellation: z.boolean().default(false)
 }).strict();
 
 const voteParamsSchema = z.object({
@@ -100,6 +102,13 @@ function pollError(reply: FastifyReply, error: unknown) {
   if (error instanceof PollClosedError) {
     return reply.status(422).send({
       error: 'poll_closed',
+      message: error.message
+    });
+  }
+
+  if (error instanceof PollCancellationNotAllowedError) {
+    return reply.status(422).send({
+      error: 'vote_cancellation_not_allowed',
       message: error.message
     });
   }
