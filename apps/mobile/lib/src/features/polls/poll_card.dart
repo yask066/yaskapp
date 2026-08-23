@@ -59,6 +59,11 @@ class PollCard extends StatelessWidget {
       }
     }
 
+    final canCancelVote = !poll.isClosed &&
+        poll.allowVoteCancellation &&
+        poll.selectedOptionIndex != null &&
+        onCancelVote != null;
+
     return Card(
       color: Colors.white,
       margin: EdgeInsets.zero,
@@ -122,15 +127,27 @@ class PollCard extends StatelessWidget {
                 SizedBox(
                   width: 40,
                   height: 40,
-                  child: IconButton(
+                  child: PopupMenuButton<_PollAction>(
                     tooltip: 'More',
-                    onPressed: () {},
+                    enabled: canCancelVote,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints.tightFor(
                       width: 40,
                       height: 40,
                     ),
-                    icon: Icon(Icons.more_horiz, size: compact ? 20 : 22),
+                    icon: Icon(Icons.more_vert, size: compact ? 20 : 22),
+                    onSelected: (action) {
+                      if (action == _PollAction.cancelVote) {
+                        onCancelVote?.call();
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      if (canCancelVote)
+                        const PopupMenuItem<_PollAction>(
+                          value: _PollAction.cancelVote,
+                          child: Text('Cancel vote'),
+                        ),
+                    ],
                   ),
                 ),
               ],
@@ -183,18 +200,6 @@ class PollCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
             ],
-            if (!poll.isClosed &&
-                poll.allowVoteCancellation &&
-                poll.selectedOptionIndex != null &&
-                onCancelVote != null)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: onCancelVote,
-                  icon: const Icon(Icons.clear, size: 18),
-                  label: const Text('Cancel vote'),
-                ),
-              ),
             SizedBox(height: compact ? 16 : 18),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -238,6 +243,8 @@ class PollCard extends StatelessWidget {
     );
   }
 }
+
+enum _PollAction { cancelVote }
 
 class _PollOptionButton extends StatelessWidget {
   const _PollOptionButton({
