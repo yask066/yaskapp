@@ -123,7 +123,7 @@ class FeedScreenState extends State<FeedScreen> {
   }
 
   Future<void> _vote(PollSummary poll, PollOptionSummary option) async {
-    if (_votingPollIds.contains(poll.id)) {
+    if (_votingPollIds.contains(poll.id) || poll.isClosed) {
       return;
     }
 
@@ -132,7 +132,7 @@ class FeedScreenState extends State<FeedScreen> {
     });
 
     try {
-      final updatedPoll = await _pollsApiClient.vote(
+      final updatedPoll = await _pollsApiClient.setVote(
         pollId: poll.id,
         optionId: option.id,
         accessToken: widget.session.accessToken,
@@ -144,7 +144,7 @@ class FeedScreenState extends State<FeedScreen> {
 
       _replacePollInFeed(updatedPoll);
     } on PollsApiException catch (error) {
-      _showSnackBar(error.message);
+      _showSnackBar(error.userMessage);
     } catch (_) {
       _showSnackBar('Could not submit vote.');
     } finally {
@@ -153,6 +153,30 @@ class FeedScreenState extends State<FeedScreen> {
           _votingPollIds.remove(poll.id);
         });
       }
+    }
+  }
+
+  Future<void> _cancelVote(PollSummary poll) async {
+    if (_votingPollIds.contains(poll.id) || poll.isClosed) {
+      return;
+    }
+
+    setState(() => _votingPollIds.add(poll.id));
+
+    try {
+      final updatedPoll = await _pollsApiClient.cancelVote(
+        pollId: poll.id,
+        accessToken: widget.session.accessToken,
+      );
+
+      if (!mounted) return;
+      _replacePollInFeed(updatedPoll);
+    } on PollsApiException catch (error) {
+      _showSnackBar(error.userMessage);
+    } catch (_) {
+      _showSnackBar('Could not cancel vote.');
+    } finally {
+      if (mounted) setState(() => _votingPollIds.remove(poll.id));
     }
   }
 
@@ -413,9 +437,13 @@ class FeedScreenState extends State<FeedScreen> {
                         return PollCard(
                           poll: poll,
                           onOpenAuthor: () => _openAuthorProfile(poll),
-                          onVote: _votingPollIds.contains(poll.id)
+                          onVote: poll.isClosed || _votingPollIds.contains(poll.id)
                               ? null
                               : (option) => _vote(poll, option),
+                          onCancelVote: poll.isClosed ||
+                                  _votingPollIds.contains(poll.id)
+                              ? null
+                              : () => _cancelVote(poll),
                           isVoting: _votingPollIds.contains(poll.id),
                           onOpenComments: () => _openComments(poll),
                           onToggleLike: _likingPollIds.contains(poll.id)

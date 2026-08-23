@@ -378,7 +378,7 @@ class _FakePollsApiClient extends PollsApiClient {
   }
 
   @override
-  Future<PollSummary> vote({
+  Future<PollSummary> setVote({
     required String pollId,
     required String optionId,
     required String accessToken,

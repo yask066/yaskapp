@@ -7,6 +7,7 @@ class PollCard extends StatelessWidget {
   const PollCard({
     required this.poll,
     this.onVote,
+    this.onCancelVote,
     this.onOpenAuthor,
     this.onOpenComments,
     this.onToggleLike,
@@ -18,6 +19,7 @@ class PollCard extends StatelessWidget {
 
   final PollSummary poll;
   final ValueChanged<PollOptionSummary>? onVote;
+  final VoidCallback? onCancelVote;
   final VoidCallback? onOpenAuthor;
   final VoidCallback? onOpenComments;
   final VoidCallback? onToggleLike;
@@ -145,12 +147,33 @@ class PollCard extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
+            if (poll.isClosed) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(
+                    Icons.lock_outline,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Poll closed',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             SizedBox(height: compact ? 14 : 16),
             for (var index = 0; index < poll.options.length; index++) ...[
               _PollOptionButton(
                 option: poll.options[index],
                 totalVotes: poll.votesCount,
-                isSelected: poll.votedOptionIndex == index,
+                isSelected: poll.selectedOptionIndex == index,
                 rank: rankByOptionIndex[index],
                 compact: compact,
                 profileVariant: compact,
@@ -160,6 +183,17 @@ class PollCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
             ],
+            if (!poll.isClosed &&
+                poll.selectedOptionIndex != null &&
+                onCancelVote != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: onCancelVote,
+                  icon: const Icon(Icons.clear, size: 18),
+                  label: const Text('Cancel vote'),
+                ),
+              ),
             SizedBox(height: compact ? 16 : 18),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

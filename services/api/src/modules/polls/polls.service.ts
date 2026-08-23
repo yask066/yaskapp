@@ -1,7 +1,9 @@
 import {
   createPollCommentRecord,
   createPollRecord,
+  cancelVoteRecord,
   createVoteRecord,
+  setVoteRecord,
   likePollRecord,
   listPollCommentRecords,
   listPublicPollRecords,
@@ -29,6 +31,11 @@ export type CreatePollInput = {
 export type CreateVoteInput = {
   pollId: string;
   optionId: string;
+  voterId: string;
+};
+
+export type CancelVoteInput = {
+  pollId: string;
   voterId: string;
 };
 
@@ -125,6 +132,51 @@ export async function voteOnPoll(input: CreateVoteInput) {
 
   if (result.status === 'already_voted') {
     throw new PollAlreadyVotedError('You have already voted in this poll.');
+  }
+
+  if (!result.poll) {
+    throw new Error('Updated poll could not be loaded.');
+  }
+
+  return {
+    poll: result.poll,
+    vote: {
+      pollId: input.pollId,
+      optionId: input.optionId,
+      votesCount: result.optionVotesCount
+    }
+  };
+}
+
+export async function cancelVote(input: CancelVoteInput) {
+  const result = await cancelVoteRecord(input);
+
+  if (result.status === 'not_found') {
+    throw new PollNotFoundError('Poll was not found.');
+  }
+
+  if (result.status === 'closed') {
+    throw new PollClosedError('Poll is closed.');
+  }
+
+  if (!result.poll) {
+    throw new Error('Updated poll could not be loaded.');
+  }
+
+  return {
+    poll: result.poll
+  };
+}
+
+export async function setVote(input: CreateVoteInput) {
+  const result = await setVoteRecord(input);
+
+  if (result.status === 'not_found') {
+    throw new PollNotFoundError('Poll or option was not found.');
+  }
+
+  if (result.status === 'closed') {
+    throw new PollClosedError('Poll is closed.');
   }
 
   if (!result.poll) {

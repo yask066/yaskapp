@@ -9,6 +9,36 @@ import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
 void main() {
   const config = ApiConfig(baseUrl: 'http://api.test');
 
+  test('maps closed vote errors to a clear user message', () async {
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((_) async {
+        return http.Response(
+          jsonEncode({
+            'error': 'poll_closed',
+            'message': 'Poll is closed.',
+          }),
+          422,
+        );
+      }),
+    );
+
+    await expectLater(
+      client.setVote(
+        pollId: 'poll-1',
+        optionId: 'option-1',
+        accessToken: 'token',
+      ),
+      throwsA(
+        isA<PollsApiException>().having(
+          (error) => error.userMessage,
+          'userMessage',
+          'This poll is closed. Voting changes are no longer available.',
+        ),
+      ),
+    );
+  });
+
   test('lists subscription polls with authorization and limit', () async {
     late http.Request request;
     final client = PollsApiClient(

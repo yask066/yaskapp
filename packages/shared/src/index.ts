@@ -52,6 +52,7 @@ export type Poll = {
   commentsCount: number;
   likesCount: number;
   viewerHasLiked: boolean;
+  viewerVoteOptionId: string | null;
   createdAt: string;
   updatedAt: string;
   endsAt: string | null;

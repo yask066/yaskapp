@@ -109,6 +109,8 @@ class PollSummary {
     required this.likesCount,
     required this.viewerHasLiked,
     required this.createdAt,
+    this.viewerVoteOptionId,
+    this.endsAt,
     this.votedOptionIndex,
   });
 
@@ -132,6 +134,10 @@ class PollSummary {
       likesCount: json['likesCount'] as int,
       viewerHasLiked: json['viewerHasLiked'] as bool? ?? false,
       createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
+      viewerVoteOptionId: json['viewerVoteOptionId'] as String?,
+      endsAt: (json['endsAt'] as String?) == null
+          ? null
+          : DateTime.parse(json['endsAt'] as String).toLocal(),
     );
   }
 
@@ -144,7 +150,25 @@ class PollSummary {
   final int likesCount;
   final bool viewerHasLiked;
   final DateTime createdAt;
+  final String? viewerVoteOptionId;
+  final DateTime? endsAt;
   final int? votedOptionIndex;
+
+  bool get isClosed => endsAt != null && !endsAt!.isAfter(DateTime.now());
+
+  int? get selectedOptionIndex {
+    final selectedId = viewerVoteOptionId;
+
+    if (selectedId != null) {
+      final index = options.indexWhere((option) => option.id == selectedId);
+
+      if (index >= 0) {
+        return index;
+      }
+    }
+
+    return votedOptionIndex;
+  }
 
   String get createdLabel {
     final elapsed = DateTime.now().difference(createdAt);

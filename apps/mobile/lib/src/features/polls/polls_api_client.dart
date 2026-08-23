@@ -6,10 +6,23 @@ import '../../core/config/api_config.dart';
 import 'poll_summary.dart';
 
 class PollsApiException implements Exception {
-  const PollsApiException(this.message, {this.statusCode});
+  const PollsApiException(this.message, {this.statusCode, this.code});
 
   final String message;
   final int? statusCode;
+  final String? code;
+
+  String get userMessage {
+    if (code == 'poll_closed' || statusCode == 422) {
+      return 'This poll is closed. Voting changes are no longer available.';
+    }
+
+    if (code == 'not_found' && statusCode == 404) {
+      return 'That poll option is no longer available. Refresh the poll and try again.';
+    }
+
+    return message;
+  }
 
   @override
   String toString() => message;
@@ -215,6 +228,43 @@ class PollsApiClient {
     return PollSummary.fromJson(poll);
   }
 
+  Future<PollSummary> setVote({
+    required String pollId,
+    required String optionId,
+    required String accessToken,
+  }) async {
+    final uri = Uri.parse(_config.baseUrl).replace(
+      path: '/polls/$pollId/votes',
+    );
+    final response = await _httpClient.put(
+      uri,
+      headers: {
+        'authorization': 'Bearer $accessToken',
+        'content-type': 'application/json',
+      },
+      body: jsonEncode({'optionId': optionId}),
+    );
+
+    return _decodePollResponse(response, 'Set vote response is invalid.');
+  }
+
+  Future<PollSummary> cancelVote({
+    required String pollId,
+    required String accessToken,
+  }) async {
+    final uri = Uri.parse(_config.baseUrl).replace(
+      path: '/polls/$pollId/votes',
+    );
+    final response = await _httpClient.delete(
+      uri,
+      headers: {
+        'authorization': 'Bearer $accessToken',
+      },
+    );
+
+    return _decodePollResponse(response, 'Cancel vote response is invalid.');
+  }
+
   Future<PollSummary> likePoll({
     required String pollId,
     required String accessToken,
@@ -325,10 +375,14 @@ class PollsApiClient {
       final message = decoded is Map<String, dynamic>
           ? decoded['message'] as String?
           : null;
+      final code = decoded is Map<String, dynamic>
+          ? decoded['error'] as String?
+          : null;
 
       throw PollsApiException(
         message ?? 'Request failed.',
         statusCode: response.statusCode,
+        code: code,
       );
     }
 

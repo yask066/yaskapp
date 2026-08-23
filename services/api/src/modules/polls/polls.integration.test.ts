@@ -71,6 +71,7 @@ type PollResponse = {
     commentsCount: number;
     likesCount: number;
     viewerHasLiked: boolean;
+    viewerVoteOptionId: string | null;
   };
 };
 
@@ -101,6 +102,7 @@ type VoteResponse = {
   poll: {
     id: string;
     votesCount: number;
+    viewerVoteOptionId: string | null;
   };
   vote: {
     pollId: string;
@@ -413,6 +415,7 @@ test('auth and polls happy path works end to end', async () => {
   const vote = voteResponse.json<VoteResponse>();
   assert.equal(vote.poll.id, createdPoll.id);
   assert.equal(vote.poll.votesCount, 1);
+  assert.equal(vote.poll.viewerVoteOptionId, optionId);
   assert.equal(vote.vote.pollId, createdPoll.id);
   assert.equal(vote.vote.optionId, optionId);
   assert.equal(vote.vote.votesCount, 1);
@@ -427,6 +430,70 @@ test('auth and polls happy path works end to end', async () => {
   });
 
   assert.equal(duplicateVoteResponse.statusCode, 409, duplicateVoteResponse.body);
+
+  const duplicateVoteState = await db.query<{
+    poll_votes_count: string;
+    option_votes_count: number;
+    poll_votes_total: number;
+  }>(
+    `
+      SELECT
+        (SELECT count(*) FROM poll_votes WHERE poll_id = $1 AND voter_id = $2)
+          AS poll_votes_count,
+        (SELECT votes_count FROM poll_options WHERE id = $3)
+          AS option_votes_count,
+        (SELECT votes_count FROM polls WHERE id = $1)
+          AS poll_votes_total
+    `,
+    [createdPoll.id, login.user.id, optionId]
+  );
+
+  assert.equal(duplicateVoteState.rows[0]?.poll_votes_count, '1');
+  assert.equal(duplicateVoteState.rows[0]?.option_votes_count, 1);
+  assert.equal(duplicateVoteState.rows[0]?.poll_votes_total, 1);
+
+  const legacyChangeResponse = await app.inject({
+    method: 'POST',
+    url: `/polls/${createdPoll.id}/votes`,
+    headers: bearer(login.accessToken),
+    payload: {
+      optionId: createdPoll.options[1]?.id
+    }
+  });
+
+  assert.equal(legacyChangeResponse.statusCode, 409, legacyChangeResponse.body);
+  assert.equal(
+    legacyChangeResponse.json<{ error: string }>().error,
+    'already_voted'
+  );
+
+  const authenticatedPollsResponse = await app.inject({
+    method: 'GET',
+    url: '/polls?limit=10',
+    headers: bearer(login.accessToken)
+  });
+
+  assert.equal(authenticatedPollsResponse.statusCode, 200, authenticatedPollsResponse.body);
+  const authenticatedPoll = authenticatedPollsResponse
+    .json<ListPollsResponse>()
+    .items.find((poll) => poll.id === createdPoll.id);
+  assert.equal(authenticatedPoll?.viewerVoteOptionId, optionId);
+
+  const unauthenticatedPolls = (await app.inject({
+    method: 'GET',
+    url: '/polls?limit=10'
+  }))
+    .json<ListPollsResponse>();
+  assert.ok(
+    unauthenticatedPolls.items.every(
+      (poll) => poll.viewerVoteOptionId === null
+    )
+  );
+  assert.equal(
+    unauthenticatedPolls.items.find((poll) => poll.id === createdPoll.id)
+      ?.viewerVoteOptionId,
+    null
+  );
 });
 
 test('poll creation and voting require authentication', async () => {
@@ -450,6 +517,389 @@ test('poll creation and voting require authentication', async () => {
   });
 
   assert.equal(voteResponse.statusCode, 401, voteResponse.body);
+
+  const invalidTokenVoteResponse = await app.inject({
+    method: 'POST',
+    url: '/polls/00000000-0000-0000-0000-000000000000/votes',
+    headers: bearer('invalid-token'),
+    payload: {
+      optionId: '00000000-0000-0000-0000-000000000000'
+    }
+  });
+
+  assert.equal(invalidTokenVoteResponse.statusCode, 401, invalidTokenVoteResponse.body);
+  assert.equal(
+    invalidTokenVoteResponse.json<{ error: string }>().error,
+    'unauthorized'
+  );
+
+  const unauthenticatedSetVoteResponse = await app.inject({
+    method: 'PUT',
+    url: '/polls/00000000-0000-0000-0000-000000000000/votes',
+    payload: {
+      optionId: '00000000-0000-0000-0000-000000000000'
+    }
+  });
+
+  assert.equal(unauthenticatedSetVoteResponse.statusCode, 401);
+
+  const unauthenticatedCancelVoteResponse = await app.inject({
+    method: 'DELETE',
+    url: '/polls/00000000-0000-0000-0000-000000000000/votes'
+  });
+
+  assert.equal(unauthenticatedCancelVoteResponse.statusCode, 401);
+});
+
+test('authenticated user can set a vote on an active poll', async () => {
+  const registered = await registerTestUser();
+
+  const createPollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(registered.accessToken),
+    payload: {
+      question: 'Can a vote be set through the idempotent endpoint?',
+      options: ['Yes', 'No']
+    }
+  });
+
+  assert.equal(createPollResponse.statusCode, 201, createPollResponse.body);
+  const createdPoll = createPollResponse.json<PollResponse>().poll;
+  const optionId = createdPoll.options[0]?.id;
+  const secondOptionId = createdPoll.options[1]?.id;
+  assert.ok(optionId);
+  assert.ok(secondOptionId);
+
+  const otherPollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(registered.accessToken),
+    payload: {
+      question: 'Which option must not be accepted by another poll?',
+      options: ['Other yes', 'Other no']
+    }
+  });
+
+  assert.equal(otherPollResponse.statusCode, 201, otherPollResponse.body);
+  const otherOptionId = otherPollResponse.json<PollResponse>().poll.options[0]?.id;
+  assert.ok(otherOptionId);
+
+  const foreignOptionResponse = await app.inject({
+    method: 'PUT',
+    url: `/polls/${createdPoll.id}/votes`,
+    headers: bearer(registered.accessToken),
+    payload: { optionId: otherOptionId }
+  });
+
+  assert.equal(foreignOptionResponse.statusCode, 404, foreignOptionResponse.body);
+
+  const invalidOptionResponse = await app.inject({
+    method: 'PUT',
+    url: `/polls/${createdPoll.id}/votes`,
+    headers: bearer(registered.accessToken),
+    payload: {
+      optionId: '00000000-0000-0000-0000-000000000000'
+    }
+  });
+
+  assert.equal(invalidOptionResponse.statusCode, 404, invalidOptionResponse.body);
+  assert.equal(
+    invalidOptionResponse.json<{ error: string }>().error,
+    'not_found'
+  );
+
+  const response = await app.inject({
+    method: 'PUT',
+    url: `/polls/${createdPoll.id}/votes`,
+    headers: bearer(registered.accessToken),
+    payload: { optionId }
+  });
+
+  assert.equal(response.statusCode, 201, response.body);
+  const vote = response.json<VoteResponse>();
+  assert.equal(vote.poll.id, createdPoll.id);
+  assert.equal(vote.poll.viewerVoteOptionId, optionId);
+  assert.equal(vote.vote.optionId, optionId);
+
+  const createdVoteState = await db.query<{
+    poll_votes_count: string;
+    selected_option_votes_count: number;
+    other_option_votes_count: number;
+    poll_votes_total: number;
+  }>(
+    `
+      SELECT
+        (SELECT count(*) FROM poll_votes WHERE poll_id = $1 AND voter_id = $2)
+          AS poll_votes_count,
+        (SELECT votes_count FROM poll_options WHERE id = $3)
+          AS selected_option_votes_count,
+        (SELECT votes_count FROM poll_options WHERE id = $4)
+          AS other_option_votes_count,
+        (SELECT votes_count FROM polls WHERE id = $1)
+          AS poll_votes_total
+    `,
+    [createdPoll.id, registered.user.id, optionId, secondOptionId]
+  );
+
+  assert.equal(createdVoteState.rows[0]?.poll_votes_count, '1');
+  assert.equal(createdVoteState.rows[0]?.selected_option_votes_count, 1);
+  assert.equal(createdVoteState.rows[0]?.other_option_votes_count, 0);
+  assert.equal(createdVoteState.rows[0]?.poll_votes_total, 1);
+
+  const changeResponse = await app.inject({
+    method: 'PUT',
+    url: `/polls/${createdPoll.id}/votes`,
+    headers: bearer(registered.accessToken),
+    payload: { optionId: secondOptionId }
+  });
+
+  assert.equal(changeResponse.statusCode, 201, changeResponse.body);
+  const changedVote = changeResponse.json<VoteResponse>();
+  assert.equal(changedVote.poll.votesCount, 1);
+  assert.equal(changedVote.poll.viewerVoteOptionId, secondOptionId);
+  assert.equal(changedVote.vote.optionId, secondOptionId);
+
+  const repeatedSetResponse = await app.inject({
+    method: 'PUT',
+    url: `/polls/${createdPoll.id}/votes`,
+    headers: bearer(registered.accessToken),
+    payload: { optionId: secondOptionId }
+  });
+
+  assert.equal(repeatedSetResponse.statusCode, 201, repeatedSetResponse.body);
+  const repeatedSetVote = repeatedSetResponse.json<VoteResponse>();
+  assert.equal(repeatedSetVote.poll.votesCount, 1);
+  assert.equal(repeatedSetVote.poll.viewerVoteOptionId, secondOptionId);
+  assert.equal(repeatedSetVote.vote.optionId, secondOptionId);
+
+  const failedChangeResponse = await app.inject({
+    method: 'PUT',
+    url: `/polls/${createdPoll.id}/votes`,
+    headers: bearer(registered.accessToken),
+    payload: { optionId: '00000000-0000-0000-0000-000000000000' }
+  });
+
+  assert.equal(failedChangeResponse.statusCode, 404, failedChangeResponse.body);
+
+  const changedVoteState = await db.query<{
+    current_option_id: string;
+    old_option_votes_count: number;
+    new_option_votes_count: number;
+    poll_votes_total: number;
+  }>(
+    `
+      SELECT
+        (SELECT option_id FROM poll_votes WHERE poll_id = $1 AND voter_id = $2)
+          AS current_option_id,
+        (SELECT votes_count FROM poll_options WHERE id = $3)
+          AS old_option_votes_count,
+        (SELECT votes_count FROM poll_options WHERE id = $4)
+          AS new_option_votes_count,
+        (SELECT votes_count FROM polls WHERE id = $1)
+          AS poll_votes_total
+    `,
+    [createdPoll.id, registered.user.id, optionId, secondOptionId]
+  );
+
+  assert.equal(changedVoteState.rows[0]?.current_option_id, secondOptionId);
+  assert.equal(changedVoteState.rows[0]?.old_option_votes_count, 0);
+  assert.equal(changedVoteState.rows[0]?.new_option_votes_count, 1);
+  assert.equal(changedVoteState.rows[0]?.poll_votes_total, 1);
+
+  const cancelResponse = await app.inject({
+    method: 'DELETE',
+    url: `/polls/${createdPoll.id}/votes`,
+    headers: bearer(registered.accessToken)
+  });
+
+  assert.equal(cancelResponse.statusCode, 200, cancelResponse.body);
+  const canceledVote = cancelResponse.json<VoteResponse>();
+  assert.equal(canceledVote.poll.votesCount, 0);
+  assert.equal(canceledVote.poll.viewerVoteOptionId, null);
+
+  const canceledVoteState = await db.query<{
+    poll_votes_count: string;
+    selected_option_votes_count: number;
+    poll_votes_total: number;
+  }>(
+    `
+      SELECT
+        (SELECT count(*) FROM poll_votes WHERE poll_id = $1 AND voter_id = $2)
+          AS poll_votes_count,
+        (SELECT votes_count FROM poll_options WHERE id = $3)
+          AS selected_option_votes_count,
+        (SELECT votes_count FROM polls WHERE id = $1)
+          AS poll_votes_total
+    `,
+    [createdPoll.id, registered.user.id, secondOptionId]
+  );
+
+  assert.equal(canceledVoteState.rows[0]?.poll_votes_count, '0');
+  assert.equal(canceledVoteState.rows[0]?.selected_option_votes_count, 0);
+  assert.equal(canceledVoteState.rows[0]?.poll_votes_total, 0);
+
+  const repeatedCancelResponse = await app.inject({
+    method: 'DELETE',
+    url: `/polls/${createdPoll.id}/votes`,
+    headers: bearer(registered.accessToken)
+  });
+
+  assert.equal(repeatedCancelResponse.statusCode, 200, repeatedCancelResponse.body);
+  const repeatedCanceledVote = repeatedCancelResponse.json<VoteResponse>();
+  assert.equal(repeatedCanceledVote.poll.id, createdPoll.id);
+  assert.equal(repeatedCanceledVote.poll.votesCount, 0);
+  assert.equal(repeatedCanceledVote.poll.viewerVoteOptionId, null);
+
+  const repeatedCancelState = await db.query<{
+    selected_option_votes_count: number;
+    poll_votes_total: number;
+  }>(
+    `
+      SELECT
+        (SELECT votes_count FROM poll_options WHERE id = $1)
+          AS selected_option_votes_count,
+        (SELECT votes_count FROM polls WHERE id = $2)
+          AS poll_votes_total
+    `,
+    [secondOptionId, createdPoll.id]
+  );
+
+  assert.equal(repeatedCancelState.rows[0]?.selected_option_votes_count, 0);
+  assert.equal(repeatedCancelState.rows[0]?.poll_votes_total, 0);
+  assert.ok((repeatedCancelState.rows[0]?.selected_option_votes_count ?? 0) >= 0);
+  assert.ok((repeatedCancelState.rows[0]?.poll_votes_total ?? 0) >= 0);
+});
+
+test('concurrent vote changes keep poll and option counters consistent', async () => {
+  const registered = await registerTestUser();
+
+  const createPollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(registered.accessToken),
+    payload: {
+      question: 'Can concurrent vote changes stay consistent?',
+      options: ['First', 'Second']
+    }
+  });
+
+  assert.equal(createPollResponse.statusCode, 201, createPollResponse.body);
+  const createdPoll = createPollResponse.json<PollResponse>().poll;
+  const firstOptionId = createdPoll.options[0]?.id;
+  const secondOptionId = createdPoll.options[1]?.id;
+  assert.ok(firstOptionId);
+  assert.ok(secondOptionId);
+
+  const responses = await Promise.all([
+    app.inject({
+      method: 'PUT',
+      url: `/polls/${createdPoll.id}/votes`,
+      headers: bearer(registered.accessToken),
+      payload: { optionId: firstOptionId }
+    }),
+    app.inject({
+      method: 'PUT',
+      url: `/polls/${createdPoll.id}/votes`,
+      headers: bearer(registered.accessToken),
+      payload: { optionId: secondOptionId }
+    })
+  ]);
+
+  assert.equal(responses[0].statusCode, 201, responses[0].body);
+  assert.equal(responses[1].statusCode, 201, responses[1].body);
+
+  const state = await db.query<{
+    vote_rows: string;
+    first_option_votes: number;
+    second_option_votes: number;
+    poll_votes_total: number;
+  }>(
+    `
+      SELECT
+        (SELECT count(*) FROM poll_votes WHERE poll_id = $1 AND voter_id = $2)
+          AS vote_rows,
+        (SELECT votes_count FROM poll_options WHERE id = $3)
+          AS first_option_votes,
+        (SELECT votes_count FROM poll_options WHERE id = $4)
+          AS second_option_votes,
+        (SELECT votes_count FROM polls WHERE id = $1)
+          AS poll_votes_total
+    `,
+    [createdPoll.id, registered.user.id, firstOptionId, secondOptionId]
+  );
+
+  const row = state.rows[0];
+  assert.equal(row?.vote_rows, '1');
+  assert.equal((row?.first_option_votes ?? 0) + (row?.second_option_votes ?? 0), 1);
+  assert.equal(row?.poll_votes_total, 1);
+});
+
+test('vote mutations are rejected after a poll closes', async () => {
+  const registered = await registerTestUser();
+
+  const createPollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(registered.accessToken),
+    payload: {
+      question: 'Should closed vote mutations be rejected?',
+      options: ['Yes', 'No']
+    }
+  });
+
+  assert.equal(createPollResponse.statusCode, 201, createPollResponse.body);
+  const createdPoll = createPollResponse.json<PollResponse>().poll;
+  const optionId = createdPoll.options[0]?.id;
+  assert.ok(optionId);
+
+  await db.query('UPDATE polls SET ends_at = now() WHERE id = $1', [createdPoll.id]);
+
+  const requests = await Promise.all([
+    app.inject({
+      method: 'POST',
+      url: `/polls/${createdPoll.id}/votes`,
+      headers: bearer(registered.accessToken),
+      payload: { optionId }
+    }),
+    app.inject({
+      method: 'PUT',
+      url: `/polls/${createdPoll.id}/votes`,
+      headers: bearer(registered.accessToken),
+      payload: { optionId }
+    }),
+    app.inject({
+      method: 'DELETE',
+      url: `/polls/${createdPoll.id}/votes`,
+      headers: bearer(registered.accessToken)
+    })
+  ]);
+
+  for (const response of requests) {
+    assert.equal(response.statusCode, 422, response.body);
+    assert.equal(response.json<{ error: string }>().error, 'poll_closed');
+  }
+
+  const state = await db.query<{
+    vote_rows: string;
+    option_votes_count: number;
+    poll_votes_total: number;
+  }>(
+    `
+      SELECT
+        (SELECT count(*) FROM poll_votes WHERE poll_id = $1 AND voter_id = $2)
+          AS vote_rows,
+        (SELECT votes_count FROM poll_options WHERE id = $3)
+          AS option_votes_count,
+        (SELECT votes_count FROM polls WHERE id = $1)
+          AS poll_votes_total
+    `,
+    [createdPoll.id, registered.user.id, optionId]
+  );
+
+  assert.equal(state.rows[0]?.vote_rows, '0');
+  assert.equal(state.rows[0]?.option_votes_count, 0);
+  assert.equal(state.rows[0]?.poll_votes_total, 0);
 });
 
 test('poll creation validates request body', async () => {

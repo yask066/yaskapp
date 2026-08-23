@@ -102,17 +102,33 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   }
 
   Future<void> _vote(PollSummary poll, PollOptionSummary option) async {
-    if (_votingPollIds.contains(poll.id)) return;
+    if (_votingPollIds.contains(poll.id) || poll.isClosed) return;
     setState(() => _votingPollIds.add(poll.id));
     try {
-      final updated = await _pollsApiClient.vote(
+      final updated = await _pollsApiClient.setVote(
         pollId: poll.id,
         optionId: option.id,
         accessToken: widget.session.accessToken,
       );
       _replacePollValue(updated);
     } on PollsApiException catch (error) {
-      _showError(error.message);
+      _showError(error.userMessage);
+    } finally {
+      if (mounted) setState(() => _votingPollIds.remove(poll.id));
+    }
+  }
+
+  Future<void> _cancelVote(PollSummary poll) async {
+    if (_votingPollIds.contains(poll.id) || poll.isClosed) return;
+    setState(() => _votingPollIds.add(poll.id));
+    try {
+      final updated = await _pollsApiClient.cancelVote(
+        pollId: poll.id,
+        accessToken: widget.session.accessToken,
+      );
+      _replacePollValue(updated);
+    } on PollsApiException catch (error) {
+      _showError(error.userMessage);
     } finally {
       if (mounted) setState(() => _votingPollIds.remove(poll.id));
     }
@@ -198,9 +214,13 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                       final poll = _polls[index];
                       return PollCard(
                         poll: poll,
-                        onVote: _votingPollIds.contains(poll.id)
+                        onVote: poll.isClosed || _votingPollIds.contains(poll.id)
                             ? null
                             : (option) => _vote(poll, option),
+                        onCancelVote: poll.isClosed ||
+                                _votingPollIds.contains(poll.id)
+                            ? null
+                            : () => _cancelVote(poll),
                         isVoting: _votingPollIds.contains(poll.id),
                         onOpenComments: () => _openComments(poll),
                         onToggleLike: _likingPollIds.contains(poll.id)

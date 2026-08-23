@@ -8,12 +8,14 @@ import {
   PollAlreadyVotedError,
   PollClosedError,
   PollNotFoundError,
+  cancelVote,
   createPoll,
   createPollComment,
   likePoll,
   listPollComments,
   listPublicPolls,
   listSubscriptionPolls,
+  setVote,
   unlikePoll,
   voteOnPoll
 } from './polls.service.js';
@@ -305,6 +307,68 @@ export function registerPollRoutes(app: FastifyInstance) {
         });
 
         return reply.status(201).send(result);
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
+
+  app.put(
+    '/polls/:pollId/votes',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      const parsedParams = voteParamsSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      const parsedBody = voteBodySchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        return validationError(reply, parsedBody.error);
+      }
+
+      try {
+        const result = await setVote({
+          pollId: parsedParams.data.pollId,
+          optionId: parsedBody.data.optionId,
+          voterId: request.user.sub
+        });
+
+        broadcastPollVoteCreated({
+          poll: result.poll,
+          vote: result.vote
+        });
+
+        return reply.status(201).send(result);
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
+
+  app.delete(
+    '/polls/:pollId/votes',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      const parsedParams = voteParamsSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      try {
+        const result = await cancelVote({
+          pollId: parsedParams.data.pollId,
+          voterId: request.user.sub
+        });
+
+        return reply.send(result);
       } catch (error) {
         return pollError(reply, error);
       }

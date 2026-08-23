@@ -43,6 +43,7 @@ export type Poll = {
   commentsCount: number;
   likesCount: number;
   viewerHasLiked: boolean;
+  viewerVoteOptionId: string | null;
   options: PollOption[];
   createdAt: string;
   updatedAt: string;
@@ -105,7 +106,12 @@ type PollCommentRow = {
   updated_at: Date;
 };
 
-function mapPoll(row: PollRow, options: PollOption[], viewerLikedPollIds: Set<string>): Poll {
+function mapPoll(
+  row: PollRow,
+  options: PollOption[],
+  viewerLikedPollIds: Set<string>,
+  viewerVoteOptionIds: Map<string, string>
+): Poll {
   return {
     id: row.id,
     authorId: row.author_id,
@@ -125,6 +131,7 @@ function mapPoll(row: PollRow, options: PollOption[], viewerLikedPollIds: Set<st
     commentsCount: row.comments_count,
     likesCount: row.likes_count,
     viewerHasLiked: viewerLikedPollIds.has(row.id),
+    viewerVoteOptionId: viewerVoteOptionIds.get(row.id) ?? null,
     options,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
@@ -236,10 +243,33 @@ async function findViewerLikedPollIds(
   return new Set(result.rows.map((row) => row.poll_id));
 }
 
+async function findViewerVoteOptionIds(
+  client: PoolClient,
+  pollIds: string[],
+  viewerId: string | undefined
+) {
+  if (!viewerId || pollIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const result = await client.query<{ poll_id: string; option_id: string }>(
+    `
+      SELECT poll_id, option_id
+      FROM poll_votes
+      WHERE voter_id = $1
+        AND poll_id = ANY($2::uuid[])
+    `,
+    [viewerId, pollIds]
+  );
+
+  return new Map(result.rows.map((row) => [row.poll_id, row.option_id]));
+}
+
 async function hydratePolls(client: PoolClient, pollIds: string[], viewerId?: string) {
   const pollRows = await findPollRowsByIds(client, pollIds);
   const optionRows = await findOptionRowsByPollIds(client, pollIds);
   const viewerLikedPollIds = await findViewerLikedPollIds(client, pollIds, viewerId);
+  const viewerVoteOptionIds = await findViewerVoteOptionIds(client, pollIds, viewerId);
   const optionsByPollId = new Map<string, PollOption[]>();
 
   for (const optionRow of optionRows) {
@@ -249,7 +279,12 @@ async function hydratePolls(client: PoolClient, pollIds: string[], viewerId?: st
   }
 
   return pollRows.map((row) =>
-    mapPoll(row, optionsByPollId.get(row.id) ?? [], viewerLikedPollIds)
+    mapPoll(
+      row,
+      optionsByPollId.get(row.id) ?? [],
+      viewerLikedPollIds,
+      viewerVoteOptionIds
+    )
   );
 }
 
@@ -803,13 +838,242 @@ export async function createVoteRecord(input: {
       [input.pollId]
     );
 
-    const [updatedPoll] = await hydratePolls(client, [input.pollId]);
+    const [updatedPoll] = await hydratePolls(client, [input.pollId], input.voterId);
 
     await client.query('COMMIT');
 
     return {
       status: 'created' as const,
       optionVotesCount: optionResult.rows[0]?.votes_count ?? 0,
+      poll: updatedPoll
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function cancelVoteRecord(input: {
+  pollId: string;
+  voterId: string;
+}) {
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const pollResult = await client.query<{
+      id: string;
+      ends_at: Date | null;
+    }>(
+      `
+        SELECT p.id, p.ends_at
+        FROM polls p
+        WHERE p.id = $1
+          AND p.visibility = 'public'
+          AND p.deleted_at IS NULL
+        FOR UPDATE
+      `,
+      [input.pollId]
+    );
+
+    const poll = pollResult.rows[0];
+
+    if (!poll) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    if (poll.ends_at && poll.ends_at <= new Date()) {
+      await client.query('ROLLBACK');
+      return { status: 'closed' as const };
+    }
+
+    const voteResult = await client.query<{ option_id: string }>(
+      `
+        DELETE FROM poll_votes
+        WHERE poll_id = $1
+          AND voter_id = $2
+        RETURNING option_id
+      `,
+      [input.pollId, input.voterId]
+    );
+
+    const optionId = voteResult.rows[0]?.option_id;
+
+    if (optionId) {
+      await client.query(
+        `
+          UPDATE poll_options
+          SET votes_count = GREATEST(votes_count - 1, 0)
+          WHERE id = $1
+        `,
+        [optionId]
+      );
+
+      await client.query(
+        `
+          UPDATE polls
+          SET votes_count = GREATEST(votes_count - 1, 0)
+          WHERE id = $1
+        `,
+        [input.pollId]
+      );
+    }
+
+    const [updatedPoll] = await hydratePolls(client, [input.pollId], input.voterId);
+
+    await client.query('COMMIT');
+
+    return {
+      status: 'canceled' as const,
+      poll: updatedPoll
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function setVoteRecord(input: {
+  pollId: string;
+  optionId: string;
+  voterId: string;
+}) {
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const pollResult = await client.query<{
+      id: string;
+      ends_at: Date | null;
+      option_id: string | null;
+    }>(
+      `
+        SELECT p.id, p.ends_at, po.id AS option_id
+        FROM polls p
+        LEFT JOIN poll_options po
+          ON po.poll_id = p.id
+          AND po.id = $2
+        WHERE p.id = $1
+          AND p.visibility = 'public'
+          AND p.deleted_at IS NULL
+        FOR UPDATE OF p
+      `,
+      [input.pollId, input.optionId]
+    );
+
+    const poll = pollResult.rows[0];
+
+    if (!poll || !poll.option_id) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    if (poll.ends_at && poll.ends_at <= new Date()) {
+      await client.query('ROLLBACK');
+      return { status: 'closed' as const };
+    }
+
+    const currentVoteResult = await client.query<{ option_id: string }>(
+      `
+        SELECT option_id
+        FROM poll_votes
+        WHERE poll_id = $1
+          AND voter_id = $2
+        FOR UPDATE
+      `,
+      [input.pollId, input.voterId]
+    );
+
+    const currentOptionId = currentVoteResult.rows[0]?.option_id;
+    let optionVotesCount = 0;
+
+    if (!currentOptionId) {
+      await client.query(
+        `
+          INSERT INTO poll_votes (poll_id, option_id, voter_id)
+          VALUES ($1, $2, $3)
+        `,
+        [input.pollId, input.optionId, input.voterId]
+      );
+
+      const optionResult = await client.query<{ votes_count: number }>(
+        `
+          UPDATE poll_options
+          SET votes_count = votes_count + 1
+          WHERE id = $1
+          RETURNING votes_count
+        `,
+        [input.optionId]
+      );
+
+      optionVotesCount = optionResult.rows[0]?.votes_count ?? 0;
+
+      await client.query(
+        `
+          UPDATE polls
+          SET votes_count = votes_count + 1
+          WHERE id = $1
+        `,
+        [input.pollId]
+      );
+    } else if (currentOptionId === input.optionId) {
+      const optionResult = await client.query<{ votes_count: number }>(
+        `
+          SELECT votes_count
+          FROM poll_options
+          WHERE id = $1
+        `,
+        [input.optionId]
+      );
+
+      optionVotesCount = optionResult.rows[0]?.votes_count ?? 0;
+    } else {
+      await client.query(
+        `
+          UPDATE poll_votes
+          SET option_id = $1
+          WHERE poll_id = $2
+            AND voter_id = $3
+        `,
+        [input.optionId, input.pollId, input.voterId]
+      );
+
+      await client.query(
+        `
+          UPDATE poll_options
+          SET votes_count = GREATEST(votes_count - 1, 0)
+          WHERE id = $1
+        `,
+        [currentOptionId]
+      );
+
+      const optionResult = await client.query<{ votes_count: number }>(
+        `
+          UPDATE poll_options
+          SET votes_count = votes_count + 1
+          WHERE id = $1
+          RETURNING votes_count
+        `,
+        [input.optionId]
+      );
+
+      optionVotesCount = optionResult.rows[0]?.votes_count ?? 0;
+    }
+
+    const [updatedPoll] = await hydratePolls(client, [input.pollId], input.voterId);
+
+    await client.query('COMMIT');
+
+    return {
+      status: 'set' as const,
+      optionVotesCount,
       poll: updatedPoll
     };
   } catch (error) {
