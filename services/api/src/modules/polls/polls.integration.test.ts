@@ -560,7 +560,8 @@ test('authenticated user can set a vote on an active poll', async () => {
     headers: bearer(registered.accessToken),
     payload: {
       question: 'Can a vote be set through the idempotent endpoint?',
-      options: ['Yes', 'No']
+      options: ['Yes', 'No'],
+      allowVoteCancellation: true
     }
   });
 

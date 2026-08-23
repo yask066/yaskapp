@@ -186,17 +186,23 @@ class PollsApiClient {
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls',
     );
+    final requestBody = <String, dynamic>{
+      'question': question,
+      'options': options,
+      // Older API versions reject unknown fields because their schema is
+      // strict. Omitting the default value keeps creation compatible with
+      // those versions; enabling the option requires the updated API.
+      if (allowVoteCancellation)
+        'allowVoteCancellation': true,
+    };
+
     final response = await _httpClient.post(
       uri,
       headers: {
         'authorization': 'Bearer $accessToken',
         'content-type': 'application/json',
       },
-      body: jsonEncode({
-        'question': question,
-        'options': options,
-        'allowVoteCancellation': allowVoteCancellation,
-      }),
+      body: jsonEncode(requestBody),
     );
     final body = _decodeObject(response);
     final poll = body['poll'];
