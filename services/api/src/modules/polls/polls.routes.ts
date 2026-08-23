@@ -231,7 +231,10 @@ export function registerPollRoutes(app: FastifyInstance) {
           body: parsedBody.data.body
         });
 
-        return reply.status(201).send(result);
+        return reply.status(201).send({
+          comment: result.comment,
+          poll: result.poll
+        });
       } catch (error) {
         return pollError(reply, error);
       }
@@ -350,12 +353,21 @@ export function registerPollRoutes(app: FastifyInstance) {
           voterId: request.user.sub
         });
 
-        broadcastPollVoteCreated({
+        if (result.operation === 'created') {
+          broadcastPollVoteCreated({
+            poll: result.poll,
+            vote: result.vote
+          });
+        } else {
+          broadcastPollVoteUpdated({
+            poll: result.poll
+          });
+        }
+
+        return reply.status(201).send({
           poll: result.poll,
           vote: result.vote
         });
-
-        return reply.status(201).send(result);
       } catch (error) {
         return pollError(reply, error);
       }

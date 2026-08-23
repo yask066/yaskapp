@@ -1086,6 +1086,7 @@ export async function setVoteRecord(input: {
 
     return {
       status: 'set' as const,
+      operation: currentOptionId ? ('updated' as const) : ('created' as const),
       optionVotesCount,
       poll: updatedPoll
     };

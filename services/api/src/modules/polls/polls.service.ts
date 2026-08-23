@@ -195,6 +195,7 @@ export async function setVote(input: CreateVoteInput) {
 
   return {
     poll: result.poll,
+    operation: result.operation,
     vote: {
       pollId: input.pollId,
       optionId: input.optionId,
