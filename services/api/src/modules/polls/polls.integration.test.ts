@@ -641,6 +641,27 @@ test('avatar upload requires authentication and a multipart file', async () => {
     'avatar_unsupported_type'
   );
 
+  const invalidImageBoundary = 'invalid-avatar-image';
+  const invalidImageResponse = await app.inject({
+    method: 'POST',
+    url: '/profiles/me/avatar',
+    headers: {
+      ...bearer(registered.accessToken),
+      'content-type': `multipart/form-data; boundary=${invalidImageBoundary}`
+    },
+    payload: multipartFileBody(
+      invalidImageBoundary,
+      'avatar',
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00])
+    )
+  });
+
+  assert.equal(invalidImageResponse.statusCode, 400, invalidImageResponse.body);
+  assert.equal(
+    invalidImageResponse.json<{ error: string }>().error,
+    'avatar_invalid'
+  );
+
   const animatedBoundary = 'animated-avatar';
   const animatedResponse = await app.inject({
     method: 'POST',

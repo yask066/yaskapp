@@ -15,6 +15,7 @@ export type RateLimitOptions = {
   limit: number;
   windowMs: number;
   errorCode?: string;
+  keyBy?: 'ip' | 'user';
 };
 
 type RateLimitResult = {
@@ -41,8 +42,14 @@ export async function consumeRateLimit(
   };
 }
 
-function clientKey(request: FastifyRequest, keyPrefix: string) {
-  return `ratelimit:${keyPrefix}:${request.ip}`;
+export function rateLimitKey(
+  request: FastifyRequest,
+  keyPrefix: string,
+  keyBy: 'ip' | 'user' = 'ip'
+) {
+  const identity = keyBy === 'user' ? request.user?.sub ?? request.ip : request.ip;
+
+  return `ratelimit:${keyPrefix}:${identity}`;
 }
 
 export function rateLimit(options: RateLimitOptions) {
@@ -54,7 +61,7 @@ export function rateLimit(options: RateLimitOptions) {
 
     try {
       const result = await consumeRateLimit(
-        clientKey(request, options.keyPrefix),
+        rateLimitKey(request, options.keyPrefix, options.keyBy),
         options.limit,
         options.windowMs
       );

@@ -136,6 +136,16 @@ export async function normalizeAvatar(body: Buffer) {
     .toBuffer();
 }
 
+function isInvalidImageError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return /corrupt|invalid|unsupported|truncated|end of stream|input buffer/i.test(
+    error.message
+  );
+}
+
 export async function uploadAvatar(userId: string, part: MultipartFile) {
   if (part.fieldname !== 'avatar') {
     throw new AvatarUploadError('The avatar field is required.');
@@ -173,7 +183,14 @@ export async function uploadAvatar(userId: string, part: MultipartFile) {
   let normalizedBody: Buffer;
   try {
     normalizedBody = await normalizeAvatar(body);
-  } catch (_) {
+  } catch (error) {
+    if (isInvalidImageError(error)) {
+      throw new AvatarUploadError(
+        'Please choose a valid image file.',
+        'avatar_invalid'
+      );
+    }
+
     throw new AvatarProcessingError('Avatar image could not be processed safely.');
   }
   const objectKey = createAvatarObjectKey(userId);

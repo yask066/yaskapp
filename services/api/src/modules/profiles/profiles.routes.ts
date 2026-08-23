@@ -161,7 +161,8 @@ export function registerProfileRoutes(app: FastifyInstance) {
           keyPrefix: 'avatar-upload',
           limit: 5,
           windowMs: 15 * 60_000,
-          errorCode: 'avatar_rate_limited'
+          errorCode: 'avatar_rate_limited',
+          keyBy: 'user'
         })
       ]
     },
@@ -198,7 +199,8 @@ export function registerProfileRoutes(app: FastifyInstance) {
           keyPrefix: 'avatar-delete',
           limit: 10,
           windowMs: 15 * 60_000,
-          errorCode: 'avatar_rate_limited'
+          errorCode: 'avatar_rate_limited',
+          keyBy: 'user'
         })
       ]
     },
