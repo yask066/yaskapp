@@ -39,6 +39,69 @@ void main() {
     );
   });
 
+  test('falls back to the legacy vote route when PUT is not deployed', () async {
+    final methods = <String>[];
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((request) async {
+        methods.add(request.method);
+        if (request.method == 'PUT') {
+          return http.Response(
+            jsonEncode({
+              'error': 'not_found',
+              'message': 'Route was not found.',
+            }),
+            404,
+          );
+        }
+
+        return http.Response(
+          jsonEncode({'poll': _pollJson(commentsCount: 0)}),
+          201,
+        );
+      }),
+    );
+
+    final poll = await client.setVote(
+      pollId: 'poll-1',
+      optionId: 'option-1',
+      accessToken: 'token',
+    );
+
+    expect(methods, ['PUT', 'POST']);
+    expect(poll.id, 'poll-1');
+  });
+
+  test('keeps missing option errors distinct from missing routes', () async {
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((_) async {
+        return http.Response(
+          jsonEncode({
+            'error': 'not_found',
+            'message': 'Poll or option was not found.',
+          }),
+          404,
+        );
+      }),
+    );
+
+    await expectLater(
+      client.setVote(
+        pollId: 'poll-1',
+        optionId: 'option-1',
+        accessToken: 'token',
+      ),
+      throwsA(
+        isA<PollsApiException>().having(
+          (error) => error.userMessage,
+          'userMessage',
+          'That poll option is no longer available. Refresh the poll and try again.',
+        ),
+      ),
+    );
+  });
+
   test('lists subscription polls with authorization and limit', () async {
     late http.Request request;
     final client = PollsApiClient(
