@@ -170,6 +170,28 @@ class PollSummary {
     return votedOptionIndex;
   }
 
+  PollSummary copyWith({
+    String? viewerVoteOptionId,
+    bool clearViewerVoteOptionId = false,
+  }) {
+    return PollSummary(
+      id: id,
+      author: author,
+      question: question,
+      options: options,
+      votesCount: votesCount,
+      commentsCount: commentsCount,
+      likesCount: likesCount,
+      viewerHasLiked: viewerHasLiked,
+      createdAt: createdAt,
+      viewerVoteOptionId: clearViewerVoteOptionId
+          ? null
+          : viewerVoteOptionId ?? this.viewerVoteOptionId,
+      endsAt: endsAt,
+      votedOptionIndex: votedOptionIndex,
+    );
+  }
+
   String get createdLabel {
     final elapsed = DateTime.now().difference(createdAt);
 

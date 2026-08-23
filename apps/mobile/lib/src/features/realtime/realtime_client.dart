@@ -70,7 +70,8 @@ class RealtimeClient {
       return;
     }
 
-    if (decoded['type'] != 'poll.vote.created') {
+    if (decoded['type'] != 'poll.vote.created' &&
+        decoded['type'] != 'poll.vote.updated') {
       return;
     }
 

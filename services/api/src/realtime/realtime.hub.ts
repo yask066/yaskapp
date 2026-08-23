@@ -8,7 +8,7 @@ type RealtimeSocket = {
 type PollVoteCreatedEvent = {
   type: 'poll.vote.created';
   payload: {
-    poll: Poll;
+    poll: Omit<Poll, 'viewerVoteOptionId'>;
     vote: {
       pollId: string;
       optionId: string;
@@ -17,11 +17,21 @@ type PollVoteCreatedEvent = {
   };
 };
 
+type PollVoteUpdatedEvent = {
+  type: 'poll.vote.updated';
+  payload: {
+    poll: Omit<Poll, 'viewerVoteOptionId'>;
+  };
+};
+
 type ConnectionReadyEvent = {
   type: 'connection.ready';
 };
 
-type RealtimeEvent = ConnectionReadyEvent | PollVoteCreatedEvent;
+type RealtimeEvent =
+  | ConnectionReadyEvent
+  | PollVoteCreatedEvent
+  | PollVoteUpdatedEvent;
 
 const openReadyState = 1;
 const clients = new Set<RealtimeSocket>();
@@ -47,11 +57,33 @@ export function addRealtimeClient(socket: RealtimeSocket) {
 }
 
 export function broadcastPollVoteCreated(payload: PollVoteCreatedEvent['payload']) {
-  const event: PollVoteCreatedEvent = {
+  broadcast({
     type: 'poll.vote.created',
-    payload
-  };
+    payload: {
+      ...payload,
+      poll: sanitizePoll(payload.poll)
+    }
+  });
+}
 
+export function broadcastPollVoteUpdated(payload: PollVoteUpdatedEvent['payload']) {
+  broadcast({
+    type: 'poll.vote.updated',
+    payload: {
+      poll: sanitizePoll(payload.poll)
+    }
+  });
+}
+
+function sanitizePoll(
+  poll: Poll | Omit<Poll, 'viewerVoteOptionId'>
+): Omit<Poll, 'viewerVoteOptionId'> {
+  const { viewerVoteOptionId: _viewerVoteOptionId, ...safePoll } = poll as Poll;
+
+  return safePoll;
+}
+
+function broadcast(event: RealtimeEvent) {
   for (const client of clients) {
     try {
       send(client, event);

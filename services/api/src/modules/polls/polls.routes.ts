@@ -2,7 +2,10 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
-import { broadcastPollVoteCreated } from '../../realtime/realtime.hub.js';
+import {
+  broadcastPollVoteCreated,
+  broadcastPollVoteUpdated
+} from '../../realtime/realtime.hub.js';
 import { authenticate, optionalAuthenticate } from '../auth/auth.utils.js';
 import {
   PollAlreadyVotedError,
@@ -366,6 +369,10 @@ export function registerPollRoutes(app: FastifyInstance) {
         const result = await cancelVote({
           pollId: parsedParams.data.pollId,
           voterId: request.user.sub
+        });
+
+        broadcastPollVoteUpdated({
+          poll: result.poll
         });
 
         return reply.send(result);

@@ -119,7 +119,10 @@ class FeedScreenState extends State<FeedScreen> {
       return;
     }
 
-    _replacePollInFeed(event.poll);
+    final currentPoll = _polls[existingIndex];
+    _replacePollInFeed(
+      event.poll.copyWith(viewerVoteOptionId: currentPoll.viewerVoteOptionId),
+    );
   }
 
   Future<void> _vote(PollSummary poll, PollOptionSummary option) async {

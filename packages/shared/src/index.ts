@@ -92,12 +92,18 @@ export type RealtimeEvent =
   | {
       type: 'poll.vote.created';
       payload: {
-        poll: Poll;
+        poll: Omit<Poll, 'viewerVoteOptionId'>;
         vote: {
           pollId: string;
           optionId: string;
           votesCount: number;
         };
+      };
+    }
+  | {
+      type: 'poll.vote.updated';
+      payload: {
+        poll: Omit<Poll, 'viewerVoteOptionId'>;
       };
     }
   | {

@@ -89,7 +89,9 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     final index = _polls.indexWhere((poll) => poll.id == event.poll.id);
     if (index < 0) return;
     setState(() {
-      _polls[index] = event.poll;
+      _polls[index] = event.poll.copyWith(
+        viewerVoteOptionId: _polls[index].viewerVoteOptionId,
+      );
     });
   }
 
