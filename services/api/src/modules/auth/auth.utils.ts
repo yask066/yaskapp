@@ -11,6 +11,15 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
       message: 'Authentication is required.'
     });
   }
+
+  const user = await request.getCurrentUser();
+
+  if (!user || user.status !== 'active') {
+    return reply.status(401).send({
+      error: 'unauthorized',
+      message: 'Authentication is required.'
+    });
+  }
 }
 
 export async function optionalAuthenticate(
@@ -24,6 +33,15 @@ export async function optionalAuthenticate(
   try {
     await request.jwtVerify();
   } catch {
+    return reply.status(401).send({
+      error: 'unauthorized',
+      message: 'Authentication is required.'
+    });
+  }
+
+  const user = await request.getCurrentUser();
+
+  if (!user || user.status !== 'active') {
     return reply.status(401).send({
       error: 'unauthorized',
       message: 'Authentication is required.'

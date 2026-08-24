@@ -200,6 +200,7 @@ async function findPollRowsByIds(client: PoolClient, pollIds: string[]) {
       JOIN profiles pr ON pr.user_id = p.author_id
       WHERE p.id = ANY($1::uuid[])
         AND p.deleted_at IS NULL
+        AND u.status = 'active'
       ORDER BY p.created_at DESC, p.id DESC
     `,
     [pollIds]
@@ -452,9 +453,11 @@ export async function listSubscriptionPollRecords(
         SELECT p.id
         FROM polls p
         JOIN follows f ON f.followee_id = p.author_id
+        JOIN users u ON u.id = p.author_id
         WHERE f.follower_id = $1
           AND p.visibility = 'public'
           AND p.deleted_at IS NULL
+          AND u.status = 'active'
         ORDER BY p.created_at DESC, p.id DESC
         LIMIT $2
       `,

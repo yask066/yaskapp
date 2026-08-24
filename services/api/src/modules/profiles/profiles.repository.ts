@@ -35,6 +35,7 @@ export async function findProfileCountryCode(userId: string) {
       FROM profiles p
       JOIN users u ON u.id = p.user_id
       WHERE p.user_id = $1
+        AND u.status = 'active'
         AND u.deleted_at IS NULL
       LIMIT 1
     `,
@@ -79,6 +80,7 @@ export async function findAvatarObjectKey(userId: string) {
       FROM profiles p
       JOIN users u ON u.id = p.user_id
       WHERE p.user_id = $1
+        AND u.status = 'active'
         AND u.deleted_at IS NULL
       LIMIT 1
     `,
@@ -171,6 +173,7 @@ export async function findPublicProfileRecord(userId: string, viewerId?: string)
       FROM users u
       JOIN profiles p ON p.user_id = u.id
       WHERE u.id = $1
+        AND u.status = 'active'
         AND u.status = 'active'
         AND u.deleted_at IS NULL
       LIMIT 1

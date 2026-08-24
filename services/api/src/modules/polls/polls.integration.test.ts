@@ -156,6 +156,52 @@ test('newly registered users receive the default user role', async () => {
   assert.equal(auth.user.role, 'user');
 });
 
+test('moderator can block a user and the blocked session stops working', async () => {
+  const moderator = await registerTestUser();
+  const target = await registerTestUser();
+
+  await db.query('UPDATE users SET role = $1 WHERE id = $2', [
+    'moderator',
+    moderator.user.id
+  ]);
+
+  const forbiddenResponse = await app.inject({
+    method: 'POST',
+    url: `/admin/users/${target.user.id}/block`,
+    headers: bearer(target.accessToken),
+    payload: { reason: 'Attempted self-service moderation.' }
+  });
+
+  assert.equal(forbiddenResponse.statusCode, 403, forbiddenResponse.body);
+
+  const missingReasonResponse = await app.inject({
+    method: 'POST',
+    url: `/admin/users/${target.user.id}/block`,
+    headers: bearer(moderator.accessToken),
+    payload: {}
+  });
+
+  assert.equal(missingReasonResponse.statusCode, 400, missingReasonResponse.body);
+
+  const blockResponse = await app.inject({
+    method: 'POST',
+    url: `/admin/users/${target.user.id}/block`,
+    headers: bearer(moderator.accessToken),
+    payload: { reason: 'Spam content.' }
+  });
+
+  assert.equal(blockResponse.statusCode, 200, blockResponse.body);
+  assert.equal(blockResponse.json<{ user: { status: string } }>().user.status, 'blocked');
+
+  const blockedSessionResponse = await app.inject({
+    method: 'GET',
+    url: '/auth/me',
+    headers: bearer(target.accessToken)
+  });
+
+  assert.equal(blockedSessionResponse.statusCode, 401, blockedSessionResponse.body);
+});
+
 function bearer(accessToken: string) {
   return {
     authorization: `Bearer ${accessToken}`

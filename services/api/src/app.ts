@@ -8,6 +8,7 @@ import { env } from './config/env.js';
 import { rateLimit } from './config/rate-limit.js';
 import { registerAuthRoutes } from './modules/auth/auth.routes.js';
 import { getCurrentUser } from './modules/auth/auth.utils.js';
+import { registerAdminRoutes } from './modules/admin/admin.routes.js';
 import { registerHealthRoutes } from './modules/health/health.routes.js';
 import { registerPollRoutes } from './modules/polls/polls.routes.js';
 import { registerProfileRoutes } from './modules/profiles/profiles.routes.js';
@@ -118,6 +119,7 @@ export function buildApp() {
   );
 
   registerAuthRoutes(app);
+  registerAdminRoutes(app);
   registerHealthRoutes(app);
   registerPollRoutes(app);
   registerProfileRoutes(app);
