@@ -561,8 +561,7 @@ test('authenticated user can set a vote on an active poll', async () => {
     payload: {
       question: 'Can a vote be set through the idempotent endpoint?',
       options: ['Yes', 'No'],
-      allowVoteCancellation: true,
-      allowVoteChange: true
+      allowVoteCancellation: true
     }
   });
 
@@ -782,8 +781,7 @@ test('concurrent vote changes keep poll and option counters consistent', async (
     headers: bearer(registered.accessToken),
     payload: {
       question: 'Can concurrent vote changes stay consistent?',
-      options: ['First', 'Second'],
-      allowVoteChange: true
+      options: ['First', 'Second']
     }
   });
 

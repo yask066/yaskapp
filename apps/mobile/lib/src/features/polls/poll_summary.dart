@@ -109,7 +109,6 @@ class PollSummary {
     required this.likesCount,
     required this.viewerHasLiked,
     this.allowVoteCancellation = false,
-    this.allowVoteChange = false,
     required this.createdAt,
     this.viewerVoteOptionId,
     this.endsAt,
@@ -136,7 +135,6 @@ class PollSummary {
       likesCount: json['likesCount'] as int,
       viewerHasLiked: json['viewerHasLiked'] as bool? ?? false,
       allowVoteCancellation: json['allowVoteCancellation'] as bool? ?? false,
-      allowVoteChange: json['allowVoteChange'] as bool? ?? false,
       createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
       viewerVoteOptionId: json['viewerVoteOptionId'] as String?,
       endsAt: (json['endsAt'] as String?) == null
@@ -154,7 +152,6 @@ class PollSummary {
   final int likesCount;
   final bool viewerHasLiked;
   final bool allowVoteCancellation;
-  final bool allowVoteChange;
   final DateTime createdAt;
   final String? viewerVoteOptionId;
   final DateTime? endsAt;
@@ -190,7 +187,6 @@ class PollSummary {
       likesCount: likesCount,
       viewerHasLiked: viewerHasLiked,
       allowVoteCancellation: allowVoteCancellation,
-      allowVoteChange: allowVoteChange,
       createdAt: createdAt,
       viewerVoteOptionId: clearViewerVoteOptionId
           ? null

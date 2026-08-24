@@ -27,7 +27,6 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
 
   var _isSubmitting = false;
   var _allowVoteCancellation = false;
-  var _allowVoteChange = false;
   String? _errorMessage;
 
   @override
@@ -91,7 +90,6 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
         question: _questionController.text.trim(),
         options: options,
         allowVoteCancellation: _allowVoteCancellation,
-        allowVoteChange: _allowVoteChange,
         accessToken: widget.accessToken,
       );
 
@@ -190,16 +188,6 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
                     ? null
                     : (value) => setState(() {
                           _allowVoteCancellation = value;
-                        }),
-              ),
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Allow voters to change their vote'),
-                value: _allowVoteChange,
-                onChanged: _isSubmitting
-                    ? null
-                    : (value) => setState(() {
-                          _allowVoteChange = value;
                         }),
               ),
               const SizedBox(height: 24),
