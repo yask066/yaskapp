@@ -4,6 +4,7 @@ import { db } from '../../config/database.js';
 import { avatarUrlForUser } from '../profiles/avatar-url.js';
 
 export type UserStatus = 'active' | 'blocked' | 'deleted';
+export type UserRole = 'user' | 'moderator' | 'superadmin';
 
 export type UserWithProfileRow = {
   id: string;
@@ -11,6 +12,7 @@ export type UserWithProfileRow = {
   username: string;
   password_hash: string;
   status: UserStatus;
+  role: UserRole;
   created_at: Date;
   updated_at: Date;
   display_name: string;
@@ -39,6 +41,10 @@ export type PublicUser = {
     followersCount: number;
     followingCount: number;
   };
+};
+
+export type AuthenticatedUser = PublicUser & {
+  role: UserRole;
 };
 
 export type CreateUserInput = {
@@ -70,9 +76,16 @@ function mapUser(row: UserWithProfileRow): PublicUser {
   };
 }
 
+function mapAuthenticatedUser(row: UserWithProfileRow): AuthenticatedUser {
+  return {
+    ...mapUser(row),
+    role: row.role
+  };
+}
+
 function mapUserWithPassword(row: UserWithProfileRow) {
   return {
-    user: mapUser(row),
+    user: mapAuthenticatedUser(row),
     passwordHash: row.password_hash
   };
 }
@@ -86,6 +99,7 @@ async function findUserByIdWithClient(client: PoolClient, userId: string) {
         u.username::text AS username,
         u.password_hash,
         u.status,
+        u.role,
         u.created_at,
         u.updated_at,
         p.display_name,
@@ -164,6 +178,7 @@ export async function findUserByEmailOrUsername(login: string) {
         u.username::text AS username,
         u.password_hash,
         u.status,
+        u.role,
         u.created_at,
         u.updated_at,
         p.display_name,
@@ -187,7 +202,7 @@ export async function findUserByEmailOrUsername(login: string) {
   return row ? mapUserWithPassword(row) : null;
 }
 
-export async function findUserById(userId: string) {
+export async function findAuthenticatedUserById(userId: string) {
   const result = await db.query<UserWithProfileRow>(
     `
       SELECT
@@ -196,6 +211,7 @@ export async function findUserById(userId: string) {
         u.username::text AS username,
         u.password_hash,
         u.status,
+        u.role,
         u.created_at,
         u.updated_at,
         p.display_name,
@@ -216,7 +232,18 @@ export async function findUserById(userId: string) {
 
   const row = result.rows[0];
 
-  return row ? mapUser(row) : null;
+  return row ? mapAuthenticatedUser(row) : null;
+}
+
+export async function findUserById(userId: string) {
+  const user = await findAuthenticatedUserById(userId);
+
+  if (!user) {
+    return null;
+  }
+
+  const { role: _role, ...publicUser } = user;
+  return publicUser;
 }
 
 export async function markUserSeen(userId: string) {

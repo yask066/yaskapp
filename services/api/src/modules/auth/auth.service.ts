@@ -6,7 +6,7 @@ import {
   findUserByEmailOrUsername,
   markUserSeen
 } from './auth.repository.js';
-import type { PublicUser } from './auth.repository.js';
+import type { AuthenticatedUser } from './auth.repository.js';
 import { hashPassword, verifyPassword } from './password.js';
 
 const tokenExpiresIn = '7d';
@@ -29,7 +29,7 @@ type LoginInput = {
 };
 
 type AuthResponse = {
-  user: PublicUser;
+  user: AuthenticatedUser;
   accessToken: string;
   tokenType: 'Bearer';
   expiresIn: string;
@@ -47,7 +47,7 @@ function isUniqueViolation(error: unknown): error is DatabaseError {
   return Boolean(error && typeof error === 'object' && 'code' in error && error.code === '23505');
 }
 
-function signAccessToken(app: FastifyInstance, user: PublicUser) {
+function signAccessToken(app: FastifyInstance, user: AuthenticatedUser) {
   return app.jwt.sign(
     {
       sub: user.id,
@@ -59,7 +59,7 @@ function signAccessToken(app: FastifyInstance, user: PublicUser) {
   );
 }
 
-function authResponse(app: FastifyInstance, user: PublicUser): AuthResponse {
+function authResponse(app: FastifyInstance, user: AuthenticatedUser): AuthResponse {
   return {
     user,
     accessToken: signAccessToken(app, user),

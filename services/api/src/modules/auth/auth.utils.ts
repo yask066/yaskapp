@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
-import { findUserById } from './auth.repository.js';
+import { findAuthenticatedUserById } from './auth.repository.js';
 
 export async function authenticate(request: FastifyRequest, reply: FastifyReply) {
   try {
@@ -34,5 +34,5 @@ export async function optionalAuthenticate(
 export async function getCurrentUser(request: FastifyRequest) {
   const userId = request.user.sub;
 
-  return findUserById(userId);
+  return findAuthenticatedUserById(userId);
 }

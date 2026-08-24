@@ -35,6 +35,7 @@ type AuthResponse = {
   user: {
     id: string;
     username: string;
+    role: 'user' | 'moderator' | 'superadmin';
     profile: {
       displayName: string;
       bio: string | null;
@@ -149,6 +150,11 @@ async function registerTestUser() {
     password
   };
 }
+
+test('newly registered users receive the default user role', async () => {
+  const auth = await registerTestUser();
+  assert.equal(auth.user.role, 'user');
+});
 
 function bearer(accessToken: string) {
   return {
