@@ -1,5 +1,7 @@
 import { db } from '../../config/database.js';
 import { findUserById } from '../auth/auth.repository.js';
+import type { UserRole } from '../auth/auth.repository.js';
+import { recordAdminAudit } from './audit.repository.js';
 
 export type BlockUserResult =
   | { status: 'blocked' | 'already_blocked' }
@@ -25,7 +27,11 @@ export type AdminCommentDeleteResult =
   | { status: 'deleted' | 'already_deleted'; pollId: string }
   | { status: 'not_found' };
 
-export async function blockUser(actorId: string, targetUserId: string): Promise<BlockUserResult> {
+export async function blockUser(
+  actorId: string,
+  targetUserId: string,
+  audit: { reason: string; requestId?: string }
+): Promise<BlockUserResult> {
   const client = await db.connect();
 
   try {
@@ -87,6 +93,16 @@ export async function blockUser(actorId: string, targetUserId: string): Promise<
       `,
       [targetUserId]
     );
+
+    await recordAdminAudit(client, {
+      actorUserId: actorId,
+      actorRole: actor.role as 'user' | 'moderator' | 'superadmin',
+      action: 'user.blocked',
+      targetType: 'user',
+      targetId: targetUserId,
+      reason: audit.reason,
+      requestId: audit.requestId
+    });
 
     await client.query('COMMIT');
     return { status: 'blocked' };
@@ -218,34 +234,56 @@ export async function getAdminPoll(pollId: string) {
   return row ? mapAdminPoll(row) : null;
 }
 
-export async function deleteAdminPoll(pollId: string) {
-  const result = await db.query<{ id: string }>(
-    `
-      UPDATE polls
-      SET deleted_at = COALESCE(deleted_at, now()), updated_at = now()
-      WHERE id = $1
-        AND deleted_at IS NULL
-      RETURNING id
-    `,
-    [pollId]
-  );
+export async function deleteAdminPoll(
+  pollId: string,
+  audit: { actorUserId: string; actorRole: UserRole; reason: string; requestId?: string }
+) {
+  const client = await db.connect();
 
-  if (result.rowCount === 1) {
-    return { status: 'deleted' as const };
+  try {
+    await client.query('BEGIN');
+    const result = await client.query<{ id: string }>(
+      `
+        UPDATE polls
+        SET deleted_at = now(), updated_at = now()
+        WHERE id = $1
+          AND deleted_at IS NULL
+        RETURNING id
+      `,
+      [pollId]
+    );
+
+    if (result.rowCount === 1) {
+      await recordAdminAudit(client, {
+        ...audit,
+        action: 'poll.deleted_by_admin',
+        targetType: 'poll',
+        targetId: pollId
+      });
+      await client.query('COMMIT');
+      return { status: 'deleted' as const };
+    }
+
+    const existing = await client.query<{ id: string }>(
+      'SELECT id FROM polls WHERE id = $1',
+      [pollId]
+    );
+    await client.query('COMMIT');
+
+    return existing.rowCount === 1
+      ? { status: 'already_deleted' as const }
+      : { status: 'not_found' as const };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
-
-  const existing = await db.query<{ id: string }>(
-    'SELECT id FROM polls WHERE id = $1',
-    [pollId]
-  );
-
-  return existing.rowCount === 1
-    ? { status: 'already_deleted' as const }
-    : { status: 'not_found' as const };
 }
 
 export async function deleteAdminComment(
-  commentId: string
+  commentId: string,
+  audit: { actorUserId: string; actorRole: UserRole; reason: string; requestId?: string }
 ): Promise<AdminCommentDeleteResult> {
   const client = await db.connect();
 
@@ -292,6 +330,14 @@ export async function deleteAdminComment(
       `,
       [comment.poll_id]
     );
+
+    await recordAdminAudit(client, {
+      ...audit,
+      action: 'comment.deleted_by_admin',
+      targetType: 'comment',
+      targetId: commentId,
+      metadata: { pollId: comment.poll_id }
+    });
 
     await client.query('COMMIT');
     return { status: 'deleted', pollId: comment.poll_id };

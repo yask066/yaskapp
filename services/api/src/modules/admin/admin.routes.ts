@@ -17,6 +17,7 @@ import {
   listAdminPolls
 } from './admin.service.js';
 import { getBlockedUser } from './admin.repository.js';
+import { listAdminAudit } from './audit.service.js';
 
 const userParamsSchema = z.object({
   userId: z.string().uuid()
@@ -40,6 +41,24 @@ const adminPollsQuerySchema = z.object({
   query: z.string().trim().max(280).optional(),
   status: z.enum(['active', 'deleted', 'all']).default('all'),
   authorId: z.string().uuid().optional()
+}).strict();
+
+const adminAuditQuerySchema = z.object({
+  action: z.enum([
+    'user.blocked',
+    'user.unblocked',
+    'user.role_changed',
+    'user.deleted',
+    'poll.deleted_by_admin',
+    'comment.deleted_by_admin'
+  ]).optional(),
+  actorId: z.string().uuid().optional(),
+  targetType: z.enum(['user', 'poll', 'comment']).optional(),
+  targetId: z.string().uuid().optional(),
+  from: z.string().datetime({ offset: true }).optional(),
+  to: z.string().datetime({ offset: true }).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).max(100_000).default(0)
 }).strict();
 
 function adminError(reply: FastifyReply, error: unknown) {
@@ -68,6 +87,25 @@ function adminError(reply: FastifyReply, error: unknown) {
 }
 
 export function registerAdminRoutes(app: FastifyInstance) {
+  app.get(
+    '/admin/audit',
+    {
+      preHandler: [authenticate, requirePermission('admin.audit.read')]
+    },
+    async (request, reply) => {
+      const parsedQuery = adminAuditQuerySchema.safeParse(request.query);
+
+      if (!parsedQuery.success) {
+        return reply.status(400).send({
+          error: 'validation_error',
+          message: 'Request input is invalid.'
+        });
+      }
+
+      return reply.send({ items: await listAdminAudit(parsedQuery.data) });
+    }
+  );
+
   app.get(
     '/admin/polls',
     {
@@ -128,7 +166,13 @@ export function registerAdminRoutes(app: FastifyInstance) {
       }
 
       try {
-        const status = await deleteAdminPoll(parsedParams.data.pollId);
+        const status = await deleteAdminPoll({
+          pollId: parsedParams.data.pollId,
+          actorUserId: request.user.sub,
+          actorRole: (await request.getCurrentUser())?.role ?? 'user',
+          reason: parsedBody.data.reason,
+          requestId: request.id
+        });
         if (status === 'deleted') {
           broadcastPollDeleted({ pollId: parsedParams.data.pollId });
         }
@@ -156,7 +200,13 @@ export function registerAdminRoutes(app: FastifyInstance) {
       }
 
       try {
-        const result = await deleteAdminComment(parsedParams.data.commentId);
+        const result = await deleteAdminComment({
+          commentId: parsedParams.data.commentId,
+          actorUserId: request.user.sub,
+          actorRole: (await request.getCurrentUser())?.role ?? 'user',
+          reason: parsedBody.data.reason,
+          requestId: request.id
+        });
         if (result.status === 'deleted') {
           broadcastCommentDeleted({
             commentId: parsedParams.data.commentId,
@@ -189,7 +239,12 @@ export function registerAdminRoutes(app: FastifyInstance) {
       try {
         const result = await blockUser(
           request.user.sub,
-          parsedParams.data.userId
+          parsedParams.data.userId,
+          {
+            actorRole: (await request.getCurrentUser())?.role ?? 'user',
+            reason: parsedBody.data.reason,
+            requestId: request.id
+          }
         );
         const user = await getBlockedUser(parsedParams.data.userId);
 

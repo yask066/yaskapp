@@ -12,8 +12,12 @@ export class AdminProtectedUserError extends Error {}
 export class AdminPollNotFoundError extends Error {}
 export class AdminCommentNotFoundError extends Error {}
 
-export async function blockUser(actorId: string, targetUserId: string) {
-  const result = await blockUserRecord(actorId, targetUserId);
+export async function blockUser(
+  actorId: string,
+  targetUserId: string,
+  audit: { actorRole: 'user' | 'moderator' | 'superadmin'; reason: string; requestId?: string }
+) {
+  const result = await blockUserRecord(actorId, targetUserId, audit);
 
   if (result.status === 'not_found') {
     throw new AdminUserNotFoundError('User was not found.');
@@ -53,8 +57,15 @@ export async function getAdminPoll(pollId: string) {
   return poll;
 }
 
-export async function deleteAdminPoll(pollId: string) {
-  const result = await deleteAdminPollRecord(pollId);
+export async function deleteAdminPoll(input: {
+  pollId: string;
+  actorUserId: string;
+  actorRole: 'user' | 'moderator' | 'superadmin';
+  reason: string;
+  requestId?: string;
+}) {
+  const { pollId, ...audit } = input;
+  const result = await deleteAdminPollRecord(pollId, audit);
 
   if (result.status === 'not_found') {
     throw new AdminPollNotFoundError('Poll was not found.');
@@ -63,8 +74,15 @@ export async function deleteAdminPoll(pollId: string) {
   return result.status;
 }
 
-export async function deleteAdminComment(commentId: string) {
-  const result = await deleteAdminCommentRecord(commentId);
+export async function deleteAdminComment(input: {
+  commentId: string;
+  actorUserId: string;
+  actorRole: 'user' | 'moderator' | 'superadmin';
+  reason: string;
+  requestId?: string;
+}) {
+  const { commentId, ...audit } = input;
+  const result = await deleteAdminCommentRecord(commentId, audit);
 
   if (result.status === 'not_found') {
     throw new AdminCommentNotFoundError('Comment was not found.');

@@ -205,10 +205,15 @@ test('moderator can block a user and the blocked session stops working', async (
 test('moderator can list and delete polls and comments', async () => {
   const moderator = await registerTestUser();
   const author = await registerTestUser();
+  const superadmin = await registerTestUser();
 
   await db.query('UPDATE users SET role = $1 WHERE id = $2', [
     'moderator',
     moderator.user.id
+  ]);
+  await db.query('UPDATE users SET role = $1 WHERE id = $2', [
+    'superadmin',
+    superadmin.user.id
   ]);
 
   const pollResponse = await app.inject({
@@ -249,6 +254,29 @@ test('moderator can list and delete polls and comments', async () => {
     payload: { reason: 'Violates content rules.' }
   });
   assert.equal(deletePollResponse.statusCode, 204, deletePollResponse.body);
+
+  const moderatorAuditResponse = await app.inject({
+    method: 'GET',
+    url: '/admin/audit',
+    headers: bearer(moderator.accessToken)
+  });
+  assert.equal(moderatorAuditResponse.statusCode, 403, moderatorAuditResponse.body);
+
+  const superadminAuditResponse = await app.inject({
+    method: 'GET',
+    url: `/admin/audit?targetType=poll&targetId=${poll.id}`,
+    headers: bearer(superadmin.accessToken)
+  });
+  assert.equal(superadminAuditResponse.statusCode, 200, superadminAuditResponse.body);
+  const pollAuditItems = superadminAuditResponse.json<{
+    items: Array<{ action: string; targetId: string; reason: string }>
+  }>().items;
+  assert.equal(
+    pollAuditItems.filter((item) => item.action === 'poll.deleted_by_admin').length,
+    1
+  );
+  assert.equal(pollAuditItems[0]?.targetId, poll.id);
+  assert.equal(pollAuditItems[0]?.reason, 'Violates content rules.');
 
   const repeatedDeleteResponse = await app.inject({
     method: 'DELETE',
