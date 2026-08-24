@@ -6,7 +6,8 @@ import {
   addRealtimeClient,
   broadcastPollVoteCreated,
   broadcastPollVoteUpdated,
-  broadcastPollDeleted
+  broadcastPollDeleted,
+  broadcastCommentDeleted
 } from './realtime.hub.js';
 
 test('realtime vote events omit viewer-specific vote state', () => {
@@ -135,4 +136,24 @@ test('realtime poll deletion events broadcast only the poll id', () => {
   } finally {
     removeClient();
   }
+});
+
+test('realtime comment deletion events broadcast only comment and poll ids', () => {
+  const messages: string[] = [];
+  const remove = addRealtimeClient({
+    readyState: 1,
+    send: (message) => messages.push(message)
+  });
+
+  messages.length = 0;
+  broadcastCommentDeleted({ commentId: 'comment-deleted', pollId: 'poll-1' });
+  remove();
+
+  assert.deepEqual(JSON.parse(messages[0] ?? ''), {
+    type: 'comment.deleted',
+    payload: {
+      commentId: 'comment-deleted',
+      pollId: 'poll-1'
+    }
+  });
 });

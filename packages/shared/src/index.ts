@@ -116,4 +116,11 @@ export type RealtimeEvent =
       payload: {
         pollId: string;
       };
+    }
+  | {
+      type: 'comment.deleted';
+      payload: {
+        commentId: string;
+        pollId: string;
+      };
     };

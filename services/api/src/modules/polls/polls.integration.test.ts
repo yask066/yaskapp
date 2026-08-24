@@ -202,6 +202,93 @@ test('moderator can block a user and the blocked session stops working', async (
   assert.equal(blockedSessionResponse.statusCode, 401, blockedSessionResponse.body);
 });
 
+test('moderator can list and delete polls and comments', async () => {
+  const moderator = await registerTestUser();
+  const author = await registerTestUser();
+
+  await db.query('UPDATE users SET role = $1 WHERE id = $2', [
+    'moderator',
+    moderator.user.id
+  ]);
+
+  const pollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(author.accessToken),
+    payload: {
+      question: 'Which poll should moderation inspect?',
+      options: ['First', 'Second']
+    }
+  });
+  assert.equal(pollResponse.statusCode, 201, pollResponse.body);
+  const poll = pollResponse.json<PollResponse>().poll;
+
+  const forbiddenResponse = await app.inject({
+    method: 'GET',
+    url: '/admin/polls',
+    headers: bearer(author.accessToken)
+  });
+  assert.equal(forbiddenResponse.statusCode, 403, forbiddenResponse.body);
+
+  const listResponse = await app.inject({
+    method: 'GET',
+    url: '/admin/polls?limit=10',
+    headers: bearer(moderator.accessToken)
+  });
+  assert.equal(listResponse.statusCode, 200, listResponse.body);
+  assert.ok(
+    listResponse.json<{ items: Array<{ id: string }> }>().items.some(
+      (item) => item.id === poll.id
+    )
+  );
+
+  const deletePollResponse = await app.inject({
+    method: 'DELETE',
+    url: `/admin/polls/${poll.id}`,
+    headers: bearer(moderator.accessToken),
+    payload: { reason: 'Violates content rules.' }
+  });
+  assert.equal(deletePollResponse.statusCode, 204, deletePollResponse.body);
+
+  const repeatedDeleteResponse = await app.inject({
+    method: 'DELETE',
+    url: `/admin/polls/${poll.id}`,
+    headers: bearer(moderator.accessToken),
+    payload: { reason: 'Repeated moderation request.' }
+  });
+  assert.equal(repeatedDeleteResponse.statusCode, 204, repeatedDeleteResponse.body);
+
+  const secondPollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(author.accessToken),
+    payload: {
+      question: 'Which comment should moderation remove?',
+      options: ['Keep', 'Remove']
+    }
+  });
+  assert.equal(secondPollResponse.statusCode, 201, secondPollResponse.body);
+  const secondPoll = secondPollResponse.json<PollResponse>().poll;
+  const commentInsert = await db.query<{ id: string }>(
+    `
+      INSERT INTO comments (poll_id, author_id, body)
+      VALUES ($1, $2, $3)
+      RETURNING id
+    `,
+    [secondPoll.id, author.user.id, 'This comment violates the rules.']
+  );
+  const commentId = commentInsert.rows[0]?.id;
+  assert.ok(commentId);
+
+  const deleteCommentResponse = await app.inject({
+    method: 'DELETE',
+    url: `/admin/comments/${commentId}`,
+    headers: bearer(moderator.accessToken),
+    payload: { reason: 'Abusive comment.' }
+  });
+  assert.equal(deleteCommentResponse.statusCode, 204, deleteCommentResponse.body);
+});
+
 function bearer(accessToken: string) {
   return {
     authorization: `Bearer ${accessToken}`

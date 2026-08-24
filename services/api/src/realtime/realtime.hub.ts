@@ -35,11 +35,20 @@ type PollDeletedEvent = {
   };
 };
 
+type CommentDeletedEvent = {
+  type: 'comment.deleted';
+  payload: {
+    commentId: string;
+    pollId: string;
+  };
+};
+
 type RealtimeEvent =
   | ConnectionReadyEvent
   | PollVoteCreatedEvent
   | PollVoteUpdatedEvent
-  | PollDeletedEvent;
+  | PollDeletedEvent
+  | CommentDeletedEvent;
 
 const openReadyState = 1;
 const clients = new Set<RealtimeSocket>();
@@ -86,6 +95,13 @@ export function broadcastPollVoteUpdated(payload: PollVoteUpdatedEvent['payload'
 export function broadcastPollDeleted(payload: PollDeletedEvent['payload']) {
   broadcast({
     type: 'poll.deleted',
+    payload
+  });
+}
+
+export function broadcastCommentDeleted(payload: CommentDeletedEvent['payload']) {
+  broadcast({
+    type: 'comment.deleted',
     payload
   });
 }
