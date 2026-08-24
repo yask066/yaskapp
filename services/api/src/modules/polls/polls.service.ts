@@ -20,6 +20,8 @@ export class PollAlreadyVotedError extends Error {}
 
 export class PollCancellationNotAllowedError extends Error {}
 
+export class PollVoteChangeNotAllowedError extends Error {}
+
 export type CreatePollInput = {
   authorId: string;
   question: string;
@@ -29,6 +31,7 @@ export type CreatePollInput = {
   visibility?: PollVisibility;
   endsAt?: string;
   allowVoteCancellation?: boolean;
+  allowVoteChange?: boolean;
 };
 
 export type CreateVoteInput = {
@@ -78,6 +81,7 @@ export async function createPoll(input: CreatePollInput) {
     imageObjectKey: normalizeOptionalText(input.imageObjectKey),
     visibility: input.visibility ?? 'public',
     allowVoteCancellation: input.allowVoteCancellation ?? false,
+    allowVoteChange: input.allowVoteChange ?? false,
     endsAt: input.endsAt ? new Date(input.endsAt) : undefined
   });
 }
@@ -187,6 +191,12 @@ export async function setVote(input: CreateVoteInput) {
 
   if (result.status === 'closed') {
     throw new PollClosedError('Poll is closed.');
+  }
+
+  if (result.status === 'change_not_allowed') {
+    throw new PollVoteChangeNotAllowedError(
+      'The poll author does not allow changing your vote.'
+    );
   }
 
   if (!result.poll) {

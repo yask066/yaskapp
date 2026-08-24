@@ -43,6 +43,7 @@ export type Poll = {
   commentsCount: number;
   likesCount: number;
   allowVoteCancellation: boolean;
+  allowVoteChange: boolean;
   viewerHasLiked: boolean;
   viewerVoteOptionId: string | null;
   options: PollOption[];
@@ -60,6 +61,7 @@ export type CreatePollRecordInput = {
   options: string[];
   endsAt?: Date;
   allowVoteCancellation: boolean;
+  allowVoteChange: boolean;
 };
 
 export type CreatePollCommentRecordInput = {
@@ -83,6 +85,7 @@ type PollRow = {
   comments_count: number;
   likes_count: number;
   allow_vote_cancellation: boolean;
+  allow_vote_change: boolean;
   created_at: Date;
   updated_at: Date;
   ends_at: Date | null;
@@ -134,6 +137,7 @@ function mapPoll(
     commentsCount: row.comments_count,
     likesCount: row.likes_count,
     allowVoteCancellation: row.allow_vote_cancellation,
+    allowVoteChange: row.allow_vote_change,
     viewerHasLiked: viewerLikedPollIds.has(row.id),
     viewerVoteOptionId: viewerVoteOptionIds.get(row.id) ?? null,
     options,
@@ -192,6 +196,7 @@ async function findPollRowsByIds(client: PoolClient, pollIds: string[]) {
         p.comments_count,
         p.likes_count,
         p.allow_vote_cancellation,
+        p.allow_vote_change,
         p.created_at,
         p.updated_at,
         p.ends_at
@@ -309,9 +314,10 @@ export async function createPollRecord(input: CreatePollRecordInput) {
           visibility,
           options_count,
           allow_vote_cancellation,
+          allow_vote_change,
           ends_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id
       `,
       [
@@ -322,6 +328,7 @@ export async function createPollRecord(input: CreatePollRecordInput) {
         input.visibility,
         input.options.length,
         input.allowVoteCancellation,
+        input.allowVoteChange,
         input.endsAt ?? null
       ]
     );
@@ -966,9 +973,10 @@ export async function setVoteRecord(input: {
       id: string;
       ends_at: Date | null;
       option_id: string | null;
+      allow_vote_change: boolean;
     }>(
       `
-        SELECT p.id, p.ends_at, po.id AS option_id
+        SELECT p.id, p.ends_at, p.allow_vote_change, po.id AS option_id
         FROM polls p
         LEFT JOIN poll_options po
           ON po.poll_id = p.id
@@ -1006,6 +1014,13 @@ export async function setVoteRecord(input: {
 
     const currentOptionId = currentVoteResult.rows[0]?.option_id;
     let optionVotesCount = 0;
+
+    if (currentOptionId &&
+        currentOptionId !== input.optionId &&
+        !poll.allow_vote_change) {
+      await client.query('ROLLBACK');
+      return { status: 'change_not_allowed' as const };
+    }
 
     if (!currentOptionId) {
       await client.query(

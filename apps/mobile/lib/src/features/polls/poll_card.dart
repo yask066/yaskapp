@@ -204,8 +204,12 @@ class PollCard extends StatelessWidget {
                 compact: compact,
                 profileVariant: compact,
                 isLoading: isVoting,
-                onTap:
-                    onVote == null ? null : () => onVote!(poll.options[index]),
+                onTap: onVote == null ||
+                        (poll.selectedOptionIndex != null &&
+                            !poll.allowVoteChange &&
+                            poll.selectedOptionIndex != index)
+                    ? null
+                    : () => onVote!(poll.options[index]),
               ),
               const SizedBox(height: 8),
             ],

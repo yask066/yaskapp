@@ -11,6 +11,7 @@ import {
   PollAlreadyVotedError,
   PollClosedError,
   PollCancellationNotAllowedError,
+  PollVoteChangeNotAllowedError,
   PollNotFoundError,
   cancelVote,
   createPoll,
@@ -49,7 +50,8 @@ const createPollSchema = z.object({
     .datetime({ offset: true })
     .refine((value) => new Date(value) > new Date(), 'Poll end date must be in the future.')
     .optional(),
-  allowVoteCancellation: z.boolean().default(false)
+  allowVoteCancellation: z.boolean().default(false),
+  allowVoteChange: z.boolean().default(false)
 }).strict();
 
 const voteParamsSchema = z.object({
@@ -109,6 +111,13 @@ function pollError(reply: FastifyReply, error: unknown) {
   if (error instanceof PollCancellationNotAllowedError) {
     return reply.status(422).send({
       error: 'vote_cancellation_not_allowed',
+      message: error.message
+    });
+  }
+
+  if (error instanceof PollVoteChangeNotAllowedError) {
+    return reply.status(422).send({
+      error: 'vote_change_not_allowed',
       message: error.message
     });
   }

@@ -52,6 +52,7 @@ export type Poll = {
   commentsCount: number;
   likesCount: number;
   allowVoteCancellation: boolean;
+  allowVoteChange: boolean;
   viewerHasLiked: boolean;
   viewerVoteOptionId: string | null;
   createdAt: string;
@@ -67,6 +68,7 @@ export type CreatePollRequest = {
   visibility?: PollVisibility;
   endsAt?: string;
   allowVoteCancellation?: boolean;
+  allowVoteChange?: boolean;
 };
 
 export type CreatePollResponse = {

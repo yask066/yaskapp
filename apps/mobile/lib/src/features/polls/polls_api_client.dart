@@ -17,6 +17,10 @@ class PollsApiException implements Exception {
       return 'The poll author does not allow vote cancellation.';
     }
 
+    if (code == 'vote_change_not_allowed') {
+      return 'The poll author does not allow changing your vote.';
+    }
+
     if (code == 'poll_closed' || statusCode == 422) {
       return 'This poll is closed. Voting changes are no longer available.';
     }
@@ -182,6 +186,7 @@ class PollsApiClient {
     required List<String> options,
     required String accessToken,
     bool allowVoteCancellation = false,
+    bool allowVoteChange = false,
   }) async {
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls',
@@ -194,6 +199,7 @@ class PollsApiClient {
       // those versions; enabling the option requires the updated API.
       if (allowVoteCancellation)
         'allowVoteCancellation': true,
+      if (allowVoteChange) 'allowVoteChange': true,
     };
 
     final response = await _httpClient.post(
