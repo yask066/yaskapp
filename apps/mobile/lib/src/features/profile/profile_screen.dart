@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/user_avatar.dart';
@@ -7,6 +9,7 @@ import '../polls/poll_card.dart';
 import '../polls/poll_comments_screen.dart';
 import '../polls/poll_summary.dart';
 import '../polls/polls_api_client.dart';
+import '../realtime/realtime_client.dart';
 import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -18,7 +21,9 @@ class ProfileScreen extends StatefulWidget {
     required this.onUserUpdated,
     super.key,
     PollsApiClient? pollsApiClient,
-  }) : _pollsApiClient = pollsApiClient;
+    RealtimeClient? realtimeClient,
+  })  : _pollsApiClient = pollsApiClient,
+        _realtimeClient = realtimeClient;
 
   final AuthUser user;
   final String accessToken;
@@ -26,6 +31,7 @@ class ProfileScreen extends StatefulWidget {
   final VoidCallback onLogout;
   final ValueChanged<AuthUser> onUserUpdated;
   final PollsApiClient? _pollsApiClient;
+  final RealtimeClient? _realtimeClient;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -35,6 +41,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late final PollsApiClient _pollsApiClient;
   late Future<List<PollSummary>> _myPollsFuture;
   late final bool _ownsPollsApiClient;
+  late final RealtimeClient _realtimeClientInstance;
+  late final bool _ownsRealtimeClient;
+  StreamSubscription<PollDeletedRealtimeEvent>? _pollDeletedSubscription;
   List<PollSummary> _myPolls = [];
   List<PollSummary> _likedPolls = [];
   var _hasLoadedMyPolls = false;
@@ -48,16 +57,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
     _ownsPollsApiClient = widget._pollsApiClient == null;
     _pollsApiClient = widget._pollsApiClient ?? PollsApiClient();
+    _ownsRealtimeClient = widget._realtimeClient == null;
+    _realtimeClientInstance = widget._realtimeClient ?? RealtimeClient();
+    _pollDeletedSubscription =
+        _realtimeClientInstance.pollDeletions.listen(_removeDeletedPoll);
+    _realtimeClientInstance.connect();
     _myPollsFuture = _loadMyPolls();
   }
 
   @override
   void dispose() {
+    unawaited(_pollDeletedSubscription?.cancel());
+    if (_ownsRealtimeClient) {
+      unawaited(_realtimeClientInstance.close());
+    }
     if (_ownsPollsApiClient) {
       _pollsApiClient.close();
     }
 
     super.dispose();
+  }
+
+  void _removeDeletedPoll(PollDeletedRealtimeEvent event) {
+    if (!mounted) return;
+    _syncMyPolls(_myPolls.where((poll) => poll.id != event.pollId).toList());
+    setState(() {
+      _likedPolls.removeWhere((poll) => poll.id == event.pollId);
+    });
   }
 
   Future<List<PollSummary>> _loadMyPolls() {

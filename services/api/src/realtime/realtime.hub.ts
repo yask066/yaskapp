@@ -28,10 +28,18 @@ type ConnectionReadyEvent = {
   type: 'connection.ready';
 };
 
+type PollDeletedEvent = {
+  type: 'poll.deleted';
+  payload: {
+    pollId: string;
+  };
+};
+
 type RealtimeEvent =
   | ConnectionReadyEvent
   | PollVoteCreatedEvent
-  | PollVoteUpdatedEvent;
+  | PollVoteUpdatedEvent
+  | PollDeletedEvent;
 
 const openReadyState = 1;
 const clients = new Set<RealtimeSocket>();
@@ -72,6 +80,13 @@ export function broadcastPollVoteUpdated(payload: PollVoteUpdatedEvent['payload'
     payload: {
       poll: sanitizePoll(payload.poll)
     }
+  });
+}
+
+export function broadcastPollDeleted(payload: PollDeletedEvent['payload']) {
+  broadcast({
+    type: 'poll.deleted',
+    payload
   });
 }
 

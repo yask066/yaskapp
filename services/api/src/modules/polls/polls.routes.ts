@@ -4,7 +4,8 @@ import { z } from 'zod';
 
 import {
   broadcastPollVoteCreated,
-  broadcastPollVoteUpdated
+  broadcastPollVoteUpdated,
+  broadcastPollDeleted
 } from '../../realtime/realtime.hub.js';
 import { authenticate, optionalAuthenticate } from '../auth/auth.utils.js';
 import {
@@ -155,6 +156,10 @@ export function registerPollRoutes(app: FastifyInstance) {
         await deletePoll({
           pollId: parsedParams.data.pollId,
           authorId: request.user.sub
+        });
+
+        broadcastPollDeleted({
+          pollId: parsedParams.data.pollId
         });
 
         return reply.status(204).send();

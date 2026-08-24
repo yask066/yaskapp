@@ -5,7 +5,8 @@ import type { Poll } from '../modules/polls/polls.repository.js';
 import {
   addRealtimeClient,
   broadcastPollVoteCreated,
-  broadcastPollVoteUpdated
+  broadcastPollVoteUpdated,
+  broadcastPollDeleted
 } from './realtime.hub.js';
 
 test('realtime vote events omit viewer-specific vote state', () => {
@@ -110,6 +111,27 @@ test('realtime vote update events broadcast aggregate poll state', () => {
     assert.equal(event.type, 'poll.vote.updated');
     assert.equal(event.payload.poll.id, 'poll-2');
     assert.equal('viewerVoteOptionId' in event.payload.poll, false);
+  } finally {
+    removeClient();
+  }
+});
+
+test('realtime poll deletion events broadcast only the poll id', () => {
+  let message = '';
+  const removeClient = addRealtimeClient({
+    readyState: 1,
+    send(data) {
+      message = data;
+    }
+  });
+
+  try {
+    broadcastPollDeleted({ pollId: 'poll-deleted' });
+
+    assert.deepEqual(JSON.parse(message), {
+      type: 'poll.deleted',
+      payload: { pollId: 'poll-deleted' }
+    });
   } finally {
     removeClient();
   }

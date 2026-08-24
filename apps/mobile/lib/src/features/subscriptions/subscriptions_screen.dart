@@ -33,6 +33,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   late final bool _ownsRealtimeClient;
   late Future<List<PollSummary>> _pollsFuture;
   StreamSubscription<PollVoteRealtimeEvent>? _voteSubscription;
+  StreamSubscription<PollDeletedRealtimeEvent>? _pollDeletedSubscription;
   List<PollSummary> _polls = [];
   var _hasLoaded = false;
   final Set<String> _votingPollIds = {};
@@ -47,12 +48,15 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     _realtimeClient = widget._realtimeClient ?? RealtimeClient();
     _pollsFuture = _loadPolls();
     _voteSubscription = _realtimeClient.pollVotes.listen(_replacePoll);
+    _pollDeletedSubscription =
+        _realtimeClient.pollDeletions.listen(_removePoll);
     _realtimeClient.connect();
   }
 
   @override
   void dispose() {
     unawaited(_voteSubscription?.cancel());
+    unawaited(_pollDeletedSubscription?.cancel());
     if (_ownsRealtimeClient) {
       unawaited(_realtimeClient.close());
     }
@@ -92,6 +96,13 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
       _polls[index] = event.poll.copyWith(
         viewerVoteOptionId: _polls[index].viewerVoteOptionId,
       );
+    });
+  }
+
+  void _removePoll(PollDeletedRealtimeEvent event) {
+    if (!mounted) return;
+    setState(() {
+      _polls.removeWhere((poll) => poll.id == event.pollId);
     });
   }
 

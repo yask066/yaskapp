@@ -41,6 +41,7 @@ class FeedScreenState extends State<FeedScreen> {
   late final bool _ownsProfilesApiClient;
   late final bool _ownsRealtimeClient;
   StreamSubscription<PollVoteRealtimeEvent>? _pollVoteSubscription;
+  StreamSubscription<PollDeletedRealtimeEvent>? _pollDeletedSubscription;
   List<PollSummary> _polls = [];
   var _hasLoadedPolls = false;
   final Set<String> _votingPollIds = {};
@@ -58,12 +59,15 @@ class FeedScreenState extends State<FeedScreen> {
     _pollsFuture = _loadPolls();
     _pollVoteSubscription =
         _realtimeClient.pollVotes.listen(_handleRealtimeVote);
+    _pollDeletedSubscription =
+        _realtimeClient.pollDeletions.listen(_handleRealtimeDeletion);
     _realtimeClient.connect();
   }
 
   @override
   void dispose() {
     unawaited(_pollVoteSubscription?.cancel());
+    unawaited(_pollDeletedSubscription?.cancel());
 
     if (_ownsRealtimeClient) {
       unawaited(_realtimeClient.close());
@@ -123,6 +127,13 @@ class FeedScreenState extends State<FeedScreen> {
     _replacePollInFeed(
       event.poll.copyWith(viewerVoteOptionId: currentPoll.viewerVoteOptionId),
     );
+  }
+
+  void _handleRealtimeDeletion(PollDeletedRealtimeEvent event) {
+    if (!mounted) return;
+    setState(() {
+      _polls.removeWhere((poll) => poll.id == event.pollId);
+    });
   }
 
   Future<void> _vote(PollSummary poll, PollOptionSummary option) async {

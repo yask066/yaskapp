@@ -110,4 +110,10 @@ export type RealtimeEvent =
     }
   | {
       type: 'connection.ready';
+    }
+  | {
+      type: 'poll.deleted';
+      payload: {
+        pollId: string;
+      };
     };

@@ -12,6 +12,12 @@ class PollVoteRealtimeEvent {
   final PollSummary poll;
 }
 
+class PollDeletedRealtimeEvent {
+  const PollDeletedRealtimeEvent({required this.pollId});
+
+  final String pollId;
+}
+
 class RealtimeClient {
   RealtimeClient({ApiConfig config = const ApiConfig()}) : _config = config;
 
@@ -20,8 +26,12 @@ class RealtimeClient {
   StreamSubscription<dynamic>? _subscription;
   final _pollVoteController =
       StreamController<PollVoteRealtimeEvent>.broadcast();
+  final _pollDeletedController =
+      StreamController<PollDeletedRealtimeEvent>.broadcast();
 
   Stream<PollVoteRealtimeEvent> get pollVotes => _pollVoteController.stream;
+  Stream<PollDeletedRealtimeEvent> get pollDeletions =>
+      _pollDeletedController.stream;
 
   void connect() {
     if (_channel != null) {
@@ -55,6 +65,7 @@ class RealtimeClient {
   Future<void> close() async {
     await disconnect();
     await _pollVoteController.close();
+    await _pollDeletedController.close();
   }
 
   void _handleMessage(dynamic message) {
@@ -67,6 +78,16 @@ class RealtimeClient {
     }
 
     if (decoded is! Map<String, dynamic>) {
+      return;
+    }
+
+    if (decoded['type'] == 'poll.deleted') {
+      final payload = decoded['payload'];
+      if (payload is Map<String, dynamic> && payload['pollId'] is String) {
+        _pollDeletedController.add(
+          PollDeletedRealtimeEvent(pollId: payload['pollId'] as String),
+        );
+      }
       return;
     }
 
