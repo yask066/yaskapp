@@ -148,7 +148,7 @@ class FeedScreenState extends State<FeedScreen> {
     });
 
     try {
-      final updatedPoll = await _pollsApiClient.setVote(
+      final updatedPoll = await _pollsApiClient.vote(
         pollId: poll.id,
         optionId: option.id,
         accessToken: widget.session.accessToken,
@@ -490,7 +490,9 @@ class FeedScreenState extends State<FeedScreen> {
                         return PollCard(
                           poll: poll,
                           onOpenAuthor: () => _openAuthorProfile(poll),
-                          onVote: poll.isClosed || _votingPollIds.contains(poll.id)
+                          onVote: poll.isClosed ||
+                                  poll.selectedOptionIndex != null ||
+                                  _votingPollIds.contains(poll.id)
                               ? null
                               : (option) => _vote(poll, option),
                           onCancelVote: poll.isClosed ||

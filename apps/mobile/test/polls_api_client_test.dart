@@ -24,7 +24,7 @@ void main() {
     );
 
     await expectLater(
-      client.setVote(
+      client.vote(
         pollId: 'poll-1',
         optionId: 'option-1',
         accessToken: 'token',
@@ -39,22 +39,11 @@ void main() {
     );
   });
 
-  test('falls back to the legacy vote route when PUT is not deployed', () async {
-    final methods = <String>[];
+  test('submits a vote through the create-vote route', () async {
     final client = PollsApiClient(
       config: config,
       httpClient: MockClient((request) async {
-        methods.add(request.method);
-        if (request.method == 'PUT') {
-          return http.Response(
-            jsonEncode({
-              'error': 'not_found',
-              'message': 'Route was not found.',
-            }),
-            404,
-          );
-        }
-
+        expect(request.method, 'POST');
         return http.Response(
           jsonEncode({'poll': _pollJson(commentsCount: 0)}),
           201,
@@ -62,13 +51,12 @@ void main() {
       }),
     );
 
-    final poll = await client.setVote(
+    final poll = await client.vote(
       pollId: 'poll-1',
       optionId: 'option-1',
       accessToken: 'token',
     );
 
-    expect(methods, ['PUT', 'POST']);
     expect(poll.id, 'poll-1');
   });
 
@@ -87,7 +75,7 @@ void main() {
     );
 
     await expectLater(
-      client.setVote(
+      client.vote(
         pollId: 'poll-1',
         optionId: 'option-1',
         accessToken: 'token',

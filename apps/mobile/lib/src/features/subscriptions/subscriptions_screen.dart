@@ -118,7 +118,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     if (_votingPollIds.contains(poll.id) || poll.isClosed) return;
     setState(() => _votingPollIds.add(poll.id));
     try {
-      final updated = await _pollsApiClient.setVote(
+      final updated = await _pollsApiClient.vote(
         pollId: poll.id,
         optionId: option.id,
         accessToken: widget.session.accessToken,
@@ -262,7 +262,9 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                       final poll = _polls[index];
                       return PollCard(
                         poll: poll,
-                        onVote: poll.isClosed || _votingPollIds.contains(poll.id)
+                        onVote: poll.isClosed ||
+                                poll.selectedOptionIndex != null ||
+                                _votingPollIds.contains(poll.id)
                             ? null
                             : (option) => _vote(poll, option),
                         onCancelVote: poll.isClosed ||

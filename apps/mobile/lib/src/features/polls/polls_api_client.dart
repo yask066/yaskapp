@@ -242,41 +242,6 @@ class PollsApiClient {
     return PollSummary.fromJson(poll);
   }
 
-  Future<PollSummary> setVote({
-    required String pollId,
-    required String optionId,
-    required String accessToken,
-  }) async {
-    final uri = Uri.parse(_config.baseUrl).replace(
-      path: '/polls/$pollId/votes',
-    );
-    try {
-      final response = await _httpClient.put(
-        uri,
-        headers: {
-          'authorization': 'Bearer $accessToken',
-          'content-type': 'application/json',
-        },
-        body: jsonEncode({'optionId': optionId}),
-      );
-
-      return _decodePollResponse(response, 'Set vote response is invalid.');
-    } on PollsApiException catch (error) {
-      // Keep first-time voting usable while an older API instance is being
-      // rolled out. Do not fall back for a real missing poll/option error.
-      if (error.statusCode == 404 &&
-          error.code == 'not_found' &&
-          error.message == 'Route was not found.') {
-        return vote(
-          pollId: pollId,
-          optionId: optionId,
-          accessToken: accessToken,
-        );
-      }
-      rethrow;
-    }
-  }
-
   Future<PollSummary> cancelVote({
     required String pollId,
     required String accessToken,

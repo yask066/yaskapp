@@ -467,6 +467,21 @@ test('auth and polls happy path works end to end', async () => {
     'already_voted'
   );
 
+  const changeVoteResponse = await app.inject({
+    method: 'PUT',
+    url: `/polls/${createdPoll.id}/votes`,
+    headers: bearer(login.accessToken),
+    payload: {
+      optionId: createdPoll.options[1]?.id
+    }
+  });
+
+  assert.equal(changeVoteResponse.statusCode, 409, changeVoteResponse.body);
+  assert.equal(
+    changeVoteResponse.json<{ error: string }>().error,
+    'already_voted'
+  );
+
   const authenticatedPollsResponse = await app.inject({
     method: 'GET',
     url: '/polls?limit=10',
@@ -603,7 +618,7 @@ test('poll author can delete a poll but other users cannot', async () => {
   );
 });
 
-test('authenticated user can set a vote on an active poll', async () => {
+test('authenticated user can vote once and cancel that vote', async () => {
   const registered = await registerTestUser();
 
   const createPollResponse = await app.inject({
@@ -707,24 +722,11 @@ test('authenticated user can set a vote on an active poll', async () => {
     payload: { optionId: secondOptionId }
   });
 
-  assert.equal(changeResponse.statusCode, 201, changeResponse.body);
-  const changedVote = changeResponse.json<VoteResponse>();
-  assert.equal(changedVote.poll.votesCount, 1);
-  assert.equal(changedVote.poll.viewerVoteOptionId, secondOptionId);
-  assert.equal(changedVote.vote.optionId, secondOptionId);
-
-  const repeatedSetResponse = await app.inject({
-    method: 'PUT',
-    url: `/polls/${createdPoll.id}/votes`,
-    headers: bearer(registered.accessToken),
-    payload: { optionId: secondOptionId }
-  });
-
-  assert.equal(repeatedSetResponse.statusCode, 201, repeatedSetResponse.body);
-  const repeatedSetVote = repeatedSetResponse.json<VoteResponse>();
-  assert.equal(repeatedSetVote.poll.votesCount, 1);
-  assert.equal(repeatedSetVote.poll.viewerVoteOptionId, secondOptionId);
-  assert.equal(repeatedSetVote.vote.optionId, secondOptionId);
+  assert.equal(changeResponse.statusCode, 409, changeResponse.body);
+  assert.equal(
+    changeResponse.json<{ error: string }>().error,
+    'already_voted'
+  );
 
   const failedChangeResponse = await app.inject({
     method: 'PUT',
@@ -735,10 +737,10 @@ test('authenticated user can set a vote on an active poll', async () => {
 
   assert.equal(failedChangeResponse.statusCode, 404, failedChangeResponse.body);
 
-  const changedVoteState = await db.query<{
+  const unchangedVoteState = await db.query<{
     current_option_id: string;
-    old_option_votes_count: number;
-    new_option_votes_count: number;
+    selected_option_votes_count: number;
+    other_option_votes_count: number;
     poll_votes_total: number;
   }>(
     `
@@ -746,19 +748,19 @@ test('authenticated user can set a vote on an active poll', async () => {
         (SELECT option_id FROM poll_votes WHERE poll_id = $1 AND voter_id = $2)
           AS current_option_id,
         (SELECT votes_count FROM poll_options WHERE id = $3)
-          AS old_option_votes_count,
+          AS selected_option_votes_count,
         (SELECT votes_count FROM poll_options WHERE id = $4)
-          AS new_option_votes_count,
+          AS other_option_votes_count,
         (SELECT votes_count FROM polls WHERE id = $1)
           AS poll_votes_total
     `,
     [createdPoll.id, registered.user.id, optionId, secondOptionId]
   );
 
-  assert.equal(changedVoteState.rows[0]?.current_option_id, secondOptionId);
-  assert.equal(changedVoteState.rows[0]?.old_option_votes_count, 0);
-  assert.equal(changedVoteState.rows[0]?.new_option_votes_count, 1);
-  assert.equal(changedVoteState.rows[0]?.poll_votes_total, 1);
+  assert.equal(unchangedVoteState.rows[0]?.current_option_id, optionId);
+  assert.equal(unchangedVoteState.rows[0]?.selected_option_votes_count, 1);
+  assert.equal(unchangedVoteState.rows[0]?.other_option_votes_count, 0);
+  assert.equal(unchangedVoteState.rows[0]?.poll_votes_total, 1);
 
   const cancelResponse = await app.inject({
     method: 'DELETE',
@@ -785,7 +787,7 @@ test('authenticated user can set a vote on an active poll', async () => {
         (SELECT votes_count FROM polls WHERE id = $1)
           AS poll_votes_total
     `,
-    [createdPoll.id, registered.user.id, secondOptionId]
+    [createdPoll.id, registered.user.id, optionId]
   );
 
   assert.equal(canceledVoteState.rows[0]?.poll_votes_count, '0');
@@ -815,7 +817,7 @@ test('authenticated user can set a vote on an active poll', async () => {
         (SELECT votes_count FROM polls WHERE id = $2)
           AS poll_votes_total
     `,
-    [secondOptionId, createdPoll.id]
+    [optionId, createdPoll.id]
   );
 
   assert.equal(repeatedCancelState.rows[0]?.selected_option_votes_count, 0);
@@ -824,7 +826,7 @@ test('authenticated user can set a vote on an active poll', async () => {
   assert.ok((repeatedCancelState.rows[0]?.poll_votes_total ?? 0) >= 0);
 });
 
-test('concurrent vote changes keep poll and option counters consistent', async () => {
+test('concurrent votes keep poll and option counters consistent', async () => {
   const registered = await registerTestUser();
 
   const createPollResponse = await app.inject({
@@ -846,21 +848,27 @@ test('concurrent vote changes keep poll and option counters consistent', async (
 
   const responses = await Promise.all([
     app.inject({
-      method: 'PUT',
+      method: 'POST',
       url: `/polls/${createdPoll.id}/votes`,
       headers: bearer(registered.accessToken),
       payload: { optionId: firstOptionId }
     }),
     app.inject({
-      method: 'PUT',
+      method: 'POST',
       url: `/polls/${createdPoll.id}/votes`,
       headers: bearer(registered.accessToken),
       payload: { optionId: secondOptionId }
     })
   ]);
 
-  assert.equal(responses[0].statusCode, 201, responses[0].body);
-  assert.equal(responses[1].statusCode, 201, responses[1].body);
+  assert.equal(
+    responses.filter((response) => response.statusCode === 201).length,
+    1
+  );
+  assert.equal(
+    responses.filter((response) => response.statusCode === 409).length,
+    1
+  );
 
   const state = await db.query<{
     vote_rows: string;

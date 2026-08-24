@@ -21,7 +21,6 @@ import {
   listPollComments,
   listPublicPolls,
   listSubscriptionPolls,
-  setVote,
   unlikePoll,
   voteOnPoll
 } from './polls.service.js';
@@ -379,22 +378,16 @@ export function registerPollRoutes(app: FastifyInstance) {
       }
 
       try {
-        const result = await setVote({
+        const result = await voteOnPoll({
           pollId: parsedParams.data.pollId,
           optionId: parsedBody.data.optionId,
           voterId: request.user.sub
         });
 
-        if (result.operation === 'created') {
-          broadcastPollVoteCreated({
-            poll: result.poll,
-            vote: result.vote
-          });
-        } else {
-          broadcastPollVoteUpdated({
-            poll: result.poll
-          });
-        }
+        broadcastPollVoteCreated({
+          poll: result.poll,
+          vote: result.vote
+        });
 
         return reply.status(201).send({
           poll: result.poll,

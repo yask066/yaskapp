@@ -4,7 +4,6 @@ import {
   deletePollRecord,
   cancelVoteRecord,
   createVoteRecord,
-  setVoteRecord,
   likePollRecord,
   listPollCommentRecords,
   listPublicPollRecords,
@@ -184,32 +183,6 @@ export async function cancelVote(input: CancelVoteInput) {
 
   return {
     poll: result.poll
-  };
-}
-
-export async function setVote(input: CreateVoteInput) {
-  const result = await setVoteRecord(input);
-
-  if (result.status === 'not_found') {
-    throw new PollNotFoundError('Poll or option was not found.');
-  }
-
-  if (result.status === 'closed') {
-    throw new PollClosedError('Poll is closed.');
-  }
-
-  if (!result.poll) {
-    throw new Error('Updated poll could not be loaded.');
-  }
-
-  return {
-    poll: result.poll,
-    operation: result.operation,
-    vote: {
-      pollId: input.pollId,
-      optionId: input.optionId,
-      votesCount: result.optionVotesCount
-    }
   };
 }
 

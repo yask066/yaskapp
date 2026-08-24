@@ -112,6 +112,32 @@ void main() {
     expect(find.text('75%'), findsOneWidget);
   });
 
+  testWidgets('does not allow selecting another option after voting',
+      (tester) async {
+    final poll = _poll(
+      viewerHasLiked: false,
+      likesCount: 3,
+      votedOptionIndex: 0,
+    );
+    final pollsApiClient = _FakePollsApiClient(initialPolls: [poll]);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FeedScreen(
+          session: _session,
+          pollsApiClient: pollsApiClient,
+          realtimeClient: _FakeRealtimeClient(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Comments'));
+    await tester.pumpAndSettle();
+
+    expect(pollsApiClient.voteCalls, 0);
+  });
+
   testWidgets('updates poll card after like response', (tester) async {
     final poll = _poll(viewerHasLiked: false, likesCount: 3);
     final updatedPoll = _poll(viewerHasLiked: true, likesCount: 4);
@@ -378,7 +404,7 @@ class _FakePollsApiClient extends PollsApiClient {
   }
 
   @override
-  Future<PollSummary> setVote({
+  Future<PollSummary> vote({
     required String pollId,
     required String optionId,
     required String accessToken,
