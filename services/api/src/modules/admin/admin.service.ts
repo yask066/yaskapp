@@ -5,12 +5,68 @@ import {
   getAdminPoll as getAdminPollRecord,
   listAdminPolls as listAdminPollsRecord
 } from './admin.repository.js';
+import {
+  changeUserRole as changeUserRoleRecord,
+  deleteAdminUser as deleteAdminUserRecord,
+  getAdminUser as getAdminUserRecord,
+  listAdminUsers as listAdminUsersRecord,
+  unblockUser as unblockUserRecord
+} from './admin.users.repository.js';
+import type { UserRole, UserStatus } from '../auth/auth.repository.js';
 
 export class AdminUserNotFoundError extends Error {}
 export class AdminSelfActionError extends Error {}
 export class AdminProtectedUserError extends Error {}
+export class AdminLastSuperadminError extends Error {}
 export class AdminPollNotFoundError extends Error {}
 export class AdminCommentNotFoundError extends Error {}
+
+type UserAudit = {
+  actorRole: UserRole;
+  reason: string;
+  requestId?: string;
+};
+
+function userMutationError(status: string): never | undefined {
+  if (status === 'not_found') throw new AdminUserNotFoundError('User was not found.');
+  if (status === 'self') throw new AdminSelfActionError('You cannot modify your own account.');
+  if (status === 'protected') throw new AdminProtectedUserError('This user cannot be modified.');
+  if (status === 'last_superadmin') throw new AdminLastSuperadminError('At least one active superadmin must remain.');
+}
+
+export async function listAdminUsers(input: {
+  limit: number;
+  offset: number;
+  query?: string;
+  status?: UserStatus | 'all';
+  role?: UserRole | 'all';
+}) {
+  return listAdminUsersRecord(input);
+}
+
+export async function getAdminUser(userId: string) {
+  const user = await getAdminUserRecord(userId);
+  if (!user) throw new AdminUserNotFoundError('User was not found.');
+  return user;
+}
+
+export async function unblockUser(actorId: string, targetUserId: string, audit: UserAudit) {
+  const result = await unblockUserRecord(actorId, targetUserId, { actorUserId: actorId, ...audit });
+  userMutationError(result.status);
+  return { status: result.status, userId: targetUserId };
+}
+
+export async function deleteAdminUser(actorId: string, targetUserId: string, audit: UserAudit) {
+  const result = await deleteAdminUserRecord(actorId, targetUserId, { actorUserId: actorId, ...audit });
+  userMutationError(result.status);
+  return { status: result.status, userId: targetUserId };
+}
+
+export async function changeUserRole(actorId: string, targetUserId: string, role: UserRole, audit: UserAudit) {
+  const result = await changeUserRoleRecord(actorId, targetUserId, role, { actorUserId: actorId, ...audit });
+  userMutationError(result.status);
+  return { status: result.status, userId: targetUserId, role };
+}
 
 export async function blockUser(
   actorId: string,

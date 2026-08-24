@@ -317,6 +317,111 @@ test('moderator can list and delete polls and comments', async () => {
   assert.equal(deleteCommentResponse.statusCode, 204, deleteCommentResponse.body);
 });
 
+test('superadmin can manage user lifecycle through the admin API', async () => {
+  const superadmin = await registerTestUser();
+  const target = await registerTestUser();
+  const regular = await registerTestUser();
+
+  await db.query('UPDATE users SET role = $1 WHERE id = $2', [
+    'superadmin',
+    superadmin.user.id
+  ]);
+
+  const regularListResponse = await app.inject({
+    method: 'GET',
+    url: '/admin/users',
+    headers: bearer(regular.accessToken)
+  });
+  assert.equal(regularListResponse.statusCode, 403, regularListResponse.body);
+
+  const listResponse = await app.inject({
+    method: 'GET',
+    url: `/admin/users?query=${target.user.username}&limit=10`,
+    headers: bearer(superadmin.accessToken)
+  });
+  assert.equal(listResponse.statusCode, 200, listResponse.body);
+  assert.ok(
+    listResponse.json<{ items: Array<{ id: string }> }>().items.some(
+      (item) => item.id === target.user.id
+    )
+  );
+
+  const detailResponse = await app.inject({
+    method: 'GET',
+    url: `/admin/users/${target.user.id}`,
+    headers: bearer(superadmin.accessToken)
+  });
+  assert.equal(detailResponse.statusCode, 200, detailResponse.body);
+
+  const roleResponse = await app.inject({
+    method: 'PATCH',
+    url: `/admin/users/${target.user.id}/role`,
+    headers: bearer(superadmin.accessToken),
+    payload: { role: 'moderator', reason: 'Promoted for moderation duties.' }
+  });
+  assert.equal(roleResponse.statusCode, 200, roleResponse.body);
+  assert.equal(roleResponse.json<{ user: { role: string } }>().user.role, 'moderator');
+
+  const blockResponse = await app.inject({
+    method: 'POST',
+    url: `/admin/users/${target.user.id}/block`,
+    headers: bearer(superadmin.accessToken),
+    payload: { reason: 'Temporary restriction.' }
+  });
+  assert.equal(blockResponse.statusCode, 200, blockResponse.body);
+
+  const unblockResponse = await app.inject({
+    method: 'POST',
+    url: `/admin/users/${target.user.id}/unblock`,
+    headers: bearer(superadmin.accessToken),
+    payload: { reason: 'Restriction lifted.' }
+  });
+  assert.equal(unblockResponse.statusCode, 200, unblockResponse.body);
+  assert.equal(
+    unblockResponse.json<{ user: { status: string } }>().user.status,
+    'active'
+  );
+
+  const deleteResponse = await app.inject({
+    method: 'DELETE',
+    url: `/admin/users/${target.user.id}`,
+    headers: bearer(superadmin.accessToken),
+    payload: { reason: 'Account violates platform rules.' }
+  });
+  assert.equal(deleteResponse.statusCode, 204, deleteResponse.body);
+
+  const selfRoleResponse = await app.inject({
+    method: 'PATCH',
+    url: `/admin/users/${superadmin.user.id}/role`,
+    headers: bearer(superadmin.accessToken),
+    payload: { role: 'user', reason: 'Invalid self-demotion.' }
+  });
+  assert.equal(selfRoleResponse.statusCode, 409, selfRoleResponse.body);
+
+  const deletedDetailResponse = await app.inject({
+    method: 'GET',
+    url: `/admin/users/${target.user.id}`,
+    headers: bearer(superadmin.accessToken)
+  });
+  assert.equal(deletedDetailResponse.statusCode, 200, deletedDetailResponse.body);
+  assert.equal(
+    deletedDetailResponse.json<{ user: { status: string } }>().user.status,
+    'deleted'
+  );
+
+  const userAuditResponse = await app.inject({
+    method: 'GET',
+    url: `/admin/audit?targetType=user&targetId=${target.user.id}`,
+    headers: bearer(superadmin.accessToken)
+  });
+  assert.equal(userAuditResponse.statusCode, 200, userAuditResponse.body);
+  assert.deepEqual(
+    userAuditResponse.json<{ items: Array<{ action: string; reason: string }> }>().items
+      .map((item) => item.action),
+    ['user.deleted', 'user.unblocked', 'user.blocked', 'user.role_changed']
+  );
+});
+
 function bearer(accessToken: string) {
   return {
     authorization: `Bearer ${accessToken}`
