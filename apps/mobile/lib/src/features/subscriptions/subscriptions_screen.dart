@@ -136,6 +136,41 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     }
   }
 
+  Future<void> _deletePoll(PollSummary poll) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete poll?'),
+        content: const Text('This poll will be removed from the feed.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await _pollsApiClient.deletePoll(
+        pollId: poll.id,
+        accessToken: widget.session.accessToken,
+      );
+      if (!mounted) return;
+      setState(() => _polls.removeWhere((item) => item.id == poll.id));
+    } on PollsApiException catch (error) {
+      _showError(error.userMessage);
+    } catch (_) {
+      _showError('Could not delete poll.');
+    }
+  }
+
   Future<void> _toggleLike(PollSummary poll) async {
     if (_likingPollIds.contains(poll.id)) return;
     setState(() => _likingPollIds.add(poll.id));
@@ -223,6 +258,9 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                                 _votingPollIds.contains(poll.id)
                             ? null
                             : () => _cancelVote(poll),
+                        onDeletePoll: poll.author.id == widget.session.user.id
+                            ? () => _deletePoll(poll)
+                            : null,
                         isVoting: _votingPollIds.contains(poll.id),
                         onOpenComments: () => _openComments(poll),
                         onToggleLike: _likingPollIds.contains(poll.id)

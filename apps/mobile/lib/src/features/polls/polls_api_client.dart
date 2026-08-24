@@ -294,6 +294,25 @@ class PollsApiClient {
     return _decodePollResponse(response, 'Cancel vote response is invalid.');
   }
 
+  Future<void> deletePoll({
+    required String pollId,
+    required String accessToken,
+  }) async {
+    final uri = Uri.parse(_config.baseUrl).replace(
+      path: '/polls/$pollId',
+    );
+    final response = await _httpClient.delete(
+      uri,
+      headers: {
+        'authorization': 'Bearer $accessToken',
+      },
+    );
+
+    if (response.statusCode != 204) {
+      _decodeObject(response);
+    }
+  }
+
   Future<PollSummary> likePoll({
     required String pollId,
     required String accessToken,

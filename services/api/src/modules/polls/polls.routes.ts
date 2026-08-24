@@ -15,6 +15,7 @@ import {
   cancelVote,
   createPoll,
   createPollComment,
+  deletePoll,
   likePoll,
   listPollComments,
   listPublicPolls,
@@ -135,6 +136,31 @@ export function registerPollRoutes(app: FastifyInstance) {
     return {
       items
     };
+    }
+  );
+
+  app.delete(
+    '/polls/:pollId',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      const parsedParams = voteParamsSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      try {
+        await deletePoll({
+          pollId: parsedParams.data.pollId,
+          authorId: request.user.sub
+        });
+
+        return reply.status(204).send();
+      } catch (error) {
+        return pollError(reply, error);
+      }
     }
   );
 

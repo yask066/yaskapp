@@ -141,6 +141,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _deletePoll(PollSummary poll) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete poll?'),
+        content: const Text('This poll will be removed permanently.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await _pollsApiClient.deletePoll(
+        pollId: poll.id,
+        accessToken: widget.accessToken,
+      );
+      if (!mounted) return;
+      _syncMyPolls(_myPolls.where((item) => item.id != poll.id).toList());
+    } on PollsApiException catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.userMessage)),
+      );
+    } catch (_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not delete poll.')),
+      );
+    }
+  }
+
   void _showSnackBar(String message) {
     if (!mounted) {
       return;
@@ -469,6 +508,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       PollCard(
                         poll: poll,
                         compact: true,
+                        onDeletePoll: _selectedTab == 0 &&
+                                poll.author.id == widget.user.id
+                            ? () => _deletePoll(poll)
+                            : null,
                         onOpenComments: () => _openComments(poll),
                         onToggleLike: _likingPollIds.contains(poll.id)
                             ? null

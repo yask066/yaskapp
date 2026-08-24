@@ -368,6 +368,52 @@ export async function createPollRecord(input: CreatePollRecordInput) {
   }
 }
 
+export async function deletePollRecord(input: {
+  pollId: string;
+  authorId: string;
+}) {
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const result = await client.query<{ id: string }>(
+      `
+        UPDATE polls
+        SET deleted_at = now(), updated_at = now()
+        WHERE id = $1
+          AND author_id = $2
+          AND deleted_at IS NULL
+        RETURNING id
+      `,
+      [input.pollId, input.authorId]
+    );
+
+    if (result.rowCount !== 1) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    await client.query(
+      `
+        UPDATE profiles
+        SET polls_count = GREATEST(polls_count - 1, 0)
+        WHERE user_id = $1
+      `,
+      [input.authorId]
+    );
+
+    await client.query('COMMIT');
+
+    return { status: 'deleted' as const };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function listPublicPollRecords(limit: number, viewerId?: string) {
   const client = await db.connect();
 

@@ -549,6 +549,58 @@ test('poll creation and voting require authentication', async () => {
   });
 
   assert.equal(unauthenticatedCancelVoteResponse.statusCode, 401);
+
+  const unauthenticatedDeletePollResponse = await app.inject({
+    method: 'DELETE',
+    url: '/polls/00000000-0000-0000-0000-000000000000'
+  });
+
+  assert.equal(unauthenticatedDeletePollResponse.statusCode, 401);
+});
+
+test('poll author can delete a poll but other users cannot', async () => {
+  const author = await registerTestUser();
+  const otherUser = await registerTestUser();
+
+  const createPollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(author.accessToken),
+    payload: {
+      question: 'Can this poll be deleted?',
+      options: ['Yes', 'No']
+    }
+  });
+
+  assert.equal(createPollResponse.statusCode, 201, createPollResponse.body);
+  const pollId = createPollResponse.json<PollResponse>().poll.id;
+
+  const forbiddenDeleteResponse = await app.inject({
+    method: 'DELETE',
+    url: `/polls/${pollId}`,
+    headers: bearer(otherUser.accessToken)
+  });
+
+  assert.equal(forbiddenDeleteResponse.statusCode, 404);
+
+  const deleteResponse = await app.inject({
+    method: 'DELETE',
+    url: `/polls/${pollId}`,
+    headers: bearer(author.accessToken)
+  });
+
+  assert.equal(deleteResponse.statusCode, 204, deleteResponse.body);
+
+  const listResponse = await app.inject({
+    method: 'GET',
+    url: '/polls?limit=50'
+  });
+
+  assert.equal(listResponse.statusCode, 200);
+  assert.equal(
+    listResponse.json<ListPollsResponse>().items.some((poll) => poll.id === pollId),
+    false
+  );
 });
 
 test('authenticated user can set a vote on an active poll', async () => {

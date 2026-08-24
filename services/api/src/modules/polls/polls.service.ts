@@ -1,6 +1,7 @@
 import {
   createPollCommentRecord,
   createPollRecord,
+  deletePollRecord,
   cancelVoteRecord,
   createVoteRecord,
   setVoteRecord,
@@ -84,6 +85,14 @@ export async function createPoll(input: CreatePollInput) {
 
 export async function listPublicPolls(limit: number, viewerId?: string) {
   return listPublicPollRecords(limit, viewerId);
+}
+
+export async function deletePoll(input: { pollId: string; authorId: string }) {
+  const result = await deletePollRecord(input);
+
+  if (result.status === 'not_found') {
+    throw new PollNotFoundError('Poll was not found.');
+  }
 }
 
 export async function listSubscriptionPolls(followerId: string, limit: number) {
