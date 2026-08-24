@@ -19,6 +19,7 @@ class FeedScreen extends StatefulWidget {
     PollsApiClient? pollsApiClient,
     ProfilesApiClient? profilesApiClient,
     RealtimeClient? realtimeClient,
+    this.onPollCreated,
   })  : _pollsApiClient = pollsApiClient,
         _profilesApiClient = profilesApiClient,
         _realtimeClient = realtimeClient;
@@ -27,6 +28,7 @@ class FeedScreen extends StatefulWidget {
   final PollsApiClient? _pollsApiClient;
   final ProfilesApiClient? _profilesApiClient;
   final RealtimeClient? _realtimeClient;
+  final ValueChanged<PollSummary>? onPollCreated;
 
   @override
   State<FeedScreen> createState() => FeedScreenState();
@@ -293,6 +295,7 @@ class FeedScreenState extends State<FeedScreen> {
     }
 
     _promotePollToTop(createdPoll);
+    widget.onPollCreated?.call(createdPoll);
 
     _showSnackBar('Poll published.');
   }

@@ -34,10 +34,10 @@ class ProfileScreen extends StatefulWidget {
   final RealtimeClient? _realtimeClient;
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ProfileScreenState createState() => ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class ProfileScreenState extends State<ProfileScreen> {
   late final PollsApiClient _pollsApiClient;
   late Future<List<PollSummary>> _myPollsFuture;
   late final bool _ownsPollsApiClient;
@@ -88,6 +88,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<List<PollSummary>> _loadMyPolls() {
     return _pollsApiClient.listMyPolls(accessToken: widget.accessToken);
+  }
+
+  Future<void> refreshMyPolls() async {
+    final polls = await _loadMyPolls();
+
+    if (!mounted) return;
+
+    setState(() {
+      _myPolls = polls;
+      _hasLoadedMyPolls = true;
+      _myPollsFuture = Future.value(polls);
+    });
   }
 
   Future<List<PollSummary>> _loadLikedPolls() async {

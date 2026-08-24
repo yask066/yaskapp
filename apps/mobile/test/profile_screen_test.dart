@@ -9,6 +9,40 @@ import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
 import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
 
 void main() {
+  testWidgets('refreshes my polls when requested after a new poll is created',
+      (tester) async {
+    final poll = _poll(commentsCount: 0, likesCount: 5, votesCount: 8);
+    final newPoll = _poll(
+      commentsCount: 0,
+      likesCount: 1,
+      votesCount: 2,
+      question: 'A newly created poll',
+    );
+    final pollsApiClient = _FakePollsApiClient(initialPolls: [poll]);
+    final profileKey = GlobalKey<ProfileScreenState>();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ProfileScreen(
+          key: profileKey,
+          user: _user,
+          accessToken: 'access-token',
+          authApiClient: AuthApiClient(httpClient: _NoopHttpClient()),
+          onLogout: () {},
+          onUserUpdated: (_) {},
+          pollsApiClient: pollsApiClient,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    pollsApiClient.initialPolls.add(newPoll);
+    await profileKey.currentState!.refreshMyPolls();
+    await tester.pumpAndSettle();
+
+    expect(find.text('A newly created poll'), findsOneWidget);
+  });
+
   testWidgets('updates my poll after like response', (tester) async {
     final poll = _poll(
       commentsCount: 0,
@@ -136,6 +170,7 @@ PollSummary _poll({
   required int commentsCount,
   required int likesCount,
   required int votesCount,
+  String question = 'Which feature should we build next?',
 }) {
   return PollSummary(
     id: 'poll-1',
@@ -144,7 +179,7 @@ PollSummary _poll({
       username: 'author',
       displayName: 'Author',
     ),
-    question: 'Which feature should we build next?',
+    question: question,
     options: const [
       PollOptionSummary(
         id: 'option-1',

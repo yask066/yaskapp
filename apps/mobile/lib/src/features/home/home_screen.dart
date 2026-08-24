@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../auth/auth_api_client.dart';
@@ -32,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final PollsApiClient _pollsApiClient;
   late final bool _ownsPollsApiClient;
   final _feedKey = GlobalKey<FeedScreenState>();
+  final _profileKey = GlobalKey<ProfileScreenState>();
 
   @override
   void initState() {
@@ -67,6 +70,9 @@ class _HomeScreenState extends State<HomeScreen> {
             key: _feedKey,
             session: widget.session,
             pollsApiClient: _pollsApiClient,
+            onPollCreated: (_) {
+              unawaited(_profileKey.currentState?.refreshMyPolls());
+            },
           ),
           SubscriptionsScreen(
             session: widget.session,
@@ -75,6 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox.shrink(),
           const _NotificationsPlaceholder(),
           ProfileScreen(
+            key: _profileKey,
             user: widget.session.user,
             accessToken: widget.session.accessToken,
             authApiClient: widget.authApiClient,
@@ -91,6 +98,10 @@ class _HomeScreenState extends State<HomeScreen> {
           setState(() {
             _selectedIndex = index;
           });
+
+          if (index == 4) {
+            unawaited(_profileKey.currentState?.refreshMyPolls());
+          }
         },
       ),
     );
