@@ -39,6 +39,7 @@ import {
   createReport,
   getModerationCase,
   listModerationCases,
+  listUserReports,
   takeoverModerationCase,
   transitionModerationCase,
   issueSanction,
@@ -87,6 +88,7 @@ const sanctionBodySchema = z.object({
 const revokeParamsSchema = z.object({ sanctionId: z.string().uuid() }).strict();
 const appealBodySchema = z.object({ sanctionId: z.string().uuid(), reason: z.string().trim().min(1).max(4000) }).strict();
 const appealsQuerySchema = z.object({ status: z.enum(['open', 'upheld', 'reduced', 'revoked', 'request_more_info']).optional(), limit: z.coerce.number().int().min(1).max(100).default(50), cursor: z.string().trim().max(512).optional() }).strict();
+const reportsQuerySchema = z.object({ limit: z.coerce.number().int().min(1).max(100).default(50), cursor: z.string().trim().max(512).optional() }).strict();
 const appealParamsSchema = z.object({ appealId: z.string().uuid() }).strict();
 const appealDecisionSchema = z.object({ status: z.enum(['upheld', 'reduced', 'revoked', 'request_more_info']), decisionNote: z.string().trim().min(1).max(4000) }).strict();
 
@@ -424,6 +426,21 @@ export function registerModerationRoutes(app: FastifyInstance) {
         if (error instanceof ModerationTargetNotFoundError) {
           return reply.status(404).send({ error: 'not_found', message: error.message });
         }
+        throw error;
+      }
+    }
+  );
+
+  app.get(
+    '/reports/mine',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const parsedQuery = reportsQuerySchema.safeParse(request.query);
+      if (!parsedQuery.success) return validationError(reply);
+      try {
+        return reply.send(await listUserReports({ reporterUserId: request.user.sub, ...parsedQuery.data }));
+      } catch (error) {
+        if (error instanceof AdminCursorError) return validationError(reply);
         throw error;
       }
     }

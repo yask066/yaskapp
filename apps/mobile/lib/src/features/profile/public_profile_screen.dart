@@ -7,6 +7,8 @@ import '../polls/polls_api_client.dart';
 import '../polls/poll_summary.dart';
 import 'profiles_api_client.dart';
 import 'public_profile.dart';
+import '../reports/report_dialog.dart';
+import '../reports/reports_api_client.dart';
 
 class PublicProfileScreen extends StatefulWidget {
   const PublicProfileScreen({
@@ -15,6 +17,7 @@ class PublicProfileScreen extends StatefulWidget {
     required this.accessToken,
     required this.profilesApiClient,
     this.pollsApiClient,
+    this.reportsApiClient,
     super.key,
   });
 
@@ -23,6 +26,7 @@ class PublicProfileScreen extends StatefulWidget {
   final String accessToken;
   final ProfilesApiClient profilesApiClient;
   final PollsApiClient? pollsApiClient;
+  final ReportsApiClient? reportsApiClient;
 
   @override
   State<PublicProfileScreen> createState() => _PublicProfileScreenState();
@@ -34,6 +38,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   PublicProfile? _profile;
   var _isFollowing = false;
   var _isFollowSubmitting = false;
+  late final ReportsApiClient _reportsApiClient;
+  late final bool _ownsReportsApiClient;
 
   bool get _isSelf => widget.userId == widget.currentUserId;
 
@@ -41,9 +47,27 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   void initState() {
     super.initState();
     _profileFuture = _loadProfile();
+    _ownsReportsApiClient = widget.reportsApiClient == null;
+    _reportsApiClient = widget.reportsApiClient ?? ReportsApiClient();
     if (widget.pollsApiClient != null) {
       _pollsFuture = _loadPolls();
     }
+  }
+
+  @override
+  void dispose() {
+    if (_ownsReportsApiClient) _reportsApiClient.close();
+    super.dispose();
+  }
+
+  Future<void> _reportUser() {
+    return showReportDialog(
+      context: context,
+      accessToken: widget.accessToken,
+      targetType: 'user',
+      targetId: widget.userId,
+      reportsApiClient: _reportsApiClient,
+    );
   }
 
   Future<List<PollSummary>> _loadPolls() {
@@ -127,7 +151,17 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(
+        title: const Text('Profile'),
+        actions: [
+          if (!_isSelf)
+            IconButton(
+              tooltip: 'Report user',
+              onPressed: _reportUser,
+              icon: const Icon(Icons.flag_outlined),
+            ),
+        ],
+      ),
       body: FutureBuilder<PublicProfile>(
         future: _profileFuture,
         builder: (context, snapshot) {

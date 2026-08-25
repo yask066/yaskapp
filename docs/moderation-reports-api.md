@@ -37,6 +37,16 @@ Repeating an active report returns `200` with the original report and case:
 }
 ```
 
+Users can list only their own submitted reports. The endpoint is cursor
+paginated and never exposes another reporter's records:
+
+```http
+GET /reports/mine?limit=20&cursor=<cursor>
+Authorization: Bearer <user-token>
+```
+
+The response has the shape `{ "items": [], "nextCursor": null }`.
+
 Users with a blocked or deleted account receive `401`. Missing/deleted targets
 receive `404`, and invalid request bodies receive `400 validation_error`.
 

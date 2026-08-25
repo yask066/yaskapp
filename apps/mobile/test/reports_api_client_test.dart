@@ -67,4 +67,32 @@ void main() {
       )),
     );
   });
+
+  test('lists the authenticated user reports with cursor pagination', () async {
+    late http.Request request;
+    final client = ReportsApiClient(
+      config: config,
+      httpClient: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(
+          jsonEncode({'items': [], 'nextCursor': null}),
+          200,
+        );
+      }),
+    );
+
+    final page = await client.listMine(
+      accessToken: 'token',
+      limit: 20,
+      cursor: 'cursor-1',
+    );
+
+    expect(request.url.path, '/reports/mine');
+    expect(request.url.queryParameters, {
+      'limit': '20',
+      'cursor': 'cursor-1',
+    });
+    expect(page.items, isEmpty);
+    expect(page.nextCursor, isNull);
+  });
 }

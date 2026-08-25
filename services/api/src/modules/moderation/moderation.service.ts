@@ -2,6 +2,7 @@ import {
   addModerationNote as addModerationNoteRecord,
   assignModerationCase as assignModerationCaseRecord,
   createReport as createReportRecord,
+  listUserReports as listUserReportsRecord,
   getModerationCase as getModerationCaseRecord,
   listModerationCases as listModerationCasesRecord,
   takeoverModerationCase as takeoverModerationCaseRecord,
@@ -26,6 +27,10 @@ export async function createReport(input: {
   description: string;
 }) {
   return createReportRecord(input);
+}
+
+export function listUserReports(input: { reporterUserId: string; limit: number; cursor?: string }) {
+  return listUserReportsRecord(input);
 }
 
 export async function listModerationCases(input: {

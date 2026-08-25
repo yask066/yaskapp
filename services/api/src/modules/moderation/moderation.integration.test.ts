@@ -138,6 +138,34 @@ test('authenticated users can create and deduplicate reports', async () => {
   assert.equal(commentReport.statusCode, 201, commentReport.body);
 });
 
+test('reporters can list their own reports without seeing another reporter\'s reports', async () => {
+  const reporter = await registerUser();
+  const otherReporter = await registerUser();
+  const author = await registerUser();
+  const poll = await createPoll(author);
+
+  const created = await app.inject({
+    method: 'POST',
+    url: '/reports',
+    headers: bearer(reporter.accessToken),
+    payload: { targetType: 'poll', targetId: poll.id, category: 'spam', description: 'My report.' }
+  });
+  assert.equal(created.statusCode, 201, created.body);
+
+  const otherCreated = await app.inject({
+    method: 'POST',
+    url: '/reports',
+    headers: bearer(otherReporter.accessToken),
+    payload: { targetType: 'poll', targetId: poll.id, category: 'other', description: 'Other report.' }
+  });
+  assert.equal(otherCreated.statusCode, 201, otherCreated.body);
+
+  const mine = await app.inject({ method: 'GET', url: '/reports/mine', headers: bearer(reporter.accessToken) });
+  assert.equal(mine.statusCode, 200, mine.body);
+  assert.equal(mine.json<{ items: Array<{ description: string }> }>().items.length, 1);
+  assert.equal(mine.json<{ items: Array<{ description: string }> }>().items[0]?.description, 'My report.');
+});
+
 test('regular users cannot issue moderation sanctions', async () => {
   const user = await registerUser();
   const response = await app.inject({

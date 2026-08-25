@@ -4,6 +4,8 @@ import '../../core/widgets/user_avatar.dart';
 import 'poll_card.dart';
 import 'poll_summary.dart';
 import 'polls_api_client.dart';
+import '../reports/report_dialog.dart';
+import '../reports/reports_api_client.dart';
 
 const _commentsNavy = Color(0xFF566A9D);
 const _commentsPrimaryText = Color(0xFF10142D);
@@ -15,12 +17,14 @@ class PollCommentsScreen extends StatefulWidget {
     required this.poll,
     required this.accessToken,
     required this.pollsApiClient,
+    this.reportsApiClient,
     super.key,
   });
 
   final PollSummary poll;
   final String accessToken;
   final PollsApiClient pollsApiClient;
+  final ReportsApiClient? reportsApiClient;
 
   @override
   State<PollCommentsScreen> createState() => _PollCommentsScreenState();
@@ -32,12 +36,33 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
   late PollSummary _poll;
   List<PollCommentSummary>? _comments;
   bool _isSubmittingComment = false;
+  late final ReportsApiClient _reportsApiClient;
+  late final bool _ownsReportsApiClient;
 
   @override
   void initState() {
     super.initState();
     _poll = widget.poll;
+    _ownsReportsApiClient = widget.reportsApiClient == null;
+    _reportsApiClient = widget.reportsApiClient ?? ReportsApiClient();
     _commentsFuture = _loadComments();
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    if (_ownsReportsApiClient) _reportsApiClient.close();
+    super.dispose();
+  }
+
+  Future<void> _reportComment(PollCommentSummary comment) {
+    return showReportDialog(
+      context: context,
+      accessToken: widget.accessToken,
+      targetType: 'comment',
+      targetId: comment.id,
+      reportsApiClient: _reportsApiClient,
+    );
   }
 
   Future<List<PollCommentSummary>> _loadComments() {
@@ -232,7 +257,10 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                           const _CommentsEmptyState()
                         else
                           for (final comment in comments) ...[
-                            _CommentTile(comment: comment),
+                            _CommentTile(
+                              comment: comment,
+                              onReport: () => _reportComment(comment),
+                            ),
                             const Divider(
                               height: 1,
                               indent: 76,
@@ -425,9 +453,10 @@ class _CommentsErrorState extends StatelessWidget {
 }
 
 class _CommentTile extends StatelessWidget {
-  const _CommentTile({required this.comment});
+  const _CommentTile({required this.comment, this.onReport});
 
   final PollCommentSummary comment;
+  final VoidCallback? onReport;
 
   @override
   Widget build(BuildContext context) {
@@ -500,17 +529,16 @@ class _CommentTile extends StatelessWidget {
                       style: TextStyle(color: _commentsSecondaryText, fontSize: 14),
                     ),
                     const Spacer(),
-                    const SizedBox(
-                      width: 36,
-                      height: 36,
-                      child: Center(
-                        child: Icon(
+                    if (onReport != null)
+                      IconButton(
+                        tooltip: 'More',
+                        onPressed: onReport,
+                        icon: const Icon(
                           Icons.more_horiz,
                           color: _commentsPrimaryText,
                           size: 20,
                         ),
                       ),
-                    ),
                   ],
                 ),
               ],

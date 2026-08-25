@@ -216,6 +216,34 @@ export async function createReport(input: {
   }
 }
 
+export async function listUserReports(input: {
+  reporterUserId: string;
+  limit: number;
+  cursor?: string;
+}) {
+  const values: unknown[] = [input.reporterUserId];
+  const conditions = ['r.reporter_user_id = $1'];
+
+  if (input.cursor) {
+    const cursor = decodeAdminCursor(input.cursor);
+    values.push(cursor.createdAt, cursor.id);
+    conditions.push(`(r.created_at, r.id) < ($${values.length - 1}::timestamptz, $${values.length}::uuid)`);
+  }
+
+  values.push(input.limit + 1);
+  const result = await db.query<ReportRow>(
+    `SELECT r.id, r.reporter_user_id, r.target_type, r.target_id, r.category,
+            r.description, r.status, r.created_at, r.updated_at
+       FROM reports r
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY r.created_at DESC, r.id DESC
+      LIMIT $${values.length}`,
+    values
+  );
+
+  return pageWithCursor(result.rows.map(mapReport), input.limit);
+}
+
 export async function listModerationCases(input: {
   status?: ModerationCaseStatus;
   category?: ReportCategory;

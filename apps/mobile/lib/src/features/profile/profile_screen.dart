@@ -10,6 +10,7 @@ import '../polls/poll_comments_screen.dart';
 import '../polls/poll_summary.dart';
 import '../polls/polls_api_client.dart';
 import '../realtime/realtime_client.dart';
+import '../reports/my_reports_screen.dart';
 import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -313,11 +314,26 @@ class ProfileScreenState extends State<ProfileScreen> {
                   onSelected: (value) {
                     if (value == 'edit') {
                       _openEditProfile(context);
+                    } else if (value == 'reports') {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => MyReportsScreen(
+                            accessToken: widget.accessToken,
+                          ),
+                        ),
+                      );
                     } else if (value == 'logout') {
                       widget.onLogout();
                     }
                   },
                   itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: 'reports',
+                      child: SizedBox(
+                        width: 144,
+                        child: Text('My reports', maxLines: 1, softWrap: false),
+                      ),
+                    ),
                     PopupMenuItem(
                       value: 'edit',
                       child: SizedBox(
