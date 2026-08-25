@@ -40,6 +40,12 @@ class AdminCapabilities {
   bool get canReadAudit => has('admin.audit.read');
 }
 
+class AdminPage<T> {
+  const AdminPage({required this.items, required this.nextCursor});
+  final List<T> items;
+  final String? nextCursor;
+}
+
 class AdminUserSummary {
   const AdminUserSummary({required this.id, required this.username, required this.email, required this.role, required this.status, required this.displayName, required this.createdAt, required this.pollsCount});
   factory AdminUserSummary.fromJson(Map<String, dynamic> json) {
@@ -125,19 +131,19 @@ class AdminApiClient {
     }
   }
 
-  Future<List<AdminUserSummary>> listUsers({required String accessToken, String query = '', String status = 'all', String role = 'all', int limit = 50}) async {
-    final body = await _request('GET', '/admin/users', accessToken: accessToken, query: {'query': query, 'status': status, 'role': role, 'limit': '$limit'});
-    return (body['items'] as List<dynamic>).map((item) => AdminUserSummary.fromJson(item as Map<String, dynamic>)).toList();
+  Future<AdminPage<AdminUserSummary>> listUsers({required String accessToken, String query = '', String status = 'all', String role = 'all', int limit = 50, String? cursor}) async {
+    final body = await _request('GET', '/admin/users', accessToken: accessToken, query: {'query': query, 'status': status, 'role': role, 'limit': '$limit', if (cursor != null) 'cursor': cursor});
+    return AdminPage(items: (body['items'] as List<dynamic>).map((item) => AdminUserSummary.fromJson(item as Map<String, dynamic>)).toList(), nextCursor: body['nextCursor'] as String?);
   }
 
-  Future<List<AdminPollSummary>> listPolls({required String accessToken, String query = '', String status = 'all', int limit = 50}) async {
-    final body = await _request('GET', '/admin/polls', accessToken: accessToken, query: {'query': query, 'status': status, 'limit': '$limit'});
-    return (body['items'] as List<dynamic>).map((item) => AdminPollSummary.fromJson(item as Map<String, dynamic>)).toList();
+  Future<AdminPage<AdminPollSummary>> listPolls({required String accessToken, String query = '', String status = 'all', int limit = 50, String? cursor}) async {
+    final body = await _request('GET', '/admin/polls', accessToken: accessToken, query: {'query': query, 'status': status, 'limit': '$limit', if (cursor != null) 'cursor': cursor});
+    return AdminPage(items: (body['items'] as List<dynamic>).map((item) => AdminPollSummary.fromJson(item as Map<String, dynamic>)).toList(), nextCursor: body['nextCursor'] as String?);
   }
 
-  Future<List<AdminAuditEntry>> listAudit({required String accessToken, int limit = 50}) async {
-    final body = await _request('GET', '/admin/audit', accessToken: accessToken, query: {'limit': '$limit'});
-    return (body['items'] as List<dynamic>).map((item) => AdminAuditEntry.fromJson(item as Map<String, dynamic>)).toList();
+  Future<AdminPage<AdminAuditEntry>> listAudit({required String accessToken, int limit = 50, String? cursor}) async {
+    final body = await _request('GET', '/admin/audit', accessToken: accessToken, query: {'limit': '$limit', if (cursor != null) 'cursor': cursor});
+    return AdminPage(items: (body['items'] as List<dynamic>).map((item) => AdminAuditEntry.fromJson(item as Map<String, dynamic>)).toList(), nextCursor: body['nextCursor'] as String?);
   }
 
   Future<List<AdminCommentSummary>> listComments({required String pollId, int limit = 50}) async {

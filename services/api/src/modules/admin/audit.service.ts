@@ -14,7 +14,7 @@ export async function listAdminAudit(input: {
   from?: string;
   to?: string;
   limit: number;
-  offset: number;
+  cursor?: string;
 }) {
   return listAdminAuditRecords(input);
 }

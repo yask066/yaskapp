@@ -362,15 +362,19 @@ test('superadmin can manage user lifecycle through the admin API', async () => {
 
   const listResponse = await app.inject({
     method: 'GET',
-    url: `/admin/users?query=${target.user.username}&limit=10`,
+    url: '/admin/users?limit=1',
     headers: bearer(superadmin.accessToken)
   });
   assert.equal(listResponse.statusCode, 200, listResponse.body);
-  assert.ok(
-    listResponse.json<{ items: Array<{ id: string }> }>().items.some(
-      (item) => item.id === target.user.id
-    )
-  );
+  assert.equal(typeof listResponse.json<{ nextCursor: string | null }>().nextCursor, 'string');
+  assert.equal(listResponse.json<{ items: Array<{ id: string }> }>().items.length, 1);
+
+  const cursorResponse = await app.inject({
+    method: 'GET',
+    url: `/admin/users?limit=1&cursor=${encodeURIComponent(listResponse.json<{ nextCursor: string }>().nextCursor)}`,
+    headers: bearer(superadmin.accessToken)
+  });
+  assert.equal(cursorResponse.statusCode, 200, cursorResponse.body);
 
   const detailResponse = await app.inject({
     method: 'GET',

@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg';
 import { db } from '../../config/database.js';
 import type { UserRole, UserStatus } from '../auth/auth.repository.js';
 import { recordAdminAudit } from './audit.repository.js';
+import { decodeAdminCursor, pageWithCursor } from './pagination.js';
 
 export type AdminUser = {
   id: string;
@@ -87,7 +88,7 @@ const adminUserSelect = `
 
 export async function listAdminUsers(input: {
   limit: number;
-  offset: number;
+  cursor?: string;
   query?: string;
   status?: UserStatus | 'all';
   role?: UserRole | 'all';
@@ -108,17 +109,22 @@ export async function listAdminUsers(input: {
     conditions.push(`u.role = $${values.length}`);
   }
 
-  values.push(input.limit, input.offset);
+  if (input.cursor) {
+    const cursor = decodeAdminCursor(input.cursor);
+    values.push(cursor.createdAt, cursor.id);
+    conditions.push(`(u.created_at, u.id) < ($${values.length - 1}::timestamptz, $${values.length}::uuid)`);
+  }
+
+  values.push(input.limit + 1);
   const result = await db.query<AdminUserRow>(
     `${adminUserSelect}
       WHERE ${conditions.join(' AND ')}
       ORDER BY u.created_at DESC, u.id DESC
-      LIMIT $${values.length - 1}
-      OFFSET $${values.length}`,
+      LIMIT $${values.length}`,
     values
   );
 
-  return result.rows.map(mapAdminUser);
+  return pageWithCursor(result.rows.map(mapAdminUser), input.limit);
 }
 
 export async function getAdminUser(userId: string) {

@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
 import type { UserRole } from '../auth/auth.repository.js';
+import { decodeAdminCursor, pageWithCursor } from './pagination.js';
 
 export type AdminAuditAction =
   | 'user.blocked'
@@ -65,7 +66,7 @@ export async function listAdminAudit(input: {
   from?: string;
   to?: string;
   limit: number;
-  offset: number;
+  cursor?: string;
 }) {
   const values: unknown[] = [];
   const conditions = ['TRUE'];
@@ -82,7 +83,13 @@ export async function listAdminAudit(input: {
   if (input.from) addCondition('created_at >= ?::timestamptz', input.from);
   if (input.to) addCondition('created_at < ?::timestamptz', input.to);
 
-  values.push(input.limit, input.offset);
+  if (input.cursor) {
+    const cursor = decodeAdminCursor(input.cursor);
+    values.push(cursor.createdAt, cursor.id);
+    conditions.push(`(created_at, id) < ($${values.length - 1}::timestamptz, $${values.length}::uuid)`);
+  }
+
+  values.push(input.limit + 1);
   const result = await db.query<{
     id: string;
     actor_user_id: string | null;
@@ -110,13 +117,12 @@ export async function listAdminAudit(input: {
       FROM admin_audit_log
       WHERE ${conditions.join(' AND ')}
       ORDER BY created_at DESC, id DESC
-      LIMIT $${values.length - 1}
-      OFFSET $${values.length}
+      LIMIT $${values.length}
     `,
     values
   );
 
-  return result.rows.map((row) => ({
+  return pageWithCursor(result.rows.map((row) => ({
     id: row.id,
     actorUserId: row.actor_user_id,
     actorRole: row.actor_role,
@@ -127,5 +133,5 @@ export async function listAdminAudit(input: {
     metadata: row.metadata,
     requestId: row.request_id,
     createdAt: row.created_at.toISOString()
-  }));
+  })), input.limit);
 }

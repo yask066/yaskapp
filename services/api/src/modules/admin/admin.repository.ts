@@ -2,6 +2,7 @@ import { db } from '../../config/database.js';
 import { findUserById } from '../auth/auth.repository.js';
 import type { UserRole } from '../auth/auth.repository.js';
 import { recordAdminAudit } from './audit.repository.js';
+import { decodeAdminCursor, pageWithCursor } from './pagination.js';
 
 export type BlockUserResult =
   | { status: 'blocked' | 'already_blocked' }
@@ -151,7 +152,7 @@ function mapAdminPoll(row: {
 
 export async function listAdminPolls(input: {
   limit: number;
-  offset: number;
+  cursor?: string;
   query?: string;
   status?: 'active' | 'deleted' | 'all';
   authorId?: string;
@@ -175,7 +176,13 @@ export async function listAdminPolls(input: {
     conditions.push(`p.author_id = $${values.length}`);
   }
 
-  values.push(input.limit, input.offset);
+  if (input.cursor) {
+    const cursor = decodeAdminCursor(input.cursor);
+    values.push(cursor.createdAt, cursor.id);
+    conditions.push(`(p.created_at, p.id) < ($${values.length - 1}::timestamptz, $${values.length}::uuid)`);
+  }
+
+  values.push(input.limit + 1);
   const result = await db.query<Parameters<typeof mapAdminPoll>[0]>(
     `
       SELECT
@@ -196,13 +203,12 @@ export async function listAdminPolls(input: {
       JOIN profiles pr ON pr.user_id = p.author_id
       WHERE ${conditions.join(' AND ')}
       ORDER BY p.created_at DESC, p.id DESC
-      LIMIT $${values.length - 1}
-      OFFSET $${values.length}
+      LIMIT $${values.length}
     `,
     values
   );
 
-  return result.rows.map(mapAdminPoll);
+  return pageWithCursor(result.rows.map(mapAdminPoll), input.limit);
 }
 
 export async function getAdminPoll(pollId: string) {

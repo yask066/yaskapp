@@ -25,6 +25,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   List<AdminUserSummary> _users = [];
   List<AdminPollSummary> _polls = [];
   List<AdminAuditEntry> _audit = [];
+  String? _usersCursor;
+  String? _pollsCursor;
+  String? _auditCursor;
   var _auditAvailable = true;
   late final RealtimeClient _realtime;
   late final bool _ownsRealtime;
@@ -64,14 +67,18 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       var auditAvailable = _capabilities.canReadAudit;
       if (auditAvailable) {
         try {
-          audit = await widget.apiClient.listAudit(accessToken: widget.accessToken);
+          final page = await widget.apiClient.listAudit(accessToken: widget.accessToken);
+          audit = page.items;
+          _auditCursor = page.nextCursor;
         } on AdminApiException catch (error) {
           if (error.statusCode != 403) rethrow;
           auditAvailable = false;
         }
       }
       if (!mounted) return;
-      setState(() { _users = results[0] as List<AdminUserSummary>; _polls = results[1] as List<AdminPollSummary>; _audit = audit; _auditAvailable = auditAvailable; _loading = false; });
+      final usersPage = results[0] as AdminPage<AdminUserSummary>;
+      final pollsPage = results[1] as AdminPage<AdminPollSummary>;
+      setState(() { _users = usersPage.items; _usersCursor = usersPage.nextCursor; _polls = pollsPage.items; _pollsCursor = pollsPage.nextCursor; _audit = audit; _auditAvailable = auditAvailable; _loading = false; });
     } on AdminApiException catch (error) {
       if (mounted) setState(() { _loading = false; _error = error.userMessage; });
     }
@@ -134,6 +141,27 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     if (reason == null) return;
     try { await widget.apiClient.deletePoll(pollId: poll.id, accessToken: widget.accessToken, reason: reason); await _load(); }
     on AdminApiException catch (error) { if (mounted) _showError(error.message); }
+  }
+
+  Future<void> _loadMoreUsers() async {
+    final cursor = _usersCursor;
+    if (cursor == null) return;
+    final page = await widget.apiClient.listUsers(accessToken: widget.accessToken, query: _query.text, status: _userStatus, role: _userRole, cursor: cursor);
+    if (mounted) setState(() { _users.addAll(page.items); _usersCursor = page.nextCursor; });
+  }
+
+  Future<void> _loadMorePolls() async {
+    final cursor = _pollsCursor;
+    if (cursor == null) return;
+    final page = await widget.apiClient.listPolls(accessToken: widget.accessToken, query: _query.text, status: _pollStatus, cursor: cursor);
+    if (mounted) setState(() { _polls.addAll(page.items); _pollsCursor = page.nextCursor; });
+  }
+
+  Future<void> _loadMoreAudit() async {
+    final cursor = _auditCursor;
+    if (cursor == null) return;
+    final page = await widget.apiClient.listAudit(accessToken: widget.accessToken, cursor: cursor);
+    if (mounted) setState(() { _audit.addAll(page.items); _auditCursor = page.nextCursor; });
   }
 
   Future<void> _showComments(AdminPollSummary poll) async {
@@ -233,6 +261,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                   ),
                 ),
               )),
+          if (_usersCursor != null) OutlinedButton(onPressed: _loadMoreUsers, child: const Text('Load more users')),
         ],
       ),
     );
@@ -259,6 +288,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                   ),
                 ))
             .toList(),
+          if (_pollsCursor != null) OutlinedButton(onPressed: _loadMorePolls, child: const Text('Load more polls')),
         ],
       ),
     );
@@ -272,7 +302,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.all(16),
-        children: _audit
+        children: [
+          ..._audit
             .map((entry) => Card(
                   child: ListTile(
                     title: Text(entry.action),
@@ -282,6 +313,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                   ),
                 ))
             .toList(),
+          if (_auditCursor != null) OutlinedButton(onPressed: _loadMoreAudit, child: const Text('Load more audit entries')),
+        ],
       ),
     );
   }

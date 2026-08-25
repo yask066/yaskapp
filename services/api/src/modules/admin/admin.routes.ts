@@ -29,6 +29,7 @@ import {
 } from './admin.service.js';
 import { getBlockedUser } from './admin.repository.js';
 import { listAdminAudit } from './audit.service.js';
+import { AdminCursorError } from './pagination.js';
 
 const userParamsSchema = z.object({
   userId: z.string().uuid()
@@ -53,7 +54,7 @@ const commentParamsSchema = z.object({
 
 const adminPollsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
-  offset: z.coerce.number().int().min(0).max(100_000).default(0),
+  cursor: z.string().trim().max(512).optional(),
   query: z.string().trim().max(280).optional(),
   status: z.enum(['active', 'deleted', 'all']).default('all'),
   authorId: z.string().uuid().optional()
@@ -61,7 +62,7 @@ const adminPollsQuerySchema = z.object({
 
 const adminUsersQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
-  offset: z.coerce.number().int().min(0).max(100_000).default(0),
+  cursor: z.string().trim().max(512).optional(),
   query: z.string().trim().max(320).optional(),
   status: z.enum(['active', 'blocked', 'deleted', 'all']).default('all'),
   role: z.enum(['user', 'moderator', 'superadmin', 'all']).default('all')
@@ -82,10 +83,16 @@ const adminAuditQuerySchema = z.object({
   from: z.string().datetime({ offset: true }).optional(),
   to: z.string().datetime({ offset: true }).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
-  offset: z.coerce.number().int().min(0).max(100_000).default(0)
+  cursor: z.string().trim().max(512).optional()
 }).strict();
 
 function adminError(reply: FastifyReply, error: unknown) {
+  if (error instanceof AdminCursorError) {
+    return reply.status(400).send({
+      error: 'validation_error',
+      message: error.message
+    });
+  }
   if (error instanceof AdminUserNotFoundError) {
     return reply.status(404).send({
       error: 'not_found',
@@ -144,7 +151,7 @@ export function registerAdminRoutes(app: FastifyInstance) {
       if (!parsedQuery.success) {
         return reply.status(400).send({ error: 'validation_error', message: 'Request input is invalid.' });
       }
-      return reply.send({ items: await listAdminUsers(parsedQuery.data) });
+      return reply.send(await listAdminUsers(parsedQuery.data));
     }
   );
 
@@ -248,7 +255,7 @@ export function registerAdminRoutes(app: FastifyInstance) {
         });
       }
 
-      return reply.send({ items: await listAdminAudit(parsedQuery.data) });
+      return reply.send(await listAdminAudit(parsedQuery.data));
     }
   );
 
@@ -267,8 +274,7 @@ export function registerAdminRoutes(app: FastifyInstance) {
         });
       }
 
-      const items = await listAdminPolls(parsedQuery.data);
-      return reply.send({ items });
+      return reply.send(await listAdminPolls(parsedQuery.data));
     }
   );
 

@@ -36,7 +36,7 @@ function userMutationError(status: string): never | undefined {
 
 export async function listAdminUsers(input: {
   limit: number;
-  offset: number;
+  cursor?: string;
   query?: string;
   status?: UserStatus | 'all';
   role?: UserRole | 'all';
@@ -95,7 +95,7 @@ export async function blockUser(
 
 export async function listAdminPolls(input: {
   limit: number;
-  offset: number;
+  cursor?: string;
   query?: string;
   status?: 'active' | 'deleted' | 'all';
   authorId?: string;
