@@ -1,0 +1,271 @@
+import 'package:flutter/material.dart';
+
+import 'admin_api_client.dart';
+
+class AdminScreen extends StatefulWidget {
+  const AdminScreen({required this.accessToken, required this.apiClient, super.key});
+  final String accessToken;
+  final AdminApiClient apiClient;
+  @override
+  State<AdminScreen> createState() => _AdminScreenState();
+}
+
+class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStateMixin {
+  late final TabController _tabs = TabController(length: 3, vsync: this);
+  final _query = TextEditingController();
+  var _loading = true;
+  String? _error;
+  var _userStatus = 'all';
+  var _userRole = 'all';
+  var _pollStatus = 'all';
+  List<AdminUserSummary> _users = [];
+  List<AdminPollSummary> _polls = [];
+  List<AdminAuditEntry> _audit = [];
+  var _auditAvailable = true;
+
+  @override
+  void initState() { super.initState(); _load(); }
+  @override
+  void dispose() { _tabs.dispose(); _query.dispose(); super.dispose(); }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final results = await Future.wait([
+        widget.apiClient.listUsers(accessToken: widget.accessToken, query: _query.text, status: _userStatus, role: _userRole),
+        widget.apiClient.listPolls(accessToken: widget.accessToken, query: _query.text, status: _pollStatus),
+      ]);
+      List<AdminAuditEntry> audit = [];
+      var auditAvailable = true;
+      try {
+        audit = await widget.apiClient.listAudit(accessToken: widget.accessToken);
+      } on AdminApiException catch (error) {
+        if (error.statusCode != 403) rethrow;
+        auditAvailable = false;
+      }
+      if (!mounted) return;
+      setState(() { _users = results[0] as List<AdminUserSummary>; _polls = results[1] as List<AdminPollSummary>; _audit = audit; _auditAvailable = auditAvailable; _loading = false; });
+    } on AdminApiException catch (error) {
+      if (mounted) setState(() { _loading = false; _error = error.message; });
+    }
+  }
+
+  Future<String?> _reason(String title) async {
+    final controller = TextEditingController();
+    final value = await showDialog<String>(context: context, builder: (context) => AlertDialog(
+      title: Text(title),
+      content: TextField(controller: controller, autofocus: true, maxLength: 500, maxLines: 3, decoration: const InputDecoration(labelText: 'Reason', hintText: 'Required for audit log.')),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')), FilledButton(onPressed: () { if (controller.text.trim().isNotEmpty) Navigator.pop(context, controller.text.trim()); }, child: const Text('Confirm'))],
+    ));
+    controller.dispose();
+    return value;
+  }
+
+  Future<void> _userAction(AdminUserSummary user, String action) async {
+    if (action == 'Role') {
+      await _changeRole(user);
+      return;
+    }
+    final reason = await _reason('$action @${user.username}');
+    if (reason == null || !mounted) return;
+    try {
+      if (action == 'Block') await widget.apiClient.blockUser(userId: user.id, accessToken: widget.accessToken, reason: reason);
+      if (action == 'Unblock') await widget.apiClient.unblockUser(userId: user.id, accessToken: widget.accessToken, reason: reason);
+      if (action == 'Delete') await widget.apiClient.deleteUser(userId: user.id, accessToken: widget.accessToken, reason: reason);
+      await _load();
+    } on AdminApiException catch (error) { if (mounted) _showError(error.message); }
+  }
+
+  Future<void> _changeRole(AdminUserSummary user) async {
+    var role = user.role;
+    final reasonController = TextEditingController();
+    final result = await showDialog<(String, String)?>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Change role @${user.username}'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          DropdownButtonFormField<String>(value: role, items: const [
+            DropdownMenuItem(value: 'user', child: Text('User')),
+            DropdownMenuItem(value: 'moderator', child: Text('Moderator')),
+            DropdownMenuItem(value: 'superadmin', child: Text('Superadmin')),
+          ], onChanged: (value) { if (value != null) role = value; }),
+          TextField(controller: reasonController, maxLength: 500, maxLines: 2, decoration: const InputDecoration(labelText: 'Reason')),
+        ]),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')), FilledButton(onPressed: () { if (reasonController.text.trim().isNotEmpty) Navigator.pop(context, (role, reasonController.text.trim())); }, child: const Text('Save'))],
+      ),
+    );
+    reasonController.dispose();
+    if (result == null) return;
+    try {
+      await widget.apiClient.changeRole(userId: user.id, role: result.$1, accessToken: widget.accessToken, reason: result.$2);
+      await _load();
+    } on AdminApiException catch (error) { if (mounted) _showError(error.message); }
+  }
+
+  Future<void> _deletePoll(AdminPollSummary poll) async {
+    final reason = await _reason('Delete poll');
+    if (reason == null) return;
+    try { await widget.apiClient.deletePoll(pollId: poll.id, accessToken: widget.accessToken, reason: reason); await _load(); }
+    on AdminApiException catch (error) { if (mounted) _showError(error.message); }
+  }
+
+  Future<void> _showComments(AdminPollSummary poll) async {
+    try {
+      final comments = await widget.apiClient.listComments(pollId: poll.id);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Comments'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: comments.isEmpty
+                ? const Text('No comments.')
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: comments.length,
+                    itemBuilder: (context, index) {
+                      final comment = comments[index];
+                      return ListTile(
+                        title: Text(comment.body),
+                        subtitle: Text('@${comment.authorUsername}'),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () async {
+                            final reason = await _reason('Delete comment');
+                            if (reason == null || !context.mounted) return;
+                            try {
+                              await widget.apiClient.deleteComment(commentId: comment.id, accessToken: widget.accessToken, reason: reason);
+                              if (context.mounted) Navigator.pop(context);
+                              await _load();
+                            } on AdminApiException catch (error) {
+                              if (mounted) _showError(error.message);
+                            }
+                          },
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+        ),
+      );
+    } on AdminApiException catch (error) {
+      if (mounted) _showError(error.message);
+    }
+  }
+
+  void _showError(String message) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: const Color(0xFFF7F8FA),
+    appBar: AppBar(title: const Text('Admin'), backgroundColor: Colors.white, elevation: 0, bottom: TabBar(controller: _tabs, tabs: const [Tab(text: 'Users'), Tab(text: 'Polls'), Tab(text: 'Audit')])),
+    body: _loading ? const Center(child: CircularProgressIndicator()) : _error != null ? _ErrorState(message: _error!, onRetry: _load) : TabBarView(controller: _tabs, children: [_usersView(), _pollsView(), _auditView()]),
+  );
+
+  Widget _usersView() {
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          TextField(
+            controller: _query,
+            onSubmitted: (_) => _load(),
+            decoration: InputDecoration(
+              hintText: 'Search users',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          Row(children: [
+            Expanded(child: DropdownButtonFormField<String>(value: _userStatus, decoration: const InputDecoration(labelText: 'Status'), items: const [DropdownMenuItem(value: 'all', child: Text('All')), DropdownMenuItem(value: 'active', child: Text('Active')), DropdownMenuItem(value: 'blocked', child: Text('Blocked')), DropdownMenuItem(value: 'deleted', child: Text('Deleted'))], onChanged: (value) { if (value != null) { setState(() => _userStatus = value); _load(); } })),
+            const SizedBox(width: 8),
+            Expanded(child: DropdownButtonFormField<String>(value: _userRole, decoration: const InputDecoration(labelText: 'Role'), items: const [DropdownMenuItem(value: 'all', child: Text('All')), DropdownMenuItem(value: 'user', child: Text('User')), DropdownMenuItem(value: 'moderator', child: Text('Moderator')), DropdownMenuItem(value: 'superadmin', child: Text('Superadmin'))], onChanged: (value) { if (value != null) { setState(() => _userRole = value); _load(); } })),
+          ]),
+          const SizedBox(height: 12),
+          ..._users.map((user) => Card(
+                child: ListTile(
+                  leading: CircleAvatar(child: Text(user.username.substring(0, 1).toUpperCase())),
+                  title: Text(user.displayName),
+                  subtitle: Text('@${user.username} · ${user.role} · ${user.status}'),
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (action) => _userAction(user, action),
+                    itemBuilder: (_) => [
+                      if (user.status == 'blocked')
+                        const PopupMenuItem(value: 'Unblock', child: Text('Unblock'))
+                      else
+                        const PopupMenuItem(value: 'Block', child: Text('Block')),
+                      if (user.status != 'deleted')
+                        const PopupMenuItem(value: 'Delete', child: Text('Delete')),
+                      if (user.status != 'deleted')
+                        const PopupMenuItem(value: 'Role', child: Text('Change role')),
+                    ],
+                  ),
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+
+  Widget _pollsView() {
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          DropdownButtonFormField<String>(value: _pollStatus, decoration: const InputDecoration(labelText: 'Status'), items: const [DropdownMenuItem(value: 'all', child: Text('All')), DropdownMenuItem(value: 'active', child: Text('Active')), DropdownMenuItem(value: 'deleted', child: Text('Deleted'))], onChanged: (value) { if (value != null) { setState(() => _pollStatus = value); _load(); } }),
+          const SizedBox(height: 12),
+          ..._polls
+            .map((poll) => Card(
+                  child: ListTile(
+                    title: Text(poll.question),
+                    subtitle: Text('@${poll.authorUsername} · ${poll.status} · ${poll.votesCount} votes'),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: poll.status == 'deleted' ? null : () => _deletePoll(poll),
+                    ),
+                    onTap: () => _showComments(poll),
+                  ),
+                ))
+            .toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _auditView() {
+    if (!_auditAvailable) {
+      return const Center(child: Text('Audit log is available to superadmins only.'));
+    }
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: _audit
+            .map((entry) => Card(
+                  child: ListTile(
+                    title: Text(entry.action),
+                    subtitle: Text('${entry.targetType} ${entry.targetId}\n${entry.reason}'),
+                    isThreeLine: true,
+                    trailing: Text(_date(entry.createdAt)),
+                  ),
+                ))
+            .toList(),
+      ),
+    );
+  }
+
+  String _date(DateTime value) => '${value.day.toString().padLeft(2, '0')}.${value.month.toString().padLeft(2, '0')}';
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+  @override
+  Widget build(BuildContext context) => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Text(message), const SizedBox(height: 12), FilledButton(onPressed: onRetry, child: const Text('Retry'))]));
+}
