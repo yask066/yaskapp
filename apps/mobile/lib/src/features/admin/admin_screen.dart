@@ -22,6 +22,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   var _userStatus = 'all';
   var _userRole = 'all';
   var _pollStatus = 'all';
+  DateTimeRange? _dateRange;
   List<AdminUserSummary> _users = [];
   List<AdminPollSummary> _polls = [];
   List<AdminAuditEntry> _audit = [];
@@ -60,14 +61,14 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     setState(() { _loading = true; _error = null; });
     try {
       final results = await Future.wait([
-        widget.apiClient.listUsers(accessToken: widget.accessToken, query: _query.text, status: _userStatus, role: _userRole),
-        widget.apiClient.listPolls(accessToken: widget.accessToken, query: _query.text, status: _pollStatus),
+        widget.apiClient.listUsers(accessToken: widget.accessToken, query: _query.text, status: _userStatus, role: _userRole, createdFrom: _dateRange?.start, createdTo: _dateRange == null ? null : _dateRange!.end.add(const Duration(days: 1))),
+        widget.apiClient.listPolls(accessToken: widget.accessToken, query: _query.text, status: _pollStatus, createdFrom: _dateRange?.start, createdTo: _dateRange == null ? null : _dateRange!.end.add(const Duration(days: 1))),
       ]);
       List<AdminAuditEntry> audit = [];
       var auditAvailable = _capabilities.canReadAudit;
       if (auditAvailable) {
         try {
-          final page = await widget.apiClient.listAudit(accessToken: widget.accessToken);
+          final page = await widget.apiClient.listAudit(accessToken: widget.accessToken, from: _dateRange?.start, to: _dateRange == null ? null : _dateRange!.end.add(const Duration(days: 1)));
           audit = page.items;
           _auditCursor = page.nextCursor;
         } on AdminApiException catch (error) {
@@ -146,22 +147,32 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   Future<void> _loadMoreUsers() async {
     final cursor = _usersCursor;
     if (cursor == null) return;
-    final page = await widget.apiClient.listUsers(accessToken: widget.accessToken, query: _query.text, status: _userStatus, role: _userRole, cursor: cursor);
+    final page = await widget.apiClient.listUsers(accessToken: widget.accessToken, query: _query.text, status: _userStatus, role: _userRole, cursor: cursor, createdFrom: _dateRange?.start, createdTo: _dateRange == null ? null : _dateRange!.end.add(const Duration(days: 1)));
     if (mounted) setState(() { _users.addAll(page.items); _usersCursor = page.nextCursor; });
   }
 
   Future<void> _loadMorePolls() async {
     final cursor = _pollsCursor;
     if (cursor == null) return;
-    final page = await widget.apiClient.listPolls(accessToken: widget.accessToken, query: _query.text, status: _pollStatus, cursor: cursor);
+    final page = await widget.apiClient.listPolls(accessToken: widget.accessToken, query: _query.text, status: _pollStatus, cursor: cursor, createdFrom: _dateRange?.start, createdTo: _dateRange == null ? null : _dateRange!.end.add(const Duration(days: 1)));
     if (mounted) setState(() { _polls.addAll(page.items); _pollsCursor = page.nextCursor; });
   }
 
   Future<void> _loadMoreAudit() async {
     final cursor = _auditCursor;
     if (cursor == null) return;
-    final page = await widget.apiClient.listAudit(accessToken: widget.accessToken, cursor: cursor);
+    final page = await widget.apiClient.listAudit(accessToken: widget.accessToken, cursor: cursor, from: _dateRange?.start, to: _dateRange == null ? null : _dateRange!.end.add(const Duration(days: 1)));
     if (mounted) setState(() { _audit.addAll(page.items); _auditCursor = page.nextCursor; });
+  }
+
+  Future<void> _pickDateRange() async {
+    final range = await showDateRangePicker(context: context, firstDate: DateTime(2020), lastDate: DateTime.now().add(const Duration(days: 1)), initialDateRange: _dateRange);
+    if (range != null && mounted) { setState(() => _dateRange = range); await _load(); }
+  }
+
+  Widget _dateFilter() {
+    final label = _dateRange == null ? 'Filter by dates' : '${_dateRange!.start.day}.${_dateRange!.start.month} – ${_dateRange!.end.day}.${_dateRange!.end.month}';
+    return Row(children: [Expanded(child: OutlinedButton.icon(onPressed: _pickDateRange, icon: const Icon(Icons.date_range), label: Text(label))), if (_dateRange != null) IconButton(tooltip: 'Clear dates', onPressed: () { setState(() => _dateRange = null); _load(); }, icon: const Icon(Icons.clear))]);
   }
 
   Future<void> _showComments(AdminPollSummary poll) async {
@@ -225,6 +236,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          _dateFilter(),
+          const SizedBox(height: 8),
           TextField(
             controller: _query,
             onSubmitted: (_) => _load(),
@@ -273,6 +286,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          _dateFilter(),
+          const SizedBox(height: 8),
           DropdownButtonFormField<String>(value: _pollStatus, decoration: const InputDecoration(labelText: 'Status'), items: const [DropdownMenuItem(value: 'all', child: Text('All')), DropdownMenuItem(value: 'active', child: Text('Active')), DropdownMenuItem(value: 'deleted', child: Text('Deleted'))], onChanged: (value) { if (value != null) { setState(() => _pollStatus = value); _load(); } }),
           const SizedBox(height: 12),
           ..._polls
@@ -303,6 +318,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          _dateFilter(),
+          const SizedBox(height: 8),
           ..._audit
             .map((entry) => Card(
                   child: ListTile(

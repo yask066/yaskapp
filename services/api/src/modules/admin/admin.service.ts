@@ -40,6 +40,8 @@ export async function listAdminUsers(input: {
   query?: string;
   status?: UserStatus | 'all';
   role?: UserRole | 'all';
+  createdFrom?: string;
+  createdTo?: string;
 }) {
   return listAdminUsersRecord(input);
 }
@@ -99,6 +101,8 @@ export async function listAdminPolls(input: {
   query?: string;
   status?: 'active' | 'deleted' | 'all';
   authorId?: string;
+  createdFrom?: string;
+  createdTo?: string;
 }) {
   return listAdminPollsRecord(input);
 }

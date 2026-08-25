@@ -57,16 +57,28 @@ const adminPollsQuerySchema = z.object({
   cursor: z.string().trim().max(512).optional(),
   query: z.string().trim().max(280).optional(),
   status: z.enum(['active', 'deleted', 'all']).default('all'),
-  authorId: z.string().uuid().optional()
-}).strict();
+  authorId: z.string().uuid().optional(),
+  createdFrom: z.string().datetime({ offset: true }).optional(),
+  createdTo: z.string().datetime({ offset: true }).optional()
+}).strict().superRefine((value, context) => {
+  if (value.createdFrom && value.createdTo && value.createdFrom >= value.createdTo) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['createdTo'], message: 'createdTo must be after createdFrom.' });
+  }
+});
 
 const adminUsersQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   cursor: z.string().trim().max(512).optional(),
   query: z.string().trim().max(320).optional(),
   status: z.enum(['active', 'blocked', 'deleted', 'all']).default('all'),
-  role: z.enum(['user', 'moderator', 'superadmin', 'all']).default('all')
-}).strict();
+  role: z.enum(['user', 'moderator', 'superadmin', 'all']).default('all'),
+  createdFrom: z.string().datetime({ offset: true }).optional(),
+  createdTo: z.string().datetime({ offset: true }).optional()
+}).strict().superRefine((value, context) => {
+  if (value.createdFrom && value.createdTo && value.createdFrom >= value.createdTo) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['createdTo'], message: 'createdTo must be after createdFrom.' });
+  }
+});
 
 const adminAuditQuerySchema = z.object({
   action: z.enum([
@@ -84,7 +96,11 @@ const adminAuditQuerySchema = z.object({
   to: z.string().datetime({ offset: true }).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   cursor: z.string().trim().max(512).optional()
-}).strict();
+}).strict().superRefine((value, context) => {
+  if (value.from && value.to && value.from >= value.to) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['to'], message: 'to must be after from.' });
+  }
+});
 
 function adminError(reply: FastifyReply, error: unknown) {
   if (error instanceof AdminCursorError) {

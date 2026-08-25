@@ -92,6 +92,8 @@ export async function listAdminUsers(input: {
   query?: string;
   status?: UserStatus | 'all';
   role?: UserRole | 'all';
+  createdFrom?: string;
+  createdTo?: string;
 }) {
   const values: unknown[] = [];
   const conditions = ['TRUE'];
@@ -107,6 +109,15 @@ export async function listAdminUsers(input: {
   if (input.role && input.role !== 'all') {
     values.push(input.role);
     conditions.push(`u.role = $${values.length}`);
+  }
+
+  if (input.createdFrom) {
+    values.push(input.createdFrom);
+    conditions.push(`u.created_at >= $${values.length}::timestamptz`);
+  }
+  if (input.createdTo) {
+    values.push(input.createdTo);
+    conditions.push(`u.created_at < $${values.length}::timestamptz`);
   }
 
   if (input.cursor) {

@@ -376,6 +376,13 @@ test('superadmin can manage user lifecycle through the admin API', async () => {
   });
   assert.equal(cursorResponse.statusCode, 200, cursorResponse.body);
 
+  const dateFilteredUsersResponse = await app.inject({
+    method: 'GET',
+    url: `/admin/users?createdFrom=2000-01-01T00:00:00.000Z&createdTo=2100-01-01T00:00:00.000Z&limit=10`,
+    headers: bearer(superadmin.accessToken)
+  });
+  assert.equal(dateFilteredUsersResponse.statusCode, 200, dateFilteredUsersResponse.body);
+
   const detailResponse = await app.inject({
     method: 'GET',
     url: `/admin/users/${target.user.id}`,

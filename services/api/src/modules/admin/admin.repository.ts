@@ -156,6 +156,8 @@ export async function listAdminPolls(input: {
   query?: string;
   status?: 'active' | 'deleted' | 'all';
   authorId?: string;
+  createdFrom?: string;
+  createdTo?: string;
 }) {
   const values: unknown[] = [];
   const conditions = ['TRUE'];
@@ -174,6 +176,15 @@ export async function listAdminPolls(input: {
   if (input.authorId) {
     values.push(input.authorId);
     conditions.push(`p.author_id = $${values.length}`);
+  }
+
+  if (input.createdFrom) {
+    values.push(input.createdFrom);
+    conditions.push(`p.created_at >= $${values.length}::timestamptz`);
+  }
+  if (input.createdTo) {
+    values.push(input.createdTo);
+    conditions.push(`p.created_at < $${values.length}::timestamptz`);
   }
 
   if (input.cursor) {
