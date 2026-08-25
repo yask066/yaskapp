@@ -132,7 +132,7 @@ test('realtime poll deletion events broadcast only the poll id', () => {
     broadcastPollDeleted({ pollId: 'poll-deleted' });
 
     assert.deepEqual(JSON.parse(message), {
-      type: 'poll.deleted',
+      type: 'poll.admin_deleted',
       payload: { pollId: 'poll-deleted' }
     });
   } finally {
@@ -152,7 +152,7 @@ test('realtime comment deletion events broadcast only comment and poll ids', () 
   remove();
 
   assert.deepEqual(JSON.parse(messages[0] ?? ''), {
-    type: 'comment.deleted',
+    type: 'comment.admin_deleted',
     payload: {
       commentId: 'comment-deleted',
       pollId: 'poll-1'

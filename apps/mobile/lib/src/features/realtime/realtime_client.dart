@@ -23,6 +23,12 @@ class UserModerationRealtimeEvent {
   final String userId;
 }
 
+class CommentDeletedRealtimeEvent {
+  const CommentDeletedRealtimeEvent({required this.commentId, required this.pollId});
+  final String commentId;
+  final String pollId;
+}
+
 class RealtimeClient {
   RealtimeClient({ApiConfig config = const ApiConfig()}) : _config = config;
 
@@ -37,6 +43,8 @@ class RealtimeClient {
       StreamController<UserModerationRealtimeEvent>.broadcast();
   final _userUnblockedController =
       StreamController<UserModerationRealtimeEvent>.broadcast();
+  final _commentDeletedController =
+      StreamController<CommentDeletedRealtimeEvent>.broadcast();
 
   Stream<PollVoteRealtimeEvent> get pollVotes => _pollVoteController.stream;
   Stream<PollDeletedRealtimeEvent> get pollDeletions =>
@@ -45,6 +53,8 @@ class RealtimeClient {
       _userBlockedController.stream;
   Stream<UserModerationRealtimeEvent> get userUnblocked =>
       _userUnblockedController.stream;
+  Stream<CommentDeletedRealtimeEvent> get commentDeletions =>
+      _commentDeletedController.stream;
 
   void connect() {
     if (_channel != null) {
@@ -81,6 +91,7 @@ class RealtimeClient {
     await _pollDeletedController.close();
     await _userBlockedController.close();
     await _userUnblockedController.close();
+    await _commentDeletedController.close();
   }
 
   void _handleMessage(dynamic message) {
@@ -96,7 +107,7 @@ class RealtimeClient {
       return;
     }
 
-    if (decoded['type'] == 'poll.deleted') {
+    if (decoded['type'] == 'poll.admin_deleted') {
       final payload = decoded['payload'];
       if (payload is Map<String, dynamic> && payload['pollId'] is String) {
         _pollDeletedController.add(
@@ -115,6 +126,17 @@ class RealtimeClient {
         } else {
           _userUnblockedController.add(event);
         }
+      }
+      return;
+    }
+
+    if (decoded['type'] == 'comment.admin_deleted') {
+      final payload = decoded['payload'];
+      if (payload is Map<String, dynamic> && payload['commentId'] is String && payload['pollId'] is String) {
+        _commentDeletedController.add(CommentDeletedRealtimeEvent(
+          commentId: payload['commentId'] as String,
+          pollId: payload['pollId'] as String,
+        ));
       }
       return;
     }

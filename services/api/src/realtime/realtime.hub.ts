@@ -29,14 +29,14 @@ type ConnectionReadyEvent = {
 };
 
 type PollDeletedEvent = {
-  type: 'poll.deleted';
+  type: 'poll.admin_deleted';
   payload: {
     pollId: string;
   };
 };
 
 type CommentDeletedEvent = {
-  type: 'comment.deleted';
+  type: 'comment.admin_deleted';
   payload: {
     commentId: string;
     pollId: string;
@@ -106,14 +106,14 @@ export function broadcastPollVoteUpdated(payload: PollVoteUpdatedEvent['payload'
 
 export function broadcastPollDeleted(payload: PollDeletedEvent['payload']) {
   broadcast({
-    type: 'poll.deleted',
+    type: 'poll.admin_deleted',
     payload
   });
 }
 
 export function broadcastCommentDeleted(payload: CommentDeletedEvent['payload']) {
   broadcast({
-    type: 'comment.deleted',
+    type: 'comment.admin_deleted',
     payload
   });
 }

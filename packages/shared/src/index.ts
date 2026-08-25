@@ -112,13 +112,13 @@ export type RealtimeEvent =
       type: 'connection.ready';
     }
   | {
-      type: 'poll.deleted';
+      type: 'poll.admin_deleted';
       payload: {
         pollId: string;
       };
     }
   | {
-      type: 'comment.deleted';
+      type: 'comment.admin_deleted';
       payload: {
         commentId: string;
         pollId: string;
