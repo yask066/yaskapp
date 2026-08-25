@@ -132,6 +132,35 @@ The separate static panel lives in `apps/moderation-web` and is not part of
 the ordinary Flutter navigation. It should be exposed only on a protected
 internal origin (VPN/SSO or equivalent) with HTTPS.
 
+## Sanctions
+
+Sanction mutations require a moderation case targeting the same user, a reason,
+and an `Idempotency-Key` header:
+
+```http
+POST /moderation/users/:userId/warning
+POST /moderation/users/:userId/strike
+POST /moderation/users/:userId/restriction
+POST /moderation/users/:userId/temporary-ban
+POST /moderation/sanctions/:sanctionId/revoke
+Authorization: Bearer <moderator-token>
+Idempotency-Key: <unique-key>
+Content-Type: application/json
+```
+
+Restriction requests may set `restrictionType` to `posting_restriction` or
+`comment_restriction`; temporary bans require `durationHours`. Reusing the
+same key and request returns the original result, while reusing it for a
+different request returns `409`. Sanction mutation and audit insertion use one
+PostgreSQL transaction.
+
+Active strikes are evaluated against the singleton `moderation_policies` row.
+The default policy creates a 24-hour posting restriction at two active
+strikes and a 72-hour temporary ban at three. Temporary bans increment the
+user session version, invalidate existing JWTs, and block login until the ban
+is revoked or expires. Poll and comment creation enforce the corresponding
+active sanctions on the backend.
+
 ## Local migration and checks
 
 ```powershell

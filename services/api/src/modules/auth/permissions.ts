@@ -23,13 +23,15 @@ export const MODERATION_PERMISSIONS = [
   'moderation.case.assign',
   'moderation.case.resolve',
   'moderation.content.delete',
+  'moderation.warning.issue',
   'moderation.strike.issue',
   'moderation.restriction.issue',
   'moderation.user.ban',
   'moderation.appeal.read',
   'moderation.appeal.resolve',
   'moderation.audit.read',
-  'moderation.policy.update'
+  'moderation.policy.update',
+  'moderation.sanction.revoke'
 ] as const;
 
 export type ModerationPermission = (typeof MODERATION_PERMISSIONS)[number];
@@ -56,9 +58,12 @@ const moderationPermissionsByRole: Record<UserRole, readonly ModerationPermissio
     'moderation.case.assign',
     'moderation.case.resolve',
     'moderation.content.delete',
+    'moderation.warning.issue',
     'moderation.strike.issue',
     'moderation.restriction.issue',
-    'moderation.appeal.read'
+    'moderation.user.ban',
+    'moderation.appeal.read',
+    'moderation.sanction.revoke'
   ],
   superadmin: MODERATION_PERMISSIONS
 };

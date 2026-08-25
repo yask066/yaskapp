@@ -16,7 +16,10 @@ export type AdminAuditAction =
   | 'moderation.note_added'
   | 'moderation.case_resolved'
   | 'moderation.case_dismissed'
-  | 'moderation.case_escalated';
+  | 'moderation.case_escalated'
+  | 'moderation.sanction_issued'
+  | 'moderation.sanction_revoked'
+  | 'moderation.policy_evaluated';
 
 export type AdminAuditTargetType = 'user' | 'poll' | 'comment' | 'case';
 

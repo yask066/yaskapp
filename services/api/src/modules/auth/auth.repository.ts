@@ -12,6 +12,7 @@ export type UserWithProfileRow = {
   username: string;
   password_hash: string;
   status: UserStatus;
+  session_version: number;
   role: UserRole;
   created_at: Date;
   updated_at: Date;
@@ -86,7 +87,8 @@ function mapAuthenticatedUser(row: UserWithProfileRow): AuthenticatedUser {
 function mapUserWithPassword(row: UserWithProfileRow) {
   return {
     user: mapAuthenticatedUser(row),
-    passwordHash: row.password_hash
+    passwordHash: row.password_hash,
+    sessionVersion: row.session_version
   };
 }
 
@@ -99,6 +101,7 @@ async function findUserByIdWithClient(client: PoolClient, userId: string) {
         u.username::text AS username,
         u.password_hash,
         u.status,
+        u.session_version,
         u.role,
         u.created_at,
         u.updated_at,
@@ -178,6 +181,7 @@ export async function findUserByEmailOrUsername(login: string) {
         u.username::text AS username,
         u.password_hash,
         u.status,
+        u.session_version,
         u.role,
         u.created_at,
         u.updated_at,
@@ -211,6 +215,7 @@ export async function findAuthenticatedUserById(userId: string) {
         u.username::text AS username,
         u.password_hash,
         u.status,
+        u.session_version,
         u.role,
         u.created_at,
         u.updated_at,

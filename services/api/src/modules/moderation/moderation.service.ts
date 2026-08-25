@@ -12,6 +12,11 @@ import {
   type ReportTargetType
 } from './moderation.repository.js';
 import type { UserRole } from '../auth/auth.repository.js';
+import {
+  issueSanction as issueSanctionRecord,
+  revokeSanction as revokeSanctionRecord,
+  type SanctionType
+} from './sanctions.repository.js';
 
 export async function createReport(input: {
   reporterUserId: string;
@@ -53,4 +58,29 @@ export function transitionModerationCase(caseId: string, actorUserId: string, ac
 
 export function addModerationNote(caseId: string, authorUserId: string, actorRole: UserRole, body: string) {
   return addModerationNoteRecord(caseId, authorUserId, actorRole, body);
+}
+
+export function issueSanction(input: {
+  userId: string;
+  caseId: string;
+  actorUserId: string;
+  actorRole: UserRole;
+  type: SanctionType;
+  reason: string;
+  expiresAt?: Date;
+  idempotencyKey: string;
+  fingerprint: string;
+}) {
+  return issueSanctionRecord(input);
+}
+
+export function revokeSanction(input: {
+  sanctionId: string;
+  actorUserId: string;
+  actorRole: UserRole;
+  reason: string;
+  idempotencyKey: string;
+  fingerprint: string;
+}) {
+  return revokeSanctionRecord(input);
 }

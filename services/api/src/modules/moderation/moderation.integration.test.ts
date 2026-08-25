@@ -13,7 +13,7 @@ const [{ buildApp }, { closeDatabaseConnection, db }, { closeRedisConnection }, 
 const app = buildApp();
 const createdUserIds = new Set<string>();
 
-type Auth = { user: { id: string; role: string }; accessToken: string };
+type Auth = { user: { id: string; username: string; role: string }; accessToken: string };
 
 function suffix() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -136,6 +136,20 @@ test('authenticated users can create and deduplicate reports', async () => {
     payload: { targetType: 'comment', targetId: comment.rows[0]?.id, category: 'harassment', description: 'Comment report.' }
   });
   assert.equal(commentReport.statusCode, 201, commentReport.body);
+});
+
+test('regular users cannot issue moderation sanctions', async () => {
+  const user = await registerUser();
+  const response = await app.inject({
+    method: 'POST',
+    url: `/moderation/users/${user.user.id}/strike`,
+    headers: bearer(user.accessToken),
+    payload: {
+      caseId: '00000000-0000-4000-8000-000000000000',
+      reason: 'Should not be accepted.'
+    }
+  });
+  assert.equal(response.statusCode, 403, response.body);
 });
 
 test('moderation queue is protected and supports filters and cursor pagination', async () => {
@@ -289,6 +303,94 @@ test('moderators can remove reported content only through its case', async () =>
     payload: { caseId, reason: 'Repeated removal.' }
   });
   assert.equal(repeated.statusCode, 204);
+});
+
+test('moderators can issue an idempotent strike for a reported user', async () => {
+  const reporter = await registerUser();
+  const moderator = await registerUser();
+  const target = await registerUser();
+  await setRole(moderator, 'moderator');
+  const report = await app.inject({
+    method: 'POST', url: '/reports', headers: bearer(reporter.accessToken),
+    payload: { targetType: 'user', targetId: target.user.id, category: 'harassment', description: 'Reported user.' }
+  });
+  assert.equal(report.statusCode, 201, report.body);
+  const caseId = report.json<{ case: { id: string } }>().case.id;
+  const headers = { ...bearer(moderator.accessToken), 'idempotency-key': `strike-${suffix()}` };
+  const payload = { caseId, reason: 'Confirmed harassment.' };
+  const first = await app.inject({ method: 'POST', url: `/moderation/users/${target.user.id}/strike`, headers, payload });
+  assert.equal(first.statusCode, 201, first.body);
+  const repeated = await app.inject({ method: 'POST', url: `/moderation/users/${target.user.id}/strike`, headers, payload });
+  assert.equal(repeated.statusCode, 200, repeated.body);
+  const second = await app.inject({
+    method: 'POST', url: `/moderation/users/${target.user.id}/strike`,
+    headers: { ...bearer(moderator.accessToken), 'idempotency-key': `strike-${suffix()}` },
+    payload
+  });
+  assert.equal(second.statusCode, 201, second.body);
+  const sanctions = await db.query<{ count: number }>('SELECT count(*)::int AS count FROM sanctions WHERE user_id = $1 AND type = \'strike\'', [target.user.id]);
+  assert.equal(Number(sanctions.rows[0]?.count), 2);
+  const automaticRestriction = await db.query<{ count: number }>("SELECT count(*)::int AS count FROM sanctions WHERE user_id = $1 AND type = 'posting_restriction' AND metadata->>'automatic' = 'true'", [target.user.id]);
+  assert.equal(Number(automaticRestriction.rows[0]?.count), 1);
+});
+
+test('temporary ban revokes the current session and blocks login until revoked', async () => {
+  const reporter = await registerUser();
+  const moderator = await registerUser();
+  const target = await registerUser();
+  await setRole(moderator, 'moderator');
+  const report = await app.inject({
+    method: 'POST', url: '/reports', headers: bearer(reporter.accessToken),
+    payload: { targetType: 'user', targetId: target.user.id, category: 'violence_or_threat', description: 'Threatening account.' }
+  });
+  const caseId = report.json<{ case: { id: string } }>().case.id;
+  const banKey = `ban-${suffix()}`;
+  const banned = await app.inject({
+    method: 'POST', url: `/moderation/users/${target.user.id}/temporary-ban`,
+    headers: { ...bearer(moderator.accessToken), 'idempotency-key': banKey },
+    payload: { caseId, reason: 'Threat confirmed.', durationHours: 1 }
+  });
+  assert.equal(banned.statusCode, 201, banned.body);
+  const revokedSession = await app.inject({ method: 'GET', url: '/auth/me', headers: bearer(target.accessToken) });
+  assert.equal(revokedSession.statusCode, 401);
+  const blockedLogin = await app.inject({
+    method: 'POST', url: '/auth/login', payload: { login: target.user.username, password: 'password123' }
+  });
+  assert.equal(blockedLogin.statusCode, 401);
+  const sanctionId = banned.json<{ sanction: { id: string } }>().sanction.id;
+  const revoked = await app.inject({
+    method: 'POST', url: `/moderation/sanctions/${sanctionId}/revoke`,
+    headers: { ...bearer(moderator.accessToken), 'idempotency-key': `revoke-${suffix()}` },
+    payload: { reason: 'Review completed.' }
+  });
+  assert.equal(revoked.statusCode, 200, revoked.body);
+  const allowedLogin = await app.inject({
+    method: 'POST', url: '/auth/login', payload: { login: target.user.username, password: 'password123' }
+  });
+  assert.equal(allowedLogin.statusCode, 200, allowedLogin.body);
+});
+
+test('posting restriction is enforced by poll creation on the backend', async () => {
+  const reporter = await registerUser();
+  const moderator = await registerUser();
+  const target = await registerUser();
+  await setRole(moderator, 'moderator');
+  const report = await app.inject({
+    method: 'POST', url: '/reports', headers: bearer(reporter.accessToken),
+    payload: { targetType: 'user', targetId: target.user.id, category: 'spam', description: 'Spam account.' }
+  });
+  const caseId = report.json<{ case: { id: string } }>().case.id;
+  const restricted = await app.inject({
+    method: 'POST', url: `/moderation/users/${target.user.id}/restriction`,
+    headers: { ...bearer(moderator.accessToken), 'idempotency-key': `restriction-${suffix()}` },
+    payload: { caseId, restrictionType: 'posting_restriction', reason: 'Repeated spam.', durationHours: 1 }
+  });
+  assert.equal(restricted.statusCode, 201, restricted.body);
+  const blockedPoll = await app.inject({
+    method: 'POST', url: '/polls', headers: bearer(target.accessToken),
+    payload: { question: 'This should be rejected', options: ['One', 'Two'] }
+  });
+  assert.equal(blockedPoll.statusCode, 403, blockedPoll.body);
 });
 
 after(async () => {

@@ -4,6 +4,7 @@ import { db } from '../../config/database.js';
 import { decodeAdminCursor, pageWithCursor } from '../admin/pagination.js';
 import type { UserRole } from '../auth/auth.repository.js';
 import { recordAdminAudit } from '../admin/audit.repository.js';
+import { listUserSanctions } from './sanctions.repository.js';
 
 export const reportTargetTypes = ['user', 'poll', 'comment'] as const;
 export type ReportTargetType = (typeof reportTargetTypes)[number];
@@ -281,7 +282,7 @@ export async function getModerationCase(caseId: string) {
   const moderationCase = await getCaseRow(db, caseId);
   if (!moderationCase) throw new ModerationCaseNotFoundError('Moderation case was not found.');
 
-  const [reports, notes] = await Promise.all([
+  const [reports, notes, sanctions] = await Promise.all([
     db.query<ReportRow>(
       `SELECT r.id, r.reporter_user_id, r.target_type, r.target_id, r.category,
               r.description, r.status, r.created_at, r.updated_at
@@ -302,12 +303,14 @@ export async function getModerationCase(caseId: string) {
         WHERE case_id = $1
         ORDER BY created_at ASC, id ASC`,
       [caseId]
-    )
+    ),
+    moderationCase.target_type === 'user' ? listUserSanctions(moderationCase.target_id) : Promise.resolve([])
   ]);
 
   return {
     case: mapCase(moderationCase),
     reports: reports.rows.map(mapReport),
+    sanctions,
     notes: notes.rows.map((note) => ({
       id: note.id,
       authorUserId: note.author_user_id,

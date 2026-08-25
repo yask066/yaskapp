@@ -5,10 +5,12 @@ declare module '@fastify/jwt' {
     payload: {
       sub: string;
       username: string;
+      sessionVersion: number;
     };
     user: {
       sub: string;
       username: string;
+      sessionVersion: number;
     };
   }
 }

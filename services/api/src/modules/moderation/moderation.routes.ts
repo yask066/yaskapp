@@ -1,9 +1,11 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 
 import { authenticate } from '../auth/auth.utils.js';
 import { moderationPermissionsForRole, requirePermission } from '../auth/permissions.js';
 import { AdminCursorError } from '../admin/pagination.js';
+import { adminMutationRateLimit } from '../admin/admin.rate-limit.js';
 import {
   AdminCommentNotFoundError,
   AdminPollNotFoundError,
@@ -19,13 +21,20 @@ import {
   ModerationTargetNotFoundError
 } from './moderation.repository.js';
 import {
+  IdempotencyConflictError,
+  SanctionCaseConflictError,
+  SanctionTargetNotFoundError
+} from './sanctions.repository.js';
+import {
   addModerationNote,
   assignModerationCase,
   createReport,
   getModerationCase,
   listModerationCases,
   takeoverModerationCase,
-  transitionModerationCase
+  transitionModerationCase,
+  issueSanction,
+  revokeSanction
 } from './moderation.service.js';
 
 const reportBodySchema = z.object({
@@ -59,6 +68,14 @@ const removeContentBodySchema = z.object({
   caseId: z.string().uuid(),
   reason: z.string().trim().min(1).max(500)
 }).strict();
+const userParamsSchema = z.object({ userId: z.string().uuid() }).strict();
+const sanctionBodySchema = z.object({
+  caseId: z.string().uuid(),
+  reason: z.string().trim().min(1).max(500),
+  restrictionType: z.enum(['posting_restriction', 'comment_restriction']).optional(),
+  durationHours: z.coerce.number().int().min(1).max(8760).optional()
+}).strict();
+const revokeParamsSchema = z.object({ sanctionId: z.string().uuid() }).strict();
 
 function validationError(reply: FastifyReply) {
   return reply.status(400).send({
@@ -67,13 +84,18 @@ function validationError(reply: FastifyReply) {
   });
 }
 
+function requestFingerprint(value: unknown) {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
 function moderationError(reply: FastifyReply, error: unknown) {
   if (error instanceof ModerationCaseNotFoundError || error instanceof ModerationTargetNotFoundError || error instanceof AdminPollNotFoundError || error instanceof AdminCommentNotFoundError) {
     return reply.status(404).send({ error: 'not_found', message: error.message });
   }
-  if (error instanceof ModerationCaseConflictError) {
+  if (error instanceof ModerationCaseConflictError || error instanceof SanctionCaseConflictError || error instanceof IdempotencyConflictError) {
     return reply.status(409).send({ error: 'moderation_conflict', message: error.message });
   }
+  if (error instanceof SanctionTargetNotFoundError) return reply.status(404).send({ error: 'not_found', message: error.message });
   throw error;
 }
 
@@ -96,6 +118,69 @@ export function registerModerationRoutes(app: FastifyInstance) {
         });
       }
       return reply.send({ permissions });
+    }
+  );
+
+  const sanctionRoutes = [
+    ['warning', 'moderation.warning.issue'],
+    ['strike', 'moderation.strike.issue'],
+    ['restriction', 'moderation.restriction.issue'],
+    ['temporary-ban', 'moderation.user.ban']
+  ] as const;
+  for (const [action, permission] of sanctionRoutes) {
+    app.post(
+      `/moderation/users/:userId/${action}`,
+      { preHandler: [authenticate, adminMutationRateLimit, requirePermission(permission)] },
+      async (request, reply) => {
+        const parsedParams = userParamsSchema.safeParse(request.params);
+        const parsedBody = sanctionBodySchema.safeParse(request.body);
+        const idempotencyKey = request.headers['idempotency-key'];
+        if (!parsedParams.success || !parsedBody.success || typeof idempotencyKey !== 'string') return validationError(reply);
+        const type = action === 'temporary-ban' ? 'temporary_ban' : action === 'restriction' ? parsedBody.data.restrictionType ?? 'posting_restriction' : action as 'warning' | 'strike';
+        if ((type === 'posting_restriction' || type === 'temporary_ban') && !parsedBody.data.durationHours) return validationError(reply);
+        try {
+          const actor = await actorContext(request);
+          const result = await issueSanction({
+            userId: parsedParams.data.userId,
+            caseId: parsedBody.data.caseId,
+            actorUserId: actor.actorId,
+            actorRole: actor.actorRole,
+            type,
+            reason: parsedBody.data.reason,
+            expiresAt: parsedBody.data.durationHours ? new Date(Date.now() + parsedBody.data.durationHours * 60 * 60 * 1000) : undefined,
+            idempotencyKey,
+            fingerprint: requestFingerprint({ action, params: parsedParams.data, body: parsedBody.data })
+          });
+          return reply.status(result.replayed ? 200 : 201).send(result);
+        } catch (error) {
+          return moderationError(reply, error);
+        }
+      }
+    );
+  }
+
+  app.post(
+    '/moderation/sanctions/:sanctionId/revoke',
+    { preHandler: [authenticate, adminMutationRateLimit, requirePermission('moderation.sanction.revoke')] },
+    async (request, reply) => {
+      const parsedParams = revokeParamsSchema.safeParse(request.params);
+      const parsedBody = z.object({ reason: z.string().trim().min(1).max(500) }).strict().safeParse(request.body);
+      const idempotencyKey = request.headers['idempotency-key'];
+      if (!parsedParams.success || !parsedBody.success || typeof idempotencyKey !== 'string') return validationError(reply);
+      try {
+        const actor = await actorContext(request);
+        const result = await revokeSanction({
+          sanctionId: parsedParams.data.sanctionId,
+          actorUserId: actor.actorId,
+          actorRole: actor.actorRole,
+          reason: parsedBody.data.reason,
+          idempotencyKey,
+          fingerprint: requestFingerprint({ params: parsedParams.data, body: parsedBody.data })
+        });
+        return reply.status(result.replayed ? 200 : 200).send(result);
+      } catch (error) {
+        return moderationError(reply, error);
+      }
     }
   );
 

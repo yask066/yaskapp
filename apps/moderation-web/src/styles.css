@@ -16,6 +16,7 @@ form { gap: 16px; margin-top: 26px; }
 input, select, textarea { width: 100%; border: 1px solid #d9dfeb; border-radius: 9px; padding: 10px 11px; background: #fff; color: #172033; }
 textarea { min-height: 110px; resize: vertical; }
 .primary { color: white; background: #5365db; }
+.danger { color: white; background: #c43d4b; }
 .secondary { color: #3343a9; background: #edf0ff; }
 .ghost { color: #4e5a70; background: transparent; border: 1px solid #d9dfeb; }
 .error { color: #b42318; min-height: 22px; }
@@ -36,5 +37,7 @@ textarea { min-height: 110px; resize: vertical; }
 .detail-section { border-top: 1px solid #edf0f5; padding-top: 16px; margin-top: 18px; }
 .report, .note { background: #f7f8fb; padding: 12px; border-radius: 10px; margin: 8px 0; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.sanction-actions { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; padding: 8px 0; border-top: 1px solid #edf0f5; }
+.note button { margin-top: 8px; }
 .empty { color: #6c768b; padding: 40px 10px; text-align: center; }
 @media (max-width: 900px) { .shell { padding: 16px; } .workspace { grid-template-columns: 1fr; } .toolbar { flex-wrap: wrap; } .topbar { align-items: start; } }

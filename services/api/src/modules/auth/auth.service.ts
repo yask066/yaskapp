@@ -8,6 +8,7 @@ import {
 } from './auth.repository.js';
 import type { AuthenticatedUser } from './auth.repository.js';
 import { hashPassword, verifyPassword } from './password.js';
+import { assertUserCanAuthenticate } from '../moderation/sanctions.repository.js';
 
 const tokenExpiresIn = '7d';
 
@@ -47,11 +48,12 @@ function isUniqueViolation(error: unknown): error is DatabaseError {
   return Boolean(error && typeof error === 'object' && 'code' in error && error.code === '23505');
 }
 
-function signAccessToken(app: FastifyInstance, user: AuthenticatedUser) {
+function signAccessToken(app: FastifyInstance, user: AuthenticatedUser, sessionVersion: number) {
   return app.jwt.sign(
     {
       sub: user.id,
-      username: user.username
+      username: user.username,
+      sessionVersion
     },
     {
       expiresIn: tokenExpiresIn
@@ -59,10 +61,10 @@ function signAccessToken(app: FastifyInstance, user: AuthenticatedUser) {
   );
 }
 
-function authResponse(app: FastifyInstance, user: AuthenticatedUser): AuthResponse {
+function authResponse(app: FastifyInstance, user: AuthenticatedUser, sessionVersion: number): AuthResponse {
   return {
     user,
-    accessToken: signAccessToken(app, user),
+    accessToken: signAccessToken(app, user, sessionVersion),
     tokenType: 'Bearer',
     expiresIn: tokenExpiresIn
   };
@@ -82,7 +84,7 @@ export async function registerUser(app: FastifyInstance, input: RegisterInput) {
       displayName: input.displayName?.trim() || username
     });
 
-    return authResponse(app, user);
+    return authResponse(app, user, 0);
   } catch (error) {
     if (isUniqueViolation(error)) {
       throw new ConflictError('Email or username is already taken.');
@@ -104,6 +106,13 @@ export async function signInUser(app: FastifyInstance, input: LoginInput) {
     throw new AuthenticationError('Account is not active.');
   }
 
+  try {
+    await assertUserCanAuthenticate(account.user.id);
+  } catch (error) {
+    if (error instanceof Error) throw new AuthenticationError(error.message);
+    throw error;
+  }
+
   const passwordMatches = await verifyPassword(input.password, account.passwordHash);
 
   if (!passwordMatches) {
@@ -112,5 +121,5 @@ export async function signInUser(app: FastifyInstance, input: LoginInput) {
 
   await markUserSeen(account.user.id);
 
-  return authResponse(app, account.user);
+  return authResponse(app, account.user, account.sessionVersion);
 }

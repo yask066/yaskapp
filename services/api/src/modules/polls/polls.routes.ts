@@ -8,6 +8,7 @@ import {
   broadcastPollDeleted
 } from '../../realtime/realtime.hub.js';
 import { authenticate, optionalAuthenticate } from '../auth/auth.utils.js';
+import { UserSanctionedError } from '../moderation/sanctions.repository.js';
 import {
   PollAlreadyVotedError,
   PollClosedError,
@@ -114,6 +115,10 @@ function pollError(reply: FastifyReply, error: unknown) {
     });
   }
 
+  if (error instanceof UserSanctionedError) {
+    return reply.status(403).send({ error: 'restricted', message: error.message });
+  }
+
 
   throw error;
 }
@@ -180,14 +185,18 @@ export function registerPollRoutes(app: FastifyInstance) {
         return validationError(reply, parsedBody.error);
       }
 
-      const poll = await createPoll({
-        authorId: request.user.sub,
-        ...parsedBody.data
-      });
+      try {
+        const poll = await createPoll({
+          authorId: request.user.sub,
+          ...parsedBody.data
+        });
 
-      return reply.status(201).send({
-        poll
-      });
+        return reply.status(201).send({
+          poll
+        });
+      } catch (error) {
+        return pollError(reply, error);
+      }
     }
   );
 

@@ -11,6 +11,7 @@ import {
   unlikePollRecord
 } from './polls.repository.js';
 import type { PollVisibility } from './polls.repository.js';
+import { assertUserCanComment, assertUserCanCreatePoll } from '../moderation/sanctions.repository.js';
 
 export class PollNotFoundError extends Error {}
 
@@ -70,6 +71,7 @@ function normalizeOptionalText(value: string | undefined) {
 }
 
 export async function createPoll(input: CreatePollInput) {
+  await assertUserCanCreatePoll(input.authorId);
   return createPollRecord({
     authorId: input.authorId,
     question: input.question.trim(),
@@ -111,6 +113,7 @@ export async function listPollComments(input: ListPollCommentsInput) {
 }
 
 export async function createPollComment(input: CreatePollCommentInput) {
+  await assertUserCanComment(input.authorId);
   const result = await createPollCommentRecord({
     pollId: input.pollId,
     authorId: input.authorId,
