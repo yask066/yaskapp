@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  api-and-web:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: yaskapp
+          POSTGRES_USER: yaskapp
+          POSTGRES_PASSWORD: yaskapp
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U yaskapp -d yaskapp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      minio:
+        image: minio/minio:latest
+        env:
+          MINIO_ROOT_USER: yaskapp
+          MINIO_ROOT_PASSWORD: yaskapp-secret
+        ports: ['9000:9000']
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://yaskapp:yaskapp@localhost:5432/yaskapp
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-only-secret-with-at-least-16-chars
+      S3_ENDPOINT: http://localhost:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: yaskapp-media
+      S3_ACCESS_KEY_ID: yaskapp
+      S3_SECRET_ACCESS_KEY: yaskapp-secret
+      S3_FORCE_PATH_STYLE: 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Create MinIO test bucket
+        run: |
+          for i in {1..30}; do curl -fsS http://127.0.0.1:9000/minio/health/live && break || sleep 2; done
+          docker run --network host --rm minio/mc:latest alias set ci http://127.0.0.1:9000 yaskapp yaskapp-secret
+          docker run --network host --rm minio/mc:latest mb --ignore-existing ci/yaskapp-media
+      - run: npm run api:typecheck
+      - run: npm run api:test
+      - name: Moderation web syntax and smoke tests
+        working-directory: apps/moderation-web
+        run: |
+          node --check src/main.js
+          node --test test/smoke.test.mjs

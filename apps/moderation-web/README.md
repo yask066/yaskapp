@@ -32,3 +32,8 @@ Before production, replace the MVP login/token flow with an httpOnly Secure
 cookie session, MFA through the identity provider, CSRF protection, strict
 origin/CORS rules, HTTPS, and an internal VPN/SSO boundary. Do not expose
 `MODERATION_HOST` directly to the public internet.
+
+CI runs `node --check src/main.js` and the web smoke tests together with the
+full API typecheck and integration suite. The API suite includes moderation
+report-to-case, content removal, sanctions, appeals, idempotency, rollback,
+concurrency, session enforcement, and permission matrix coverage.

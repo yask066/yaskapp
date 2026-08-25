@@ -594,6 +594,14 @@ E2E smoke:
 - удалить client-side admin capability probing, если оно больше не нужно;
 - сохранить server-side `/admin/*` только как внутренний API для panel/backend.
 
+### Финальный блок — CI и verification
+
+- backend typecheck и полный integration suite запускаются в CI;
+- web-панель проходит JavaScript syntax check и smoke-тесты;
+- PostgreSQL, Redis и MinIO поднимаются как CI services;
+- moderation regression suite покрывает permissions, HTTP error matrix,
+  transactions, rollback, idempotency, concurrency, sanctions и appeals.
+
 ## 21. Открытые решения
 
 1. Будет ли web-панель доступна через VPN или публичный домен с MFA?
