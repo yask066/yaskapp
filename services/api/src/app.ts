@@ -9,6 +9,10 @@ import { rateLimit } from './config/rate-limit.js';
 import { registerAuthRoutes } from './modules/auth/auth.routes.js';
 import { getCurrentUser } from './modules/auth/auth.utils.js';
 import { registerAdminRoutes } from './modules/admin/admin.routes.js';
+import {
+  buildAdminFailureLog,
+  isAdminFailureRequest
+} from './modules/admin/admin-request-logging.js';
 import { registerHealthRoutes } from './modules/health/health.routes.js';
 import { registerPollRoutes } from './modules/polls/polls.routes.js';
 import { registerProfileRoutes } from './modules/profiles/profiles.routes.js';
@@ -117,6 +121,26 @@ export function buildApp() {
       windowMs: 60_000
     })
   );
+
+  app.addHook('onResponse', (request, reply, done) => {
+    if (isAdminFailureRequest(request.url, reply.statusCode)) {
+      const logEntry = buildAdminFailureLog({
+        requestId: request.id,
+        method: request.method,
+        route: request.routeOptions.url ?? request.url.split('?', 1)[0],
+        statusCode: reply.statusCode,
+        actorUserId: request.user?.sub
+      });
+
+      if (reply.statusCode >= 500) {
+        request.log.error(logEntry, 'Admin request failed');
+      } else {
+        request.log.warn(logEntry, 'Admin request failed');
+      }
+    }
+
+    done();
+  });
 
   registerAuthRoutes(app);
   registerAdminRoutes(app);
