@@ -30,6 +30,7 @@ import {
 import { getBlockedUser } from './admin.repository.js';
 import { listAdminAudit } from './audit.service.js';
 import { AdminCursorError } from './pagination.js';
+import { adminMutationRateLimit } from './admin.rate-limit.js';
 
 const userParamsSchema = z.object({
   userId: z.string().uuid()
@@ -189,7 +190,7 @@ export function registerAdminRoutes(app: FastifyInstance) {
 
   app.post(
     '/admin/users/:userId/unblock',
-    { preHandler: [authenticate, requirePermission('admin.users.unblock')] },
+    { preHandler: [authenticate, requirePermission('admin.users.unblock'), adminMutationRateLimit] },
     async (request, reply) => {
       const parsedParams = userParamsSchema.safeParse(request.params);
       const parsedBody = blockBodySchema.safeParse(request.body);
@@ -214,7 +215,7 @@ export function registerAdminRoutes(app: FastifyInstance) {
 
   app.delete(
     '/admin/users/:userId',
-    { preHandler: [authenticate, requirePermission('admin.users.delete')] },
+    { preHandler: [authenticate, requirePermission('admin.users.delete'), adminMutationRateLimit] },
     async (request, reply) => {
       const parsedParams = userParamsSchema.safeParse(request.params);
       const parsedBody = blockBodySchema.safeParse(request.body);
@@ -236,7 +237,7 @@ export function registerAdminRoutes(app: FastifyInstance) {
 
   app.patch(
     '/admin/users/:userId/role',
-    { preHandler: [authenticate, requirePermission('admin.users.roles.update')] },
+    { preHandler: [authenticate, requirePermission('admin.users.roles.update'), adminMutationRateLimit] },
     async (request, reply) => {
       const parsedParams = userParamsSchema.safeParse(request.params);
       const parsedBody = roleBodySchema.safeParse(request.body);
@@ -320,7 +321,7 @@ export function registerAdminRoutes(app: FastifyInstance) {
   app.delete(
     '/admin/polls/:pollId',
     {
-      preHandler: [authenticate, requirePermission('admin.polls.delete')]
+      preHandler: [authenticate, requirePermission('admin.polls.delete'), adminMutationRateLimit]
     },
     async (request, reply) => {
       const parsedParams = pollParamsSchema.safeParse(request.params);
@@ -354,7 +355,7 @@ export function registerAdminRoutes(app: FastifyInstance) {
   app.delete(
     '/admin/comments/:commentId',
     {
-      preHandler: [authenticate, requirePermission('admin.comments.delete')]
+      preHandler: [authenticate, requirePermission('admin.comments.delete'), adminMutationRateLimit]
     },
     async (request, reply) => {
       const parsedParams = commentParamsSchema.safeParse(request.params);
@@ -391,7 +392,7 @@ export function registerAdminRoutes(app: FastifyInstance) {
   app.post(
     '/admin/users/:userId/block',
     {
-      preHandler: [authenticate, requirePermission('admin.users.block')]
+      preHandler: [authenticate, requirePermission('admin.users.block'), adminMutationRateLimit]
     },
     async (request, reply) => {
       const parsedParams = userParamsSchema.safeParse(request.params);
