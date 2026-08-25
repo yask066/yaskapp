@@ -43,12 +43,24 @@ type CommentDeletedEvent = {
   };
 };
 
+type UserBlockedEvent = {
+  type: 'user.blocked';
+  payload: { userId: string };
+};
+
+type UserUnblockedEvent = {
+  type: 'user.unblocked';
+  payload: { userId: string };
+};
+
 type RealtimeEvent =
   | ConnectionReadyEvent
   | PollVoteCreatedEvent
   | PollVoteUpdatedEvent
   | PollDeletedEvent
-  | CommentDeletedEvent;
+  | CommentDeletedEvent
+  | UserBlockedEvent
+  | UserUnblockedEvent;
 
 const openReadyState = 1;
 const clients = new Set<RealtimeSocket>();
@@ -104,6 +116,14 @@ export function broadcastCommentDeleted(payload: CommentDeletedEvent['payload'])
     type: 'comment.deleted',
     payload
   });
+}
+
+export function broadcastUserBlocked(payload: UserBlockedEvent['payload']) {
+  broadcast({ type: 'user.blocked', payload });
+}
+
+export function broadcastUserUnblocked(payload: UserUnblockedEvent['payload']) {
+  broadcast({ type: 'user.unblocked', payload });
 }
 
 function sanitizePoll(

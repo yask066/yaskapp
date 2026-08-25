@@ -123,4 +123,8 @@ export type RealtimeEvent =
         commentId: string;
         pollId: string;
       };
+    }
+  | {
+      type: 'user.blocked' | 'user.unblocked';
+      payload: { userId: string };
     };

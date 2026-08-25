@@ -1,7 +1,12 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
-import { broadcastCommentDeleted, broadcastPollDeleted } from '../../realtime/realtime.hub.js';
+import {
+  broadcastCommentDeleted,
+  broadcastPollDeleted,
+  broadcastUserBlocked,
+  broadcastUserUnblocked
+} from '../../realtime/realtime.hub.js';
 import { authenticate } from '../auth/auth.utils.js';
 import { permissionsForRole, requirePermission } from '../auth/permissions.js';
 import {
@@ -174,6 +179,9 @@ export function registerAdminRoutes(app: FastifyInstance) {
           reason: parsedBody.data.reason,
           requestId: request.id
         });
+        if (result.status === 'updated') {
+          broadcastUserUnblocked({ userId: parsedParams.data.userId });
+        }
         return reply.send({ user: await getAdminUser(parsedParams.data.userId), status: result.status });
       } catch (error) {
         return adminError(reply, error);
@@ -384,6 +392,9 @@ export function registerAdminRoutes(app: FastifyInstance) {
             requestId: request.id
           }
         );
+        if (result.status === 'blocked') {
+          broadcastUserBlocked({ userId: parsedParams.data.userId });
+        }
         const user = await getBlockedUser(parsedParams.data.userId);
 
         return reply.send({

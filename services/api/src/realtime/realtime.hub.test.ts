@@ -7,7 +7,9 @@ import {
   broadcastPollVoteCreated,
   broadcastPollVoteUpdated,
   broadcastPollDeleted,
-  broadcastCommentDeleted
+  broadcastCommentDeleted,
+  broadcastUserBlocked,
+  broadcastUserUnblocked
 } from './realtime.hub.js';
 
 test('realtime vote events omit viewer-specific vote state', () => {
@@ -156,4 +158,22 @@ test('realtime comment deletion events broadcast only comment and poll ids', () 
       pollId: 'poll-1'
     }
   });
+});
+
+test('realtime user moderation events broadcast only the user id', () => {
+  const messages: string[] = [];
+  const remove = addRealtimeClient({
+    readyState: 1,
+    send: (message) => messages.push(message)
+  });
+  messages.length = 0;
+
+  broadcastUserBlocked({ userId: 'user-blocked' });
+  broadcastUserUnblocked({ userId: 'user-unblocked' });
+
+  assert.deepEqual(messages.map((message) => JSON.parse(message)), [
+    { type: 'user.blocked', payload: { userId: 'user-blocked' } },
+    { type: 'user.unblocked', payload: { userId: 'user-unblocked' } }
+  ]);
+  remove();
 });

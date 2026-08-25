@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 
 import 'admin_api_client.dart';
+import '../realtime/realtime_client.dart';
 
 class AdminScreen extends StatefulWidget {
-  const AdminScreen({required this.accessToken, required this.apiClient, this.capabilities, super.key});
+  const AdminScreen({required this.accessToken, required this.apiClient, this.capabilities, RealtimeClient? realtimeClient, super.key}) : _realtimeClient = realtimeClient;
   final String accessToken;
   final AdminApiClient apiClient;
   final AdminCapabilities? capabilities;
+  final RealtimeClient? _realtimeClient;
   @override
   State<AdminScreen> createState() => _AdminScreenState();
 }
@@ -23,13 +26,32 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   List<AdminPollSummary> _polls = [];
   List<AdminAuditEntry> _audit = [];
   var _auditAvailable = true;
+  late final RealtimeClient _realtime;
+  late final bool _ownsRealtime;
+  StreamSubscription<UserModerationRealtimeEvent>? _blockedSubscription;
+  StreamSubscription<UserModerationRealtimeEvent>? _unblockedSubscription;
 
   AdminCapabilities get _capabilities => widget.capabilities ?? const AdminCapabilities(<String>{});
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _ownsRealtime = widget._realtimeClient == null;
+    _realtime = widget._realtimeClient ?? RealtimeClient();
+    _blockedSubscription = _realtime.userBlocked.listen((_) => _load());
+    _unblockedSubscription = _realtime.userUnblocked.listen((_) => _load());
+    _realtime.connect();
+    _load();
+  }
   @override
-  void dispose() { _tabs.dispose(); _query.dispose(); super.dispose(); }
+  void dispose() {
+    unawaited(_blockedSubscription?.cancel());
+    unawaited(_unblockedSubscription?.cancel());
+    if (_ownsRealtime) unawaited(_realtime.close());
+    _tabs.dispose();
+    _query.dispose();
+    super.dispose();
+  }
 
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });

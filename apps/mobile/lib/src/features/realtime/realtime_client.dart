@@ -18,6 +18,11 @@ class PollDeletedRealtimeEvent {
   final String pollId;
 }
 
+class UserModerationRealtimeEvent {
+  const UserModerationRealtimeEvent({required this.userId});
+  final String userId;
+}
+
 class RealtimeClient {
   RealtimeClient({ApiConfig config = const ApiConfig()}) : _config = config;
 
@@ -28,10 +33,18 @@ class RealtimeClient {
       StreamController<PollVoteRealtimeEvent>.broadcast();
   final _pollDeletedController =
       StreamController<PollDeletedRealtimeEvent>.broadcast();
+  final _userBlockedController =
+      StreamController<UserModerationRealtimeEvent>.broadcast();
+  final _userUnblockedController =
+      StreamController<UserModerationRealtimeEvent>.broadcast();
 
   Stream<PollVoteRealtimeEvent> get pollVotes => _pollVoteController.stream;
   Stream<PollDeletedRealtimeEvent> get pollDeletions =>
       _pollDeletedController.stream;
+  Stream<UserModerationRealtimeEvent> get userBlocked =>
+      _userBlockedController.stream;
+  Stream<UserModerationRealtimeEvent> get userUnblocked =>
+      _userUnblockedController.stream;
 
   void connect() {
     if (_channel != null) {
@@ -66,6 +79,8 @@ class RealtimeClient {
     await disconnect();
     await _pollVoteController.close();
     await _pollDeletedController.close();
+    await _userBlockedController.close();
+    await _userUnblockedController.close();
   }
 
   void _handleMessage(dynamic message) {
@@ -87,6 +102,19 @@ class RealtimeClient {
         _pollDeletedController.add(
           PollDeletedRealtimeEvent(pollId: payload['pollId'] as String),
         );
+      }
+      return;
+    }
+
+    if (decoded['type'] == 'user.blocked' || decoded['type'] == 'user.unblocked') {
+      final payload = decoded['payload'];
+      if (payload is Map<String, dynamic> && payload['userId'] is String) {
+        final event = UserModerationRealtimeEvent(userId: payload['userId'] as String);
+        if (decoded['type'] == 'user.blocked') {
+          _userBlockedController.add(event);
+        } else {
+          _userUnblockedController.add(event);
+        }
       }
       return;
     }
