@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "db:migrate": "tsx src/db/migrate.ts",
+    "db:bootstrap-superadmin": "tsx src/db/bootstrap-superadmin.cli.ts",
     "db:check": "tsx src/db/check.ts",
     "avatars:cleanup": "tsx src/jobs/cleanup-avatar-objects.ts",
     "test": "npm run db:migrate && node --import tsx --test --test-reporter spec \"src/**/*.test.ts\"",
