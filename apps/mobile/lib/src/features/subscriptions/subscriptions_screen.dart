@@ -8,6 +8,8 @@ import '../polls/poll_comments_screen.dart';
 import '../polls/poll_summary.dart';
 import '../polls/polls_api_client.dart';
 import '../realtime/realtime_client.dart';
+import '../reports/report_dialog.dart';
+import '../reports/reports_api_client.dart';
 
 class SubscriptionsScreen extends StatefulWidget {
   const SubscriptionsScreen({
@@ -15,12 +17,15 @@ class SubscriptionsScreen extends StatefulWidget {
     super.key,
     PollsApiClient? pollsApiClient,
     RealtimeClient? realtimeClient,
+    ReportsApiClient? reportsApiClient,
   })  : _pollsApiClient = pollsApiClient,
-        _realtimeClient = realtimeClient;
+        _realtimeClient = realtimeClient,
+        _reportsApiClient = reportsApiClient;
 
   final AuthSession session;
   final PollsApiClient? _pollsApiClient;
   final RealtimeClient? _realtimeClient;
+  final ReportsApiClient? _reportsApiClient;
 
   @override
   State<SubscriptionsScreen> createState() => _SubscriptionsScreenState();
@@ -31,6 +36,8 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   late final RealtimeClient _realtimeClient;
   late final bool _ownsPollsApiClient;
   late final bool _ownsRealtimeClient;
+  late final ReportsApiClient _reportsApiClient;
+  late final bool _ownsReportsApiClient;
   late Future<List<PollSummary>> _pollsFuture;
   StreamSubscription<PollVoteRealtimeEvent>? _voteSubscription;
   StreamSubscription<PollDeletedRealtimeEvent>? _pollDeletedSubscription;
@@ -44,8 +51,10 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     super.initState();
     _ownsPollsApiClient = widget._pollsApiClient == null;
     _ownsRealtimeClient = widget._realtimeClient == null;
+    _ownsReportsApiClient = widget._reportsApiClient == null;
     _pollsApiClient = widget._pollsApiClient ?? PollsApiClient();
     _realtimeClient = widget._realtimeClient ?? RealtimeClient();
+    _reportsApiClient = widget._reportsApiClient ?? ReportsApiClient();
     _pollsFuture = _loadPolls();
     _voteSubscription = _realtimeClient.pollVotes.listen(_replacePoll);
     _pollDeletedSubscription =
@@ -63,6 +72,9 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     if (_ownsPollsApiClient) {
       _pollsApiClient.close();
     }
+    if (_ownsReportsApiClient) {
+      _reportsApiClient.close();
+    }
     super.dispose();
   }
 
@@ -70,6 +82,16 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     return _pollsApiClient
         .listSubscriptions(accessToken: widget.session.accessToken)
         .timeout(const Duration(seconds: 10));
+  }
+
+  Future<void> _reportPoll(PollSummary poll) {
+    return showReportDialog(
+      context: context,
+      accessToken: widget.session.accessToken,
+      targetType: 'poll',
+      targetId: poll.id,
+      reportsApiClient: _reportsApiClient,
+    );
   }
 
   Future<void> _refresh() async {
@@ -274,6 +296,9 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                         onDeletePoll: poll.author.id == widget.session.user.id
                             ? () => _deletePoll(poll)
                             : null,
+                        onReport: poll.author.id == widget.session.user.id
+                            ? null
+                            : () => _reportPoll(poll),
                         isVoting: _votingPollIds.contains(poll.id),
                         onOpenComments: () => _openComments(poll),
                         onToggleLike: _likingPollIds.contains(poll.id)

@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../auth/auth_api_client.dart';
 import '../auth/auth_session.dart';
-import '../admin/admin_api_client.dart';
-import '../admin/admin_screen.dart';
 import '../feed/feed_screen.dart';
 import '../polls/polls_api_client.dart';
 import '../profile/profile_screen.dart';
@@ -35,9 +33,6 @@ class _HomeScreenState extends State<HomeScreen> {
   var _selectedIndex = 0;
   late final PollsApiClient _pollsApiClient;
   late final bool _ownsPollsApiClient;
-  late final AdminApiClient _adminApiClient;
-  var _adminAvailable = false;
-  AdminCapabilities? _adminCapabilities;
   final _feedKey = GlobalKey<FeedScreenState>();
   final _profileKey = GlobalKey<ProfileScreenState>();
 
@@ -46,17 +41,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _ownsPollsApiClient = widget._pollsApiClient == null;
     _pollsApiClient = widget._pollsApiClient ?? PollsApiClient();
-    _adminApiClient = AdminApiClient();
-    _checkAdminAccess();
-  }
-
-  Future<void> _checkAdminAccess() async {
-    try {
-      final capabilities = await _adminApiClient.loadCapabilities(accessToken: widget.session.accessToken);
-      if (mounted) setState(() { _adminAvailable = true; _adminCapabilities = capabilities; });
-    } on AdminApiException {
-      // A denied probe keeps the admin area hidden for ordinary users.
-    }
   }
 
   @override
@@ -64,8 +48,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_ownsPollsApiClient) {
       _pollsApiClient.close();
     }
-    _adminApiClient.close();
-
     super.dispose();
   }
 
@@ -95,13 +77,6 @@ class _HomeScreenState extends State<HomeScreen> {
             session: widget.session,
             pollsApiClient: _pollsApiClient,
           ),
-          _adminAvailable
-              ? AdminScreen(
-                  accessToken: widget.session.accessToken,
-                  apiClient: _adminApiClient,
-                  capabilities: _adminCapabilities,
-                )
-              : const SizedBox.shrink(),
           const _NotificationsPlaceholder(),
           ProfileScreen(
             key: _profileKey,
@@ -117,13 +92,12 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: _MainBottomNavigation(
         selectedIndex: _selectedIndex,
         onCreate: _openCreatePoll,
-        showAdmin: _adminAvailable,
         onSelected: (index) {
           setState(() {
             _selectedIndex = index;
           });
 
-          if (index == 4) {
+          if (index == 3) {
             unawaited(_profileKey.currentState?.refreshMyPolls());
           }
         },
@@ -137,13 +111,11 @@ class _MainBottomNavigation extends StatelessWidget {
     required this.selectedIndex,
     required this.onSelected,
     required this.onCreate,
-    required this.showAdmin,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onSelected;
   final VoidCallback onCreate;
-  final bool showAdmin;
 
   @override
   Widget build(BuildContext context) {
@@ -177,27 +149,19 @@ class _MainBottomNavigation extends StatelessWidget {
                 child: const Center(child: _CreateNavigationIcon()),
               ),
             ),
-            if (showAdmin)
-              _NavItem(
-                label: 'Admin',
-                icon: Icons.admin_panel_settings_outlined,
-                selectedIcon: Icons.admin_panel_settings,
-                selected: selectedIndex == 2,
-                onTap: () => onSelected(2),
-              ),
             _NavItem(
               label: 'Notifications',
               icon: Icons.notifications_none_outlined,
               selectedIcon: Icons.notifications,
-              selected: selectedIndex == 3,
-              onTap: () => onSelected(3),
+              selected: selectedIndex == 2,
+              onTap: () => onSelected(2),
             ),
             _NavItem(
               label: 'Profile',
               icon: Icons.person_outline,
               selectedIcon: Icons.person,
-              selected: selectedIndex == 4,
-              onTap: () => onSelected(4),
+              selected: selectedIndex == 3,
+              onTap: () => onSelected(3),
             ),
           ],
         ),

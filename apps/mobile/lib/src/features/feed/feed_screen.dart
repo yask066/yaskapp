@@ -11,6 +11,8 @@ import '../polls/polls_api_client.dart';
 import '../profile/profiles_api_client.dart';
 import '../profile/public_profile_screen.dart';
 import '../realtime/realtime_client.dart';
+import '../reports/report_dialog.dart';
+import '../reports/reports_api_client.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({
@@ -19,15 +21,18 @@ class FeedScreen extends StatefulWidget {
     PollsApiClient? pollsApiClient,
     ProfilesApiClient? profilesApiClient,
     RealtimeClient? realtimeClient,
+    ReportsApiClient? reportsApiClient,
     this.onPollCreated,
   })  : _pollsApiClient = pollsApiClient,
         _profilesApiClient = profilesApiClient,
-        _realtimeClient = realtimeClient;
+        _realtimeClient = realtimeClient,
+        _reportsApiClient = reportsApiClient;
 
   final AuthSession session;
   final PollsApiClient? _pollsApiClient;
   final ProfilesApiClient? _profilesApiClient;
   final RealtimeClient? _realtimeClient;
+  final ReportsApiClient? _reportsApiClient;
   final ValueChanged<PollSummary>? onPollCreated;
 
   @override
@@ -42,6 +47,8 @@ class FeedScreenState extends State<FeedScreen> {
   late final ProfilesApiClient _profilesApiClient;
   late final bool _ownsProfilesApiClient;
   late final bool _ownsRealtimeClient;
+  late final ReportsApiClient _reportsApiClient;
+  late final bool _ownsReportsApiClient;
   StreamSubscription<PollVoteRealtimeEvent>? _pollVoteSubscription;
   StreamSubscription<PollDeletedRealtimeEvent>? _pollDeletedSubscription;
   List<PollSummary> _polls = [];
@@ -55,9 +62,11 @@ class FeedScreenState extends State<FeedScreen> {
     _ownsPollsApiClient = widget._pollsApiClient == null;
     _ownsProfilesApiClient = widget._profilesApiClient == null;
     _ownsRealtimeClient = widget._realtimeClient == null;
+    _ownsReportsApiClient = widget._reportsApiClient == null;
     _pollsApiClient = widget._pollsApiClient ?? PollsApiClient();
     _profilesApiClient = widget._profilesApiClient ?? ProfilesApiClient();
     _realtimeClient = widget._realtimeClient ?? RealtimeClient();
+    _reportsApiClient = widget._reportsApiClient ?? ReportsApiClient();
     _pollsFuture = _loadPolls();
     _pollVoteSubscription =
         _realtimeClient.pollVotes.listen(_handleRealtimeVote);
@@ -82,6 +91,9 @@ class FeedScreenState extends State<FeedScreen> {
     if (_ownsProfilesApiClient) {
       _profilesApiClient.close();
     }
+    if (_ownsReportsApiClient) {
+      _reportsApiClient.close();
+    }
 
     super.dispose();
   }
@@ -90,6 +102,16 @@ class FeedScreenState extends State<FeedScreen> {
     return _pollsApiClient
         .listPolls(accessToken: widget.session.accessToken)
         .timeout(const Duration(seconds: 10));
+  }
+
+  Future<void> _reportPoll(PollSummary poll) {
+    return showReportDialog(
+      context: context,
+      accessToken: widget.session.accessToken,
+      targetType: 'poll',
+      targetId: poll.id,
+      reportsApiClient: _reportsApiClient,
+    );
   }
 
   Future<void> _refreshPolls() async {
@@ -502,6 +524,9 @@ class FeedScreenState extends State<FeedScreen> {
                           onDeletePoll: poll.author.id == widget.session.user.id
                               ? () => _deletePoll(poll)
                               : null,
+                          onReport: poll.author.id == widget.session.user.id
+                              ? null
+                              : () => _reportPoll(poll),
                           isVoting: _votingPollIds.contains(poll.id),
                           onOpenComments: () => _openComments(poll),
                           onToggleLike: _likingPollIds.contains(poll.id)
