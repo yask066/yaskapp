@@ -14,6 +14,7 @@ import {
   isAdminFailureRequest
 } from './modules/admin/admin-request-logging.js';
 import { registerHealthRoutes } from './modules/health/health.routes.js';
+import { registerModerationRoutes } from './modules/moderation/moderation.routes.js';
 import { registerPollRoutes } from './modules/polls/polls.routes.js';
 import { registerProfileRoutes } from './modules/profiles/profiles.routes.js';
 import { registerRealtimeRoutes } from './realtime/realtime.routes.js';
@@ -145,6 +146,7 @@ export function buildApp() {
   registerAuthRoutes(app);
   registerAdminRoutes(app);
   registerHealthRoutes(app);
+  registerModerationRoutes(app);
   registerPollRoutes(app);
   registerProfileRoutes(app);
   registerRealtimeRoutes(app);

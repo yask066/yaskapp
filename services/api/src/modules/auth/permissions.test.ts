@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import {
   ADMIN_PERMISSIONS,
   hasPermission,
+  moderationPermissionsForRole,
   permissionsForRole
 } from './permissions.js';
 
@@ -39,4 +40,12 @@ test('unknown permission is denied', () => {
 test('unknown role has no permissions', () => {
   assert.deepEqual(permissionsForRole('unknown'), []);
   assert.equal(hasPermission('unknown', 'admin.audit.read'), false);
+});
+
+test('moderation permissions are separated from ordinary user permissions', () => {
+  assert.equal(hasPermission('user', 'moderation.queue.read'), false);
+  assert.equal(hasPermission('moderator', 'moderation.queue.read'), true);
+  assert.equal(hasPermission('moderator', 'moderation.case.assign'), true);
+  assert.equal(hasPermission('superadmin', 'moderation.policy.update'), true);
+  assert.ok(moderationPermissionsForRole('moderator').includes('moderation.case.resolve'));
 });

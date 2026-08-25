@@ -17,6 +17,24 @@ export const ADMIN_PERMISSIONS = [
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
 
+export const MODERATION_PERMISSIONS = [
+  'moderation.queue.read',
+  'moderation.case.read',
+  'moderation.case.assign',
+  'moderation.case.resolve',
+  'moderation.content.delete',
+  'moderation.strike.issue',
+  'moderation.restriction.issue',
+  'moderation.user.ban',
+  'moderation.appeal.read',
+  'moderation.appeal.resolve',
+  'moderation.audit.read',
+  'moderation.policy.update'
+] as const;
+
+export type ModerationPermission = (typeof MODERATION_PERMISSIONS)[number];
+export type Permission = AdminPermission | ModerationPermission;
+
 const permissionsByRole: Record<UserRole, readonly AdminPermission[]> = {
   user: [],
   moderator: [
@@ -30,15 +48,35 @@ const permissionsByRole: Record<UserRole, readonly AdminPermission[]> = {
   superadmin: ADMIN_PERMISSIONS
 };
 
+const moderationPermissionsByRole: Record<UserRole, readonly ModerationPermission[]> = {
+  user: [],
+  moderator: [
+    'moderation.queue.read',
+    'moderation.case.read',
+    'moderation.case.assign',
+    'moderation.case.resolve',
+    'moderation.content.delete',
+    'moderation.strike.issue',
+    'moderation.restriction.issue',
+    'moderation.appeal.read'
+  ],
+  superadmin: MODERATION_PERMISSIONS
+};
+
 export function permissionsForRole(role: string) {
   return permissionsByRole[role as UserRole] ?? [];
 }
 
-export function hasPermission(role: string, permission: string) {
-  return permissionsForRole(role).includes(permission as AdminPermission);
+export function moderationPermissionsForRole(role: string) {
+  return moderationPermissionsByRole[role as UserRole] ?? [];
 }
 
-export function requirePermission(permission: AdminPermission) {
+export function hasPermission(role: string, permission: string) {
+  return permissionsForRole(role).includes(permission as AdminPermission) ||
+    moderationPermissionsForRole(role).includes(permission as ModerationPermission);
+}
+
+export function requirePermission(permission: Permission) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await request.getCurrentUser();
 
