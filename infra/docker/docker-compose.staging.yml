@@ -118,6 +118,19 @@ services:
       timeout: 5s
       retries: 5
 
+  moderation-web:
+    image: yaskapp-moderation-web:staging
+    build:
+      context: ../..
+      dockerfile: apps/moderation-web/Dockerfile
+    logging: *default-logging
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    expose:
+      - "80"
+
   https:
     image: caddy:2-alpine
     env_file:
@@ -126,6 +139,8 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      moderation-web:
+        condition: service_started
     restart: unless-stopped
     ports:
       - "80:80"

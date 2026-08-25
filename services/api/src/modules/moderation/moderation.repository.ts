@@ -2,6 +2,8 @@ import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
 import { decodeAdminCursor, pageWithCursor } from '../admin/pagination.js';
+import type { UserRole } from '../auth/auth.repository.js';
+import { recordAdminAudit } from '../admin/audit.repository.js';
 
 export const reportTargetTypes = ['user', 'poll', 'comment'] as const;
 export type ReportTargetType = (typeof reportTargetTypes)[number];
@@ -29,6 +31,8 @@ export type ModerationCaseStatus =
 export type ModerationCasePriority = 'low' | 'normal' | 'high' | 'critical';
 
 export class ModerationTargetNotFoundError extends Error {}
+export class ModerationCaseNotFoundError extends Error {}
+export class ModerationCaseConflictError extends Error {}
 
 type ReportRow = {
   id: string;
@@ -256,4 +260,194 @@ export async function listModerationCases(input: {
   );
 
   return pageWithCursor(result.rows.map(mapCase), input.limit);
+}
+
+async function getCaseRow(executor: Pick<PoolClient, 'query'>, caseId: string) {
+  const result = await executor.query<CaseRow>(
+    `SELECT mc.id, mc.target_type, mc.target_id, mc.status, mc.priority,
+            mc.assigned_to_user_id, mc.created_at, mc.updated_at, mc.resolved_at,
+            count(mcr.report_id)::int AS reports_count
+       FROM moderation_cases mc
+       LEFT JOIN moderation_case_reports mcr ON mcr.case_id = mc.id
+      WHERE mc.id = $1
+      GROUP BY mc.id
+      LIMIT 1`,
+    [caseId]
+  );
+  return result.rows[0];
+}
+
+export async function getModerationCase(caseId: string) {
+  const moderationCase = await getCaseRow(db, caseId);
+  if (!moderationCase) throw new ModerationCaseNotFoundError('Moderation case was not found.');
+
+  const [reports, notes] = await Promise.all([
+    db.query<ReportRow>(
+      `SELECT r.id, r.reporter_user_id, r.target_type, r.target_id, r.category,
+              r.description, r.status, r.created_at, r.updated_at
+         FROM reports r
+         JOIN moderation_case_reports mcr ON mcr.report_id = r.id
+        WHERE mcr.case_id = $1
+        ORDER BY r.created_at ASC, r.id ASC`,
+      [caseId]
+    ),
+    db.query<{
+      id: string;
+      author_user_id: string | null;
+      body: string;
+      created_at: Date;
+    }>(
+      `SELECT id, author_user_id, body, created_at
+         FROM moderation_case_notes
+        WHERE case_id = $1
+        ORDER BY created_at ASC, id ASC`,
+      [caseId]
+    )
+  ]);
+
+  return {
+    case: mapCase(moderationCase),
+    reports: reports.rows.map(mapReport),
+    notes: notes.rows.map((note) => ({
+      id: note.id,
+      authorUserId: note.author_user_id,
+      body: note.body,
+      createdAt: note.created_at.toISOString()
+    }))
+  };
+}
+
+async function mutateCase(
+  caseId: string,
+  actorUserId: string,
+  actorRole: UserRole,
+  action: 'assign' | 'takeover' | 'resolve' | 'dismiss' | 'escalate',
+  input?: { resolutionCode?: string; note?: string }
+) {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const current = await client.query<CaseRow>(
+      `SELECT id, target_type, target_id, status, priority,
+              assigned_to_user_id, created_at, updated_at, resolved_at
+         FROM moderation_cases
+        WHERE id = $1
+        FOR UPDATE`,
+      [caseId]
+    );
+    const moderationCase = current.rows[0];
+    if (!moderationCase) throw new ModerationCaseNotFoundError('Moderation case was not found.');
+
+    if (['resolved', 'dismissed', 'duplicate'].includes(moderationCase.status)) {
+      throw new ModerationCaseConflictError('Moderation case is already closed.');
+    }
+    if (action === 'assign' && moderationCase.assigned_to_user_id && moderationCase.assigned_to_user_id !== actorUserId) {
+      throw new ModerationCaseConflictError('Moderation case is already assigned to another moderator.');
+    }
+
+    const nextStatus = action === 'resolve'
+      ? 'resolved'
+      : action === 'dismiss'
+        ? 'dismissed'
+        : action === 'escalate'
+          ? 'escalated'
+          : 'in_review';
+    const auditAction = action === 'assign'
+      ? 'moderation.case_assigned'
+      : action === 'takeover'
+        ? 'moderation.case_taken_over'
+        : action === 'resolve'
+          ? 'moderation.case_resolved'
+          : action === 'dismiss'
+            ? 'moderation.case_dismissed'
+            : 'moderation.case_escalated';
+
+    await client.query(
+      `UPDATE moderation_cases
+          SET assigned_to_user_id = $1,
+              status = $2,
+              resolution_code = $3,
+              resolution_note = $4,
+              resolved_at = CASE WHEN $2 IN ('resolved', 'dismissed') THEN now() ELSE NULL END
+        WHERE id = $5`,
+      [
+        action === 'resolve' || action === 'dismiss' || action === 'escalate'
+          ? moderationCase.assigned_to_user_id ?? actorUserId
+          : actorUserId,
+        nextStatus,
+        input?.resolutionCode ?? null,
+        input?.note ?? null,
+        caseId
+      ]
+    );
+    await recordAdminAudit(client, {
+      actorUserId,
+      actorRole,
+      action: auditAction,
+      targetType: 'case',
+      targetId: caseId,
+      reason: input?.note ?? `Moderation case ${action}.`
+    });
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+  return getModerationCase(caseId);
+}
+
+export function assignModerationCase(caseId: string, actorUserId: string, actorRole: UserRole) {
+  return mutateCase(caseId, actorUserId, actorRole, 'assign');
+}
+
+export function takeoverModerationCase(caseId: string, actorUserId: string, actorRole: UserRole) {
+  return mutateCase(caseId, actorUserId, actorRole, 'takeover');
+}
+
+export function transitionModerationCase(
+  caseId: string,
+  actorUserId: string,
+  actorRole: UserRole,
+  action: 'resolve' | 'dismiss' | 'escalate',
+  input: { resolutionCode?: string; note?: string }
+) {
+  return mutateCase(caseId, actorUserId, actorRole, action, input);
+}
+
+export async function addModerationNote(caseId: string, authorUserId: string, actorRole: UserRole, body: string) {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const moderationCase = await client.query<{ id: string }>(
+      `SELECT id FROM moderation_cases
+        WHERE id = $1 AND status NOT IN ('resolved', 'dismissed', 'duplicate')
+        FOR UPDATE`,
+      [caseId]
+    );
+    if (!moderationCase.rows[0]) throw new ModerationCaseNotFoundError('Open moderation case was not found.');
+    const note = (await client.query<{ id: string; created_at: Date }>(
+      `INSERT INTO moderation_case_notes (case_id, author_user_id, body)
+       VALUES ($1, $2, $3)
+       RETURNING id, created_at`,
+      [caseId, authorUserId, body]
+    )).rows[0];
+    await recordAdminAudit(client, {
+      actorUserId: authorUserId,
+      actorRole,
+      action: 'moderation.note_added',
+      targetType: 'case',
+      targetId: caseId,
+      reason: 'Moderation note added.',
+      metadata: { noteId: note.id }
+    });
+    await client.query('COMMIT');
+    return { id: note.id, authorUserId, body, createdAt: note.created_at.toISOString() };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }

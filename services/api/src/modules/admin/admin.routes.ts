@@ -88,10 +88,16 @@ const adminAuditQuerySchema = z.object({
     'user.role_changed',
     'user.deleted',
     'poll.deleted_by_admin',
-    'comment.deleted_by_admin'
+    'comment.deleted_by_admin',
+    'moderation.case_assigned',
+    'moderation.case_taken_over',
+    'moderation.note_added',
+    'moderation.case_resolved',
+    'moderation.case_dismissed',
+    'moderation.case_escalated'
   ]).optional(),
   actorId: z.string().uuid().optional(),
-  targetType: z.enum(['user', 'poll', 'comment']).optional(),
+  targetType: z.enum(['user', 'poll', 'comment', 'case']).optional(),
   targetId: z.string().uuid().optional(),
   from: z.string().datetime({ offset: true }).optional(),
   to: z.string().datetime({ offset: true }).optional(),

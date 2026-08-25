@@ -210,6 +210,87 @@ test('blocked reporters are rejected and invalid targets leave no persisted case
   assert.deepEqual(persisted.rows[0], { reports: '0', cases: '0' });
 });
 
+test('moderators can inspect, assign, note and resolve a case', async () => {
+  const reporter = await registerUser();
+  const moderator = await registerUser();
+  const author = await registerUser();
+  await setRole(moderator, 'moderator');
+  const poll = await createPoll(author);
+  const report = await app.inject({
+    method: 'POST',
+    url: '/reports',
+    headers: bearer(reporter.accessToken),
+    payload: { targetType: 'poll', targetId: poll.id, category: 'spam', description: 'Workflow report.' }
+  });
+  const caseId = report.json<{ case: { id: string } }>().case.id;
+
+  const forbidden = await app.inject({ method: 'GET', url: `/moderation/cases/${caseId}`, headers: bearer(reporter.accessToken) });
+  assert.equal(forbidden.statusCode, 403);
+
+  const detail = await app.inject({ method: 'GET', url: `/moderation/cases/${caseId}`, headers: bearer(moderator.accessToken) });
+  assert.equal(detail.statusCode, 200, detail.body);
+  assert.equal(detail.json<{ case: { status: string }; reports: unknown[]; notes: unknown[] }>().case.status, 'open');
+  assert.equal(detail.json<{ reports: unknown[] }>().reports.length, 1);
+
+  const assign = await app.inject({ method: 'POST', url: `/moderation/cases/${caseId}/assign`, headers: bearer(moderator.accessToken) });
+  assert.equal(assign.statusCode, 200, assign.body);
+  assert.equal(assign.json<{ case: { status: string; assignedToUserId: string } }>().case.status, 'in_review');
+  assert.equal(assign.json<{ case: { assignedToUserId: string } }>().case.assignedToUserId, moderator.user.id);
+
+  const note = await app.inject({
+    method: 'POST', url: `/moderation/cases/${caseId}/notes`, headers: bearer(moderator.accessToken),
+    payload: { body: 'Reviewed the reported poll.' }
+  });
+  assert.equal(note.statusCode, 201, note.body);
+
+  const resolve = await app.inject({
+    method: 'POST', url: `/moderation/cases/${caseId}/resolve`, headers: bearer(moderator.accessToken),
+    payload: { resolutionCode: 'content_removed', note: 'Content violates policy.' }
+  });
+  assert.equal(resolve.statusCode, 200, resolve.body);
+  assert.equal(resolve.json<{ case: { status: string } }>().case.status, 'resolved');
+
+  const repeatResolve = await app.inject({
+    method: 'POST', url: `/moderation/cases/${caseId}/resolve`, headers: bearer(moderator.accessToken),
+    payload: { resolutionCode: 'content_removed', note: 'Repeated resolution.' }
+  });
+  assert.equal(repeatResolve.statusCode, 409);
+});
+
+test('moderators can remove reported content only through its case', async () => {
+  const reporter = await registerUser();
+  const moderator = await registerUser();
+  const author = await registerUser();
+  await setRole(moderator, 'moderator');
+  const poll = await createPoll(author);
+  const report = await app.inject({
+    method: 'POST', url: '/reports', headers: bearer(reporter.accessToken),
+    payload: { targetType: 'poll', targetId: poll.id, category: 'spam', description: 'Remove this poll.' }
+  });
+  const caseId = report.json<{ case: { id: string } }>().case.id;
+
+  const wrongCase = await app.inject({
+    method: 'POST', url: `/moderation/content/poll/${poll.id}/remove`, headers: bearer(moderator.accessToken),
+    payload: { caseId: '00000000-0000-4000-8000-000000000000', reason: 'Wrong case.' }
+  });
+  assert.equal(wrongCase.statusCode, 404);
+
+  const removed = await app.inject({
+    method: 'POST', url: `/moderation/content/poll/${poll.id}/remove`, headers: bearer(moderator.accessToken),
+    payload: { caseId, reason: 'Confirmed spam.' }
+  });
+  assert.equal(removed.statusCode, 204, removed.body);
+
+  const deletedPoll = await db.query<{ deleted_at: Date | null }>('SELECT deleted_at FROM polls WHERE id = $1', [poll.id]);
+  assert.ok(deletedPoll.rows[0]?.deleted_at);
+
+  const repeated = await app.inject({
+    method: 'POST', url: `/moderation/content/poll/${poll.id}/remove`, headers: bearer(moderator.accessToken),
+    payload: { caseId, reason: 'Repeated removal.' }
+  });
+  assert.equal(repeated.statusCode, 204);
+});
+
 after(async () => {
   if (createdUserIds.size > 0) {
     await db.query('DELETE FROM users WHERE id = ANY($1::uuid[])', [[...createdUserIds]]);

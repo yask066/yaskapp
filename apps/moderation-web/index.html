@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Yaskapp Moderation</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main id="app" class="shell">
+      <section id="login-view" class="card auth-card">
+        <p class="eyebrow">YASKAPP TRUST & SAFETY</p>
+        <h1>Moderation workspace</h1>
+        <p class="muted">This workspace is restricted to authorized moderation staff.</p>
+        <form id="login-form">
+          <label>Login<input name="login" required autocomplete="username" /></label>
+          <label>Password<input name="password" type="password" required autocomplete="current-password" /></label>
+          <button class="primary" type="submit">Sign in</button>
+          <p id="login-error" class="error" role="alert"></p>
+        </form>
+      </section>
+
+      <section id="panel-view" hidden>
+        <header class="topbar">
+          <div><p class="eyebrow">YASKAPP TRUST & SAFETY</p><h1>Moderation queue</h1></div>
+          <button id="logout-button" class="ghost">Sign out</button>
+        </header>
+        <div id="capability-error" class="error" role="alert"></div>
+        <section class="toolbar card">
+          <label>Status<select id="status-filter"><option value="">All</option><option value="open">Open</option><option value="in_review">In review</option><option value="escalated">Escalated</option><option value="resolved">Resolved</option><option value="dismissed">Dismissed</option></select></label>
+          <label>Priority<select id="priority-filter"><option value="">All</option><option value="critical">Critical</option><option value="high">High</option><option value="normal">Normal</option><option value="low">Low</option></select></label>
+          <button id="refresh-button" class="secondary">Refresh</button>
+        </section>
+        <div class="workspace">
+          <section class="card queue-card"><div class="section-title"><h2>Cases</h2><span id="case-count" class="muted"></span></div><div id="queue" class="queue"></div><button id="load-more" class="secondary" hidden>Load more</button></section>
+          <section id="case-detail" class="card detail-card"><div class="empty">Select a case to inspect it.</div></section>
+        </div>
+      </section>
+    </main>
+    <script>window.__MODERATION_API_BASE__ = window.__MODERATION_API_BASE__ || '';</script>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

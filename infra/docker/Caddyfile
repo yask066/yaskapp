@@ -1,3 +1,7 @@
+{$MODERATION_HOST:moderation.localhost} {
+    reverse_proxy moderation-web:80
+}
+
 :80 {
     # Temporary IP-based staging access. Caddy also forwards WebSocket upgrades.
     reverse_proxy api:3000

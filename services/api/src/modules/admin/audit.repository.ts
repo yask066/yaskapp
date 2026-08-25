@@ -10,9 +10,15 @@ export type AdminAuditAction =
   | 'user.role_changed'
   | 'user.deleted'
   | 'poll.deleted_by_admin'
-  | 'comment.deleted_by_admin';
+  | 'comment.deleted_by_admin'
+  | 'moderation.case_assigned'
+  | 'moderation.case_taken_over'
+  | 'moderation.note_added'
+  | 'moderation.case_resolved'
+  | 'moderation.case_dismissed'
+  | 'moderation.case_escalated';
 
-export type AdminAuditTargetType = 'user' | 'poll' | 'comment';
+export type AdminAuditTargetType = 'user' | 'poll' | 'comment' | 'case';
 
 export type AdminAuditRecordInput = {
   actorUserId: string;
