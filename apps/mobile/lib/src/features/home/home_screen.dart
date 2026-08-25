@@ -37,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final bool _ownsPollsApiClient;
   late final AdminApiClient _adminApiClient;
   var _adminAvailable = false;
+  AdminCapabilities? _adminCapabilities;
   final _feedKey = GlobalKey<FeedScreenState>();
   final _profileKey = GlobalKey<ProfileScreenState>();
 
@@ -51,8 +52,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _checkAdminAccess() async {
     try {
-      final available = await _adminApiClient.canAccess(accessToken: widget.session.accessToken);
-      if (mounted) setState(() => _adminAvailable = available);
+      final capabilities = await _adminApiClient.loadCapabilities(accessToken: widget.session.accessToken);
+      if (mounted) setState(() { _adminAvailable = true; _adminCapabilities = capabilities; });
     } on AdminApiException {
       // A denied probe keeps the admin area hidden for ordinary users.
     }
@@ -98,6 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ? AdminScreen(
                   accessToken: widget.session.accessToken,
                   apiClient: _adminApiClient,
+                  capabilities: _adminCapabilities,
                 )
               : const SizedBox.shrink(),
           const _NotificationsPlaceholder(),

@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import 'admin_api_client.dart';
 
 class AdminScreen extends StatefulWidget {
-  const AdminScreen({required this.accessToken, required this.apiClient, super.key});
+  const AdminScreen({required this.accessToken, required this.apiClient, this.capabilities, super.key});
   final String accessToken;
   final AdminApiClient apiClient;
+  final AdminCapabilities? capabilities;
   @override
   State<AdminScreen> createState() => _AdminScreenState();
 }
@@ -23,6 +24,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   List<AdminAuditEntry> _audit = [];
   var _auditAvailable = true;
 
+  AdminCapabilities get _capabilities => widget.capabilities ?? const AdminCapabilities(<String>{});
+
   @override
   void initState() { super.initState(); _load(); }
   @override
@@ -36,17 +39,19 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
         widget.apiClient.listPolls(accessToken: widget.accessToken, query: _query.text, status: _pollStatus),
       ]);
       List<AdminAuditEntry> audit = [];
-      var auditAvailable = true;
-      try {
-        audit = await widget.apiClient.listAudit(accessToken: widget.accessToken);
-      } on AdminApiException catch (error) {
-        if (error.statusCode != 403) rethrow;
-        auditAvailable = false;
+      var auditAvailable = _capabilities.canReadAudit;
+      if (auditAvailable) {
+        try {
+          audit = await widget.apiClient.listAudit(accessToken: widget.accessToken);
+        } on AdminApiException catch (error) {
+          if (error.statusCode != 403) rethrow;
+          auditAvailable = false;
+        }
       }
       if (!mounted) return;
       setState(() { _users = results[0] as List<AdminUserSummary>; _polls = results[1] as List<AdminPollSummary>; _audit = audit; _auditAvailable = auditAvailable; _loading = false; });
     } on AdminApiException catch (error) {
-      if (mounted) setState(() { _loading = false; _error = error.message; });
+      if (mounted) setState(() { _loading = false; _error = error.userMessage; });
     }
   }
 
@@ -73,7 +78,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       if (action == 'Unblock') await widget.apiClient.unblockUser(userId: user.id, accessToken: widget.accessToken, reason: reason);
       if (action == 'Delete') await widget.apiClient.deleteUser(userId: user.id, accessToken: widget.accessToken, reason: reason);
       await _load();
-    } on AdminApiException catch (error) { if (mounted) _showError(error.message); }
+    } on AdminApiException catch (error) { if (mounted) _showError(error.userMessage); }
   }
 
   Future<void> _changeRole(AdminUserSummary user) async {
@@ -99,7 +104,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     try {
       await widget.apiClient.changeRole(userId: user.id, role: result.$1, accessToken: widget.accessToken, reason: result.$2);
       await _load();
-    } on AdminApiException catch (error) { if (mounted) _showError(error.message); }
+    } on AdminApiException catch (error) { if (mounted) _showError(error.userMessage); }
   }
 
   Future<void> _deletePoll(AdminPollSummary poll) async {
@@ -139,7 +144,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                               if (context.mounted) Navigator.pop(context);
                               await _load();
                             } on AdminApiException catch (error) {
-                              if (mounted) _showError(error.message);
+                              if (mounted) _showError(error.userMessage);
                             }
                           },
                         ),
@@ -151,7 +156,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
         ),
       );
     } on AdminApiException catch (error) {
-      if (mounted) _showError(error.message);
+      if (mounted) _showError(error.userMessage);
     }
   }
 
@@ -194,13 +199,13 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                   trailing: PopupMenuButton<String>(
                     onSelected: (action) => _userAction(user, action),
                     itemBuilder: (_) => [
-                      if (user.status == 'blocked')
+                      if (user.status == 'blocked' && _capabilities.canUnblockUsers)
                         const PopupMenuItem(value: 'Unblock', child: Text('Unblock'))
-                      else
+                      else if (user.status != 'blocked' && _capabilities.canBlockUsers)
                         const PopupMenuItem(value: 'Block', child: Text('Block')),
-                      if (user.status != 'deleted')
+                      if (user.status != 'deleted' && _capabilities.canDeleteUsers)
                         const PopupMenuItem(value: 'Delete', child: Text('Delete')),
-                      if (user.status != 'deleted')
+                      if (user.status != 'deleted' && _capabilities.canChangeRoles)
                         const PopupMenuItem(value: 'Role', child: Text('Change role')),
                     ],
                   ),
@@ -226,9 +231,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                     subtitle: Text('@${poll.authorUsername} · ${poll.status} · ${poll.votesCount} votes'),
                     trailing: IconButton(
                       icon: const Icon(Icons.delete_outline),
-                      onPressed: poll.status == 'deleted' ? null : () => _deletePoll(poll),
+                      onPressed: poll.status == 'deleted' || !_capabilities.canDeletePolls ? null : () => _deletePoll(poll),
                     ),
-                    onTap: () => _showComments(poll),
+                    onTap: _capabilities.canDeleteComments ? () => _showComments(poll) : null,
                   ),
                 ))
             .toList(),

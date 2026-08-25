@@ -156,6 +156,32 @@ test('newly registered users receive the default user role', async () => {
   assert.equal(auth.user.role, 'user');
 });
 
+test('admin capabilities are resolved on the backend without exposing them in AuthUser', async () => {
+  const user = await registerTestUser();
+  const forbiddenResponse = await app.inject({
+    method: 'GET',
+    url: '/admin/capabilities',
+    headers: bearer(user.accessToken)
+  });
+  assert.equal(forbiddenResponse.statusCode, 403, forbiddenResponse.body);
+
+  await db.query('UPDATE users SET role = $1 WHERE id = $2', ['moderator', user.user.id]);
+  const capabilitiesResponse = await app.inject({
+    method: 'GET',
+    url: '/admin/capabilities',
+    headers: bearer(user.accessToken)
+  });
+  assert.equal(capabilitiesResponse.statusCode, 200, capabilitiesResponse.body);
+  assert.deepEqual(capabilitiesResponse.json<{ permissions: string[] }>().permissions, [
+    'admin.users.read',
+    'admin.users.block',
+    'admin.users.unblock',
+    'admin.polls.read',
+    'admin.polls.delete',
+    'admin.comments.delete'
+  ]);
+});
+
 test('moderator can block a user and the blocked session stops working', async () => {
   const moderator = await registerTestUser();
   const target = await registerTestUser();

@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { broadcastCommentDeleted, broadcastPollDeleted } from '../../realtime/realtime.hub.js';
 import { authenticate } from '../auth/auth.utils.js';
-import { requirePermission } from '../auth/permissions.js';
+import { permissionsForRole, requirePermission } from '../auth/permissions.js';
 import {
   AdminProtectedUserError,
   AdminCommentNotFoundError,
@@ -113,6 +113,24 @@ function adminError(reply: FastifyReply, error: unknown) {
 }
 
 export function registerAdminRoutes(app: FastifyInstance) {
+  app.get(
+    '/admin/capabilities',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const user = await request.getCurrentUser();
+      const permissions = user ? permissionsForRole(user.role) : [];
+
+      if (permissions.length === 0) {
+        return reply.status(403).send({
+          error: 'forbidden',
+          message: 'You do not have permission to access administrative capabilities.'
+        });
+      }
+
+      return reply.send({ permissions });
+    }
+  );
+
   app.get(
     '/admin/users',
     { preHandler: [authenticate, requirePermission('admin.users.read')] },

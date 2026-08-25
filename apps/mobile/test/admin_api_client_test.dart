@@ -58,4 +58,43 @@ void main() {
     expect(request.url.path, '/admin/polls/poll-1');
     expect(jsonDecode(request.body), {'reason': 'Violates rules.'});
   });
+
+  test('loads server-issued admin capabilities without changing AuthUser', () async {
+    final client = AdminApiClient(
+      config: config,
+      httpClient: MockClient((request) async {
+        expect(request.url.path, '/admin/capabilities');
+        return http.Response(jsonEncode({
+          'permissions': ['admin.users.read', 'admin.polls.read'],
+        }), 200);
+      }),
+    );
+
+    final capabilities = await client.loadCapabilities(accessToken: 'token');
+
+    expect(capabilities.canReadUsers, isTrue);
+    expect(capabilities.canDeleteUsers, isFalse);
+    expect(capabilities.canReadPolls, isTrue);
+  });
+
+  test('maps admin transition errors to a safe user message', () async {
+    final client = AdminApiClient(
+      config: config,
+      httpClient: MockClient((_) async {
+        return http.Response(jsonEncode({
+          'error': 'invalid_admin_transition',
+          'message': 'At least one superadmin must remain.',
+        }), 409);
+      }),
+    );
+
+    await expectLater(
+      client.deleteUser(userId: 'user-1', accessToken: 'token', reason: 'Cleanup.'),
+      throwsA(isA<AdminApiException>().having(
+        (error) => error.userMessage,
+        'userMessage',
+        'This administrative action is not allowed in the current state.',
+      )),
+    );
+  });
 }

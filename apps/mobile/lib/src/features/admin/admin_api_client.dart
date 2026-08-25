@@ -9,8 +9,35 @@ class AdminApiException implements Exception {
   final String message;
   final int? statusCode;
   final String? code;
+  String get userMessage {
+    if (statusCode == 401) return 'Your session has expired. Please sign in again.';
+    if (statusCode == 403) return 'You do not have permission to perform this action.';
+    if (statusCode == 404) return 'The requested moderation item was not found.';
+    if (statusCode == 409 || code == 'invalid_admin_transition') return 'This administrative action is not allowed in the current state.';
+    if (statusCode == 400 || statusCode == 422 || code == 'validation_error') return 'Please provide a valid reason and try again.';
+    if (statusCode == 429) return 'Too many administrative requests. Try again later.';
+    return message;
+  }
   @override
   String toString() => message;
+}
+
+class AdminCapabilities {
+  const AdminCapabilities(this.permissions);
+  factory AdminCapabilities.fromJson(Map<String, dynamic> json) => AdminCapabilities(
+        (json['permissions'] as List<dynamic>? ?? const []).whereType<String>().toSet(),
+      );
+  final Set<String> permissions;
+  bool has(String permission) => permissions.contains(permission);
+  bool get canReadUsers => has('admin.users.read');
+  bool get canBlockUsers => has('admin.users.block');
+  bool get canUnblockUsers => has('admin.users.unblock');
+  bool get canDeleteUsers => has('admin.users.delete');
+  bool get canChangeRoles => has('admin.users.roles.update');
+  bool get canReadPolls => has('admin.polls.read');
+  bool get canDeletePolls => has('admin.polls.delete');
+  bool get canDeleteComments => has('admin.comments.delete');
+  bool get canReadAudit => has('admin.audit.read');
 }
 
 class AdminUserSummary {
@@ -82,6 +109,11 @@ class AdminApiClient {
   final ApiConfig _config;
   final http.Client _httpClient;
   void close() => _httpClient.close();
+
+  Future<AdminCapabilities> loadCapabilities({required String accessToken}) async {
+    final body = await _request('GET', '/admin/capabilities', accessToken: accessToken);
+    return AdminCapabilities.fromJson(body);
+  }
 
   Future<bool> canAccess({required String accessToken}) async {
     try {
