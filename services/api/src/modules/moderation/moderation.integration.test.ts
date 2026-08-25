@@ -166,6 +166,47 @@ test('reporters can list their own reports without seeing another reporter\'s re
   assert.equal(mine.json<{ items: Array<{ description: string }> }>().items[0]?.description, 'My report.');
 });
 
+test('superadmin can read and update moderation policy while regular staff cannot', async () => {
+  const moderator = await registerUser();
+  const superadmin = await registerUser();
+  await setRole(moderator, 'moderator');
+  await setRole(superadmin, 'superadmin');
+
+  const denied = await app.inject({
+    method: 'GET',
+    url: '/moderation/policy',
+    headers: bearer(moderator.accessToken)
+  });
+  assert.equal(denied.statusCode, 403, denied.body);
+
+  const current = await app.inject({ method: 'GET', url: '/moderation/policy', headers: bearer(superadmin.accessToken) });
+  assert.equal(current.statusCode, 200, current.body);
+
+  const updated = await app.inject({
+    method: 'PATCH',
+    url: '/moderation/policy',
+    headers: { ...bearer(superadmin.accessToken), 'idempotency-key': `policy-${suffix()}` },
+    payload: {
+      postingRestrictionStrikes: 4,
+      temporaryBanStrikes: 6,
+      strikeRetentionDays: 120,
+      defaultRestrictionHours: 36,
+      defaultTemporaryBanHours: 96,
+      reason: 'Adjust thresholds after moderation review.'
+    }
+  });
+  assert.equal(updated.statusCode, 200, updated.body);
+  assert.equal(updated.json<{ policy: { postingRestrictionStrikes: number } }>().policy.postingRestrictionStrikes, 4);
+  await db.query(
+    `UPDATE moderation_policies
+        SET posting_restriction_strikes = 2,
+            temporary_ban_strikes = 3,
+            strike_retention_days = 90,
+            default_restriction_hours = 24,
+            default_temporary_ban_hours = 72`,
+  );
+});
+
 test('regular users cannot issue moderation sanctions', async () => {
   const user = await registerUser();
   const response = await app.inject({

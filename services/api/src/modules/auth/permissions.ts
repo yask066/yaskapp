@@ -31,6 +31,7 @@ export const MODERATION_PERMISSIONS = [
   'moderation.appeal.read',
   'moderation.appeal.resolve',
   'moderation.audit.read',
+  'moderation.policy.read',
   'moderation.policy.update',
   'moderation.sanction.revoke'
 ] as const;

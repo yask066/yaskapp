@@ -20,6 +20,7 @@ export type AdminAuditAction =
   | 'moderation.sanction_issued'
   | 'moderation.sanction_revoked'
   | 'moderation.policy_evaluated'
+  | 'moderation.policy_updated'
   | 'moderation.permanent_ban_issued'
   | 'moderation.appeal_created'
   | 'moderation.appeal_resolved';

@@ -22,6 +22,11 @@ textarea { min-height: 110px; resize: vertical; }
 .error { color: #b42318; min-height: 22px; }
 .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
 .toolbar { display: flex; gap: 14px; align-items: end; padding: 16px; margin-bottom: 18px; }
+.panel-nav { display: flex; gap: 6px; padding: 7px; margin-bottom: 18px; }
+.nav-tab { color: #4e5a70; background: transparent; }
+.nav-tab.active { color: #3343a9; background: #edf0ff; }
+.policy-form { max-width: 650px; margin-top: 0; }
+.policy-form .primary { width: fit-content; }
 .toolbar label { min-width: 160px; }
 .workspace { display: grid; grid-template-columns: minmax(330px, .8fr) minmax(500px, 1.2fr); gap: 18px; align-items: start; }
 .queue-card, .detail-card { padding: 18px; min-height: 520px; }

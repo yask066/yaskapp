@@ -2,7 +2,10 @@ const apiBase = window.__MODERATION_API_BASE__ || '';
 let accessToken = null;
 let capabilities = new Set();
 let nextCursor = null;
+let appealsCursor = null;
+let auditCursor = null;
 let selectedCaseId = null;
+let activeSection = 'cases';
 
 const $ = (id) => document.getElementById(id);
 const loginView = $('login-view');
@@ -29,6 +32,22 @@ function can(permission) { return capabilities.has(permission); }
 function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char])); }
 function idempotencyKey() { return `${crypto.randomUUID()}-${Date.now()}`; }
 
+function showSection(section) {
+  activeSection = section;
+  document.querySelectorAll('.panel-section').forEach((panel) => { panel.hidden = panel.id !== `section-${section}`; });
+  document.querySelectorAll('.nav-tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.section === section));
+  if (section === 'appeals') loadAppeals();
+  if (section === 'audit') loadAudit();
+  if (section === 'policy') loadPolicy();
+}
+
+function configureNavigation() {
+  document.querySelectorAll('.nav-tab[data-permission]').forEach((tab) => {
+    tab.hidden = !can(tab.dataset.permission);
+  });
+  document.querySelectorAll('.nav-tab').forEach((tab) => tab.onclick = () => showSection(tab.dataset.section));
+}
+
 async function signIn(event) {
   event.preventDefault();
   const form = new FormData(event.target);
@@ -39,10 +58,11 @@ async function signIn(event) {
     const capabilityResult = await request('/moderation/capabilities');
     capabilities = new Set(capabilityResult.permissions || []);
     if (!can('moderation.queue.read')) throw new Error('This account is not authorized for moderation.');
+    configureNavigation();
     showPanel();
     await loadQueue();
     await loadAppeals();
-  } catch (error) { showLogin(error.message); }
+  } catch (error) { accessToken = null; capabilities.clear(); showLogin(error.status === 403 ? 'This account is not authorized for moderation.' : error.message); }
 }
 
 function queryString(cursor = null) {
@@ -90,7 +110,7 @@ async function loadCase(caseId) {
 function reason(label) { const value = window.prompt(`${label} — reason (required):`); return value?.trim() || null; }
 function durationHours(label) { const value = Number.parseInt(window.prompt(`${label} — duration in hours:`) || '', 10); return Number.isInteger(value) && value > 0 ? value : null; }
 async function mutate(path, body = {}, idempotent = false) { await request(path, { method: 'POST', body: JSON.stringify(body), headers: idempotent ? { 'idempotency-key': idempotencyKey() } : {} }); await loadCase(selectedCaseId); await loadQueue(); }
-async function mutateAppeal(path, body = {}) { await request(path, { method: 'POST', body: JSON.stringify(body), headers: { 'idempotency-key': idempotencyKey() } }); await loadAppeals(); }
+async function mutateAppeal(path, body = {}) { await request(path, { method: 'POST', body: JSON.stringify(body), headers: { 'idempotency-key': idempotencyKey() } }); appealsCursor = null; await loadAppeals(); }
 function bindCaseActions(item) {
   $('assign-case')?.addEventListener('click', () => mutate(`/moderation/cases/${item.id}/assign`));
   $('takeover-case')?.addEventListener('click', () => mutate(`/moderation/cases/${item.id}/takeover`));
@@ -107,21 +127,75 @@ function bindCaseActions(item) {
   document.querySelectorAll('.revoke-sanction').forEach((button) => button.addEventListener('click', async () => { const note = reason('Revoke sanction'); if (note && window.confirm('Revoke this sanction?')) await mutate(`/moderation/sanctions/${button.dataset.sanctionId}/revoke`, { reason: note }, true); }));
 }
 
-async function loadAppeals() {
+async function loadAppeals(append = false) {
   if (!can('moderation.appeal.read')) return;
   try {
-    const result = await request('/moderation/appeals?status=open&limit=30');
-    $('appeals-card').hidden = false;
-    $('appeals').innerHTML = (result.items || []).map((appeal) => `<article class="note"><strong>${escapeHtml(appeal.status)}</strong> · ${escapeHtml(appeal.userId)}<p>${escapeHtml(appeal.reason)}</p><small>${new Date(appeal.createdAt).toLocaleString()}</small>${can('moderation.appeal.resolve') ? `<div class="actions"><button class="secondary appeal-decision" data-id="${escapeHtml(appeal.id)}" data-status="upheld">Uphold</button><button class="ghost appeal-decision" data-id="${escapeHtml(appeal.id)}" data-status="reduced">Reduce</button><button class="danger appeal-decision" data-id="${escapeHtml(appeal.id)}" data-status="revoked">Revoke</button><button class="ghost appeal-decision" data-id="${escapeHtml(appeal.id)}" data-status="request_more_info">Request info</button></div>` : ''}</article>`).join('') || '<p class="muted">No open appeals.</p>';
+    const result = await request(`/moderation/appeals?status=open&limit=30${appealsCursor ? `&cursor=${encodeURIComponent(appealsCursor)}` : ''}`);
+    appealsCursor = result.nextCursor;
+    const html = (result.items || []).map((appeal) => `<article class="note"><strong>${escapeHtml(appeal.status)}</strong> · ${escapeHtml(appeal.userId)}<p>${escapeHtml(appeal.reason)}</p><small>${new Date(appeal.createdAt).toLocaleString()}</small>${can('moderation.appeal.resolve') ? `<div class="actions"><button class="secondary appeal-decision" data-id="${escapeHtml(appeal.id)}" data-status="upheld">Uphold</button><button class="ghost appeal-decision" data-id="${escapeHtml(appeal.id)}" data-status="reduced">Reduce</button><button class="danger appeal-decision" data-id="${escapeHtml(appeal.id)}" data-status="revoked">Revoke</button><button class="ghost appeal-decision" data-id="${escapeHtml(appeal.id)}" data-status="request_more_info">Request info</button></div>` : ''}</article>`).join('');
+    if (!append) $('appeals').innerHTML = '';
+    $('appeals').insertAdjacentHTML('beforeend', html || (!append ? '<p class="muted">No open appeals.</p>' : ''));
+    $('appeals-load-more').hidden = !appealsCursor;
     document.querySelectorAll('.appeal-decision').forEach((button) => button.addEventListener('click', async () => { const note = reason(`Appeal decision: ${button.dataset.status}`); if (note) await mutateAppeal(`/moderation/appeals/${button.dataset.id}/resolve`, { status: button.dataset.status, decisionNote: note }); }));
   } catch (error) { handleError(error); }
 }
-function handleError(error) { if (error.status === 401) { accessToken = null; showLogin('Session expired.'); } else $('capability-error').textContent = `${error.status || ''} ${error.message}`; }
+
+async function loadAudit(append = false) {
+  if (!can('admin.audit.read')) return;
+  try {
+    const result = await request(`/admin/audit?limit=30${append && auditCursor ? `&cursor=${encodeURIComponent(auditCursor)}` : ''}`);
+    auditCursor = result.nextCursor;
+    if (!append) $('audit').innerHTML = '';
+    for (const entry of result.items || []) {
+      const article = document.createElement('article');
+      article.className = 'note';
+      article.innerHTML = `<strong>${escapeHtml(entry.action)}</strong><p>${escapeHtml(entry.reason)}</p><small>${escapeHtml(entry.actorRole)} · ${escapeHtml(entry.targetType)}:${escapeHtml(entry.targetId)} · ${new Date(entry.createdAt).toLocaleString()}</small>`;
+      $('audit').appendChild(article);
+    }
+    $('audit-load-more').hidden = !auditCursor;
+  } catch (error) { handleError(error); }
+}
+
+async function loadPolicy() {
+  if (!can('moderation.policy.read')) return;
+  try {
+    const result = await request('/moderation/policy');
+    const form = $('policy-form');
+    for (const [name, value] of Object.entries(result.policy || {})) if (form.elements[name]) form.elements[name].value = value;
+    $('policy-status').textContent = result.policy?.updatedAt ? `Last updated ${new Date(result.policy.updatedAt).toLocaleString()}` : '';
+  } catch (error) { handleError(error); }
+}
+
+async function savePolicy(event) {
+  event.preventDefault();
+  if (!can('moderation.policy.update')) return;
+  const form = new FormData(event.target);
+  const body = Object.fromEntries(form.entries());
+  for (const name of ['postingRestrictionStrikes', 'temporaryBanStrikes', 'strikeRetentionDays', 'defaultRestrictionHours', 'defaultTemporaryBanHours']) body[name] = Number(body[name]);
+  const button = event.target.querySelector('button[type="submit"]');
+  button.disabled = true;
+  try {
+    const result = await request('/moderation/policy', { method: 'PATCH', body: JSON.stringify(body), headers: { 'idempotency-key': idempotencyKey() } });
+    $('policy-status').textContent = `Saved ${new Date(result.policy.updatedAt).toLocaleString()}`;
+  } catch (error) { handleError(error); } finally { button.disabled = false; }
+}
+
+function handleError(error) {
+  if (error.status === 401) { accessToken = null; capabilities.clear(); showLogin('Session expired.'); return; }
+  if (error.status === 403) { $('capability-error').textContent = 'You do not have permission for this section or action.'; return; }
+  if (error.status === 429) { $('capability-error').textContent = 'Too many administrative requests. Try again later.'; return; }
+  $('capability-error').textContent = `${error.status || ''} ${error.message}`;
+}
 
 $('login-form').addEventListener('submit', signIn);
 $('logout-button').addEventListener('click', () => { accessToken = null; capabilities.clear(); showLogin(); });
 $('refresh-button').addEventListener('click', () => loadQueue());
-$('refresh-appeals').addEventListener('click', () => loadAppeals());
+$('refresh-appeals').addEventListener('click', () => { appealsCursor = null; loadAppeals(); });
+$('refresh-audit').addEventListener('click', () => { auditCursor = null; loadAudit(); });
+$('refresh-policy').addEventListener('click', () => loadPolicy());
+$('policy-form').addEventListener('submit', savePolicy);
 $('load-more').addEventListener('click', () => loadQueue(true));
+$('appeals-load-more').addEventListener('click', () => loadAppeals(true));
+$('audit-load-more').addEventListener('click', () => loadAudit(true));
 $('status-filter').addEventListener('change', () => loadQueue());
 $('priority-filter').addEventListener('change', () => loadQueue());

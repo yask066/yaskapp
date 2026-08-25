@@ -46,6 +46,8 @@ import {
   revokeSanction
 } from './moderation.service.js';
 import { createAppeal, listAppeals, resolveAppeal } from './appeals.service.js';
+import { getModerationPolicy, updateModerationPolicy } from './policy.service.js';
+import { PolicyIdempotencyConflictError } from './policy.repository.js';
 
 const reportBodySchema = z.object({
   targetType: z.enum(reportTargetTypes),
@@ -91,6 +93,18 @@ const appealsQuerySchema = z.object({ status: z.enum(['open', 'upheld', 'reduced
 const reportsQuerySchema = z.object({ limit: z.coerce.number().int().min(1).max(100).default(50), cursor: z.string().trim().max(512).optional() }).strict();
 const appealParamsSchema = z.object({ appealId: z.string().uuid() }).strict();
 const appealDecisionSchema = z.object({ status: z.enum(['upheld', 'reduced', 'revoked', 'request_more_info']), decisionNote: z.string().trim().min(1).max(4000) }).strict();
+const policyBodySchema = z.object({
+  postingRestrictionStrikes: z.coerce.number().int().min(1).max(100),
+  temporaryBanStrikes: z.coerce.number().int().min(1).max(100),
+  strikeRetentionDays: z.coerce.number().int().min(1).max(3650),
+  defaultRestrictionHours: z.coerce.number().int().min(1).max(8760),
+  defaultTemporaryBanHours: z.coerce.number().int().min(1).max(8760),
+  reason: z.string().trim().min(1).max(500)
+}).strict().superRefine((value, context) => {
+  if (value.temporaryBanStrikes < value.postingRestrictionStrikes) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['temporaryBanStrikes'], message: 'temporaryBanStrikes must be at least postingRestrictionStrikes.' });
+  }
+});
 
 function validationError(reply: FastifyReply) {
   return reply.status(400).send({
@@ -111,7 +125,7 @@ function moderationError(reply: FastifyReply, error: unknown) {
     return reply.status(409).send({ error: 'moderation_conflict', message: error.message });
   }
   if (error instanceof SanctionTargetNotFoundError || error instanceof AppealNotFoundError) return reply.status(404).send({ error: 'not_found', message: error.message });
-  if (error instanceof AppealConflictError) return reply.status(409).send({ error: 'moderation_conflict', message: error.message });
+  if (error instanceof AppealConflictError || error instanceof PolicyIdempotencyConflictError) return reply.status(409).send({ error: 'moderation_conflict', message: error.message });
   throw error;
 }
 
@@ -121,6 +135,29 @@ async function actorContext(request: Parameters<typeof authenticate>[0]) {
 }
 
 export function registerModerationRoutes(app: FastifyInstance) {
+  app.get('/moderation/policy', { preHandler: [authenticate, requirePermission('moderation.policy.read')] }, async (_request, reply) => {
+    return reply.send({ policy: await getModerationPolicy() });
+  });
+
+  app.patch('/moderation/policy', { preHandler: [authenticate, adminMutationRateLimit, requirePermission('moderation.policy.update')] }, async (request, reply) => {
+    const parsedBody = policyBodySchema.safeParse(request.body);
+    const idempotencyKey = request.headers['idempotency-key'];
+    if (!parsedBody.success || typeof idempotencyKey !== 'string') return validationError(reply);
+    try {
+      const actor = await actorContext(request);
+      const result = await updateModerationPolicy({
+        ...parsedBody.data,
+        actorUserId: actor.actorId,
+        actorRole: actor.actorRole,
+        idempotencyKey,
+        fingerprint: requestFingerprint(parsedBody.data)
+      });
+      return reply.status(result.replayed ? 200 : 200).send(result);
+    } catch (error) {
+      return moderationError(reply, error);
+    }
+  });
+
   app.get(
     '/moderation/capabilities',
     { preHandler: [authenticate] },
