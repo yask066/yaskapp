@@ -27,6 +27,7 @@ export const MODERATION_PERMISSIONS = [
   'moderation.strike.issue',
   'moderation.restriction.issue',
   'moderation.user.ban',
+  'moderation.permanent_ban.issue',
   'moderation.appeal.read',
   'moderation.appeal.resolve',
   'moderation.audit.read',

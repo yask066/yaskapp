@@ -25,6 +25,7 @@ textarea { min-height: 110px; resize: vertical; }
 .toolbar label { min-width: 160px; }
 .workspace { display: grid; grid-template-columns: minmax(330px, .8fr) minmax(500px, 1.2fr); gap: 18px; align-items: start; }
 .queue-card, .detail-card { padding: 18px; min-height: 520px; }
+.appeals-card { padding: 18px; margin-top: 18px; }
 .section-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .queue { display: grid; gap: 9px; }
 .case-row { width: 100%; text-align: left; border: 1px solid #e6eaf1; background: #fff; padding: 13px; }

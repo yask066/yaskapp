@@ -150,6 +150,16 @@ test('regular users cannot issue moderation sanctions', async () => {
     }
   });
   assert.equal(response.statusCode, 403, response.body);
+  const permanentBan = await app.inject({
+    method: 'POST',
+    url: `/moderation/users/${user.user.id}/permanent-ban`,
+    headers: { ...bearer(user.accessToken), 'idempotency-key': `ban-${suffix()}` },
+    payload: {
+      caseId: '00000000-0000-4000-8000-000000000000',
+      reason: 'Should not be accepted.'
+    }
+  });
+  assert.equal(permanentBan.statusCode, 403, permanentBan.body);
 });
 
 test('moderation queue is protected and supports filters and cursor pagination', async () => {
@@ -391,6 +401,55 @@ test('posting restriction is enforced by poll creation on the backend', async ()
     payload: { question: 'This should be rejected', options: ['One', 'Two'] }
   });
   assert.equal(blockedPoll.statusCode, 403, blockedPoll.body);
+});
+
+test('permanent ban requires superadmin and can be revoked through an appeal', async () => {
+  const reporter = await registerUser();
+  const moderator = await registerUser();
+  const superadmin = await registerUser();
+  const target = await registerUser();
+  await setRole(moderator, 'moderator');
+  await setRole(superadmin, 'superadmin');
+  const report = await app.inject({
+    method: 'POST', url: '/reports', headers: bearer(reporter.accessToken),
+    payload: { targetType: 'user', targetId: target.user.id, category: 'hate_or_discrimination', description: 'Severe violation.' }
+  });
+  const caseId = report.json<{ case: { id: string } }>().case.id;
+  const moderatorAttempt = await app.inject({
+    method: 'POST', url: `/moderation/users/${target.user.id}/permanent-ban`,
+    headers: { ...bearer(moderator.accessToken), 'idempotency-key': `permanent-${suffix()}` },
+    payload: { caseId, reason: 'Moderator cannot issue permanent bans.' }
+  });
+  assert.equal(moderatorAttempt.statusCode, 403, moderatorAttempt.body);
+  const banned = await app.inject({
+    method: 'POST', url: `/moderation/users/${target.user.id}/permanent-ban`,
+    headers: { ...bearer(superadmin.accessToken), 'idempotency-key': `permanent-${suffix()}` },
+    payload: { caseId, reason: 'Severe violation confirmed.' }
+  });
+  assert.equal(banned.statusCode, 201, banned.body);
+  const sanctionId = banned.json<{ sanction: { id: string; type: string } }>().sanction.id;
+  assert.equal(banned.json<{ sanction: { type: string } }>().sanction.type, 'permanent_ban');
+
+  const appeal = await app.inject({
+    method: 'POST', url: '/appeals', headers: { ...bearer(target.accessToken), 'idempotency-key': `appeal-${suffix()}` },
+    payload: { sanctionId, reason: 'I request a review.' }
+  });
+  assert.equal(appeal.statusCode, 201, appeal.body);
+  const appealId = appeal.json<{ appeal: { id: string } }>().appeal.id;
+  const appeals = await app.inject({ method: 'GET', url: '/moderation/appeals?status=open', headers: bearer(moderator.accessToken) });
+  assert.equal(appeals.statusCode, 200, appeals.body);
+  const moderatorDecision = await app.inject({
+    method: 'POST', url: `/moderation/appeals/${appealId}/resolve`, headers: { ...bearer(moderator.accessToken), 'idempotency-key': `decision-${suffix()}` },
+    payload: { status: 'revoked', decisionNote: 'Moderator cannot decide appeals.' }
+  });
+  assert.equal(moderatorDecision.statusCode, 403, moderatorDecision.body);
+  const decision = await app.inject({
+    method: 'POST', url: `/moderation/appeals/${appealId}/resolve`, headers: { ...bearer(superadmin.accessToken), 'idempotency-key': `decision-${suffix()}` },
+    payload: { status: 'revoked', decisionNote: 'Appeal upheld and ban revoked.' }
+  });
+  assert.equal(decision.statusCode, 200, decision.body);
+  const login = await app.inject({ method: 'POST', url: '/auth/login', payload: { login: target.user.username, password: 'password123' } });
+  assert.equal(login.statusCode, 200, login.body);
 });
 
 after(async () => {

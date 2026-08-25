@@ -97,7 +97,10 @@ const adminAuditQuerySchema = z.object({
     'moderation.case_escalated',
     'moderation.sanction_issued',
     'moderation.sanction_revoked',
-    'moderation.policy_evaluated'
+    'moderation.policy_evaluated',
+    'moderation.permanent_ban_issued',
+    'moderation.appeal_created',
+    'moderation.appeal_resolved'
   ]).optional(),
   actorId: z.string().uuid().optional(),
   targetType: z.enum(['user', 'poll', 'comment', 'case']).optional(),

@@ -58,6 +58,18 @@ export async function optionalAuthenticate(
   }
 }
 
+export async function authenticateForAppeal(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    await request.jwtVerify();
+  } catch {
+    return reply.status(401).send({ error: 'unauthorized', message: 'Authentication is required.' });
+  }
+  const user = await request.getCurrentUser();
+  if (!user || user.status !== 'active') {
+    return reply.status(401).send({ error: 'unauthorized', message: 'Authentication is required.' });
+  }
+}
+
 export async function getCurrentUser(request: FastifyRequest) {
   const userId = request.user.sub;
 

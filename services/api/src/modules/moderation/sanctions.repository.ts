@@ -4,7 +4,7 @@ import { db } from '../../config/database.js';
 import type { UserRole } from '../auth/auth.repository.js';
 import { recordAdminAudit } from '../admin/audit.repository.js';
 
-export type SanctionType = 'warning' | 'strike' | 'posting_restriction' | 'comment_restriction' | 'temporary_ban';
+export type SanctionType = 'warning' | 'strike' | 'posting_restriction' | 'comment_restriction' | 'temporary_ban' | 'permanent_ban';
 export type SanctionStatus = 'active' | 'expired' | 'revoked';
 
 export class SanctionTargetNotFoundError extends Error {}
@@ -45,6 +45,7 @@ function mapSanction(row: SanctionRow) {
     createdAt: row.created_at.toISOString()
   };
 }
+export type Sanction = ReturnType<typeof mapSanction>;
 
 export async function getActiveUserSanctions(userId: string) {
   const result = await db.query<SanctionRow>(
@@ -78,21 +79,22 @@ export function userHasSanction(sanctions: Awaited<ReturnType<typeof getActiveUs
 }
 
 export async function assertUserCanAuthenticate(userId: string) {
-  if (userHasSanction(await getActiveUserSanctions(userId), 'temporary_ban')) {
+  const sanctions = await getActiveUserSanctions(userId);
+  if (userHasSanction(sanctions, 'temporary_ban') || userHasSanction(sanctions, 'permanent_ban')) {
     throw new UserSanctionedError('login', 'Account access is temporarily restricted.');
   }
 }
 
 export async function assertUserCanCreatePoll(userId: string) {
   const sanctions = await getActiveUserSanctions(userId);
-  if (userHasSanction(sanctions, 'posting_restriction') || userHasSanction(sanctions, 'temporary_ban')) {
+  if (userHasSanction(sanctions, 'posting_restriction') || userHasSanction(sanctions, 'temporary_ban') || userHasSanction(sanctions, 'permanent_ban')) {
     throw new UserSanctionedError('poll', 'Creating polls is temporarily restricted.');
   }
 }
 
 export async function assertUserCanComment(userId: string) {
   const sanctions = await getActiveUserSanctions(userId);
-  if (userHasSanction(sanctions, 'comment_restriction') || userHasSanction(sanctions, 'temporary_ban')) {
+  if (userHasSanction(sanctions, 'comment_restriction') || userHasSanction(sanctions, 'temporary_ban') || userHasSanction(sanctions, 'permanent_ban')) {
     throw new UserSanctionedError('comment', 'Creating comments is temporarily restricted.');
   }
 }
@@ -148,7 +150,7 @@ async function insertSanction(client: PoolClient, input: {
   await recordAdminAudit(client, {
     actorUserId: input.actorUserId,
     actorRole: input.actorRole,
-    action: 'moderation.sanction_issued',
+    action: input.type === 'permanent_ban' ? 'moderation.permanent_ban_issued' : 'moderation.sanction_issued',
     targetType: 'user',
     targetId: input.userId,
     reason: input.reason,
@@ -244,7 +246,7 @@ export async function issueSanction(input: {
       if (existing.rows[0].request_fingerprint !== input.fingerprint) throw new IdempotencyConflictError('Idempotency-Key was already used with a different request.');
       if (existing.rows[0].response) {
         await client.query('COMMIT');
-        return { replayed: true, sanction: existing.rows[0].response };
+        return { replayed: true as const, sanction: existing.rows[0].response as Sanction };
       }
     } else {
       await client.query(
@@ -254,8 +256,9 @@ export async function issueSanction(input: {
       );
     }
 
-    let expiresAt = input.expiresAt;
+    const expiresAt = input.expiresAt;
     if (input.type === 'temporary_ban' && !expiresAt) throw new SanctionCaseConflictError('Temporary ban duration is required.');
+    if (input.type === 'permanent_ban' && expiresAt) throw new SanctionCaseConflictError('Permanent ban cannot have an expiry.');
     const sanction = await insertSanction(client, input);
     if (input.type === 'strike') {
       await client.query(
@@ -265,13 +268,13 @@ export async function issueSanction(input: {
       );
       await evaluateStrikePolicy(client, input);
     }
-    if (input.type === 'temporary_ban') {
+    if (input.type === 'temporary_ban' || input.type === 'permanent_ban') {
       await client.query('UPDATE users SET session_version = session_version + 1 WHERE id = $1', [input.userId]);
     }
     const response = { sanction };
     await finalizeIdempotency(client, input.actorUserId, input.idempotencyKey, input.fingerprint, response);
     await client.query('COMMIT');
-    return { replayed: false, ...response };
+    return { replayed: false as const, ...response };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -290,7 +293,7 @@ export async function revokeSanction(input: { sanctionId: string; actorUserId: s
     );
     if (existing.rows[0]) {
       if (existing.rows[0].request_fingerprint !== input.fingerprint) throw new IdempotencyConflictError('Idempotency-Key was already used with a different request.');
-      if (existing.rows[0].response) { await client.query('COMMIT'); return { replayed: true, ...existing.rows[0].response as object }; }
+      if (existing.rows[0].response) { await client.query('COMMIT'); return { replayed: true as const, ...existing.rows[0].response as { sanction: Sanction } }; }
     } else {
       await client.query(
         `INSERT INTO moderation_idempotency_keys (actor_user_id, idempotency_key, request_fingerprint, expires_at)
@@ -315,11 +318,11 @@ export async function revokeSanction(input: { sanctionId: string; actorUserId: s
       reason: input.reason,
       metadata: { sanctionId: sanction.id }
     });
-    if (sanction.type === 'temporary_ban' && sanction.userId) await client.query('UPDATE users SET session_version = session_version + 1 WHERE id = $1', [sanction.userId]);
+    if ((sanction.type === 'temporary_ban' || sanction.type === 'permanent_ban') && sanction.userId) await client.query('UPDATE users SET session_version = session_version + 1 WHERE id = $1', [sanction.userId]);
     const response = { sanction };
     await finalizeIdempotency(client, input.actorUserId, input.idempotencyKey, input.fingerprint, response);
     await client.query('COMMIT');
-    return { replayed: false, ...response };
+    return { replayed: false as const, ...response };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

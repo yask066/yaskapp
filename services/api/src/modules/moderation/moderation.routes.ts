@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 
-import { authenticate } from '../auth/auth.utils.js';
+import { authenticate, authenticateForAppeal } from '../auth/auth.utils.js';
 import { moderationPermissionsForRole, requirePermission } from '../auth/permissions.js';
 import { AdminCursorError } from '../admin/pagination.js';
 import { adminMutationRateLimit } from '../admin/admin.rate-limit.js';
@@ -12,7 +12,14 @@ import {
   deleteAdminComment,
   deleteAdminPoll
 } from '../admin/admin.service.js';
-import { broadcastCommentDeleted, broadcastPollDeleted } from '../../realtime/realtime.hub.js';
+import {
+  broadcastCommentDeleted,
+  broadcastPollDeleted,
+  broadcastModerationAppealCreated,
+  broadcastModerationAppealResolved,
+  broadcastModerationSanctionCreated,
+  broadcastModerationSanctionRevoked
+} from '../../realtime/realtime.hub.js';
 import {
   ModerationCaseConflictError,
   ModerationCaseNotFoundError,
@@ -25,6 +32,7 @@ import {
   SanctionCaseConflictError,
   SanctionTargetNotFoundError
 } from './sanctions.repository.js';
+import { AppealConflictError, AppealNotFoundError } from './appeals.repository.js';
 import {
   addModerationNote,
   assignModerationCase,
@@ -36,6 +44,7 @@ import {
   issueSanction,
   revokeSanction
 } from './moderation.service.js';
+import { createAppeal, listAppeals, resolveAppeal } from './appeals.service.js';
 
 const reportBodySchema = z.object({
   targetType: z.enum(reportTargetTypes),
@@ -76,6 +85,10 @@ const sanctionBodySchema = z.object({
   durationHours: z.coerce.number().int().min(1).max(8760).optional()
 }).strict();
 const revokeParamsSchema = z.object({ sanctionId: z.string().uuid() }).strict();
+const appealBodySchema = z.object({ sanctionId: z.string().uuid(), reason: z.string().trim().min(1).max(4000) }).strict();
+const appealsQuerySchema = z.object({ status: z.enum(['open', 'upheld', 'reduced', 'revoked', 'request_more_info']).optional(), limit: z.coerce.number().int().min(1).max(100).default(50), cursor: z.string().trim().max(512).optional() }).strict();
+const appealParamsSchema = z.object({ appealId: z.string().uuid() }).strict();
+const appealDecisionSchema = z.object({ status: z.enum(['upheld', 'reduced', 'revoked', 'request_more_info']), decisionNote: z.string().trim().min(1).max(4000) }).strict();
 
 function validationError(reply: FastifyReply) {
   return reply.status(400).send({
@@ -95,7 +108,8 @@ function moderationError(reply: FastifyReply, error: unknown) {
   if (error instanceof ModerationCaseConflictError || error instanceof SanctionCaseConflictError || error instanceof IdempotencyConflictError) {
     return reply.status(409).send({ error: 'moderation_conflict', message: error.message });
   }
-  if (error instanceof SanctionTargetNotFoundError) return reply.status(404).send({ error: 'not_found', message: error.message });
+  if (error instanceof SanctionTargetNotFoundError || error instanceof AppealNotFoundError) return reply.status(404).send({ error: 'not_found', message: error.message });
+  if (error instanceof AppealConflictError) return reply.status(409).send({ error: 'moderation_conflict', message: error.message });
   throw error;
 }
 
@@ -125,7 +139,8 @@ export function registerModerationRoutes(app: FastifyInstance) {
     ['warning', 'moderation.warning.issue'],
     ['strike', 'moderation.strike.issue'],
     ['restriction', 'moderation.restriction.issue'],
-    ['temporary-ban', 'moderation.user.ban']
+    ['temporary-ban', 'moderation.user.ban'],
+    ['permanent-ban', 'moderation.permanent_ban.issue']
   ] as const;
   for (const [action, permission] of sanctionRoutes) {
     app.post(
@@ -136,7 +151,7 @@ export function registerModerationRoutes(app: FastifyInstance) {
         const parsedBody = sanctionBodySchema.safeParse(request.body);
         const idempotencyKey = request.headers['idempotency-key'];
         if (!parsedParams.success || !parsedBody.success || typeof idempotencyKey !== 'string') return validationError(reply);
-        const type = action === 'temporary-ban' ? 'temporary_ban' : action === 'restriction' ? parsedBody.data.restrictionType ?? 'posting_restriction' : action as 'warning' | 'strike';
+        const type = action === 'temporary-ban' ? 'temporary_ban' : action === 'permanent-ban' ? 'permanent_ban' : action === 'restriction' ? parsedBody.data.restrictionType ?? 'posting_restriction' : action as 'warning' | 'strike';
         if ((type === 'posting_restriction' || type === 'temporary_ban') && !parsedBody.data.durationHours) return validationError(reply);
         try {
           const actor = await actorContext(request);
@@ -150,6 +165,12 @@ export function registerModerationRoutes(app: FastifyInstance) {
             expiresAt: parsedBody.data.durationHours ? new Date(Date.now() + parsedBody.data.durationHours * 60 * 60 * 1000) : undefined,
             idempotencyKey,
             fingerprint: requestFingerprint({ action, params: parsedParams.data, body: parsedBody.data })
+          });
+          if (!result.replayed) broadcastModerationSanctionCreated({
+            sanctionId: result.sanction.id,
+            userId: result.sanction.userId ?? parsedParams.data.userId,
+            sanctionType: result.sanction.type,
+            status: result.sanction.status
           });
           return reply.status(result.replayed ? 200 : 201).send(result);
         } catch (error) {
@@ -177,7 +198,86 @@ export function registerModerationRoutes(app: FastifyInstance) {
           idempotencyKey,
           fingerprint: requestFingerprint({ params: parsedParams.data, body: parsedBody.data })
         });
+        if (!result.replayed) broadcastModerationSanctionRevoked({
+          sanctionId: result.sanction.id,
+          userId: result.sanction.userId ?? actor.actorId,
+          sanctionType: result.sanction.type
+        });
         return reply.status(result.replayed ? 200 : 200).send(result);
+      } catch (error) {
+        return moderationError(reply, error);
+      }
+    }
+  );
+
+  app.post(
+    '/appeals',
+    { preHandler: [authenticateForAppeal] },
+    async (request, reply) => {
+      const parsedBody = appealBodySchema.safeParse(request.body);
+      const idempotencyKey = request.headers['idempotency-key'];
+      if (!parsedBody.success || typeof idempotencyKey !== 'string') return validationError(reply);
+      try {
+        const result = await createAppeal({
+          sanctionId: parsedBody.data.sanctionId,
+          userId: request.user.sub,
+          reason: parsedBody.data.reason,
+          idempotencyKey,
+          fingerprint: requestFingerprint(parsedBody.data)
+        });
+        if (!result.replayed) broadcastModerationAppealCreated({
+          appealId: result.appeal.id,
+          sanctionId: result.appeal.sanctionId,
+          userId: result.appeal.userId
+        });
+        return reply.status(result.replayed ? 200 : 201).send(result);
+      } catch (error) {
+        return moderationError(reply, error);
+      }
+    }
+  );
+
+  app.get(
+    '/moderation/appeals',
+    { preHandler: [authenticate, requirePermission('moderation.appeal.read')] },
+    async (request, reply) => {
+      const parsedQuery = appealsQuerySchema.safeParse(request.query);
+      if (!parsedQuery.success) return validationError(reply);
+      try {
+        return reply.send(await listAppeals(parsedQuery.data));
+      } catch (error) {
+        if (error instanceof AdminCursorError) return validationError(reply);
+        throw error;
+      }
+    }
+  );
+
+  app.post(
+    '/moderation/appeals/:appealId/resolve',
+    { preHandler: [authenticate, adminMutationRateLimit, requirePermission('moderation.appeal.resolve')] },
+    async (request, reply) => {
+      const parsedParams = appealParamsSchema.safeParse(request.params);
+      const parsedBody = appealDecisionSchema.safeParse(request.body);
+      const idempotencyKey = request.headers['idempotency-key'];
+      if (!parsedParams.success || !parsedBody.success || typeof idempotencyKey !== 'string') return validationError(reply);
+      try {
+        const actor = await actorContext(request);
+        const result = await resolveAppeal({
+          appealId: parsedParams.data.appealId,
+          actorUserId: actor.actorId,
+          actorRole: actor.actorRole,
+          status: parsedBody.data.status,
+          decisionNote: parsedBody.data.decisionNote,
+          idempotencyKey,
+          fingerprint: requestFingerprint({ params: parsedParams.data, body: parsedBody.data })
+        });
+        if (!result.replayed) broadcastModerationAppealResolved({
+          appealId: result.appeal.id,
+          sanctionId: result.appeal.sanctionId,
+          userId: result.appeal.userId,
+          status: result.appeal.status
+        });
+        return reply.status(200).send(result);
       } catch (error) {
         return moderationError(reply, error);
       }

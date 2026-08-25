@@ -9,7 +9,11 @@ import {
   broadcastPollDeleted,
   broadcastCommentDeleted,
   broadcastUserBlocked,
-  broadcastUserUnblocked
+  broadcastUserUnblocked,
+  broadcastModerationSanctionCreated,
+  broadcastModerationSanctionRevoked,
+  broadcastModerationAppealCreated,
+  broadcastModerationAppealResolved
 } from './realtime.hub.js';
 
 test('realtime vote events omit viewer-specific vote state', () => {
@@ -176,4 +180,21 @@ test('realtime user moderation events broadcast only the user id', () => {
     { type: 'user.unblocked', payload: { userId: 'user-unblocked' } }
   ]);
   remove();
+});
+
+test('realtime moderation events contain identifiers and state only', () => {
+  const messages: string[] = [];
+  const remove = addRealtimeClient({ readyState: 1, send: (message) => messages.push(message) });
+  messages.length = 0;
+  broadcastModerationSanctionCreated({ sanctionId: 'sanction-1', userId: 'user-1', sanctionType: 'permanent_ban', status: 'active' });
+  broadcastModerationSanctionRevoked({ sanctionId: 'sanction-1', userId: 'user-1', sanctionType: 'permanent_ban' });
+  broadcastModerationAppealCreated({ appealId: 'appeal-1', sanctionId: 'sanction-1', userId: 'user-1' });
+  broadcastModerationAppealResolved({ appealId: 'appeal-1', sanctionId: 'sanction-1', userId: 'user-1', status: 'revoked' });
+  remove();
+  assert.deepEqual(messages.map((message) => JSON.parse(message)), [
+    { type: 'moderation.sanction_created', payload: { sanctionId: 'sanction-1', userId: 'user-1', sanctionType: 'permanent_ban', status: 'active' } },
+    { type: 'moderation.sanction_revoked', payload: { sanctionId: 'sanction-1', userId: 'user-1', sanctionType: 'permanent_ban' } },
+    { type: 'moderation.appeal_created', payload: { appealId: 'appeal-1', sanctionId: 'sanction-1', userId: 'user-1' } },
+    { type: 'moderation.appeal_resolved', payload: { appealId: 'appeal-1', sanctionId: 'sanction-1', userId: 'user-1', status: 'revoked' } }
+  ]);
 });

@@ -53,6 +53,26 @@ type UserUnblockedEvent = {
   payload: { userId: string };
 };
 
+type ModerationSanctionCreatedEvent = {
+  type: 'moderation.sanction_created';
+  payload: { sanctionId: string; userId: string; sanctionType: string; status: string };
+};
+
+type ModerationSanctionRevokedEvent = {
+  type: 'moderation.sanction_revoked';
+  payload: { sanctionId: string; userId: string; sanctionType: string };
+};
+
+type ModerationAppealCreatedEvent = {
+  type: 'moderation.appeal_created';
+  payload: { appealId: string; sanctionId: string; userId: string };
+};
+
+type ModerationAppealResolvedEvent = {
+  type: 'moderation.appeal_resolved';
+  payload: { appealId: string; sanctionId: string; userId: string; status: string };
+};
+
 type RealtimeEvent =
   | ConnectionReadyEvent
   | PollVoteCreatedEvent
@@ -60,7 +80,11 @@ type RealtimeEvent =
   | PollDeletedEvent
   | CommentDeletedEvent
   | UserBlockedEvent
-  | UserUnblockedEvent;
+  | UserUnblockedEvent
+  | ModerationSanctionCreatedEvent
+  | ModerationSanctionRevokedEvent
+  | ModerationAppealCreatedEvent
+  | ModerationAppealResolvedEvent;
 
 const openReadyState = 1;
 const clients = new Set<RealtimeSocket>();
@@ -124,6 +148,22 @@ export function broadcastUserBlocked(payload: UserBlockedEvent['payload']) {
 
 export function broadcastUserUnblocked(payload: UserUnblockedEvent['payload']) {
   broadcast({ type: 'user.unblocked', payload });
+}
+
+export function broadcastModerationSanctionCreated(payload: ModerationSanctionCreatedEvent['payload']) {
+  broadcast({ type: 'moderation.sanction_created', payload });
+}
+
+export function broadcastModerationSanctionRevoked(payload: ModerationSanctionRevokedEvent['payload']) {
+  broadcast({ type: 'moderation.sanction_revoked', payload });
+}
+
+export function broadcastModerationAppealCreated(payload: ModerationAppealCreatedEvent['payload']) {
+  broadcast({ type: 'moderation.appeal_created', payload });
+}
+
+export function broadcastModerationAppealResolved(payload: ModerationAppealResolvedEvent['payload']) {
+  broadcast({ type: 'moderation.appeal_resolved', payload });
 }
 
 function sanitizePoll(

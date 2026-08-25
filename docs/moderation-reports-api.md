@@ -161,6 +161,48 @@ user session version, invalidate existing JWTs, and block login until the ban
 is revoked or expires. Poll and comment creation enforce the corresponding
 active sanctions on the backend.
 
+## Permanent bans and appeals
+
+Permanent bans use the same sanction model with `type = permanent_ban` and no
+expiry. Only a superadmin can create or revoke one:
+
+```http
+POST /moderation/users/:userId/permanent-ban
+Authorization: Bearer <superadmin-token>
+Idempotency-Key: <unique-key>
+```
+
+```json
+{ "caseId": "...", "reason": "Severe policy violation." }
+```
+
+The affected user's existing JWT is revoked, login and authenticated content
+mutations are denied, while the profile and moderation history remain
+available for review.
+
+A sanctioned user can submit an appeal even after the sanction invalidates the
+session used for ordinary API calls:
+
+```http
+POST /appeals
+Authorization: Bearer <previous-user-token>
+Idempotency-Key: <unique-key>
+```
+
+```json
+{ "sanctionId": "...", "reason": "Please review this decision." }
+```
+
+Moderators can list appeals with `GET /moderation/appeals`; only superadmins
+can decide them through `POST /moderation/appeals/:appealId/resolve` using
+`upheld`, `reduced`, `revoked`, or `request_more_info`. Decisions are
+idempotent, transactional, and audited.
+
+After commit, the API publishes safe WebSocket events:
+`moderation.sanction_created`, `moderation.sanction_revoked`,
+`moderation.appeal_created`, and `moderation.appeal_resolved`. Payloads contain
+only IDs and state fields.
+
 ## Local migration and checks
 
 ```powershell
