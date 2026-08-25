@@ -108,8 +108,7 @@ test('admin read endpoints enforce authentication, permissions, validation and f
   const missingUser = await app.inject({
     method: 'GET', url: '/admin/users/00000000-0000-4000-8000-000000000000', headers: bearer(moderator.accessToken)
   });
-  assert.equal(missingUser.statusCode, 200);
-  assert.equal(missingUser.json<{ user: null }>().user, null);
+  assert.equal(missingUser.statusCode, 404);
 
   const regularPolls = await app.inject({ method: 'GET', url: '/admin/polls', headers: bearer(regular.accessToken) });
   assert.equal(regularPolls.statusCode, 403);
@@ -128,8 +127,7 @@ test('admin read endpoints enforce authentication, permissions, validation and f
   assert.equal(invalidPollId.statusCode, 400);
 
   const missingPoll = await app.inject({ method: 'GET', url: '/admin/polls/00000000-0000-4000-8000-000000000000', headers: bearer(moderator.accessToken) });
-  assert.equal(missingPoll.statusCode, 200);
-  assert.equal(missingPoll.json<{ poll: null }>().poll, null);
+  assert.equal(missingPoll.statusCode, 404);
 
   const regularAudit = await app.inject({ method: 'GET', url: '/admin/audit', headers: bearer(regular.accessToken) });
   assert.equal(regularAudit.statusCode, 403);
@@ -148,19 +146,17 @@ test('admin read endpoints enforce authentication, permissions, validation and f
 test('last superadmin protection preserves the final account and emits no audit entry', async () => {
   const first = await registerUser();
   const second = await registerUser();
-  const operator = await registerUser();
   await promote(first, 'superadmin');
   await promote(second, 'superadmin');
-  await promote(operator, 'superadmin');
 
   const demoteSecond = await app.inject({
-    method: 'PATCH', url: `/admin/users/${second.user.id}/role`, headers: bearer(operator.accessToken),
+    method: 'PATCH', url: `/admin/users/${second.user.id}/role`, headers: bearer(first.accessToken),
     payload: { role: 'user', reason: 'Reduce administrator count.' }
   });
   assert.equal(demoteSecond.statusCode, 200, demoteSecond.body);
 
   const demoteLast = await app.inject({
-    method: 'PATCH', url: `/admin/users/${first.user.id}/role`, headers: bearer(operator.accessToken),
+    method: 'PATCH', url: `/admin/users/${first.user.id}/role`, headers: bearer(first.accessToken),
     payload: { role: 'user', reason: 'Attempt to remove final superadmin.' }
   });
   assert.equal(demoteLast.statusCode, 409, demoteLast.body);
@@ -170,7 +166,7 @@ test('last superadmin protection preserves the final account and emits no audit 
   assert.equal(firstRole.rows[0]?.role, 'superadmin');
 
   const deleteLast = await app.inject({
-    method: 'DELETE', url: `/admin/users/${first.user.id}`, headers: bearer(operator.accessToken),
+    method: 'DELETE', url: `/admin/users/${first.user.id}`, headers: bearer(first.accessToken),
     payload: { reason: 'Attempt to delete final superadmin.' }
   });
   assert.equal(deleteLast.statusCode, 409, deleteLast.body);
@@ -275,6 +271,9 @@ test('admin mutation transactions roll back state when audit insertion fails', a
   }), 'unblock audit insertion should fail');
   const afterUnblock = await db.query<{ status: string }>('SELECT status FROM users WHERE id = $1', [target.user.id]);
   assert.equal(afterUnblock.rows[0]?.status, 'blocked');
+  await adminUsersRepository.unblockUser(actor.user.id, target.user.id, {
+    actorUserId: actor.user.id, actorRole: 'superadmin', reason: 'Restore target for remaining rollback checks.'
+  });
 
   await assert.rejects(() => adminUsersRepository.changeUserRole(actor.user.id, target.user.id, 'moderator', {
     actorUserId: actor.user.id, actorRole: 'superadmin', reason: ''
