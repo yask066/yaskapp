@@ -166,7 +166,10 @@ class AdminApiClient {
   }
 
   Future<Map<String, dynamic>> _request(String method, String path, {String? accessToken, Map<String, String>? query, Map<String, dynamic>? body}) async {
-    final uri = Uri.parse(_config.baseUrl).replace(path: path, queryParameters: query == null ? null : query..removeWhere((_, value) => value.isEmpty));
+    final queryParameters = query == null
+        ? null
+        : (Map<String, String>.from(query)..removeWhere((_, value) => value.isEmpty));
+    final uri = Uri.parse(_config.baseUrl).replace(path: path, queryParameters: queryParameters);
     final request = http.Request(method, uri);
     if (accessToken != null && accessToken.isNotEmpty) request.headers['authorization'] = 'Bearer $accessToken';
     if (body != null) { request.headers['content-type'] = 'application/json'; request.body = jsonEncode(body); }

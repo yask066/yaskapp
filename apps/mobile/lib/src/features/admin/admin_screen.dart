@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'admin_api_client.dart';
+import 'admin_reload_gate.dart';
 import '../realtime/realtime_client.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -34,6 +35,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   late final bool _ownsRealtime;
   StreamSubscription<UserModerationRealtimeEvent>? _blockedSubscription;
   StreamSubscription<UserModerationRealtimeEvent>? _unblockedSubscription;
+  final _reloadGate = AdminReloadGate();
 
   AdminCapabilities get _capabilities => widget.capabilities ?? const AdminCapabilities(<String>{});
 
@@ -42,8 +44,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     super.initState();
     _ownsRealtime = widget._realtimeClient == null;
     _realtime = widget._realtimeClient ?? RealtimeClient();
-    _blockedSubscription = _realtime.userBlocked.listen((_) => _load());
-    _unblockedSubscription = _realtime.userUnblocked.listen((_) => _load());
+    _blockedSubscription = _realtime.userBlocked.listen((_) => _requestReload());
+    _unblockedSubscription = _realtime.userUnblocked.listen((_) => _requestReload());
     _realtime.connect();
     _load();
   }
@@ -57,7 +59,14 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     super.dispose();
   }
 
-  Future<void> _load() async {
+  void _requestReload() {
+    if (mounted) unawaited(_load());
+  }
+
+  Future<void> _load() => _reloadGate.run(_loadOnce);
+
+  Future<void> _loadOnce() async {
+    if (!mounted) return;
     setState(() { _loading = true; _error = null; });
     try {
       final results = await Future.wait([
@@ -107,7 +116,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       if (action == 'Block') await widget.apiClient.blockUser(userId: user.id, accessToken: widget.accessToken, reason: reason);
       if (action == 'Unblock') await widget.apiClient.unblockUser(userId: user.id, accessToken: widget.accessToken, reason: reason);
       if (action == 'Delete') await widget.apiClient.deleteUser(userId: user.id, accessToken: widget.accessToken, reason: reason);
-      await _load();
+      _requestReload();
     } on AdminApiException catch (error) { if (mounted) _showError(error.userMessage); }
   }
 
@@ -133,14 +142,14 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     if (result == null) return;
     try {
       await widget.apiClient.changeRole(userId: user.id, role: result.$1, accessToken: widget.accessToken, reason: result.$2);
-      await _load();
+      _requestReload();
     } on AdminApiException catch (error) { if (mounted) _showError(error.userMessage); }
   }
 
   Future<void> _deletePoll(AdminPollSummary poll) async {
     final reason = await _reason('Delete poll');
     if (reason == null) return;
-    try { await widget.apiClient.deletePoll(pollId: poll.id, accessToken: widget.accessToken, reason: reason); await _load(); }
+    try { await widget.apiClient.deletePoll(pollId: poll.id, accessToken: widget.accessToken, reason: reason); _requestReload(); }
     on AdminApiException catch (error) { if (mounted) _showError(error.message); }
   }
 
@@ -203,7 +212,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                             try {
                               await widget.apiClient.deleteComment(commentId: comment.id, accessToken: widget.accessToken, reason: reason);
                               if (context.mounted) Navigator.pop(context);
-                              await _load();
+                              _requestReload();
                             } on AdminApiException catch (error) {
                               if (mounted) _showError(error.userMessage);
                             }
@@ -260,7 +269,11 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                   title: Text(user.displayName),
                   subtitle: Text('@${user.username} · ${user.role} · ${user.status}'),
                   trailing: PopupMenuButton<String>(
-                    onSelected: (action) => _userAction(user, action),
+                    onSelected: (action) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) unawaited(_userAction(user, action));
+                      });
+                    },
                     itemBuilder: (_) => [
                       if (user.status == 'blocked' && _capabilities.canUnblockUsers)
                         const PopupMenuItem(value: 'Unblock', child: Text('Unblock'))

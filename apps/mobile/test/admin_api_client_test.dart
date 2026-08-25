@@ -59,6 +59,25 @@ void main() {
     expect(jsonDecode(request.body), {'reason': 'Violates rules.'});
   });
 
+  test('omits empty admin query parameters', () async {
+    late http.Request request;
+    final client = AdminApiClient(
+      config: config,
+      httpClient: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(jsonEncode({'items': [], 'nextCursor': null}), 200);
+      }),
+    );
+
+    await client.listUsers(accessToken: 'token');
+
+    expect(request.url.queryParameters, {
+      'status': 'all',
+      'role': 'all',
+      'limit': '50',
+    });
+  });
+
   test('loads server-issued admin capabilities without changing AuthUser', () async {
     final client = AdminApiClient(
       config: config,
