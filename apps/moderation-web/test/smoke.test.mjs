@@ -32,3 +32,8 @@ test('moderation panel includes the reference workspace navigation and filters',
   assert.match(html, /id="type-filter"/);
   assert.match(html, /id="assigned-filter"/);
 });
+
+test('moderation panel assets remain available at the IP admin mount', () => {
+  assert.match(html, /href="\/src\/styles\.css"/);
+  assert.match(html, /src="\/src\/main\.js"/);
+});

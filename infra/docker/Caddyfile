@@ -10,6 +10,9 @@ http://{$STAGING_PUBLIC_IP:127.0.0.1} {
     handle /admin {
         redir /admin/ 308
     }
+    handle /src/* {
+        reverse_proxy moderation-web:80
+    }
     handle_path /admin/* {
         reverse_proxy moderation-web:80
     }

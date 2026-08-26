@@ -7,10 +7,11 @@ const html = await readFile(new URL('../../../apps/moderation-web/index.html', i
 
 test('development IP serves moderation panel under /admin', () => {
   assert.match(caddyfile, /http:\/\/\{\$STAGING_PUBLIC_IP:127\.0\.0\.1\}\s*\{/);
+  assert.match(caddyfile, /handle \/src\/\*\s*\{[\s\S]*?reverse_proxy moderation-web:80/);
   assert.match(caddyfile, /handle_path \/admin\/\*\s*\{[\s\S]*?reverse_proxy moderation-web:80/);
 });
 
-test('moderation panel uses relative asset paths for the /admin mount', () => {
-  assert.match(html, /href="src\/styles\.css"/);
-  assert.match(html, /src="src\/main\.js"/);
+test('moderation panel uses stable asset paths for the /admin mount', () => {
+  assert.match(html, /href="\/src\/styles\.css"/);
+  assert.match(html, /src="\/src\/main\.js"/);
 });
