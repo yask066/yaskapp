@@ -144,13 +144,6 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
   }
 
   @override
-  void dispose() {
-    _commentController.dispose();
-
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
