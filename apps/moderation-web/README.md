@@ -23,6 +23,17 @@ The staging compose file builds this app as `moderation-web` and Caddy routes
 hostname before exposing the panel. Put it behind VPN/SSO or an equivalent
 network access layer before production exposure, and use HTTPS.
 
+The staging Caddyfile uses separate `STAGING_API_DOMAIN` and
+`MODERATION_HOST` hostnames. The moderation hostname serves the panel and
+proxies only the panel's API paths to the private API container, so the panel
+does not depend on a developer-machine IP or a public catch-all HTTP route.
+
+For preliminary development without a registered domain, the same staging
+stack also exposes the panel at `http://5.44.44.197/admin` and proxies API
+requests from that IP to the private API container. This IP/HTTP route is for
+development only; use a domain with HTTPS plus the production access controls
+before exposing the moderation panel publicly.
+
 The panel now contains capability-gated Cases, Appeals, Audit, and Policy
 sections. The browser keeps the access token in memory only, clears it on
 logout/session expiry, and treats `401`, `403`, `404`, `409`, and `429` as

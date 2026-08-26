@@ -1,8 +1,58 @@
-{$MODERATION_HOST:moderation.localhost} {
-    reverse_proxy moderation-web:80
+http://5.44.44.197 {
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    }
+
+    handle /admin {
+        redir /admin/ 308
+    }
+    handle_path /admin/* {
+        reverse_proxy moderation-web:80
+    }
+    handle /auth/* {
+        reverse_proxy api:3000
+    }
+    handle /moderation/* {
+        reverse_proxy api:3000
+    }
+    handle /appeals* {
+        reverse_proxy api:3000
+    }
+    handle {
+        reverse_proxy api:3000
+    }
 }
 
-:80 {
-    # Temporary IP-based staging access. Caddy also forwards WebSocket upgrades.
+{$STAGING_API_DOMAIN:api-staging.example.com} {
     reverse_proxy api:3000
+}
+
+{$MODERATION_HOST:moderation-staging.example.com} {
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    }
+
+    handle /auth/* {
+        reverse_proxy api:3000
+    }
+    handle /moderation/* {
+        reverse_proxy api:3000
+    }
+    handle /admin/* {
+        reverse_proxy api:3000
+    }
+    handle /appeals* {
+        reverse_proxy api:3000
+    }
+    handle {
+        reverse_proxy moderation-web:80
+    }
 }

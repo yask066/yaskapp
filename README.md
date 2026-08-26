@@ -47,6 +47,12 @@ start it from the repository root:
 docker compose -f infra/docker/docker-compose.staging.yml up -d --build
 ```
 
+Before a domain is available, the staging stack can be used through the VPS
+IP. The moderation panel is available at `http://5.44.44.197/admin`, and the
+API base URL for Flutter is `http://5.44.44.197`. This is an HTTP-only
+development route; switch to the domain-based HTTPS configuration before
+production use.
+
 The staging Compose flow runs the `migrate` job after PostgreSQL is healthy and
 starts the API only after that job exits successfully.
 

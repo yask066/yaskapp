@@ -122,6 +122,18 @@ flutter run `
 The exact domain is selected during implementation. The API must not depend on
 the developer's LAN address after deployment.
 
+For staging, use two separate hostnames:
+
+- `STAGING_API_DOMAIN`, for example `api-staging.example.com`;
+- `MODERATION_HOST`, for example `moderation-staging.example.com`.
+
+Caddy terminates HTTPS for both hosts. The moderation host serves the static
+panel and proxies only its required API paths (`/auth/*`, `/moderation/*`,
+`/admin/*`, `/appeals*`) to the private API service. Set
+`CORS_ORIGINS=https://moderation-staging.example.com` in the API environment.
+Do not use the example domains in production; replace them with DNS records
+pointing to the VPS public IP.
+
 ## Deployment Flow
 
 1. Select a VPS or managed host and configure the firewall.

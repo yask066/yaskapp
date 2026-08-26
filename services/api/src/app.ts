@@ -93,7 +93,9 @@ export function buildApp() {
   });
 
   app.register(cors, {
-    origin: true,
+    origin: env.CORS_ORIGINS === '*'
+      ? true
+      : env.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean),
     credentials: true
   });
 

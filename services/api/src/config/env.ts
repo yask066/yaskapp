@@ -9,6 +9,7 @@ const envSchema = z
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
   HOST: z.string().default('0.0.0.0'),
+  CORS_ORIGINS: z.string().default('*'),
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
   JWT_SECRET: z.string().min(16).default(developmentJwtSecret),
