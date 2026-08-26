@@ -23,3 +23,12 @@ test('destructive policy writes use an idempotency key', () => {
   assert.match(source, /PATCH', body: JSON\.stringify\(body\)/);
   assert.match(source, /'idempotency-key': idempotencyKey\(\)/);
 });
+
+test('moderation panel includes the reference workspace navigation and filters', () => {
+  assert.match(html, /class="admin-shell"/);
+  assert.match(html, /class="sidebar"/);
+  assert.match(html, /class="user-chip"/);
+  assert.match(html, /placeholder="Search by ID, user, content\.\.\."/);
+  assert.match(html, /id="type-filter"/);
+  assert.match(html, /id="assigned-filter"/);
+});
