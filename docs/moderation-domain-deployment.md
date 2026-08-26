@@ -11,12 +11,13 @@ Until a domain is registered and delegated, the staging Caddy configuration
 also provides a development-only IP route:
 
 ```text
-http://5.44.44.197/admin
+http://<STAGING_PUBLIC_IP>/admin
 ```
 
 The IP route serves the moderation web app under `/admin` and proxies the API
 paths through the same host. It does not provide HTTPS and must not be used
-for production moderation access.
+for production moderation access. Set `STAGING_PUBLIC_IP` in
+`services/api/.env.staging` to the VPS public IP.
 
 Replace both example hostnames with the real domain before deployment. Caddy
 automatically requests and renews certificates for both hosts through ports 80

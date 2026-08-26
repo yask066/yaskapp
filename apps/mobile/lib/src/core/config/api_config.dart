@@ -2,11 +2,11 @@ class ApiConfig {
   const ApiConfig({
     this.baseUrl = const String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: 'http://5.44.44.197',
+      defaultValue: 'http://localhost:3000',
     ),
     this.websocketUrl = const String.fromEnvironment(
       'API_WEBSOCKET_URL',
-      defaultValue: 'ws://5.44.44.197/realtime',
+      defaultValue: 'ws://localhost:3000/realtime',
     ),
   });
 

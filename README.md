@@ -47,11 +47,21 @@ start it from the repository root:
 docker compose -f infra/docker/docker-compose.staging.yml up -d --build
 ```
 
-Before a domain is available, the staging stack can be used through the VPS
-IP. The moderation panel is available at `http://5.44.44.197/admin`, and the
-API base URL for Flutter is `http://5.44.44.197`. This is an HTTP-only
-development route; switch to the domain-based HTTPS configuration before
-production use.
+Before a domain is available, set `STAGING_PUBLIC_IP` in
+`services/api/.env.staging` to the VPS public IP. The staging stack then serves
+the moderation panel at `http://<STAGING_PUBLIC_IP>/admin`. Pass the same
+address to Flutter through `API_BASE_URL` and `API_WEBSOCKET_URL`. This is an
+HTTP-only development route; switch to the domain-based HTTPS configuration
+before production use.
+
+PowerShell example:
+
+```powershell
+$env:YASKAPP_BACKEND_HOST = "5.44.44.197"
+flutter run `
+  --dart-define=API_BASE_URL="http://$env:YASKAPP_BACKEND_HOST" `
+  --dart-define=API_WEBSOCKET_URL="ws://$env:YASKAPP_BACKEND_HOST/realtime"
+```
 
 The staging Compose flow runs the `migrate` job after PostgreSQL is healthy and
 starts the API only after that job exits successfully.

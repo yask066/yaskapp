@@ -1,4 +1,4 @@
-http://5.44.44.197 {
+http://{$STAGING_PUBLIC_IP:127.0.0.1} {
     header {
         X-Content-Type-Options "nosniff"
         X-Frame-Options "DENY"

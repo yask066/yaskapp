@@ -29,8 +29,9 @@ proxies only the panel's API paths to the private API container, so the panel
 does not depend on a developer-machine IP or a public catch-all HTTP route.
 
 For preliminary development without a registered domain, the same staging
-stack also exposes the panel at `http://5.44.44.197/admin` and proxies API
-requests from that IP to the private API container. This IP/HTTP route is for
+stack also exposes the panel at `http://<STAGING_PUBLIC_IP>/admin` and proxies
+API requests from that IP to the private API container. Set
+`STAGING_PUBLIC_IP` in `services/api/.env.staging`. This IP/HTTP route is for
 development only; use a domain with HTTPS plus the production access controls
 before exposing the moderation panel publicly.
 
