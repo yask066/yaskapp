@@ -125,7 +125,6 @@ async function loadQueue(append = false) {
 }
 
 async function loadPollDetails(pollId) {
-  if (!can('admin.polls.read')) return null;
   try {
     return (await request(`/admin/polls/${pollId}`)).poll;
   } catch (error) {
