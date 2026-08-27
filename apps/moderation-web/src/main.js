@@ -77,8 +77,12 @@ async function signIn(event) {
     accessToken = result.accessToken;
     const currentUser = await request('/auth/me');
     currentUserId = currentUser.user?.id || null;
-    const capabilityResult = await request('/moderation/capabilities');
-    capabilities = new Set(capabilityResult.permissions || []);
+    const moderationCapabilities = await request('/moderation/capabilities');
+    const adminCapabilities = await request('/admin/capabilities');
+    capabilities = new Set([
+      ...(moderationCapabilities.permissions || []),
+      ...(adminCapabilities.permissions || [])
+    ]);
     if (!can('moderation.queue.read')) throw new Error('This account is not authorized for moderation.');
     configureNavigation();
     showPanel();
