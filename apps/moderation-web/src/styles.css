@@ -96,6 +96,13 @@ textarea { min-height: 110px; resize: vertical; }
 .avatar.neutral { color: #344054; background: #eef1f5; }
 .content-preview details { margin-top: 22px; color: #315dcc; }
 .content-preview summary, .history-section summary { cursor: pointer; color: #315dcc; font-weight: 650; }
+.poll-options { display: grid; gap: 8px; margin: 14px 0; padding: 0; list-style: none; }
+.poll-options li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; border-radius: 7px; background: #f5f7fb; }
+.poll-options strong { color: #566a9d; font-size: 12px; white-space: nowrap; }
+.poll-metadata { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; margin: 16px 0 0; }
+.poll-metadata div { display: grid; gap: 2px; }
+.poll-metadata dt { color: #667085; font-size: 12px; }
+.poll-metadata dd { margin: 0; font-weight: 650; }
 .report-section { border-left: 1px solid #e4e7ec; padding-left: 24px; }
 .report-section > strong { display: block; margin: 8px 0 16px; font-size: 16px; }
 .report-section .reporter { margin-top: 18px; }

@@ -69,3 +69,9 @@ test('closing More actions after copying the case ID updates its accessibility s
 test('dropdowns stay hidden until opened', () => {
   assert.match(styles, /\[hidden\]\s*\{[^}]*display:\s*none\s*!important/);
 });
+
+test('poll details load the protected admin poll record', () => {
+  assert.match(source, /\/admin\/polls\//);
+  assert.match(source, /votesCount/);
+  assert.match(source, /Poll details/);
+});

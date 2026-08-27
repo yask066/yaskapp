@@ -22,6 +22,7 @@ export type AdminPoll = {
   likesCount: number;
   createdAt: string;
   deletedAt: string | null;
+  options: Array<{ id: string; text: string; position: number; votesCount: number }>;
 };
 
 export type AdminCommentDeleteResult =
@@ -146,7 +147,8 @@ function mapAdminPoll(row: {
     commentsCount: row.comments_count,
     likesCount: row.likes_count,
     createdAt: row.created_at.toISOString(),
-    deletedAt: row.deleted_at?.toISOString() ?? null
+    deletedAt: row.deleted_at?.toISOString() ?? null,
+    options: []
   };
 }
 
@@ -248,7 +250,30 @@ export async function getAdminPoll(pollId: string) {
   );
 
   const row = result.rows[0];
-  return row ? mapAdminPoll(row) : null;
+  if (!row) return null;
+
+  const optionsResult = await db.query<{
+    id: string;
+    text: string;
+    position: number;
+    votes_count: number;
+  }>(
+    `SELECT id, text, position, votes_count
+       FROM poll_options
+      WHERE poll_id = $1
+      ORDER BY position ASC, id ASC`,
+    [pollId]
+  );
+
+  return {
+    ...mapAdminPoll(row),
+    options: optionsResult.rows.map((option) => ({
+      id: option.id,
+      text: option.text,
+      position: option.position,
+      votesCount: option.votes_count
+    }))
+  };
 }
 
 export async function deleteAdminPoll(

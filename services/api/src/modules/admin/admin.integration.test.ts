@@ -230,7 +230,10 @@ test('admin poll and comment deletion are transactional and idempotent', async (
 
   const detail = await app.inject({ method: 'GET', url: `/admin/polls/${poll.id}`, headers: bearer(moderator.accessToken) });
   assert.equal(detail.statusCode, 200);
-  assert.equal(detail.json<{ poll: { status: string } }>().poll.status, 'active');
+  const detailPoll = detail.json<{ poll: { status: string; options: Array<{ text: string; votesCount: number }> } }>().poll;
+  assert.equal(detailPoll.status, 'active');
+  assert.deepEqual(detailPoll.options.map((option) => option.text), ['Keep', 'Remove']);
+  assert.deepEqual(detailPoll.options.map((option) => option.votesCount), [0, 0]);
 
   const deletePoll = await app.inject({ method: 'DELETE', url: `/admin/polls/${poll.id}`, headers: bearer(moderator.accessToken), payload: { reason: 'Removed by moderator.' } });
   assert.equal(deletePoll.statusCode, 204);
