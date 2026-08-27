@@ -148,7 +148,11 @@ function bindCaseActions(item) {
   });
   const copyCaseId = async () => { await navigator.clipboard?.writeText(item.id); };
   $('copy-case-id')?.addEventListener('click', copyCaseId);
-  $('copy-case-id-menu')?.addEventListener('click', async () => { await copyCaseId(); if (menu) menu.hidden = true; });
+  $('copy-case-id-menu')?.addEventListener('click', async () => {
+    await copyCaseId();
+    if (menu) menu.hidden = true;
+    menuToggle?.setAttribute('aria-expanded', 'false');
+  });
   $('assign-case')?.addEventListener('click', () => mutate(`/moderation/cases/${item.id}/assign`));
   $('takeover-case')?.addEventListener('click', () => mutate(`/moderation/cases/${item.id}/takeover`));
   $('add-note')?.addEventListener('click', async () => { const body = $('note-body').value.trim(); if (body) await mutate(`/moderation/cases/${item.id}/notes`, { body }); });

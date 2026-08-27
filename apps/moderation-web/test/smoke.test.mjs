@@ -59,3 +59,8 @@ test('case filters send search and assignment criteria to the API', () => {
   assert.match(source, /unassigned/);
   assert.match(source, /\/auth\/me/);
 });
+
+test('closing More actions after copying the case ID updates its accessibility state', () => {
+  assert.match(source, /copy-case-id-menu/);
+  assert.match(source, /menuToggle\?\.setAttribute\('aria-expanded', 'false'\)/);
+});
