@@ -48,7 +48,7 @@ function renderActionBar(item) {
     sanctionItems,
     '<button id="copy-case-id-menu">Copy case ID</button>',
   ].join('');
-  return `<div class="action-bar">${can('moderation.case.resolve') ? '<button id="resolve-case" class="primary action-button">✓&nbsp; Resolve</button>' : ''}${can('moderation.case.resolve') ? '<button id="dismiss-case" class="ghost action-button">⊗&nbsp; Dismiss</button>' : ''}<div class="more-actions"><button id="more-actions-toggle" class="ghost action-button">•••&nbsp; More actions</button><div id="more-actions-menu" class="more-actions-menu" hidden>${menuItems || '<span class="muted">No additional actions.</span>'}</div></div></div>`;
+  return `<div class="action-bar">${can('moderation.case.resolve') ? '<button id="resolve-case" class="primary action-button">✓&nbsp; Resolve</button>' : ''}${can('moderation.case.resolve') ? '<button id="dismiss-case" class="ghost action-button">⊗&nbsp; Dismiss</button>' : ''}<div class="more-actions"><button id="more-actions-toggle" class="ghost action-button" aria-expanded="false" aria-controls="more-actions-menu">•••&nbsp; More actions</button><div id="more-actions-menu" class="more-actions-menu" hidden>${menuItems || '<span class="muted">No additional actions.</span>'}</div></div></div>`;
 }
 
 function showSection(section) {
@@ -134,7 +134,11 @@ async function mutate(path, body = {}, idempotent = false) { await request(path,
 async function mutateAppeal(path, body = {}) { await request(path, { method: 'POST', body: JSON.stringify(body), headers: { 'idempotency-key': idempotencyKey() } }); appealsCursor = null; await loadAppeals(); }
 function bindCaseActions(item) {
   const menu = $('more-actions-menu');
-  $('more-actions-toggle')?.addEventListener('click', () => { menu.hidden = !menu.hidden; });
+  const menuToggle = $('more-actions-toggle');
+  menuToggle?.addEventListener('click', () => {
+    menu.hidden = !menu.hidden;
+    menuToggle.setAttribute('aria-expanded', String(!menu.hidden));
+  });
   const copyCaseId = async () => { await navigator.clipboard?.writeText(item.id); };
   $('copy-case-id')?.addEventListener('click', copyCaseId);
   $('copy-case-id-menu')?.addEventListener('click', async () => { await copyCaseId(); if (menu) menu.hidden = true; });
@@ -220,7 +224,24 @@ $('refresh-appeals').addEventListener('click', () => { appealsCursor = null; loa
 $('refresh-audit').addEventListener('click', () => { auditCursor = null; loadAudit(); });
 $('refresh-policy').addEventListener('click', () => loadPolicy());
 $('policy-form').addEventListener('submit', savePolicy);
-$('filters-toggle').addEventListener('click', () => { $('filters-popover').hidden = !$('filters-popover').hidden; });
+$('filters-toggle').addEventListener('click', () => {
+  const button = $('filters-toggle');
+  const popover = $('filters-popover');
+  popover.hidden = !popover.hidden;
+  button.setAttribute('aria-expanded', String(!popover.hidden));
+});
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.filter-dropdown')) {
+    $('filters-popover').hidden = true;
+    $('filters-toggle').setAttribute('aria-expanded', 'false');
+  }
+  if (!event.target.closest('.more-actions')) {
+    const menu = $('more-actions-menu');
+    const toggle = $('more-actions-toggle');
+    if (menu) menu.hidden = true;
+    toggle?.setAttribute('aria-expanded', 'false');
+  }
+});
 $('load-more').addEventListener('click', () => loadQueue(true));
 $('appeals-load-more').addEventListener('click', () => loadAppeals(true));
 $('audit-load-more').addEventListener('click', () => loadAudit(true));

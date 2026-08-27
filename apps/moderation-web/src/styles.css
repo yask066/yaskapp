@@ -56,9 +56,10 @@ textarea { min-height: 110px; resize: vertical; }
 .search-icon { position: absolute; left: 12px; bottom: 8px; color: #526482; font-size: 24px; line-height: 1; }
 .refresh-button { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .refresh-button span { font-size: 20px; }
+.filter-dropdown { position: relative; }
 .filter-button { display: flex; align-items: center; gap: 8px; color: #344054; background: #fff; border: 1px solid #dce2ec; white-space: nowrap; }
 .filter-button span { color: #566a9d; font-size: 20px; transform: rotate(90deg); }
-.filters-popover { position: absolute; z-index: 10; top: calc(100% - 7px); left: 50%; display: grid; grid-template-columns: repeat(3, minmax(140px, 1fr)); gap: 12px; width: min(560px, calc(100% - 28px)); padding: 16px; border: 1px solid #e4e7ec; border-radius: 10px; background: #fff; box-shadow: 0 14px 32px #18243d1a; }
+.filters-popover { position: absolute; z-index: 10; top: calc(100% + 8px); left: 0; display: grid; grid-template-columns: repeat(3, minmax(140px, 1fr)); gap: 12px; width: min(560px, calc(100vw - 56px)); padding: 16px; border: 1px solid #e4e7ec; border-radius: 10px; background: #fff; box-shadow: 0 14px 32px #18243d1a; }
 .filters-popover label { color: #667085; font-size: 12px; font-weight: 650; }
 .workspace { display: grid; grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr); gap: 0; align-items: stretch; overflow: hidden; border: 1px solid #e4e9f2; border-radius: 14px; background: #fff; box-shadow: 0 8px 28px #1a2c5008; }
 .queue-card, .detail-card { min-height: 665px; border: 0; border-radius: 0; box-shadow: none; }
@@ -105,7 +106,7 @@ textarea { min-height: 110px; resize: vertical; }
 .action-bar { position: sticky; bottom: -20px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 24px -20px -20px; padding: 16px 20px 20px; border-top: 1px solid #e4e7ec; background: #fff; }
 .action-button { width: 100%; min-height: 48px; font-size: 15px; }
 .more-actions { position: relative; }
-.more-actions-menu { position: absolute; z-index: 5; right: 0; bottom: calc(100% + 8px); display: grid; min-width: 190px; padding: 6px; border: 1px solid #e4e7ec; border-radius: 10px; background: #fff; box-shadow: 0 12px 26px #18243d1a; }
+.more-actions-menu { position: absolute; z-index: 5; right: 0; bottom: calc(100% + 8px); display: grid; min-width: 210px; max-width: min(300px, calc(100vw - 32px)); padding: 6px; border: 1px solid #e4e7ec; border-radius: 10px; background: #fff; box-shadow: 0 12px 26px #18243d1a; }
 .more-actions-menu button { padding: 9px 11px; color: #344054; background: transparent; text-align: left; white-space: nowrap; }
 .more-actions-menu button:hover { background: #f1f4f8; }
 .more-actions-menu .menu-danger { color: #b42318; }

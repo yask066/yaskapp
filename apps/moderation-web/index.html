@@ -46,11 +46,13 @@
               <section class="toolbar card">
                 <label class="search-field"><span class="search-icon">⌕</span><input id="search-filter" placeholder="Search cases by ID, user or content..." /></label>
                 <label class="quick-status">Status<select id="status-filter"><option value="">All</option><option value="open">Open</option><option value="in_review">In review</option><option value="escalated">Escalated</option><option value="resolved">Resolved</option><option value="dismissed">Dismissed</option></select></label>
-                <button id="filters-toggle" class="filter-button" type="button"><span>⌁</span>Filters</button>
-                <div id="filters-popover" class="filters-popover" hidden>
-                  <label>Priority<select id="priority-filter"><option value="">All</option><option value="critical">Critical</option><option value="high">High</option><option value="normal">Normal</option><option value="low">Low</option></select></label>
-                  <label>Type<select id="type-filter"><option value="">All</option><option value="poll">Poll</option><option value="comment">Comment</option><option value="user">User</option></select></label>
-                  <label>Assigned<select id="assigned-filter"><option value="">Anyone</option><option value="me">Me</option><option value="unassigned">Unassigned</option></select></label>
+                <div class="filter-dropdown">
+                  <button id="filters-toggle" class="filter-button" type="button" aria-expanded="false" aria-controls="filters-popover"><span>⌁</span>Filters</button>
+                  <div id="filters-popover" class="filters-popover" hidden>
+                    <label>Priority<select id="priority-filter"><option value="">All</option><option value="critical">Critical</option><option value="high">High</option><option value="normal">Normal</option><option value="low">Low</option></select></label>
+                    <label>Type<select id="type-filter"><option value="">All</option><option value="poll">Poll</option><option value="comment">Comment</option><option value="user">User</option></select></label>
+                    <label>Assigned<select id="assigned-filter"><option value="">Anyone</option><option value="me">Me</option><option value="unassigned">Unassigned</option></select></label>
+                  </div>
                 </div>
                 <button id="refresh-button" class="secondary refresh-button"><span>⟳</span>Refresh</button>
               </section>

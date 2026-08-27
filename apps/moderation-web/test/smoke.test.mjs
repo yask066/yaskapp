@@ -43,8 +43,11 @@ test('moderation panel assets remain available at the IP admin mount', () => {
 test('moderation workspace follows the compact inspector layout', () => {
   assert.match(html, /id="filters-toggle"/);
   assert.match(html, /id="filters-popover"/);
+  assert.match(html, /class="filter-dropdown"/);
+  assert.match(html, /aria-expanded="false"/);
   assert.match(source, /id="more-actions-toggle"/);
   assert.match(source, /id="more-actions-menu"/);
+  assert.match(source, /document\.addEventListener\('click'/);
   assert.match(source, /Reported content/);
   assert.match(source, /History/);
   assert.doesNotMatch(html, /class="section-tabs"/);
