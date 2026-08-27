@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
 const source = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
+const styles = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 
 test('panel keeps the access token in memory and clears it on session errors', () => {
@@ -63,4 +64,8 @@ test('case filters send search and assignment criteria to the API', () => {
 test('closing More actions after copying the case ID updates its accessibility state', () => {
   assert.match(source, /copy-case-id-menu/);
   assert.match(source, /menuToggle\?\.setAttribute\('aria-expanded', 'false'\)/);
+});
+
+test('dropdowns stay hidden until opened', () => {
+  assert.match(styles, /\[hidden\]\s*\{[^}]*display:\s*none\s*!important/);
 });

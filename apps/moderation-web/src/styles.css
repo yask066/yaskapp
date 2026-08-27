@@ -1,5 +1,6 @@
 :root { color: #18243d; background: #f7f9fd; font: 15px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; border: 0; border-radius: 9px; padding: 10px 15px; font-weight: 650; }
