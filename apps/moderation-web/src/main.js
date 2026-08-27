@@ -114,12 +114,13 @@ async function loadQueue(append = false) {
     for (const item of result.items || []) {
       const row = document.createElement('button');
       row.className = `case-row${item.id === selectedCaseId ? ' selected' : ''}`;
-      row.innerHTML = `<strong>${escapeHtml(targetLabel(item.targetType))}</strong><span class="case-reason">${escapeHtml(item.category || 'Reported content')}</span><span class="pill ${escapeHtml(item.priority)}">${escapeHtml(item.priority)}</span><span class="pill">${escapeHtml(item.status)}</span><span class="case-meta">${new Date(item.createdAt).toLocaleString()}</span>`;
+      row.innerHTML = `<div class="case-row-top"><strong>${escapeHtml(targetLabel(item.targetType))}</strong><span class="pill ${escapeHtml(item.priority)}">${escapeHtml(item.priority)}</span></div><span class="case-id">Case #${escapeHtml(shortId(item.id))}</span><span class="case-reason">${escapeHtml(item.category || 'Reported content')}</span><div class="case-row-meta"><span class="pill">${escapeHtml(item.status)}</span><span class="case-meta">${new Date(item.createdAt).toLocaleString()}</span><span class="case-meta">by @reporter</span></div>`;
       row.onclick = () => loadCase(item.id);
       queue.appendChild(row);
     }
     $('case-count').textContent = `${queue.children.length} loaded`;
     $('sidebar-case-count').textContent = queue.children.length;
+    $('open-case-count').textContent = queue.children.length;
     $('load-more').hidden = !nextCursor;
   } catch (error) { handleError(error); }
 }
@@ -149,6 +150,16 @@ function bindPollDetails(item) {
   });
 }
 
+function renderUserContext(item, report) {
+  const userId = report?.reporterUserId || item.targetId;
+  return `<section class="context-card"><h3>User context</h3><div class="context-user"><span class="avatar small neutral">U</span><div><strong>@reporter</strong><span class="muted">User ID: ${escapeHtml(shortId(userId))}</span></div></div><div class="context-stats"><span><strong>—</strong>Polls</span><span><strong>—</strong>Reports</span><span><strong>—</strong>Warnings</span></div><button class="secondary context-link" type="button">View user profile</button></section>`;
+}
+
+function renderPreviousActions(result) {
+  const actions = (result.sanctions || []).slice(0, 2).map((sanction) => `<li><strong>${escapeHtml(sanction.type)}</strong><span>${escapeHtml(sanction.reason || 'Moderation action')}</span><small>${new Date(sanction.createdAt).toLocaleDateString()}</small></li>`).join('');
+  return `<section class="context-card previous-actions"><h3>Previous actions</h3><ul>${actions || '<li class="muted">No previous actions.</li>'}</ul><button class="ghost context-link" type="button">View full history</button></section>`;
+}
+
 async function loadCase(caseId) {
   try {
     selectedCaseId = caseId;
@@ -159,9 +170,11 @@ async function loadCase(caseId) {
     const firstReport = reports[0];
     $('case-detail').innerHTML = `<div class="inspector-header"><div><p class="eyebrow">CASE</p><h2>Case #${shortId(item.id)} <button id="copy-case-id" class="icon-button" title="Copy case ID">▣</button></h2><span class="pill">${escapeHtml(item.status)}</span><span class="pill ${escapeHtml(item.priority)}">${escapeHtml(item.priority)}</span><span class="meta-dot">·</span><span class="muted">${new Date(item.createdAt).toLocaleString()}</span></div><div class="assignment"><span>Assigned to</span><strong>${escapeHtml(item.assignedToUserId ? 'you' : 'unassigned')} <button class="icon-button" title="Edit assignment">✎</button></strong></div></div>
       <div class="inspector-grid"><section class="inspector-section reported-content"><h3>Reported content</h3><div class="content-preview"><div class="content-author"><span class="avatar small">Y</span><span>Reported ${escapeHtml(item.targetType)} · ${new Date(item.createdAt).toLocaleString()}</span></div><strong>${escapeHtml(targetLabel(item.targetType))}</strong><p class="muted">Content ID: ${escapeHtml(shortId(item.targetId))}</p>${item.targetType === 'poll' ? '<details id="poll-details"><summary>Poll details</summary><div id="poll-details-content"><p class="muted">Expand to load poll details.</p></div></details>' : ''}</div></section><section class="inspector-section report-section"><h3>Report</h3>${firstReport ? `<strong>${escapeHtml(firstReport.category)}</strong><p>${escapeHtml(firstReport.description)}</p><span class="muted">Reported by</span><div class="reporter"><span class="avatar small neutral">A</span><span>Reporter<br><small>${new Date(firstReport.createdAt).toLocaleString()}</small></span></div>` : '<p class="muted">No reports.</p>'}</section></div>
+      <div class="context-grid">${renderUserContext(item, firstReport)}${renderPreviousActions(result)}</div>
       <div class="history-section"><h3>History</h3><details open><summary>History · ${reports.length + 1} events</summary><div class="timeline"><div><span class="timeline-dot"></span><strong>${new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong><span>Case created</span></div><div><span class="timeline-dot"></span><strong>${new Date(item.updatedAt || item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong><span>Status changed to <em>${escapeHtml(item.status)}</em></span></div></div></details></div>
-      <div class="detail-section"><h3>Internal notes</h3><div>${(result.notes || []).map((note) => `<article class="note">${escapeHtml(note.body)}<br><small>${new Date(note.createdAt).toLocaleString()}</small></article>`).join('') || '<p class="muted">No notes.</p>'}</div>${can('moderation.case.resolve') ? '<textarea id="note-body" placeholder="Add an internal note"></textarea><button id="add-note" class="secondary">Add note</button>' : ''}</div>
-      <div class="detail-section"><h3>Sanctions</h3>${sanctions.map((sanction) => `<article class="note"><strong>${escapeHtml(sanction.type)}</strong> · ${escapeHtml(sanction.status)}<p>${escapeHtml(sanction.reason)}</p><small>${new Date(sanction.createdAt).toLocaleString()}${sanction.expiresAt ? ` · expires ${new Date(sanction.expiresAt).toLocaleString()}` : ''}</small>${sanction.status === 'active' && can('moderation.sanction.revoke') ? `<button class="ghost revoke-sanction" data-sanction-id="${escapeHtml(sanction.id)}">Revoke</button>` : ''}</article>`).join('') || '<p class="muted">No sanctions.</p>'}</div>${renderActionBar(item)}`;
+      <div class="moderation-action-panel"><h3>Moderation action</h3><div class="moderation-actions" role="group" aria-label="Moderation action"><button class="action-option selected" type="button">✓ <span>No violation</span></button><button class="action-option" type="button">▣ <span>Remove content</span></button><button class="action-option" type="button">⚠ <span>Warn user</span></button><button class="action-option" type="button">⊘ <span>Suspend user</span></button><button class="action-option" type="button">⚑ <span>Escalate</span></button></div>
+      <div class="detail-section"><h3>Moderator note <span class="muted">(optional)</span></h3><div>${(result.notes || []).map((note) => `<article class="note">${escapeHtml(note.body)}<br><small>${new Date(note.createdAt).toLocaleString()}</small></article>`).join('') || '<p class="muted">No notes.</p>'}</div>${can('moderation.case.resolve') ? '<textarea id="note-body" placeholder="Add a note about your decision..."></textarea><button id="add-note" class="secondary">Add note</button><button class="ghost save-draft" type="button">Save draft</button>' : ''}</div>
+      <div class="detail-section"><h3>Sanctions</h3>${sanctions.map((sanction) => `<article class="note"><strong>${escapeHtml(sanction.type)}</strong> · ${escapeHtml(sanction.status)}<p>${escapeHtml(sanction.reason)}</p><small>${new Date(sanction.createdAt).toLocaleString()}${sanction.expiresAt ? ` · expires ${new Date(sanction.expiresAt).toLocaleString()}` : ''}</small>${sanction.status === 'active' && can('moderation.sanction.revoke') ? `<button class="ghost revoke-sanction" data-sanction-id="${escapeHtml(sanction.id)}">Revoke</button>` : ''}</article>`).join('') || '<p class="muted">No sanctions.</p>'}</div>${renderActionBar(item)}</div>`;
     bindPollDetails(item);
     bindCaseActions(item);
     document.querySelectorAll('.case-row').forEach((row) => row.classList.toggle('selected', row.textContent.includes(item.id)));

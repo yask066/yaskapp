@@ -82,3 +82,16 @@ test('poll details load the protected admin poll record', () => {
   assert.match(source, /votesCount/);
   assert.match(source, /Poll details/);
 });
+
+test('moderation panel follows the high-fidelity trust and safety layout', () => {
+  assert.match(html, /class="sidebar-section-label">MODERATION/);
+  assert.match(html, /class="sidebar-section-label">MANAGEMENT/);
+  assert.match(html, /class="sidebar-section-label">SYSTEM/);
+  assert.match(html, /id="open-case-count"/);
+  assert.match(html, /id="priority-filter"/);
+  assert.match(source, /class="moderation-actions"/);
+  assert.match(source, /User context/);
+  assert.match(source, /Previous actions/);
+  assert.match(source, /No violation/);
+  assert.match(source, /Save draft/);
+});

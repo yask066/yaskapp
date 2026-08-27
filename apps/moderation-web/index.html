@@ -25,36 +25,39 @@
           <aside class="sidebar">
             <div class="brand"><span class="brand-mark">♢</span><div><strong>YASKAPP</strong><span>TRUST &amp; SAFETY</span></div></div>
             <nav class="sidebar-nav" aria-label="Main navigation">
+              <p class="sidebar-section-label">MODERATION</p>
               <button class="nav-tab active" data-section="cases"><span class="nav-icon">◈</span>Queue<span class="nav-count" id="sidebar-case-count"></span></button>
               <button class="nav-tab" data-section="appeals" data-permission="moderation.appeal.read" hidden><span class="nav-icon">◌</span>Appeals</button>
-              <button class="nav-static"><span class="nav-icon">♙</span>Users</button>
               <button class="nav-static"><span class="nav-icon">▧</span>Reports</button>
+              <p class="sidebar-section-label">MANAGEMENT</p>
+              <button class="nav-static"><span class="nav-icon">♙</span>Users</button>
               <button class="nav-tab" data-section="policy" data-permission="moderation.policy.read" hidden><span class="nav-icon">▤</span>Policy</button>
               <div class="sidebar-divider"></div>
+              <p class="sidebar-section-label">SYSTEM</p>
               <button class="nav-static"><span class="nav-icon">⚙</span>Settings</button>
               <button class="nav-tab" data-section="audit" data-permission="admin.audit.read" hidden><span class="nav-icon">▧</span>Audit log</button>
             </nav>
-            <div class="sidebar-footer"><button id="logout-button" class="sign-out"><span class="nav-icon">↪</span>Sign out</button></div>
+            <div class="sidebar-footer"><button class="collapse-button"><span class="nav-icon">‹›</span>Collapse</button><button id="logout-button" class="sign-out"><span class="nav-icon">↪</span>Sign out</button></div>
           </aside>
           <main class="main-content">
             <header class="topbar">
-              <div><p class="eyebrow">YASKAPP TRUST &amp; SAFETY</p><h1>Moderation queue</h1></div>
+              <div><p class="eyebrow">YASKAPP TRUST &amp; SAFETY</p><div class="heading-line"><h1>Moderation queue</h1><span id="open-case-count" class="header-count">6</span><span class="muted open-label">open cases</span></div></div>
               <div class="user-chip"><span class="avatar">Y</span><span>yaskapp_admin</span><span class="chevron">⌄</span></div>
             </header>
             <div id="capability-error" class="error" role="alert"></div>
             <div id="section-cases" class="panel-section">
               <section class="toolbar card">
                 <label class="search-field"><span class="search-icon">⌕</span><input id="search-filter" placeholder="Search cases by ID, user or content..." /></label>
-                <label class="quick-status">Status<select id="status-filter"><option value="">All</option><option value="open">Open</option><option value="in_review">In review</option><option value="escalated">Escalated</option><option value="resolved">Resolved</option><option value="dismissed">Dismissed</option></select></label>
+                <label class="quick-status">Status<select id="status-filter"><option value="open" selected>Open</option><option value="">All</option><option value="in_review">In review</option><option value="escalated">Escalated</option><option value="resolved">Resolved</option><option value="dismissed">Dismissed</option></select></label>
                 <div class="filter-dropdown">
-                  <button id="filters-toggle" class="filter-button" type="button" aria-expanded="false" aria-controls="filters-popover"><span>⌁</span>Filters</button>
+                  <button id="filters-toggle" class="filter-button" type="button" aria-expanded="false" aria-controls="filters-popover"><span>⌁</span>Filters <b class="filter-count">2</b></button>
                   <div id="filters-popover" class="filters-popover" hidden>
                     <label>Priority<select id="priority-filter"><option value="">All</option><option value="critical">Critical</option><option value="high">High</option><option value="normal">Normal</option><option value="low">Low</option></select></label>
                     <label>Type<select id="type-filter"><option value="">All</option><option value="poll">Poll</option><option value="comment">Comment</option><option value="user">User</option></select></label>
                     <label>Assigned<select id="assigned-filter"><option value="">Anyone</option><option value="me">Me</option><option value="unassigned">Unassigned</option></select></label>
                   </div>
                 </div>
-                <button id="refresh-button" class="secondary refresh-button"><span>⟳</span>Refresh</button>
+                <button id="refresh-button" class="secondary refresh-button" aria-label="Refresh"><span>⟳</span><em>Refresh</em></button>
               </section>
               <div class="workspace">
                 <section class="card queue-card"><div class="section-title"><h2>Cases <span id="case-count" class="count-badge"></span></h2><button class="sort-button">Sort: Newest <span>⌄</span></button></div><div id="queue" class="queue"></div><button id="load-more" class="load-more" hidden>Load more <span>⌄</span></button></section>
