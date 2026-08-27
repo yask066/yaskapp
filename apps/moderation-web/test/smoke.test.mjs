@@ -75,6 +75,9 @@ test('poll details load the protected admin poll record', () => {
   assert.match(source, /\/admin\/capabilities/);
   assert.match(source, /adminCapabilities[\s\S]*catch/);
   assert.doesNotMatch(source, /if \(!can\('admin\.polls\.read'\)\) return null/);
+  assert.match(source, /poll-details-content/);
+  assert.match(source, /addEventListener\('toggle'/);
+  assert.doesNotMatch(source, /const poll = item\.targetType === 'poll' \? await loadPollDetails/);
   assert.match(source, /moderationCapabilities/);
   assert.match(source, /votesCount/);
   assert.match(source, /Poll details/);
