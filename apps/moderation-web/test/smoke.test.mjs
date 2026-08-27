@@ -27,10 +27,12 @@ test('destructive policy writes use an idempotency key', () => {
 test('moderation panel includes the reference workspace navigation and filters', () => {
   assert.match(html, /class="admin-shell"/);
   assert.match(html, /class="sidebar"/);
+  assert.match(html, /class="sidebar-divider"/);
   assert.match(html, /class="user-chip"/);
   assert.match(html, /placeholder="Search by ID, user, content\.\.\."/);
   assert.match(html, /id="type-filter"/);
   assert.match(html, /id="assigned-filter"/);
+  assert.doesNotMatch(html, /class="section-tabs"/);
 });
 
 test('moderation panel assets remain available at the IP admin mount', () => {

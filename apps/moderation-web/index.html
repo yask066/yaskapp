@@ -30,8 +30,8 @@
               <button class="nav-static"><span class="nav-icon">♙</span>Users</button>
               <button class="nav-static"><span class="nav-icon">▧</span>Reports</button>
               <button class="nav-tab" data-section="policy" data-permission="moderation.policy.read" hidden><span class="nav-icon">▤</span>Policy</button>
+              <div class="sidebar-divider"></div>
               <button class="nav-static"><span class="nav-icon">⚙</span>Settings</button>
-              <button class="nav-static"><span class="nav-icon">♙</span>Admin team</button>
               <button class="nav-tab" data-section="audit" data-permission="admin.audit.read" hidden><span class="nav-icon">▧</span>Audit log</button>
             </nav>
             <div class="sidebar-footer"><button id="logout-button" class="sign-out"><span class="nav-icon">↪</span>Sign out</button></div>
@@ -42,11 +42,6 @@
               <div class="user-chip"><span class="avatar">Y</span><span>yaskapp_admin</span><span class="chevron">⌄</span></div>
             </header>
             <div id="capability-error" class="error" role="alert"></div>
-            <nav class="section-tabs" aria-label="Moderation sections">
-              <button class="nav-tab active" data-section="cases">Cases</button>
-              <button class="nav-tab" data-section="appeals" data-permission="moderation.appeal.read" hidden>Appeals</button>
-              <button class="nav-tab" data-section="policy" data-permission="moderation.policy.read" hidden>Policy</button>
-            </nav>
             <div id="section-cases" class="panel-section">
               <section class="toolbar card">
                 <label class="search-field"><span class="search-icon">⌕</span><input id="search-filter" placeholder="Search by ID, user, content..." /></label>
