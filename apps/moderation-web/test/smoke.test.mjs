@@ -29,7 +29,7 @@ test('moderation panel includes the reference workspace navigation and filters',
   assert.match(html, /class="sidebar"/);
   assert.match(html, /class="sidebar-divider"/);
   assert.match(html, /class="user-chip"/);
-  assert.match(html, /placeholder="Search by ID, user, content\.\.\."/);
+  assert.match(html, /placeholder="Search cases by ID, user or content\.\.\."/);
   assert.match(html, /id="type-filter"/);
   assert.match(html, /id="assigned-filter"/);
   assert.doesNotMatch(html, /class="section-tabs"/);
@@ -38,4 +38,14 @@ test('moderation panel includes the reference workspace navigation and filters',
 test('moderation panel assets remain available at the IP admin mount', () => {
   assert.match(html, /href="\/src\/styles\.css"/);
   assert.match(html, /src="\/src\/main\.js"/);
+});
+
+test('moderation workspace follows the compact inspector layout', () => {
+  assert.match(html, /id="filters-toggle"/);
+  assert.match(html, /id="filters-popover"/);
+  assert.match(source, /id="more-actions-toggle"/);
+  assert.match(source, /id="more-actions-menu"/);
+  assert.match(source, /Reported content/);
+  assert.match(source, /History/);
+  assert.doesNotMatch(html, /class="section-tabs"/);
 });

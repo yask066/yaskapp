@@ -25,7 +25,7 @@
           <aside class="sidebar">
             <div class="brand"><span class="brand-mark">♢</span><div><strong>YASKAPP</strong><span>TRUST &amp; SAFETY</span></div></div>
             <nav class="sidebar-nav" aria-label="Main navigation">
-              <button class="nav-tab active" data-section="cases"><span class="nav-icon">◈</span>Moderation queue<span class="nav-count" id="sidebar-case-count"></span></button>
+              <button class="nav-tab active" data-section="cases"><span class="nav-icon">◈</span>Queue<span class="nav-count" id="sidebar-case-count"></span></button>
               <button class="nav-tab" data-section="appeals" data-permission="moderation.appeal.read" hidden><span class="nav-icon">◌</span>Appeals</button>
               <button class="nav-static"><span class="nav-icon">♙</span>Users</button>
               <button class="nav-static"><span class="nav-icon">▧</span>Reports</button>
@@ -44,11 +44,14 @@
             <div id="capability-error" class="error" role="alert"></div>
             <div id="section-cases" class="panel-section">
               <section class="toolbar card">
-                <label class="search-field"><span class="search-icon">⌕</span><input id="search-filter" placeholder="Search by ID, user, content..." /></label>
-                <label>Status<select id="status-filter"><option value="">All</option><option value="open">Open</option><option value="in_review">In review</option><option value="escalated">Escalated</option><option value="resolved">Resolved</option><option value="dismissed">Dismissed</option></select></label>
-                <label>Priority<select id="priority-filter"><option value="">All</option><option value="critical">Critical</option><option value="high">High</option><option value="normal">Normal</option><option value="low">Low</option></select></label>
-                <label>Type<select id="type-filter"><option value="">All</option><option value="poll">Poll</option><option value="comment">Comment</option><option value="user">User</option></select></label>
-                <label>Assigned to<select id="assigned-filter"><option value="">All</option><option value="me">Me</option><option value="unassigned">Unassigned</option></select></label>
+                <label class="search-field"><span class="search-icon">⌕</span><input id="search-filter" placeholder="Search cases by ID, user or content..." /></label>
+                <label class="quick-status">Status<select id="status-filter"><option value="">All</option><option value="open">Open</option><option value="in_review">In review</option><option value="escalated">Escalated</option><option value="resolved">Resolved</option><option value="dismissed">Dismissed</option></select></label>
+                <button id="filters-toggle" class="filter-button" type="button"><span>⌁</span>Filters</button>
+                <div id="filters-popover" class="filters-popover" hidden>
+                  <label>Priority<select id="priority-filter"><option value="">All</option><option value="critical">Critical</option><option value="high">High</option><option value="normal">Normal</option><option value="low">Low</option></select></label>
+                  <label>Type<select id="type-filter"><option value="">All</option><option value="poll">Poll</option><option value="comment">Comment</option><option value="user">User</option></select></label>
+                  <label>Assigned<select id="assigned-filter"><option value="">Anyone</option><option value="me">Me</option><option value="unassigned">Unassigned</option></select></label>
+                </div>
                 <button id="refresh-button" class="secondary refresh-button"><span>⟳</span>Refresh</button>
               </section>
               <div class="workspace">
