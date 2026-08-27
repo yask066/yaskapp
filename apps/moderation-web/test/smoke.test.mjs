@@ -76,8 +76,7 @@ test('poll details load the protected admin poll record', () => {
   assert.match(source, /adminCapabilities[\s\S]*catch/);
   assert.doesNotMatch(source, /if \(!can\('admin\.polls\.read'\)\) return null/);
   assert.match(source, /poll-details-content/);
-  assert.match(source, /addEventListener\('toggle'/);
-  assert.doesNotMatch(source, /const poll = item\.targetType === 'poll' \? await loadPollDetails/);
+  assert.match(source, /const poll = item\.targetType === 'poll' \? await loadPollDetails/);
   assert.match(source, /moderationCapabilities/);
   assert.match(source, /votesCount/);
   assert.match(source, /Poll details/);
@@ -94,4 +93,11 @@ test('moderation panel follows the high-fidelity trust and safety layout', () =>
   assert.match(source, /Previous actions/);
   assert.match(source, /No violation/);
   assert.match(source, /Save draft/);
+});
+
+test('reported poll content is expanded with vote result bars', () => {
+  assert.match(source, /details open/);
+  assert.match(source, /poll-result-bar/);
+  assert.match(source, /Poll ID/);
+  assert.match(source, /votesCount/);
 });
