@@ -19,7 +19,7 @@ async function request(path, options = {}) {
   });
   const body = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
-    const error = new Error(body?.message || 'Request failed.');
+    const error = new Error(body?.message || `Request failed (${response.status}).`);
     error.status = response.status;
     error.code = body?.error;
     throw error;
@@ -78,7 +78,10 @@ async function signIn(event) {
     const currentUser = await request('/auth/me');
     currentUserId = currentUser.user?.id || null;
     const moderationCapabilities = await request('/moderation/capabilities');
-    const adminCapabilities = await request('/admin/capabilities');
+    const adminCapabilities = await request('/admin/capabilities').catch((error) => {
+      if (error.status === 403 || error.status === 404) return { permissions: [] };
+      throw error;
+    });
     capabilities = new Set([
       ...(moderationCapabilities.permissions || []),
       ...(adminCapabilities.permissions || [])

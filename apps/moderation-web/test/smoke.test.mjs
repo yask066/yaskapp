@@ -73,6 +73,7 @@ test('dropdowns stay hidden until opened', () => {
 test('poll details load the protected admin poll record', () => {
   assert.match(source, /\/admin\/polls\//);
   assert.match(source, /\/admin\/capabilities/);
+  assert.match(source, /adminCapabilities[\s\S]*catch/);
   assert.match(source, /moderationCapabilities/);
   assert.match(source, /votesCount/);
   assert.match(source, /Poll details/);
