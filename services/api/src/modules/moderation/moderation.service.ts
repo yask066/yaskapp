@@ -38,7 +38,9 @@ export async function listModerationCases(input: {
   category?: ReportCategory;
   priority?: ModerationCasePriority;
   assigneeId?: string;
+  unassigned?: boolean;
   targetType?: ReportTargetType;
+  search?: string;
   limit: number;
   cursor?: string;
 }) {

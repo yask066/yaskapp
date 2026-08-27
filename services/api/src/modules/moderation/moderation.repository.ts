@@ -249,7 +249,9 @@ export async function listModerationCases(input: {
   category?: ReportCategory;
   priority?: ModerationCasePriority;
   assigneeId?: string;
+  unassigned?: boolean;
   targetType?: ReportTargetType;
+  search?: string;
   limit: number;
   cursor?: string;
 }) {
@@ -263,7 +265,22 @@ export async function listModerationCases(input: {
   if (input.status) add('mc.status = ?', input.status);
   if (input.priority) add('mc.priority = ?', input.priority);
   if (input.assigneeId) add('mc.assigned_to_user_id = ?', input.assigneeId);
+  if (input.unassigned) conditions.push('mc.assigned_to_user_id IS NULL');
   if (input.targetType) add('mc.target_type = ?', input.targetType);
+  if (input.search) {
+    values.push(`%${input.search}%`);
+    const searchPlaceholder = `$${values.length}`;
+    conditions.push(`(
+      mc.id::text ILIKE ${searchPlaceholder}
+      OR mc.target_id::text ILIKE ${searchPlaceholder}
+      OR EXISTS (
+        SELECT 1 FROM reports search_report
+        WHERE search_report.target_type = mc.target_type
+          AND search_report.target_id = mc.target_id
+          AND (search_report.category::text ILIKE ${searchPlaceholder} OR search_report.description ILIKE ${searchPlaceholder})
+      )
+    )`);
+  }
   if (input.category) {
     values.push(input.category);
     conditions.push(`EXISTS (SELECT 1 FROM reports category_report WHERE category_report.target_type = mc.target_type AND category_report.target_id = mc.target_id AND category_report.category = $${values.length})`);

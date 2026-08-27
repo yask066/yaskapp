@@ -52,3 +52,10 @@ test('moderation workspace follows the compact inspector layout', () => {
   assert.match(source, /History/);
   assert.doesNotMatch(html, /class="section-tabs"/);
 });
+
+test('case filters send search and assignment criteria to the API', () => {
+  assert.match(source, /search-filter/);
+  assert.match(source, /assigneeId/);
+  assert.match(source, /unassigned/);
+  assert.match(source, /\/auth\/me/);
+});

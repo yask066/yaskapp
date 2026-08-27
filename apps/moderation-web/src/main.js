@@ -1,5 +1,6 @@
 const apiBase = window.__MODERATION_API_BASE__ || '';
 let accessToken = null;
+let currentUserId = null;
 let capabilities = new Set();
 let nextCursor = null;
 let appealsCursor = null;
@@ -74,6 +75,8 @@ async function signIn(event) {
   try {
     const result = await request('/auth/login', { method: 'POST', body: JSON.stringify({ login: form.get('login'), password: form.get('password') }) });
     accessToken = result.accessToken;
+    const currentUser = await request('/auth/me');
+    currentUserId = currentUser.user?.id || null;
     const capabilityResult = await request('/moderation/capabilities');
     capabilities = new Set(capabilityResult.permissions || []);
     if (!can('moderation.queue.read')) throw new Error('This account is not authorized for moderation.');
@@ -81,12 +84,16 @@ async function signIn(event) {
     showPanel();
     await loadQueue();
     await loadAppeals();
-  } catch (error) { accessToken = null; capabilities.clear(); showLogin(error.status === 403 ? 'This account is not authorized for moderation.' : error.message); }
+  } catch (error) { accessToken = null; currentUserId = null; capabilities.clear(); showLogin(error.status === 403 ? 'This account is not authorized for moderation.' : error.message); }
 }
 
 function queryString(cursor = null) {
   const params = new URLSearchParams({ limit: '30' });
   for (const [id, key] of [['status-filter', 'status'], ['priority-filter', 'priority'], ['type-filter', 'targetType']]) if ($(id).value) params.set(key, $(id).value);
+  const search = $('search-filter').value.trim();
+  if (search) params.set('search', search);
+  if ($('assigned-filter').value === 'me' && currentUserId) params.set('assigneeId', currentUserId);
+  if ($('assigned-filter').value === 'unassigned') params.set('unassigned', 'true');
   if (cursor) params.set('cursor', cursor);
   return `?${params}`;
 }
@@ -218,7 +225,7 @@ function handleError(error) {
 }
 
 $('login-form').addEventListener('submit', signIn);
-$('logout-button').addEventListener('click', () => { accessToken = null; capabilities.clear(); showLogin(); });
+$('logout-button').addEventListener('click', () => { accessToken = null; currentUserId = null; capabilities.clear(); showLogin(); });
 $('refresh-button').addEventListener('click', () => loadQueue());
 $('refresh-appeals').addEventListener('click', () => { appealsCursor = null; loadAppeals(); });
 $('refresh-audit').addEventListener('click', () => { auditCursor = null; loadAudit(); });
@@ -248,3 +255,6 @@ $('audit-load-more').addEventListener('click', () => loadAudit(true));
 $('status-filter').addEventListener('change', () => loadQueue());
 $('priority-filter').addEventListener('change', () => loadQueue());
 $('type-filter').addEventListener('change', () => loadQueue());
+$('assigned-filter').addEventListener('change', () => loadQueue());
+let searchTimer;
+$('search-filter').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => loadQueue(), 250); });

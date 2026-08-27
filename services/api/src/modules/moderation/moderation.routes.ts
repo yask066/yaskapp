@@ -61,7 +61,9 @@ const casesQuerySchema = z.object({
   category: z.enum(reportCategories).optional(),
   priority: z.enum(['low', 'normal', 'high', 'critical']).optional(),
   assigneeId: z.string().uuid().optional(),
+  unassigned: z.coerce.boolean().optional(),
   targetType: z.enum(reportTargetTypes).optional(),
+  search: z.string().trim().min(1).max(200).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   cursor: z.string().trim().max(512).optional()
 }).strict();
