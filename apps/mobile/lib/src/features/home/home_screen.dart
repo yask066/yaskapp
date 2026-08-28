@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/user_avatar.dart';
 import '../auth/auth_api_client.dart';
 import '../auth/auth_session.dart';
 import '../feed/feed_screen.dart';
@@ -89,7 +90,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: _MainBottomNavigation(
+      bottomNavigationBar: MainBottomNavigation(
+        user: widget.session.user,
         selectedIndex: _selectedIndex,
         onCreate: _openCreatePoll,
         onSelected: (index) {
@@ -106,13 +108,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _MainBottomNavigation extends StatelessWidget {
-  const _MainBottomNavigation({
+class MainBottomNavigation extends StatelessWidget {
+  const MainBottomNavigation({
+    required this.user,
     required this.selectedIndex,
     required this.onSelected,
     required this.onCreate,
   });
 
+  final AuthUser user;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
   final VoidCallback onCreate;
@@ -160,6 +164,12 @@ class _MainBottomNavigation extends StatelessWidget {
               label: 'Profile',
               icon: Icons.person_outline,
               selectedIcon: Icons.person,
+              customIcon: UserAvatar(
+                displayName: user.profile.displayName,
+                username: user.username,
+                imageUrl: user.profile.avatarUrl,
+                radius: 14,
+              ),
               selected: selectedIndex == 3,
               onTap: () => onSelected(3),
             ),
@@ -177,6 +187,7 @@ class _NavItem extends StatelessWidget {
     required this.selectedIcon,
     required this.selected,
     required this.onTap,
+    this.customIcon,
   });
 
   final String label;
@@ -184,6 +195,7 @@ class _NavItem extends StatelessWidget {
   final IconData selectedIcon;
   final bool selected;
   final VoidCallback onTap;
+  final Widget? customIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -196,11 +208,12 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              selected ? selectedIcon : icon,
-              color: selected ? navy : secondary,
-              size: selected ? 26 : 24,
-            ),
+            customIcon ??
+                Icon(
+                  selected ? selectedIcon : icon,
+                  color: selected ? navy : secondary,
+                  size: selected ? 26 : 24,
+                ),
             const SizedBox(height: 4),
             FittedBox(
               fit: BoxFit.scaleDown,
