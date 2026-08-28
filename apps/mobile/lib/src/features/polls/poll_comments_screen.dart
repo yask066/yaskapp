@@ -194,7 +194,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                       return ListView(
                         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                         children: [
-                          PollCard(poll: _poll),
+                          PollCard(poll: _poll, accessToken: widget.accessToken),
                           const _CommentsLoadingState(),
                         ],
                       );
@@ -204,7 +204,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                       return ListView(
                         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                         children: [
-                          PollCard(poll: _poll),
+                          PollCard(poll: _poll, accessToken: widget.accessToken),
                           _CommentsErrorState(onRetry: _retryComments),
                         ],
                       );
@@ -215,7 +215,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                     return ListView(
                       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                       children: [
-                        PollCard(poll: _poll),
+                        PollCard(poll: _poll, accessToken: widget.accessToken),
                         const SizedBox(height: 26),
                         Row(
                           children: [

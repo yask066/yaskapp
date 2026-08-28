@@ -511,6 +511,7 @@ class FeedScreenState extends State<FeedScreen> {
 
                         return PollCard(
                           poll: poll,
+                          accessToken: widget.session.accessToken,
                           onOpenAuthor: () => _openAuthorProfile(poll),
                           onVote: poll.isClosed ||
                                   poll.selectedOptionIndex != null ||

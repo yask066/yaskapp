@@ -55,6 +55,13 @@ export function buildApp() {
   });
 
   app.setErrorHandler((error, request, reply) => {
+    if (error instanceof app.multipartErrors.RequestFileTooLargeError) {
+      return reply.status(400).send({
+        error: 'poll_image_too_large',
+        message: 'Poll image file must be 5 MB or smaller.'
+      });
+    }
+
     const errorStatusCode =
       typeof error === 'object' &&
       error !== null &&

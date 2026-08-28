@@ -41,7 +41,15 @@ export function registerPollImageRoutes(app: FastifyInstance) {
         const object = await getObject(poll.image_object_key);
 
         reply.header('content-type', object.ContentType ?? 'image/webp');
-        reply.header('cache-control', 'public, max-age=300');
+        const isPublic = poll.visibility === 'public';
+        reply.header(
+          'cache-control',
+          isPublic ? 'public, max-age=300' : 'private, max-age=300'
+        );
+
+        if (!isPublic) {
+          reply.header('vary', 'Authorization');
+        }
 
         if (object.ContentLength !== undefined) {
           reply.header('content-length', object.ContentLength);

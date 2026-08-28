@@ -284,6 +284,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                       final poll = _polls[index];
                       return PollCard(
                         poll: poll,
+                        accessToken: widget.session.accessToken,
                         onVote: poll.isClosed ||
                                 poll.selectedOptionIndex != null ||
                                 _votingPollIds.contains(poll.id)

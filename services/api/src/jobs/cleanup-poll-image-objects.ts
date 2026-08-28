@@ -1,3 +1,6 @@
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
 import { db } from '../config/database.js';
 import {
   deleteObjects,
@@ -7,6 +10,11 @@ import {
 
 const pollImagePrefix = 'poll-images/';
 const defaultGracePeriodHours = 24;
+
+export function isCleanupCliInvocation(moduleUrl: string, argvPath?: string) {
+  return argvPath !== undefined &&
+    moduleUrl === pathToFileURL(resolve(argvPath)).href;
+}
 
 export function selectOrphanedPollImageKeys(
   objects: StorageObject[],
@@ -67,7 +75,7 @@ export async function cleanupOrphanedPollImages(input?: {
   };
 }
 
-if (import.meta.url === `file://${process.argv[1]?.replaceAll('\\', '/')}`) {
+if (isCleanupCliInvocation(import.meta.url, process.argv[1])) {
   cleanupOrphanedPollImages()
     .then((result) => {
       console.log(JSON.stringify(result));

@@ -137,6 +137,17 @@ function pollError(reply: FastifyReply, error: unknown) {
   throw error;
 }
 
+export async function cleanupUploadedPollImage(
+  objectKey: string,
+  deleteImage: (key: string) => Promise<void> = deletePollImageObject
+) {
+  try {
+    await deleteImage(objectKey);
+  } catch (_) {
+    // Preserve the original poll creation error for the client.
+  }
+}
+
 async function parseMultipartCreatePoll(request: FastifyRequest) {
   const fields: Record<string, unknown> = {};
   let imagePart: Pick<MultipartFile, 'fieldname' | 'mimetype' | 'toBuffer'> | undefined;
@@ -268,7 +279,7 @@ export function registerPollRoutes(app: FastifyInstance) {
         });
       } catch (error) {
         if (uploadedImageObjectKey) {
-          await deletePollImageObject(uploadedImageObjectKey);
+          await cleanupUploadedPollImage(uploadedImageObjectKey);
         }
 
         return pollError(reply, error);

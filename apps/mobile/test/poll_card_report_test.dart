@@ -24,9 +24,28 @@ void main() {
     await tester.tap(find.text('Report'));
     expect(reported, isTrue);
   });
+
+  testWidgets('sends the access token when loading a poll image', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: PollCard(
+              poll: _poll(imageUrl: '/media/polls/poll-1'),
+              accessToken: 'token-123',
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final image = tester.widget<Image>(find.byType(Image));
+    final provider = image.image as NetworkImage;
+    expect(provider.headers?['authorization'], 'Bearer token-123');
+  });
 }
 
-PollSummary _poll() => PollSummary.fromJson({
+PollSummary _poll({String? imageUrl}) => PollSummary.fromJson({
       'id': 'poll-1',
       'question': 'Question',
       'createdAt': '2026-08-25T12:00:00.000Z',
@@ -44,4 +63,5 @@ PollSummary _poll() => PollSummary.fromJson({
       'options': [
         {'id': 'option-1', 'text': 'Option', 'position': 0, 'votesCount': 0},
       ],
+      'imageUrl': imageUrl,
     });

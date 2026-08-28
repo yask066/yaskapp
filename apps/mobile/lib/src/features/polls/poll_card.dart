@@ -7,6 +7,7 @@ import 'poll_summary.dart';
 class PollCard extends StatelessWidget {
   const PollCard({
     required this.poll,
+    this.accessToken,
     this.onVote,
     this.onCancelVote,
     this.onDeletePoll,
@@ -21,6 +22,7 @@ class PollCard extends StatelessWidget {
   });
 
   final PollSummary poll;
+  final String? accessToken;
   final ValueChanged<PollOptionSummary>? onVote;
   final VoidCallback? onCancelVote;
   final VoidCallback? onDeletePoll;
@@ -216,6 +218,9 @@ class PollCard extends StatelessWidget {
                   aspectRatio: 16 / 9,
                   child: Image.network(
                     const ApiConfig().uri(poll.imageUrl!).toString(),
+                    headers: accessToken == null
+                        ? null
+                        : {'authorization': 'Bearer $accessToken'},
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) => Container(
                       color: const Color(0xFFF0F2F7),

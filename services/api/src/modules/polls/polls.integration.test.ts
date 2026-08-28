@@ -482,10 +482,15 @@ function multipartFileBody(
   return Buffer.concat([header, body, footer]);
 }
 
-function multipartPollBody(boundary: string, image: Buffer) {
+function multipartPollBody(
+  boundary: string,
+  image: Buffer,
+  visibility?: 'public' | 'followers' | 'private'
+) {
   const fields = [
     ['question', 'Poll with an image'],
-    ['options', JSON.stringify(['Yes', 'No'])]
+    ['options', JSON.stringify(['Yes', 'No'])],
+    ...(visibility ? [['visibility', visibility]] : [])
   ].map(([name, value]) =>
     Buffer.from(
       `--${boundary}\r\n` +
@@ -873,6 +878,56 @@ test('authenticated user can create a poll with an image using multipart form da
 
   assert.equal(imageResponse.statusCode, 200, imageResponse.body);
   assert.equal(imageResponse.headers['content-type'], 'image/webp');
+});
+
+test('rejects poll images larger than 5 MB with a client error', async () => {
+  const user = await registerTestUser();
+  const boundary = `poll-image-too-large-${uniqueSuffix()}`;
+  const oversizedImage = Buffer.alloc(5 * 1024 * 1024 + 1, 0);
+
+  const response = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: {
+      ...bearer(user.accessToken),
+      'content-type': `multipart/form-data; boundary=${boundary}`
+    },
+    payload: multipartPollBody(boundary, oversizedImage)
+  });
+
+  assert.equal(response.statusCode, 400, response.body);
+  assert.equal(response.json<{ error: string }>().error, 'poll_image_too_large');
+});
+
+test('uses private caching for protected poll images', async () => {
+  const author = await registerTestUser();
+  const boundary = `poll-private-image-${uniqueSuffix()}`;
+  const image = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64'
+  );
+
+  const createResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: {
+      ...bearer(author.accessToken),
+      'content-type': `multipart/form-data; boundary=${boundary}`
+    },
+    payload: multipartPollBody(boundary, image, 'private')
+  });
+  assert.equal(createResponse.statusCode, 201, createResponse.body);
+
+  const pollId = createResponse.json<PollResponse>().poll.id;
+  const imageResponse = await app.inject({
+    method: 'GET',
+    url: `/media/polls/${pollId}`,
+    headers: bearer(author.accessToken)
+  });
+
+  assert.equal(imageResponse.statusCode, 200, imageResponse.body);
+  assert.equal(imageResponse.headers['cache-control'], 'private, max-age=300');
+  assert.equal(imageResponse.headers.vary, 'Authorization');
 });
 
 test('poll creation and voting require authentication', async () => {

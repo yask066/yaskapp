@@ -561,6 +561,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                     for (final poll in polls) ...[
                       PollCard(
                         poll: poll,
+                        accessToken: widget.accessToken,
                         compact: true,
                         onDeletePoll: _selectedTab == 0 &&
                                 poll.author.id == widget.user.id

@@ -556,9 +556,10 @@ export async function findViewablePollImageRecord(
 ) {
   const result = await db.query<{
     image_object_key: string | null;
+    visibility: 'public' | 'followers' | 'private';
   }>(
     `
-      SELECT p.image_object_key
+      SELECT p.image_object_key, p.visibility
       FROM polls p
       JOIN users u ON u.id = p.author_id
       WHERE p.id = $1
