@@ -231,9 +231,11 @@ void main() {
 
     expect(sentRequest, isA<http.Request>());
     final multipart = sentRequest as http.Request;
-    expect(multipart.headers['content-type'], startsWith('multipart/form-data; boundary='));
+    expect(multipart.headers['content-type'],
+        startsWith('multipart/form-data; boundary='));
     expect(utf8.decode(multipart.bodyBytes), contains('Question with image'));
-    expect(utf8.decode(multipart.bodyBytes), contains(jsonEncode(['Yes', 'No'])));
+    expect(
+        utf8.decode(multipart.bodyBytes), contains(jsonEncode(['Yes', 'No'])));
     expect(multipart.headers['authorization'], 'Bearer access-token');
     expect(utf8.decode(multipart.bodyBytes), contains('name="image"'));
     expect(utf8.decode(multipart.bodyBytes), contains('filename="poll.png"'));

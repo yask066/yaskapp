@@ -197,8 +197,7 @@ class PollsApiClient {
       // Older API versions reject unknown fields because their schema is
       // strict. Omitting the default value keeps creation compatible with
       // those versions; enabling the option requires the updated API.
-      if (allowVoteCancellation)
-        'allowVoteCancellation': true,
+      if (allowVoteCancellation) 'allowVoteCancellation': true,
     };
 
     final http.Response response;
@@ -429,9 +428,8 @@ class PollsApiClient {
       final message = decoded is Map<String, dynamic>
           ? decoded['message'] as String?
           : null;
-      final code = decoded is Map<String, dynamic>
-          ? decoded['error'] as String?
-          : null;
+      final code =
+          decoded is Map<String, dynamic> ? decoded['error'] as String? : null;
 
       throw PollsApiException(
         message ?? 'Request failed.',

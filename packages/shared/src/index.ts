@@ -45,7 +45,7 @@ export type Poll = {
   question: string;
   description: string | null;
   options: PollOption[];
-  imageObjectKey: string | null;
+  imageUrl: string | null;
   visibility: PollVisibility;
   optionsCount: number;
   votesCount: number;
@@ -63,7 +63,6 @@ export type CreatePollRequest = {
   question: string;
   description?: string;
   options: string[];
-  imageObjectKey?: string;
   visibility?: PollVisibility;
   endsAt?: string;
   allowVoteCancellation?: boolean;

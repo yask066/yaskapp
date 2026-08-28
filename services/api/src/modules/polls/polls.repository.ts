@@ -36,7 +36,6 @@ export type Poll = {
   author: PollAuthor;
   question: string;
   description: string | null;
-  imageObjectKey: string | null;
   imageUrl: string | null;
   visibility: PollVisibility;
   optionsCount: number;
@@ -128,7 +127,6 @@ function mapPoll(
     },
     question: row.question,
     description: row.description,
-    imageObjectKey: row.image_object_key,
     imageUrl: row.image_object_key === null ? null : `/media/polls/${row.id}`,
     visibility: row.visibility,
     optionsCount: row.options_count,

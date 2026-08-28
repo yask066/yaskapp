@@ -864,6 +864,7 @@ test('authenticated user can create a poll with an image using multipart form da
   const createdPoll = response.json<PollResponse>().poll;
   assert.equal(createdPoll.question, 'Poll with an image');
   assert.equal(createdPoll.imageUrl, `/media/polls/${createdPoll.id}`);
+  assert.equal('imageObjectKey' in (createdPoll as Record<string, unknown>), false);
 
   const imageResponse = await app.inject({
     method: 'GET',
