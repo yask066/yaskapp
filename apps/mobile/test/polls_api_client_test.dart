@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -204,6 +205,39 @@ void main() {
     expect(result.poll.id, 'poll-1');
     expect(result.poll.commentsCount, 1);
   });
+
+  test('creates a poll with an image as multipart form data', () async {
+    late http.BaseRequest sentRequest;
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((request) async {
+        sentRequest = request;
+        return http.Response(
+          jsonEncode({'poll': _pollJson(commentsCount: 0)}),
+          201,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+
+    await client.createPoll(
+      question: 'Question with image',
+      options: ['Yes', 'No'],
+      accessToken: 'access-token',
+      imageBytes: Uint8List.fromList([1, 2, 3]),
+      imageFilename: 'poll.png',
+      imageContentType: 'image/png',
+    );
+
+    expect(sentRequest, isA<http.Request>());
+    final multipart = sentRequest as http.Request;
+    expect(multipart.headers['content-type'], startsWith('multipart/form-data; boundary='));
+    expect(utf8.decode(multipart.bodyBytes), contains('Question with image'));
+    expect(utf8.decode(multipart.bodyBytes), contains(jsonEncode(['Yes', 'No'])));
+    expect(multipart.headers['authorization'], 'Bearer access-token');
+    expect(utf8.decode(multipart.bodyBytes), contains('name="image"'));
+    expect(utf8.decode(multipart.bodyBytes), contains('filename="poll.png"'));
+  });
 }
 
 Map<String, dynamic> _commentJson() {
@@ -236,6 +270,7 @@ Map<String, dynamic> _pollJson({required int commentsCount}) {
     'question': 'Which feature should be next?',
     'description': null,
     'imageObjectKey': null,
+    'imageUrl': null,
     'visibility': 'public',
     'optionsCount': 2,
     'votesCount': 0,

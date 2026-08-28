@@ -2,6 +2,33 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
 
 void main() {
+  test('parses an optional poll image URL', () {
+    final poll = PollSummary.fromJson({
+      'id': 'poll-1',
+      'author': {
+        'id': 'user-1',
+        'username': 'ada',
+        'displayName': 'Ada Lovelace',
+        'avatarObjectKey': null,
+        'avatarUrl': null,
+      },
+      'question': 'Which option?',
+      'imageUrl': '/media/polls/poll-1',
+      'options': [
+        {'id': 'option-1', 'text': 'First', 'position': 0, 'votesCount': 0},
+        {'id': 'option-2', 'text': 'Second', 'position': 1, 'votesCount': 0},
+      ],
+      'votesCount': 0,
+      'commentsCount': 0,
+      'likesCount': 0,
+      'viewerHasLiked': false,
+      'createdAt': '2026-07-21T10:00:00.000Z',
+      'endsAt': null,
+    });
+
+    expect(poll.imageUrl, '/media/polls/poll-1');
+  });
+
   test('parses viewer vote and closed state from poll json', () {
     final poll = PollSummary.fromJson({
       'id': 'poll-1',

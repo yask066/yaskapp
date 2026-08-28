@@ -103,6 +103,7 @@ class PollSummary {
     required this.id,
     required this.author,
     required this.question,
+    this.imageUrl,
     required this.options,
     required this.votesCount,
     required this.commentsCount,
@@ -123,6 +124,7 @@ class PollSummary {
       author:
           PollAuthorSummary.fromJson(json['author'] as Map<String, dynamic>),
       question: json['question'] as String,
+      imageUrl: json['imageUrl'] as String?,
       options: optionsJson
           .map(
             (optionJson) => PollOptionSummary.fromJson(
@@ -146,6 +148,7 @@ class PollSummary {
   final String id;
   final PollAuthorSummary author;
   final String question;
+  final String? imageUrl;
   final List<PollOptionSummary> options;
   final int votesCount;
   final int commentsCount;
@@ -181,6 +184,7 @@ class PollSummary {
       id: id,
       author: author,
       question: question,
+      imageUrl: imageUrl,
       options: options,
       votesCount: votesCount,
       commentsCount: commentsCount,

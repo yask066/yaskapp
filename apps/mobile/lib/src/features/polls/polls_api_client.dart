@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../../core/config/api_config.dart';
 import 'poll_summary.dart';
@@ -182,6 +184,9 @@ class PollsApiClient {
     required List<String> options,
     required String accessToken,
     bool allowVoteCancellation = false,
+    Uint8List? imageBytes,
+    String? imageFilename,
+    String? imageContentType,
   }) async {
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls',
@@ -196,14 +201,40 @@ class PollsApiClient {
         'allowVoteCancellation': true,
     };
 
-    final response = await _httpClient.post(
-      uri,
-      headers: {
-        'authorization': 'Bearer $accessToken',
-        'content-type': 'application/json',
-      },
-      body: jsonEncode(requestBody),
-    );
+    final http.Response response;
+
+    if (imageBytes == null) {
+      response = await _httpClient.post(
+        uri,
+        headers: {
+          'authorization': 'Bearer $accessToken',
+          'content-type': 'application/json',
+        },
+        body: jsonEncode(requestBody),
+      );
+    } else {
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['authorization'] = 'Bearer $accessToken'
+        ..fields['question'] = question
+        ..fields['options'] = jsonEncode(options);
+
+      if (allowVoteCancellation) {
+        request.fields['allowVoteCancellation'] = 'true';
+      }
+
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'image',
+          imageBytes,
+          filename: imageFilename ?? 'poll-image',
+          contentType: _mediaType(imageContentType ?? 'image/jpeg'),
+        ),
+      );
+
+      response = await http.Response.fromStream(
+        await _httpClient.send(request),
+      );
+    }
     final body = _decodeObject(response);
     final poll = body['poll'];
 
@@ -212,6 +243,16 @@ class PollsApiClient {
     }
 
     return PollSummary.fromJson(poll);
+  }
+
+  MediaType? _mediaType(String contentType) {
+    final parts = contentType.split('/');
+
+    if (parts.length != 2 || parts.any((part) => part.isEmpty)) {
+      return null;
+    }
+
+    return MediaType(parts[0], parts[1]);
   }
 
   Future<PollSummary> vote({
