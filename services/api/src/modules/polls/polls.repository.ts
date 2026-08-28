@@ -380,14 +380,14 @@ export async function deletePollRecord(input: {
   try {
     await client.query('BEGIN');
 
-    const result = await client.query<{ id: string }>(
+    const result = await client.query<{ id: string; image_object_key: string | null }>(
       `
         UPDATE polls
         SET deleted_at = now(), updated_at = now()
         WHERE id = $1
           AND author_id = $2
           AND deleted_at IS NULL
-        RETURNING id
+        RETURNING id, image_object_key
       `,
       [input.pollId, input.authorId]
     );
@@ -408,7 +408,10 @@ export async function deletePollRecord(input: {
 
     await client.query('COMMIT');
 
-    return { status: 'deleted' as const };
+    return {
+      status: 'deleted' as const,
+      imageObjectKey: result.rows[0]?.image_object_key ?? null
+    };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

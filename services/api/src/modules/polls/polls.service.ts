@@ -10,6 +10,7 @@ import {
   listSubscriptionPollRecords,
   unlikePollRecord
 } from './polls.repository.js';
+import { deletePollImageObject, PollImageStorageError } from './poll-images.service.js';
 import type { PollVisibility } from './polls.repository.js';
 import { assertUserCanComment, assertUserCanCreatePoll } from '../moderation/sanctions.repository.js';
 
@@ -93,6 +94,14 @@ export async function deletePoll(input: { pollId: string; authorId: string }) {
 
   if (result.status === 'not_found') {
     throw new PollNotFoundError('Poll was not found.');
+  }
+
+  if (result.imageObjectKey) {
+    try {
+      await deletePollImageObject(result.imageObjectKey);
+    } catch (_) {
+      throw new PollImageStorageError('Poll image storage is temporarily unavailable.');
+    }
   }
 }
 

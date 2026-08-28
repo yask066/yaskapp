@@ -12,6 +12,7 @@
     "db:bootstrap-superadmin": "npm run db:bootstrap-superadmin -w @yaskapp/api --",
     "db:migrate": "npm run db:migrate -w @yaskapp/api",
     "db:check": "npm run db:check -w @yaskapp/api",
+    "poll-images:cleanup": "npm run poll-images:cleanup -w @yaskapp/api",
     "shared:build": "npm run build -w @yaskapp/shared",
     "countries:check": "node scripts/check-country-catalog.mjs",
     "api:test": "npm run countries:check && npm run test -w @yaskapp/api"

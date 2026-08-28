@@ -981,6 +981,39 @@ test('poll author can delete a poll but other users cannot', async () => {
   );
 });
 
+test('deleting a poll removes its image from the media endpoint', async () => {
+  const author = await registerTestUser();
+  const boundary = `poll-delete-image-${uniqueSuffix()}`;
+  const image = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64'
+  );
+  const createResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: {
+      ...bearer(author.accessToken),
+      'content-type': `multipart/form-data; boundary=${boundary}`
+    },
+    payload: multipartPollBody(boundary, image)
+  });
+  assert.equal(createResponse.statusCode, 201, createResponse.body);
+  const poll = createResponse.json<PollResponse>().poll;
+
+  const deleteResponse = await app.inject({
+    method: 'DELETE',
+    url: `/polls/${poll.id}`,
+    headers: bearer(author.accessToken)
+  });
+  assert.equal(deleteResponse.statusCode, 204, deleteResponse.body);
+
+  const imageResponse = await app.inject({
+    method: 'GET',
+    url: `/media/polls/${poll.id}`
+  });
+  assert.equal(imageResponse.statusCode, 404, imageResponse.body);
+});
+
 test('authenticated user can vote once and cancel that vote', async () => {
   const registered = await registerTestUser();
 
