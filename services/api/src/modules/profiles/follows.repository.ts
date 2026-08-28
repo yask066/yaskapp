@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
+import { createNotification } from '../notifications/notifications.repository.js';
 
 export type FollowMutation = {
   followerId: string;
@@ -128,6 +129,12 @@ export async function followUserRecord(
     );
 
     if (insertResult.rowCount === 1) {
+      await createNotification({
+        recipientUserId: input.followeeId,
+        actorUserId: input.followerId,
+        type: 'follow',
+        deduplicationKey: `follow:${input.followerId}:${input.followeeId}`
+      }, client);
       await client.query(
         `
           UPDATE profiles

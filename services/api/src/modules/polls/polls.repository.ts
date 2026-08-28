@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
 import { avatarUrlForUser } from '../profiles/avatar-url.js';
+import { createNotification } from '../notifications/notifications.repository.js';
 
 export type PollVisibility = 'public' | 'followers' | 'private';
 
@@ -644,9 +645,9 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
   try {
     await client.query('BEGIN');
 
-    const pollResult = await client.query<{ id: string }>(
+    const pollResult = await client.query<{ id: string; author_id: string }>(
       `
-        SELECT id
+        SELECT id, author_id
         FROM polls
         WHERE id = $1
           AND visibility = 'public'
@@ -700,6 +701,17 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
       throw new Error('Comment insert did not return a row.');
     }
 
+    if (pollResult.rows[0].author_id !== input.authorId) {
+      await createNotification({
+        recipientUserId: pollResult.rows[0].author_id,
+        actorUserId: input.authorId,
+        type: 'comment',
+        pollId: input.pollId,
+        commentId: comment.id,
+        deduplicationKey: `comment:${comment.id}:${pollResult.rows[0].author_id}`
+      }, client);
+    }
+
     await client.query(
       `
         UPDATE polls
@@ -740,9 +752,9 @@ export async function likePollRecord(input: {
   try {
     await client.query('BEGIN');
 
-    const pollResult = await client.query<{ id: string }>(
+    const pollResult = await client.query<{ id: string; author_id: string }>(
       `
-        SELECT id
+        SELECT id, author_id
         FROM polls
         WHERE id = $1
           AND visibility = 'public'
@@ -768,6 +780,15 @@ export async function likePollRecord(input: {
     );
 
     if (likeResult.rowCount === 1) {
+      if (pollResult.rows[0].author_id !== input.userId) {
+        await createNotification({
+          recipientUserId: pollResult.rows[0].author_id,
+          actorUserId: input.userId,
+          type: 'like',
+          pollId: input.pollId,
+          deduplicationKey: `like:poll:${input.pollId}:${input.userId}`
+        }, client);
+      }
       await client.query(
         `
           UPDATE polls
@@ -869,11 +890,12 @@ export async function createVoteRecord(input: {
 
     const pollResult = await client.query<{
       id: string;
+      author_id: string;
       ends_at: Date | null;
       option_id: string | null;
     }>(
       `
-        SELECT p.id, p.ends_at, po.id AS option_id
+        SELECT p.id, p.author_id, p.ends_at, po.id AS option_id
         FROM polls p
         LEFT JOIN poll_options po
           ON po.poll_id = p.id
@@ -931,6 +953,16 @@ export async function createVoteRecord(input: {
       `,
       [input.pollId]
     );
+
+    if (poll.author_id !== input.voterId) {
+      await createNotification({
+        recipientUserId: poll.author_id,
+        actorUserId: input.voterId,
+        type: 'poll_vote',
+        pollId: input.pollId,
+        deduplicationKey: `poll_vote:${input.pollId}:${input.voterId}`
+      }, client);
+    }
 
     const [updatedPoll] = await hydratePolls(client, [input.pollId], input.voterId);
 
