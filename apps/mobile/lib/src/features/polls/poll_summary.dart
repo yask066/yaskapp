@@ -177,6 +177,9 @@ class PollSummary {
   }
 
   PollSummary copyWith({
+    bool? viewerHasLiked,
+    int? likesCount,
+    int? commentsCount,
     String? viewerVoteOptionId,
     bool clearViewerVoteOptionId = false,
   }) {
@@ -187,9 +190,9 @@ class PollSummary {
       imageUrl: imageUrl,
       options: options,
       votesCount: votesCount,
-      commentsCount: commentsCount,
-      likesCount: likesCount,
-      viewerHasLiked: viewerHasLiked,
+      commentsCount: commentsCount ?? this.commentsCount,
+      likesCount: likesCount ?? this.likesCount,
+      viewerHasLiked: viewerHasLiked ?? this.viewerHasLiked,
       allowVoteCancellation: allowVoteCancellation,
       createdAt: createdAt,
       viewerVoteOptionId: clearViewerVoteOptionId

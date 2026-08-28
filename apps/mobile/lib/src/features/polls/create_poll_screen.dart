@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'poll_summary.dart';
 import 'polls_api_client.dart';
@@ -27,6 +30,10 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
 
   var _isSubmitting = false;
   var _allowVoteCancellation = false;
+  final _imagePicker = ImagePicker();
+  Uint8List? _imageBytes;
+  String? _imageFilename;
+  String? _imageContentType;
   String? _errorMessage;
 
   @override
@@ -61,6 +68,73 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
     });
   }
 
+  Future<void> _pickImage() async {
+    if (_isSubmitting) {
+      return;
+    }
+
+    final file = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 2048,
+      maxHeight: 2048,
+      imageQuality: 90,
+    );
+
+    if (file == null || !mounted) {
+      return;
+    }
+
+    final contentType = _contentTypeFor(file.name);
+    if (contentType == null) {
+      setState(() {
+        _errorMessage = 'Choose a JPEG, PNG, or WebP image.';
+      });
+      return;
+    }
+
+    final bytes = await file.readAsBytes();
+    if (!mounted) {
+      return;
+    }
+
+    if (bytes.length > 5 * 1024 * 1024) {
+      setState(() {
+        _errorMessage = 'Poll image must be 5 MB or smaller.';
+      });
+      return;
+    }
+
+    setState(() {
+      _imageBytes = bytes;
+      _imageFilename = file.name;
+      _imageContentType = contentType;
+      _errorMessage = null;
+    });
+  }
+
+  void _removeImage() {
+    if (_isSubmitting) {
+      return;
+    }
+
+    setState(() {
+      _imageBytes = null;
+      _imageFilename = null;
+      _imageContentType = null;
+    });
+  }
+
+  String? _contentTypeFor(String filename) {
+    final extension = filename.toLowerCase().split('.').last;
+
+    return switch (extension) {
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      _ => null,
+    };
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -90,6 +164,9 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
         question: _questionController.text.trim(),
         options: options,
         allowVoteCancellation: _allowVoteCancellation,
+        imageBytes: _imageBytes,
+        imageFilename: _imageFilename,
+        imageContentType: _imageContentType,
         accessToken: widget.accessToken,
       );
 
@@ -180,6 +257,36 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
                 max: 280,
                 color: secondaryText,
               ),
+              const SizedBox(height: 16),
+              if (_imageBytes == null)
+                OutlinedButton.icon(
+                  onPressed: _isSubmitting ? null : _pickImage,
+                  icon: const Icon(Icons.add_photo_alternate_outlined),
+                  label: const Text('Add image'),
+                )
+              else
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Stack(
+                    children: [
+                      Image.memory(
+                        _imageBytes!,
+                        width: double.infinity,
+                        height: 220,
+                        fit: BoxFit.cover,
+                      ),
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: IconButton.filled(
+                          tooltip: 'Remove image',
+                          onPressed: _isSubmitting ? null : _removeImage,
+                          icon: const Icon(Icons.close),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Allow voters to cancel their vote'),
@@ -249,8 +356,7 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
               SizedBox(
                 height: 48,
                 child: OutlinedButton.icon(
-                  onPressed:
-                      _optionControllers.length >= 5 ? null : _addOption,
+                  onPressed: _optionControllers.length >= 5 ? null : _addOption,
                   icon: const Icon(Icons.add, size: 20),
                   label: const Text('Add option'),
                   style: OutlinedButton.styleFrom(

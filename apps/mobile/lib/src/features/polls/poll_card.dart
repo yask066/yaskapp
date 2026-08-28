@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/config/api_config.dart';
 import '../../core/widgets/user_avatar.dart';
 import 'poll_summary.dart';
 
@@ -207,6 +208,24 @@ class PollCard extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
+            if (poll.imageUrl != null) ...[
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Image.network(
+                    const ApiConfig().uri(poll.imageUrl!).toString(),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: const Color(0xFFF0F2F7),
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.broken_image_outlined),
+                    ),
+                  ),
+                ),
+              ),
+            ],
             if (poll.isClosed) ...[
               const SizedBox(height: 10),
               Row(
@@ -238,9 +257,8 @@ class PollCard extends StatelessWidget {
                 compact: compact,
                 profileVariant: compact,
                 isLoading: isVoting,
-                onTap: onVote == null
-                    ? null
-                    : () => onVote!(poll.options[index]),
+                onTap:
+                    onVote == null ? null : () => onVote!(poll.options[index]),
               ),
               const SizedBox(height: 8),
             ],
