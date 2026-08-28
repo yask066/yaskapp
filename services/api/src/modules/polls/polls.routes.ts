@@ -139,11 +139,13 @@ function pollError(reply: FastifyReply, error: unknown) {
 
 export async function cleanupUploadedPollImage(
   objectKey: string,
-  deleteImage: (key: string) => Promise<void> = deletePollImageObject
+  deleteImage: (key: string) => Promise<void> = deletePollImageObject,
+  onCleanupError?: (error: unknown, objectKey: string) => void
 ) {
   try {
     await deleteImage(objectKey);
-  } catch (_) {
+  } catch (error) {
+    onCleanupError?.(error, objectKey);
     // Preserve the original poll creation error for the client.
   }
 }
@@ -279,7 +281,16 @@ export function registerPollRoutes(app: FastifyInstance) {
         });
       } catch (error) {
         if (uploadedImageObjectKey) {
-          await cleanupUploadedPollImage(uploadedImageObjectKey);
+          await cleanupUploadedPollImage(
+            uploadedImageObjectKey,
+            deletePollImageObject,
+            (cleanupError, objectKey) => {
+              request.log.warn(
+                { err: cleanupError, objectKey },
+                'Failed to clean up uploaded poll image after poll creation failed'
+              );
+            }
+          );
         }
 
         return pollError(reply, error);
