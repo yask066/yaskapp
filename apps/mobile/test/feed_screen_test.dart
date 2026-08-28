@@ -10,12 +10,27 @@ import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
 import 'package:yaskapp_mobile/src/features/realtime/realtime_client.dart';
 
 void main() {
+  testWidgets('shows one feed without category tabs', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FeedScreen(
+          session: _session,
+          pollsApiClient: _FakePollsApiClient(initialPolls: const []),
+          realtimeClient: _FakeRealtimeClient(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('For you'), findsNothing);
+    expect(find.text('Following'), findsNothing);
+    expect(find.text('Trending'), findsNothing);
+  });
+
   testWidgets('ties share medal colors and zero-vote options stay readable', (
     tester,
   ) async {
     const navy = Color(0xFF00104F);
-    const orange = Color(0xFFF47B16);
-    const silver = Color(0xFFB9BEC7);
 
     final poll = PollSummary(
       id: 'ranked-poll',
@@ -61,15 +76,17 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: PollCard(poll: poll)));
     await tester.pumpAndSettle();
 
-    final progressColors = tester
-        .widgetList<ColoredBox>(find.byType(ColoredBox))
-        .map((box) => box.color)
+    final progressValues = tester
+        .widgetList<LinearProgressIndicator>(
+          find.byType(LinearProgressIndicator),
+        )
+        .map((progress) => progress.value)
         .toList();
 
-    expect(progressColors, containsAllInOrder([orange, orange, silver, navy]));
+    expect(progressValues, containsAllInOrder([5 / 12, 5 / 12, 2 / 12, 0]));
     expect(
       tester.widget<Text>(find.text('No votes')).style?.color,
-      const Color(0xFF0A123F),
+      const Color(0xFF566A9D),
     );
   });
 

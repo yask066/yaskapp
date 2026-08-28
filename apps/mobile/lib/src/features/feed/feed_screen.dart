@@ -564,8 +564,6 @@ class _HomeHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _CreatePrompt(onCreatePoll: onCreatePoll),
-          const SizedBox(height: 12),
-          const _FeedFilters(),
         ],
       ),
     );
@@ -638,102 +636,6 @@ class _CreatePrompt extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _FeedFilters extends StatelessWidget {
-  const _FeedFilters();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 52,
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0F050C3F),
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(child: _FilterChip(label: 'For you', selected: true)),
-          const _FilterDivider(),
-          Expanded(child: _FilterChip(label: 'Following')),
-          const _FilterDivider(),
-          Expanded(child: _FilterChip(label: 'Trending')),
-        ],
-      ),
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({required this.label, this.selected = false});
-
-  final String label;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: label,
-      child: Material(
-        color: selected ? const Color(0xFF566A9D) : Colors.transparent,
-        borderRadius: BorderRadius.circular(24),
-        child: InkWell(
-          onTap: () {},
-          borderRadius: BorderRadius.circular(24),
-          child: SizedBox(
-            height: 48,
-            child: Padding(
-              padding: EdgeInsets.zero,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (selected) ...[
-                    const Icon(Icons.check, color: Colors.white, size: 18),
-                    const SizedBox(width: 6),
-                  ],
-                  Flexible(
-                    child: Text(
-                      label,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color:
-                            selected ? Colors.white : const Color(0xFF566A9D),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FilterDivider extends StatelessWidget {
-  const _FilterDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SizedBox(
-      width: 1,
-      height: 32,
-      child: ColoredBox(color: Color(0xFFE5E7EB)),
     );
   }
 }
