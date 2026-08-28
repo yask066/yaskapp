@@ -1,3 +1,4 @@
+import type { MultipartFile } from '@fastify/multipart';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -9,6 +10,12 @@ import {
 } from '../../realtime/realtime.hub.js';
 import { authenticate, optionalAuthenticate } from '../auth/auth.utils.js';
 import { UserSanctionedError } from '../moderation/sanctions.repository.js';
+import {
+  deletePollImageObject,
+  PollImageStorageError,
+  PollImageUploadError,
+  processPollImage
+} from './poll-images.service.js';
 import {
   PollAlreadyVotedError,
   PollClosedError,
@@ -44,7 +51,6 @@ const createPollSchema = z.object({
 
       return new Set(normalizedOptions).size === normalizedOptions.length;
     }, 'Poll options must be unique.'),
-  imageObjectKey: z.string().trim().min(1).max(1024).optional(),
   visibility: z.enum(['public', 'followers', 'private']).default('public'),
   endsAt: z
     .string()
@@ -119,8 +125,53 @@ function pollError(reply: FastifyReply, error: unknown) {
     return reply.status(403).send({ error: 'restricted', message: error.message });
   }
 
+  if (error instanceof PollImageUploadError) {
+    return reply.status(400).send({ error: error.code, message: error.message });
+  }
+
+  if (error instanceof PollImageStorageError) {
+    return reply.status(503).send({ error: 'poll_image_storage_unavailable', message: error.message });
+  }
+
 
   throw error;
+}
+
+async function parseMultipartCreatePoll(request: FastifyRequest) {
+  const fields: Record<string, unknown> = {};
+  let imagePart: Pick<MultipartFile, 'fieldname' | 'mimetype' | 'toBuffer'> | undefined;
+
+  for await (const part of request.parts()) {
+    if (part.type === 'file') {
+      if (part.fieldname !== 'image' || imagePart) {
+        throw new PollImageUploadError('Only one image field is allowed.');
+      }
+
+      const imageBytes = await part.toBuffer();
+      imagePart = {
+        fieldname: part.fieldname,
+        mimetype: part.mimetype,
+        toBuffer: async () => imageBytes
+      };
+      continue;
+    }
+
+    fields[part.fieldname] = part.value;
+  }
+
+  if (fields.options !== undefined && typeof fields.options === 'string') {
+    try {
+      fields.options = JSON.parse(fields.options);
+    } catch (_) {
+      fields.options = undefined;
+    }
+  }
+
+  if (fields.allowVoteCancellation !== undefined) {
+    fields.allowVoteCancellation = fields.allowVoteCancellation === 'true';
+  }
+
+  return { fields, imagePart };
 }
 
 export function registerPollRoutes(app: FastifyInstance) {
@@ -179,22 +230,47 @@ export function registerPollRoutes(app: FastifyInstance) {
       preHandler: authenticate
     },
     async (request, reply) => {
-      const parsedBody = createPollSchema.safeParse(request.body);
+      let rawBody: unknown = request.body;
+      let imagePart: Pick<MultipartFile, 'fieldname' | 'mimetype' | 'toBuffer'> | undefined;
+
+      try {
+        if (request.isMultipart()) {
+          const multipart = await parseMultipartCreatePoll(request);
+          rawBody = multipart.fields;
+          imagePart = multipart.imagePart;
+        }
+      } catch (error) {
+        return pollError(reply, error);
+      }
+
+      const parsedBody = createPollSchema.safeParse(rawBody);
 
       if (!parsedBody.success) {
         return validationError(reply, parsedBody.error);
       }
 
+      let uploadedImageObjectKey: string | undefined;
+
       try {
+
+        if (imagePart) {
+          uploadedImageObjectKey = (await processPollImage(request.user.sub, imagePart)).objectKey;
+        }
+
         const poll = await createPoll({
           authorId: request.user.sub,
-          ...parsedBody.data
+          ...parsedBody.data,
+          imageObjectKey: uploadedImageObjectKey
         });
 
         return reply.status(201).send({
           poll
         });
       } catch (error) {
+        if (uploadedImageObjectKey) {
+          await deletePollImageObject(uploadedImageObjectKey);
+        }
+
         return pollError(reply, error);
       }
     }

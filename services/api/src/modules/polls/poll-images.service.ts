@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { MultipartFile } from '@fastify/multipart';
 import sharp, { type Metadata } from 'sharp';
 
-import { putObject } from '../../config/storage.js';
+import { deleteObject, putObject } from '../../config/storage.js';
 
 const maxPollImageBytes = 5 * 1024 * 1024;
 
@@ -12,7 +12,16 @@ export const allowedPollImageMimeTypes = new Set([
   'image/webp'
 ]);
 
-export class PollImageUploadError extends Error {}
+export type PollImageErrorCode =
+  | 'poll_image_invalid'
+  | 'poll_image_unsupported_type'
+  | 'poll_image_too_large';
+
+export class PollImageUploadError extends Error {
+  constructor(message: string, readonly code: PollImageErrorCode = 'poll_image_invalid') {
+    super(message);
+  }
+}
 
 export class PollImageStorageError extends Error {}
 
@@ -50,19 +59,22 @@ function matchesImageSignature(mimetype: string, body: Buffer) {
 export function validatePollImageBytes(mimetype: string, body: Buffer) {
   if (!allowedPollImageMimeTypes.has(mimetype)) {
     throw new PollImageUploadError(
-      'Poll image must be a JPEG, PNG, or WebP image.'
+      'Poll image must be a JPEG, PNG, or WebP image.',
+      'poll_image_unsupported_type'
     );
   }
 
   if (body.length > maxPollImageBytes) {
     throw new PollImageUploadError(
-      'Poll image file must be 5 MB or smaller.'
+      'Poll image file must be 5 MB or smaller.',
+      'poll_image_too_large'
     );
   }
 
   if (!matchesImageSignature(mimetype, body)) {
     throw new PollImageUploadError(
-      'Poll image content does not match its declared image type.'
+      'Poll image content does not match its declared image type.',
+      'poll_image_unsupported_type'
     );
   }
 }
@@ -90,10 +102,9 @@ function isInvalidImageError(error: unknown) {
   );
 }
 
-export async function processPollImage(
-  authorId: string,
-  part: MultipartFile
-) {
+type PollImagePart = Pick<MultipartFile, 'fieldname' | 'mimetype' | 'toBuffer'>;
+
+export async function processPollImage(authorId: string, part: PollImagePart) {
   if (part.fieldname !== 'image') {
     throw new PollImageUploadError('The image field is required.');
   }
@@ -137,4 +148,8 @@ export async function processPollImage(
   }
 
   return { objectKey };
+}
+
+export function deletePollImageObject(objectKey: string) {
+  return deleteObject(objectKey);
 }

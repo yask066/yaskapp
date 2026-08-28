@@ -481,6 +481,27 @@ function multipartFileBody(
   return Buffer.concat([header, body, footer]);
 }
 
+function multipartPollBody(boundary: string, image: Buffer) {
+  const fields = [
+    ['question', 'Poll with an image'],
+    ['options', JSON.stringify(['Yes', 'No'])]
+  ].map(([name, value]) =>
+    Buffer.from(
+      `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="${name}"\r\n\r\n` +
+        `${value}\r\n`
+    )
+  );
+  const fileHeader = Buffer.from(
+    `--${boundary}\r\n` +
+      'Content-Disposition: form-data; name="image"; filename="poll.png"\r\n' +
+      'Content-Type: image/png\r\n\r\n'
+  );
+  const footer = Buffer.from(`\r\n--${boundary}--\r\n`);
+
+  return Buffer.concat([...fields, fileHeader, image, footer]);
+}
+
 function animatedWebpBody() {
   const body = Buffer.alloc(12 + 8 + 10);
 
@@ -818,6 +839,28 @@ test('auth and polls happy path works end to end', async () => {
       ?.viewerVoteOptionId,
     null
   );
+});
+
+test('authenticated user can create a poll with an image using multipart form data', async () => {
+  const user = await registerTestUser();
+  const boundary = `poll-image-${uniqueSuffix()}`;
+  const image = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64'
+  );
+
+  const response = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: {
+      ...bearer(user.accessToken),
+      'content-type': `multipart/form-data; boundary=${boundary}`
+    },
+    payload: multipartPollBody(boundary, image)
+  });
+
+  assert.equal(response.statusCode, 201, response.body);
+  assert.equal(response.json<PollResponse>().poll.question, 'Poll with an image');
 });
 
 test('poll creation and voting require authentication', async () => {
