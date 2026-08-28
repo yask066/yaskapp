@@ -15,6 +15,7 @@ import {
 } from './modules/admin/admin-request-logging.js';
 import { registerHealthRoutes } from './modules/health/health.routes.js';
 import { registerModerationRoutes } from './modules/moderation/moderation.routes.js';
+import { registerNotificationRoutes } from './modules/notifications/notifications.routes.js';
 import { registerPollRoutes } from './modules/polls/polls.routes.js';
 import { registerPollImageRoutes } from './modules/polls/poll-image.routes.js';
 import { registerProfileRoutes } from './modules/profiles/profiles.routes.js';
@@ -157,6 +158,7 @@ export function buildApp() {
   registerAdminRoutes(app);
   registerHealthRoutes(app);
   registerModerationRoutes(app);
+  registerNotificationRoutes(app);
   registerPollRoutes(app);
   registerPollImageRoutes(app);
   registerProfileRoutes(app);

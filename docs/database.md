@@ -24,3 +24,5 @@ services/api/src/db/migrations/001_initial_social_schema.sql
 - Object storage references are stored as object keys, not public URLs.
 - Vote, like, and follow uniqueness is enforced at the database level.
 - Counters are denormalized fields intended to be updated transactionally by the API.
+- Notifications use an optional unique `deduplication_key` to make repeated domain
+  events safe, and retain nullable poll/comment references when targets are deleted.
