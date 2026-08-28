@@ -156,124 +156,133 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
       },
       child: Scaffold(
         backgroundColor: Colors.white,
-        body: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                height: 64,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                  children: [
-                    IconButton(
-                      tooltip: 'Back',
-                      onPressed: _closeWithResult,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints.tightFor(width: 24, height: 24),
-                      icon: const Icon(Icons.arrow_back_ios_new, size: 24),
-                    ),
-                    const SizedBox(width: 16),
-                    const Text(
-                      'Comments',
-                      style: TextStyle(
-                        color: _commentsPrimaryText,
-                        fontSize: 23,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-                ),
-              ),
-              Expanded(
-                child: FutureBuilder<List<PollCommentSummary>>(
-                  future: _commentsFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return ListView(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                        children: [
-                          PollCard(poll: _poll, accessToken: widget.accessToken),
-                          const _CommentsLoadingState(),
-                        ],
-                      );
-                    }
-
-                    if (snapshot.hasError) {
-                      return ListView(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                        children: [
-                          PollCard(poll: _poll, accessToken: widget.accessToken),
-                          _CommentsErrorState(onRetry: _retryComments),
-                        ],
-                      );
-                    }
-
-                    final comments = _comments ?? snapshot.data ?? [];
-
-                    return ListView(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                      children: [
-                        PollCard(poll: _poll, accessToken: widget.accessToken),
-                        const SizedBox(height: 26),
-                        Row(
-                          children: [
-                            Text(
-                              '${comments.length} comments',
-                              style: const TextStyle(
-                                color: _commentsSecondaryText,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const Spacer(),
-                            const Text(
-                              'Newest',
-                              style: TextStyle(
-                                color: _commentsSecondaryText,
-                                fontSize: 15,
-                              ),
-                            ),
-                            const Icon(
-                              Icons.keyboard_arrow_down,
-                              color: _commentsSecondaryText,
-                              size: 18,
-                            ),
-                          ],
-                        ),
-                        const Divider(
-                          height: 32,
-                          color: _commentsDivider,
-                        ),
-                        if (comments.isEmpty)
-                          const _CommentsEmptyState()
-                        else
-                          for (final comment in comments) ...[
-                            _CommentTile(
-                              comment: comment,
-                              onReport: () => _reportComment(comment),
-                            ),
-                            const Divider(
-                              height: 1,
-                              indent: 76,
-                              color: _commentsDivider,
-                            ),
-                          ],
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ],
+        resizeToAvoidBottomInset: false,
+        body: AnimatedPadding(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
           ),
-        ),
-        bottomNavigationBar: SafeArea(
-          top: false,
-          child: _CommentComposer(
-            controller: _commentController,
-            isSubmitting: _isSubmittingComment,
-            onSubmit: _submitComment,
+          child: SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  height: 64,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          tooltip: 'Back',
+                          onPressed: _closeWithResult,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints.tightFor(
+                              width: 24, height: 24),
+                          icon: const Icon(Icons.arrow_back_ios_new, size: 24),
+                        ),
+                        const SizedBox(width: 16),
+                        const Text(
+                          'Comments',
+                          style: TextStyle(
+                            color: _commentsPrimaryText,
+                            fontSize: 23,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: FutureBuilder<List<PollCommentSummary>>(
+                    future: _commentsFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return ListView(
+                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                          children: [
+                            PollCard(
+                                poll: _poll, accessToken: widget.accessToken),
+                            const _CommentsLoadingState(),
+                          ],
+                        );
+                      }
+
+                      if (snapshot.hasError) {
+                        return ListView(
+                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                          children: [
+                            PollCard(
+                                poll: _poll, accessToken: widget.accessToken),
+                            _CommentsErrorState(onRetry: _retryComments),
+                          ],
+                        );
+                      }
+
+                      final comments = _comments ?? snapshot.data ?? [];
+
+                      return ListView(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                        children: [
+                          PollCard(
+                              poll: _poll, accessToken: widget.accessToken),
+                          const SizedBox(height: 26),
+                          Row(
+                            children: [
+                              Text(
+                                '${comments.length} comments',
+                                style: const TextStyle(
+                                  color: _commentsSecondaryText,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const Spacer(),
+                              const Text(
+                                'Newest',
+                                style: TextStyle(
+                                  color: _commentsSecondaryText,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const Icon(
+                                Icons.keyboard_arrow_down,
+                                color: _commentsSecondaryText,
+                                size: 18,
+                              ),
+                            ],
+                          ),
+                          const Divider(
+                            height: 32,
+                            color: _commentsDivider,
+                          ),
+                          if (comments.isEmpty)
+                            const _CommentsEmptyState()
+                          else
+                            for (final comment in comments) ...[
+                              _CommentTile(
+                                comment: comment,
+                                onReport: () => _reportComment(comment),
+                              ),
+                              const Divider(
+                                height: 1,
+                                indent: 76,
+                                color: _commentsDivider,
+                              ),
+                            ],
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                _CommentComposer(
+                  controller: _commentController,
+                  isSubmitting: _isSubmittingComment,
+                  onSubmit: _submitComment,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -315,31 +324,31 @@ class _CommentComposer extends StatelessWidget {
                   maxLength: 1000,
                   textInputAction: TextInputAction.done,
                   decoration: InputDecoration(
-                  hintText: 'Add a comment...',
-                  counterText: '',
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                  hintStyle: const TextStyle(
-                    color: _commentsSecondaryText,
-                    fontSize: 16,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: const BorderSide(color: _commentsDivider),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: const BorderSide(color: _commentsDivider),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: const BorderSide(color: _commentsNavy),
-                  ),
-                ),
+                    hintText: 'Add a comment...',
+                    counterText: '',
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                    hintStyle: const TextStyle(
+                      color: _commentsSecondaryText,
+                      fontSize: 16,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: const BorderSide(color: _commentsDivider),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: const BorderSide(color: _commentsDivider),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: const BorderSide(color: _commentsNavy),
+                    ),
                   ),
                 ),
               ),
+            ),
             const SizedBox(width: 10),
             IconButton(
               tooltip: 'Post comment',
@@ -514,12 +523,14 @@ class _CommentTile extends StatelessWidget {
                     const SizedBox(width: 8),
                     const Text(
                       'Like',
-                      style: TextStyle(color: _commentsSecondaryText, fontSize: 14),
+                      style: TextStyle(
+                          color: _commentsSecondaryText, fontSize: 14),
                     ),
                     const SizedBox(width: 20),
                     const Text(
                       'Reply',
-                      style: TextStyle(color: _commentsSecondaryText, fontSize: 14),
+                      style: TextStyle(
+                          color: _commentsSecondaryText, fontSize: 14),
                     ),
                     const Spacer(),
                     if (onReport != null)

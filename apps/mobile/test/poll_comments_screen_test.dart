@@ -62,6 +62,29 @@ void main() {
     expect(find.byTooltip('Post comment'), findsOneWidget);
   });
 
+  testWidgets('keeps comment composer above the keyboard', (tester) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          pollsApiClient: _FakePollsApiClient(
+            commentsFuture: Future.value([]),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final composerRect = tester.getRect(find.byType(TextField));
+    expect(composerRect.bottom, lessThanOrEqualTo(500));
+  });
+
   testWidgets('disables repeated comment submissions while in flight', (
     tester,
   ) async {
