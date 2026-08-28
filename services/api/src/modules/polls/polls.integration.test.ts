@@ -63,6 +63,7 @@ type PollResponse = {
   poll: {
     id: string;
     question: string;
+    imageUrl?: string | null;
     options: Array<{
       id: string;
       text: string;
@@ -860,7 +861,17 @@ test('authenticated user can create a poll with an image using multipart form da
   });
 
   assert.equal(response.statusCode, 201, response.body);
-  assert.equal(response.json<PollResponse>().poll.question, 'Poll with an image');
+  const createdPoll = response.json<PollResponse>().poll;
+  assert.equal(createdPoll.question, 'Poll with an image');
+  assert.equal(createdPoll.imageUrl, `/media/polls/${createdPoll.id}`);
+
+  const imageResponse = await app.inject({
+    method: 'GET',
+    url: createdPoll.imageUrl
+  });
+
+  assert.equal(imageResponse.statusCode, 200, imageResponse.body);
+  assert.equal(imageResponse.headers['content-type'], 'image/webp');
 });
 
 test('poll creation and voting require authentication', async () => {

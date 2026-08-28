@@ -37,6 +37,7 @@ export type Poll = {
   question: string;
   description: string | null;
   imageObjectKey: string | null;
+  imageUrl: string | null;
   visibility: PollVisibility;
   optionsCount: number;
   votesCount: number;
@@ -128,6 +129,7 @@ function mapPoll(
     question: row.question,
     description: row.description,
     imageObjectKey: row.image_object_key,
+    imageUrl: row.image_object_key === null ? null : `/media/polls/${row.id}`,
     visibility: row.visibility,
     optionsCount: row.options_count,
     votesCount: row.votes_count,
@@ -545,6 +547,40 @@ export async function findPollRecordById(pollId: string) {
   } finally {
     client.release();
   }
+}
+
+export async function findViewablePollImageRecord(
+  pollId: string,
+  viewerId?: string
+) {
+  const result = await db.query<{
+    image_object_key: string | null;
+  }>(
+    `
+      SELECT p.image_object_key
+      FROM polls p
+      JOIN users u ON u.id = p.author_id
+      WHERE p.id = $1
+        AND p.deleted_at IS NULL
+        AND u.status = 'active'
+        AND (
+          p.visibility = 'public'
+          OR p.author_id = $2
+          OR (
+            p.visibility = 'followers'
+            AND EXISTS (
+              SELECT 1
+              FROM follows f
+              WHERE f.follower_id = $2
+                AND f.followee_id = p.author_id
+            )
+          )
+        )
+    `,
+    [pollId, viewerId ?? null]
+  );
+
+  return result.rows[0] ?? null;
 }
 
 export async function listPollCommentRecords(input: { pollId: string; limit: number }) {

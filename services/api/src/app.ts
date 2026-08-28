@@ -16,6 +16,7 @@ import {
 import { registerHealthRoutes } from './modules/health/health.routes.js';
 import { registerModerationRoutes } from './modules/moderation/moderation.routes.js';
 import { registerPollRoutes } from './modules/polls/polls.routes.js';
+import { registerPollImageRoutes } from './modules/polls/poll-image.routes.js';
 import { registerProfileRoutes } from './modules/profiles/profiles.routes.js';
 import { registerRealtimeRoutes } from './realtime/realtime.routes.js';
 
@@ -150,6 +151,7 @@ export function buildApp() {
   registerHealthRoutes(app);
   registerModerationRoutes(app);
   registerPollRoutes(app);
+  registerPollImageRoutes(app);
   registerProfileRoutes(app);
   registerRealtimeRoutes(app);
 
