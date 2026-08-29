@@ -40,6 +40,34 @@ test('notifications API is authenticated, cursor-based and owner-scoped', async 
   assert.equal(registration.statusCode, 201, registration.body);
   const auth = registration.json<{ user: { id: string }; accessToken: string }>();
 
+  const defaults = await app.inject({ method: 'GET', url: '/notification-preferences', headers: bearer(auth.accessToken) });
+  assert.equal(defaults.statusCode, 200, defaults.body);
+  assert.equal(defaults.json<{ follow: { inApp: boolean; push: boolean } }>().follow.inApp, true);
+
+  const updatedPreferences = await app.inject({
+    method: 'PATCH',
+    url: '/notification-preferences',
+    headers: bearer(auth.accessToken),
+    payload: { follow: { inApp: false, push: true } }
+  });
+  assert.equal(updatedPreferences.statusCode, 200, updatedPreferences.body);
+  assert.deepEqual(updatedPreferences.json<{ follow: { inApp: boolean; push: boolean } }>().follow, { inApp: false, push: true });
+
+  const suppressed = await createNotification({
+    recipientUserId: auth.user.id,
+    type: 'follow',
+    deduplicationKey: `suppressed:${suffix}`
+  });
+  assert.equal(suppressed.created, false);
+
+  const reenabledPreferences = await app.inject({
+    method: 'PATCH',
+    url: '/notification-preferences',
+    headers: bearer(auth.accessToken),
+    payload: { follow: { inApp: true } }
+  });
+  assert.equal(reenabledPreferences.statusCode, 200, reenabledPreferences.body);
+
   await db.query(
     `INSERT INTO notifications (recipient_user_id, type, payload, deduplication_key)
      VALUES ($1, 'follow', '{}'::jsonb, $2)`,

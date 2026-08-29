@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
 import { decodeAdminCursor, pageWithCursor } from '../admin/pagination.js';
+import { isInAppEnabled } from './notification-preferences.repository.js';
 
 type QueryExecutor = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>;
 
@@ -84,6 +85,9 @@ export async function createNotification(
   input: CreateNotificationInput,
   executor: QueryExecutor = db
 ) {
+  if (!(await isInAppEnabled(input.recipientUserId, input.type, executor))) {
+    return { created: false, id: null };
+  }
   const result = await executor.query<{ id: string }>(
     `
       INSERT INTO notifications (

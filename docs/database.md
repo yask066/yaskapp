@@ -17,6 +17,7 @@ services/api/src/db/migrations/001_initial_social_schema.sql
 - `likes`: likes for either polls or comments.
 - `follows`: follower/followee graph.
 - `notifications`: user notification inbox.
+- `notification_preferences`: per-user in-app and push notification settings.
 
 ## Notes
 

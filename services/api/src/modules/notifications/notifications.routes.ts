@@ -10,6 +10,19 @@ import {
   markAllNotificationsRead,
   markNotificationRead
 } from './notifications.repository.js';
+import { getNotificationPreferences, updateNotificationPreferences } from './notification-preferences.repository.js';
+
+const preferenceSchema = z.object({
+  inApp: z.boolean().optional(),
+  push: z.boolean().optional()
+}).strict();
+const preferencesBodySchema = z.object({
+  poll_vote: preferenceSchema.optional(),
+  comment: preferenceSchema.optional(),
+  comment_reply: preferenceSchema.optional(),
+  like: preferenceSchema.optional(),
+  follow: preferenceSchema.optional()
+}).strict();
 
 const notificationIdSchema = z.object({ id: z.string().uuid() }).strict();
 const listQuerySchema = z.object({
@@ -19,6 +32,16 @@ const listQuerySchema = z.object({
 }).strict();
 
 export function registerNotificationRoutes(app: FastifyInstance) {
+  app.get('/notification-preferences', { preHandler: [authenticate] }, async (request, reply) => {
+    return reply.send(await getNotificationPreferences(request.user.sub));
+  });
+
+  app.patch('/notification-preferences', { preHandler: [authenticate] }, async (request, reply) => {
+    const parsed = preferencesBodySchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(422).send({ error: 'validation_error', message: 'Request input is invalid.' });
+    return reply.send(await updateNotificationPreferences(request.user.sub, parsed.data));
+  });
+
   app.get('/notifications', { preHandler: [authenticate] }, async (request, reply) => {
     const parsed = listQuerySchema.safeParse(request.query);
     if (!parsed.success) {
