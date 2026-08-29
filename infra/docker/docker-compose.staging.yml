@@ -102,9 +102,12 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 3000
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-service-account.json
     restart: unless-stopped
     expose:
       - "3000"
+    volumes:
+      - ./secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
     healthcheck:
       test:
         - CMD
@@ -116,7 +119,34 @@ services:
           .catch(() => process.exit(1))
       interval: 15s
       timeout: 5s
-      retries: 5
+        retries: 5
+
+  notification-worker:
+    image: yaskapp-api:staging
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    env_file:
+      - ../../services/api/.env.staging
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-service-account.json
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - ./secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
+    command:
+      - sh
+      - -c
+      - >-
+        while true; do
+          node services/api/dist/jobs/run-notification-push-worker.js || true;
+          sleep 30;
+        done
+    restart: unless-stopped
 
   moderation-web:
     image: yaskapp-moderation-web:staging

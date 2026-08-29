@@ -12,6 +12,7 @@
 .env.*
 !.env.example
 backups/
+infra/docker/secrets/
 
 # Node.js
 node_modules/
