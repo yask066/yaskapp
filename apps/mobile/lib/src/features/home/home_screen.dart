@@ -9,6 +9,7 @@ import '../feed/feed_screen.dart';
 import '../polls/polls_api_client.dart';
 import '../profile/profile_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
+import '../notifications/notifications_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -32,6 +33,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   var _selectedIndex = 0;
+  var _unreadNotifications = 0;
   late final PollsApiClient _pollsApiClient;
   late final bool _ownsPollsApiClient;
   final _feedKey = GlobalKey<FeedScreenState>();
@@ -78,7 +80,10 @@ class _HomeScreenState extends State<HomeScreen> {
             session: widget.session,
             pollsApiClient: _pollsApiClient,
           ),
-          const _NotificationsPlaceholder(),
+          NotificationsScreen(
+            session: widget.session,
+            onUnreadCountChanged: (count) => setState(() => _unreadNotifications = count),
+          ),
           ProfileScreen(
             key: _profileKey,
             user: widget.session.user,
@@ -94,6 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
         user: widget.session.user,
         selectedIndex: _selectedIndex,
         onCreate: _openCreatePoll,
+        unreadNotifications: _unreadNotifications,
         onSelected: (index) {
           setState(() {
             _selectedIndex = index;
@@ -114,12 +120,14 @@ class MainBottomNavigation extends StatelessWidget {
     required this.selectedIndex,
     required this.onSelected,
     required this.onCreate,
+    this.unreadNotifications = 0,
   });
 
   final AuthUser user;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
   final VoidCallback onCreate;
+  final int unreadNotifications;
 
   @override
   Widget build(BuildContext context) {
@@ -159,6 +167,7 @@ class MainBottomNavigation extends StatelessWidget {
               selectedIcon: Icons.notifications,
               selected: selectedIndex == 2,
               onTap: () => onSelected(2),
+              badgeCount: unreadNotifications,
             ),
             _NavItem(
               label: 'Profile',
@@ -188,6 +197,7 @@ class _NavItem extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.customIcon,
+    this.badgeCount = 0,
   });
 
   final String label;
@@ -196,6 +206,7 @@ class _NavItem extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final Widget? customIcon;
+  final int badgeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -208,12 +219,23 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            customIcon ??
-                Icon(
-                  selected ? selectedIcon : icon,
-                  color: selected ? navy : secondary,
-                  size: selected ? 26 : 24,
-                ),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                customIcon ?? Icon(selected ? selectedIcon : icon, color: selected ? navy : secondary, size: selected ? 26 : 24),
+                if (badgeCount > 0)
+                  Positioned(
+                    right: -12,
+                    top: -8,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(color: const Color(0xFFD92D20), borderRadius: BorderRadius.circular(10)),
+                      child: Text(badgeCount > 99 ? '99+' : '$badgeCount', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 4),
             FittedBox(
               fit: BoxFit.scaleDown,
@@ -248,19 +270,6 @@ class _CreateNavigationIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: const Icon(Icons.add, color: Colors.white, size: 30),
-    );
-  }
-}
-
-class _NotificationsPlaceholder extends StatelessWidget {
-  const _NotificationsPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return const _SimplePlaceholderScreen(
-      title: 'Notifications',
-      icon: Icons.notifications_none_outlined,
-      message: 'Your notifications will appear here.',
     );
   }
 }
