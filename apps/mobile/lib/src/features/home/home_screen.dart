@@ -10,6 +10,7 @@ import '../polls/polls_api_client.dart';
 import '../profile/profile_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import '../notifications/notifications_screen.dart';
+import '../notifications/notifications_api_client.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -19,13 +20,16 @@ class HomeScreen extends StatefulWidget {
     required this.onUserUpdated,
     super.key,
     PollsApiClient? pollsApiClient,
-  }) : _pollsApiClient = pollsApiClient;
+    NotificationsApiClient? notificationsApiClient,
+  })  : _pollsApiClient = pollsApiClient,
+        _notificationsApiClient = notificationsApiClient;
 
   final AuthSession session;
   final AuthApiClient authApiClient;
   final VoidCallback onLogout;
   final ValueChanged<AuthUser> onUserUpdated;
   final PollsApiClient? _pollsApiClient;
+  final NotificationsApiClient? _notificationsApiClient;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -34,8 +38,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   var _selectedIndex = 0;
   var _unreadNotifications = 0;
+  var _notificationsViewed = false;
   late final PollsApiClient _pollsApiClient;
   late final bool _ownsPollsApiClient;
+  late final NotificationsApiClient _notificationsApiClientInstance;
+  late final bool _ownsNotificationsApiClient;
   final _feedKey = GlobalKey<FeedScreenState>();
   final _profileKey = GlobalKey<ProfileScreenState>();
 
@@ -44,6 +51,10 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _ownsPollsApiClient = widget._pollsApiClient == null;
     _pollsApiClient = widget._pollsApiClient ?? PollsApiClient();
+    _ownsNotificationsApiClient = widget._notificationsApiClient == null;
+    _notificationsApiClientInstance =
+        widget._notificationsApiClient ?? NotificationsApiClient();
+    unawaited(_loadUnreadNotificationCount());
   }
 
   @override
@@ -51,7 +62,23 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_ownsPollsApiClient) {
       _pollsApiClient.close();
     }
+    if (_ownsNotificationsApiClient) {
+      _notificationsApiClientInstance.close();
+    }
     super.dispose();
+  }
+
+  Future<void> _loadUnreadNotificationCount() async {
+    try {
+      final page = await _notificationsApiClientInstance.list(
+        accessToken: widget.session.accessToken,
+        limit: 1,
+      );
+      if (!mounted || _notificationsViewed) return;
+      setState(() => _unreadNotifications = page.unreadCount);
+    } catch (_) {
+      // The notification tab can retry the full request when opened.
+    }
   }
 
   Future<void> _openCreatePoll() async {
@@ -83,6 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
           NotificationsScreen(
             session: widget.session,
             isActive: _selectedIndex == 2,
+            apiClient: _notificationsApiClientInstance,
             onUnreadCountChanged: (count) =>
                 setState(() => _unreadNotifications = count),
           ),
@@ -103,7 +131,10 @@ class _HomeScreenState extends State<HomeScreen> {
         onCreate: _openCreatePoll,
         unreadNotifications: _unreadNotifications,
         onNotificationsOpened: () {
-          setState(() => _unreadNotifications = 0);
+          setState(() {
+            _notificationsViewed = true;
+            _unreadNotifications = 0;
+          });
         },
         onSelected: (index) {
           setState(() {
