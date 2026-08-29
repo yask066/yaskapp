@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { checkDatabaseConnection } from '../../config/database.js';
 import { checkRedisConnection } from '../../config/redis.js';
 import { checkStorageConnection } from '../../config/storage.js';
+import { getNotificationMetrics } from '../notifications/notifications.metrics.js';
 
 export function registerHealthRoutes(app: FastifyInstance) {
   app.get('/health', async () => ({
@@ -44,4 +45,10 @@ export function registerHealthRoutes(app: FastifyInstance) {
       });
     }
   });
+
+  app.get('/health/metrics', async () => ({
+    status: 'ok',
+    service: 'api',
+    notifications: getNotificationMetrics()
+  }));
 }

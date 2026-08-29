@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg';
 import { db } from '../../config/database.js';
 import { decodeAdminCursor, pageWithCursor } from '../admin/pagination.js';
 import { isInAppEnabled, isPushEnabled } from './notification-preferences.repository.js';
+import { incrementNotificationMetric } from './notifications.metrics.js';
 
 type QueryExecutor = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>;
 
@@ -86,6 +87,7 @@ export async function createNotification(
   executor: QueryExecutor = db
 ) {
   if (!(await isInAppEnabled(input.recipientUserId, input.type, executor))) {
+    incrementNotificationMetric('suppressed');
     return { created: false, id: null };
   }
   const result = await executor.query<{ id: string }>(
@@ -111,6 +113,7 @@ export async function createNotification(
   );
 
   const notificationId = result.rows[0]?.id ?? null;
+  if (notificationId) incrementNotificationMetric('created');
   if (notificationId && await isPushEnabled(input.recipientUserId, input.type, executor)) {
     await executor.query(
       `INSERT INTO notification_push_jobs (notification_id, recipient_user_id, type, poll_id, comment_id)

@@ -12,6 +12,7 @@
     "db:check": "tsx src/db/check.ts",
     "avatars:cleanup": "tsx src/jobs/cleanup-avatar-objects.ts",
     "poll-images:cleanup": "tsx src/jobs/cleanup-poll-image-objects.ts",
+    "notifications:cleanup": "tsx src/jobs/cleanup-notifications.ts",
     "test": "npm run db:migrate && node --import tsx --test --test-reporter spec \"src/**/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

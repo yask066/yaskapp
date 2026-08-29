@@ -12,6 +12,12 @@ import {
 } from './notifications.repository.js';
 import { getNotificationPreferences, updateNotificationPreferences } from './notification-preferences.repository.js';
 import { registerNotificationDevice, revokeNotificationDevice } from './notification-devices.repository.js';
+import { rateLimit } from '../../config/rate-limit.js';
+import { incrementNotificationMetric } from './notifications.metrics.js';
+
+const notificationReadRateLimit = rateLimit({ keyPrefix: 'notifications-read', limit: 60, windowMs: 60_000, keyBy: 'user' });
+const notificationListRateLimit = rateLimit({ keyPrefix: 'notifications-list', limit: 120, windowMs: 60_000, keyBy: 'user' });
+const notificationDeviceRateLimit = rateLimit({ keyPrefix: 'notification-devices', limit: 20, windowMs: 60_000, keyBy: 'user' });
 
 const preferenceSchema = z.object({
   inApp: z.boolean().optional(),
@@ -37,13 +43,13 @@ const listQuerySchema = z.object({
 }).strict();
 
 export function registerNotificationRoutes(app: FastifyInstance) {
-  app.post('/notification-devices', { preHandler: [authenticate] }, async (request, reply) => {
+  app.post('/notification-devices', { preHandler: [authenticate, notificationDeviceRateLimit] }, async (request, reply) => {
     const parsed = deviceBodySchema.safeParse(request.body);
     if (!parsed.success) return reply.status(422).send({ error: 'validation_error', message: 'Request input is invalid.' });
     return reply.status(201).send(await registerNotificationDevice(request.user.sub, parsed.data.token, parsed.data.platform));
   });
 
-  app.delete('/notification-devices', { preHandler: [authenticate] }, async (request, reply) => {
+  app.delete('/notification-devices', { preHandler: [authenticate, notificationDeviceRateLimit] }, async (request, reply) => {
     const parsed = deviceBodySchema.pick({ token: true }).safeParse(request.body);
     if (!parsed.success) return reply.status(422).send({ error: 'validation_error', message: 'Request input is invalid.' });
     await revokeNotificationDevice(request.user.sub, parsed.data.token);
@@ -60,7 +66,7 @@ export function registerNotificationRoutes(app: FastifyInstance) {
     return reply.send(await updateNotificationPreferences(request.user.sub, parsed.data));
   });
 
-  app.get('/notifications', { preHandler: [authenticate] }, async (request, reply) => {
+  app.get('/notifications', { preHandler: [authenticate, notificationListRateLimit] }, async (request, reply) => {
     const parsed = listQuerySchema.safeParse(request.query);
     if (!parsed.success) {
       return reply.status(422).send({ error: 'validation_error', message: 'Request input is invalid.' });
@@ -79,7 +85,7 @@ export function registerNotificationRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/notifications/:id/read', { preHandler: [authenticate] }, async (request, reply) => {
+  app.post('/notifications/:id/read', { preHandler: [authenticate, notificationReadRateLimit] }, async (request, reply) => {
     const parsed = notificationIdSchema.safeParse(request.params);
     if (!parsed.success) {
       return reply.status(422).send({ error: 'validation_error', message: 'Request input is invalid.' });
@@ -94,11 +100,12 @@ export function registerNotificationRoutes(app: FastifyInstance) {
       notificationId: parsed.data.id,
       unreadCount: await countUnreadNotifications(request.user.sub)
     });
+    incrementNotificationMetric('read');
 
     return reply.status(204).send();
   });
 
-  app.post('/notifications/read-all', { preHandler: [authenticate] }, async (request, reply) => {
+  app.post('/notifications/read-all', { preHandler: [authenticate, notificationReadRateLimit] }, async (request, reply) => {
     const result = await markAllNotificationsRead(request.user.sub);
     return reply.send(result);
   });
