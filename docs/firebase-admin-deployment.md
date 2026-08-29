@@ -17,15 +17,15 @@ chown 1000:1000 infra/docker/secrets/firebase-service-account.json
 chmod 400 infra/docker/secrets/firebase-service-account.json
 ```
 
-The staging Compose file mounts this file read-only inside the API container
+The staging Compose file mounts this file read-only inside the notification worker container
 at `/run/secrets/firebase-service-account.json` and sets
 `GOOGLE_APPLICATION_CREDENTIALS` to that path. The Node process uses Firebase
 Admin SDK Application Default Credentials.
 
-Rebuild and restart the API after uploading the file:
+Rebuild and restart the notification worker after uploading the file:
 
 ```bash
-docker compose -f infra/docker/docker-compose.staging.yml up -d --build api
+docker compose -f infra/docker/docker-compose.staging.yml up -d --build notification-worker
 ```
 
 The staging Compose configuration includes a permanent `notification-worker`
@@ -45,7 +45,7 @@ docker compose -f infra/docker/docker-compose.staging.yml logs -f notification-w
 To process pending push jobs once manually:
 
 ```bash
-docker compose -f infra/docker/docker-compose.staging.yml run --rm api node services/api/dist/jobs/run-notification-push-worker.js
+docker compose -f infra/docker/docker-compose.staging.yml run --rm notification-worker node services/api/dist/jobs/run-notification-push-worker.js
 ```
 
 Do not print the file, its contents, or the credential JSON in logs. If the

@@ -102,12 +102,9 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 3000
-      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-service-account.json
     restart: unless-stopped
     expose:
       - "3000"
-    volumes:
-      - ./secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
     healthcheck:
       test:
         - CMD
@@ -143,7 +140,7 @@ services:
       - -c
       - >-
         while true; do
-          node services/api/dist/jobs/run-notification-push-worker.js || true;
+          node services/api/dist/jobs/run-notification-push-worker.js;
           sleep 30;
         done
     restart: unless-stopped
