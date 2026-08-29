@@ -43,12 +43,19 @@ void main() {
   });
 
   testWidgets('notification tab loads the first page on open', (tester) async {
+    final requests = <http.Request>[];
     final apiClient = NotificationsApiClient(
       config: const ApiConfig(baseUrl: 'http://test'),
-      httpClient: MockClient((request) async => http.Response(
-            '{"items":[{"id":"notification-1","type":"follow","actor":{"username":"alice","displayName":"Alice"},"pollId":null,"commentId":null,"readAt":null,"createdAt":"2026-08-29T10:00:00.000Z","isTargetAvailable":true}],"nextCursor":null,"unreadCount":1}',
-            200,
-          )),
+      httpClient: MockClient((request) async {
+        requests.add(request);
+        if (request.url.path == '/notifications/read-all') {
+          return http.Response('{"unreadCount":0}', 200);
+        }
+        return http.Response(
+          '{"items":[{"id":"notification-1","type":"follow","actor":{"username":"alice","displayName":"Alice"},"pollId":null,"commentId":null,"readAt":null,"createdAt":"2026-08-29T10:00:00.000Z","isTargetAvailable":true}],"nextCursor":null,"unreadCount":1}',
+          200,
+        );
+      }),
     );
     final session = AuthSession(
       user: AuthUser(
@@ -78,6 +85,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Alice started following you'), findsOneWidget);
-    expect(find.text('New'), findsOneWidget);
+    expect(find.text('Earlier'), findsOneWidget);
+    expect(find.text('Mark all read'), findsNothing);
+    expect(requests.map((request) => request.url.path), contains('/notifications/read-all'));
   });
 }

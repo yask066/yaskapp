@@ -80,6 +80,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _loadingMore = false;
       });
       widget.onUnreadCountChanged?.call(page.unreadCount);
+      if (!append && page.unreadCount > 0) {
+        await _markAllRead();
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -191,12 +194,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Notifications'), actions: [
-        TextButton(
-            onPressed:
-                _items.any((item) => item.isUnread) ? _markAllRead : null,
-            child: const Text('Mark all read'))
-      ]),
+      appBar: AppBar(title: const Text('Notifications')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
