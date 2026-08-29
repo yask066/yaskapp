@@ -14,6 +14,8 @@ import {
   broadcastModerationSanctionRevoked,
   broadcastModerationAppealCreated,
   broadcastModerationAppealResolved
+  , sendNotificationCreated,
+  sendNotificationRead
 } from './realtime.hub.js';
 
 test('realtime vote events omit viewer-specific vote state', () => {
@@ -197,4 +199,26 @@ test('realtime moderation events contain identifiers and state only', () => {
     { type: 'moderation.appeal_created', payload: { appealId: 'appeal-1', sanctionId: 'sanction-1', userId: 'user-1' } },
     { type: 'moderation.appeal_resolved', payload: { appealId: 'appeal-1', sanctionId: 'sanction-1', userId: 'user-1', status: 'revoked' } }
   ]);
+});
+
+test('notification events are delivered only to the matching user', () => {
+  const first: string[] = [];
+  const second: string[] = [];
+  const removeFirst = addRealtimeClient({ readyState: 1, send: (message) => first.push(message) }, 'user-1');
+  const removeSecond = addRealtimeClient({ readyState: 1, send: (message) => second.push(message) }, 'user-2');
+  first.length = 0;
+  second.length = 0;
+
+  sendNotificationCreated('user-1', {
+    notification: { id: 'notification-1', type: 'follow', actorId: 'actor-1', pollId: null, commentId: null, createdAt: '2026-08-29T10:00:00.000Z' },
+    unreadCount: 1
+  });
+  sendNotificationRead('user-1', { notificationId: 'notification-1', unreadCount: 0 });
+
+  assert.equal(first.length, 2);
+  assert.equal(second.length, 0);
+  assert.equal(JSON.parse(first[0] ?? '').type, 'notification.created');
+  assert.equal(JSON.parse(first[1] ?? '').type, 'notification.read');
+  removeFirst();
+  removeSecond();
 });

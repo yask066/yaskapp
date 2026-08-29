@@ -2,6 +2,8 @@ import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
 import { createNotification } from '../notifications/notifications.repository.js';
+import { countUnreadNotifications } from '../notifications/notifications.repository.js';
+import { sendNotificationCreated } from '../../realtime/realtime.hub.js';
 
 export type FollowMutation = {
   followerId: string;
@@ -108,6 +110,7 @@ export async function followUserRecord(
   }
 
   return withTransaction(async (client) => {
+    let notificationId: string | null = null;
     const userIds = [input.followerId, input.followeeId].sort();
     const existingUsers = await lockUserProfiles(client, userIds);
 
@@ -129,12 +132,12 @@ export async function followUserRecord(
     );
 
     if (insertResult.rowCount === 1) {
-      await createNotification({
+      notificationId = (await createNotification({
         recipientUserId: input.followeeId,
         actorUserId: input.followerId,
         type: 'follow',
         deduplicationKey: `follow:${input.followerId}:${input.followeeId}`
-      }, client);
+      }, client)).id;
       await client.query(
         `
           UPDATE profiles
@@ -154,7 +157,7 @@ export async function followUserRecord(
       );
     }
 
-    return {
+    const result = {
       following: true,
       ...(await readFollowCounts(
         client,
@@ -162,6 +165,13 @@ export async function followUserRecord(
         input.followeeId
       ))
     };
+    if (notificationId) {
+      sendNotificationCreated(input.followeeId, {
+        notification: { id: notificationId, type: 'follow', actorId: input.followerId, pollId: null, commentId: null, createdAt: new Date().toISOString() },
+        unreadCount: await countUnreadNotifications(input.followeeId)
+      });
+    }
+    return result;
   });
 }
 

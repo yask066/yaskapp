@@ -2,7 +2,8 @@ import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
 import { avatarUrlForUser } from '../profiles/avatar-url.js';
-import { createNotification } from '../notifications/notifications.repository.js';
+import { countUnreadNotifications, createNotification } from '../notifications/notifications.repository.js';
+import { sendNotificationCreated } from '../../realtime/realtime.hub.js';
 
 export type PollVisibility = 'public' | 'followers' | 'private';
 
@@ -644,6 +645,7 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
 
   try {
     await client.query('BEGIN');
+    let notificationId: string | null = null;
 
     const pollResult = await client.query<{ id: string; author_id: string }>(
       `
@@ -702,14 +704,14 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
     }
 
     if (pollResult.rows[0].author_id !== input.authorId) {
-      await createNotification({
+      notificationId = (await createNotification({
         recipientUserId: pollResult.rows[0].author_id,
         actorUserId: input.authorId,
         type: 'comment',
         pollId: input.pollId,
         commentId: comment.id,
         deduplicationKey: `comment:${comment.id}:${pollResult.rows[0].author_id}`
-      }, client);
+      }, client)).id;
     }
 
     await client.query(
@@ -729,6 +731,13 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
     }
 
     await client.query('COMMIT');
+
+    if (notificationId) {
+      sendNotificationCreated(pollResult.rows[0].author_id, {
+        notification: { id: notificationId, type: 'comment', actorId: input.authorId, pollId: input.pollId, commentId: comment.id, createdAt: new Date().toISOString() },
+        unreadCount: await countUnreadNotifications(pollResult.rows[0].author_id)
+      });
+    }
 
     return {
       status: 'created' as const,
@@ -751,6 +760,7 @@ export async function likePollRecord(input: {
 
   try {
     await client.query('BEGIN');
+    let notificationId: string | null = null;
 
     const pollResult = await client.query<{ id: string; author_id: string }>(
       `
@@ -781,13 +791,13 @@ export async function likePollRecord(input: {
 
     if (likeResult.rowCount === 1) {
       if (pollResult.rows[0].author_id !== input.userId) {
-        await createNotification({
+        notificationId = (await createNotification({
           recipientUserId: pollResult.rows[0].author_id,
           actorUserId: input.userId,
           type: 'like',
           pollId: input.pollId,
           deduplicationKey: `like:poll:${input.pollId}:${input.userId}`
-        }, client);
+        }, client)).id;
       }
       await client.query(
         `
@@ -802,6 +812,13 @@ export async function likePollRecord(input: {
     const [poll] = await hydratePolls(client, [input.pollId], input.userId);
 
     await client.query('COMMIT');
+
+    if (notificationId) {
+      sendNotificationCreated(pollResult.rows[0].author_id, {
+        notification: { id: notificationId, type: 'like', actorId: input.userId, pollId: input.pollId, commentId: null, createdAt: new Date().toISOString() },
+        unreadCount: await countUnreadNotifications(pollResult.rows[0].author_id)
+      });
+    }
 
     return {
       status: 'liked' as const,
@@ -887,6 +904,7 @@ export async function createVoteRecord(input: {
 
   try {
     await client.query('BEGIN');
+    let notificationId: string | null = null;
 
     const pollResult = await client.query<{
       id: string;
@@ -955,18 +973,25 @@ export async function createVoteRecord(input: {
     );
 
     if (poll.author_id !== input.voterId) {
-      await createNotification({
+      notificationId = (await createNotification({
         recipientUserId: poll.author_id,
         actorUserId: input.voterId,
         type: 'poll_vote',
         pollId: input.pollId,
         deduplicationKey: `poll_vote:${input.pollId}:${input.voterId}`
-      }, client);
+      }, client)).id;
     }
 
     const [updatedPoll] = await hydratePolls(client, [input.pollId], input.voterId);
 
     await client.query('COMMIT');
+
+    if (notificationId) {
+      sendNotificationCreated(poll.author_id, {
+        notification: { id: notificationId, type: 'poll_vote', actorId: input.voterId, pollId: input.pollId, commentId: null, createdAt: new Date().toISOString() },
+        unreadCount: await countUnreadNotifications(poll.author_id)
+      });
+    }
 
     return {
       status: 'created' as const,

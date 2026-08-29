@@ -53,7 +53,8 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     _ownsRealtimeClient = widget._realtimeClient == null;
     _ownsReportsApiClient = widget._reportsApiClient == null;
     _pollsApiClient = widget._pollsApiClient ?? PollsApiClient();
-    _realtimeClient = widget._realtimeClient ?? RealtimeClient();
+    _realtimeClient = widget._realtimeClient ??
+        RealtimeClient(accessToken: widget.session.accessToken);
     _reportsApiClient = widget._reportsApiClient ?? ReportsApiClient();
     _pollsFuture = _loadPolls();
     _voteSubscription = _realtimeClient.pollVotes.listen(_replacePoll);
@@ -290,10 +291,10 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                                 _votingPollIds.contains(poll.id)
                             ? null
                             : (option) => _vote(poll, option),
-                        onCancelVote: poll.isClosed ||
-                                _votingPollIds.contains(poll.id)
-                            ? null
-                            : () => _cancelVote(poll),
+                        onCancelVote:
+                            poll.isClosed || _votingPollIds.contains(poll.id)
+                                ? null
+                                : () => _cancelVote(poll),
                         onDeletePoll: poll.author.id == widget.session.user.id
                             ? () => _deletePoll(poll)
                             : null,

@@ -59,7 +59,8 @@ class ProfileScreenState extends State<ProfileScreen> {
     _ownsPollsApiClient = widget._pollsApiClient == null;
     _pollsApiClient = widget._pollsApiClient ?? PollsApiClient();
     _ownsRealtimeClient = widget._realtimeClient == null;
-    _realtimeClientInstance = widget._realtimeClient ?? RealtimeClient();
+    _realtimeClientInstance = widget._realtimeClient ??
+        RealtimeClient(accessToken: widget.accessToken);
     _pollDeletedSubscription =
         _realtimeClientInstance.pollDeletions.listen(_removeDeletedPoll);
     _realtimeClientInstance.connect();
@@ -366,78 +367,82 @@ class ProfileScreenState extends State<ProfileScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Column(
                         children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                UserAvatar(
-                                  displayName: displayName,
-                                  username: widget.user.username,
-                                  imageUrl: widget.user.profile.avatarUrl,
-                                  radius: 40,
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        displayName,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: Color(0xFF10142D),
-                                          fontSize: 22,
-                                          height: 26 / 22,
-                                          fontWeight: FontWeight.w700,
-                                        ),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              UserAvatar(
+                                displayName: displayName,
+                                username: widget.user.username,
+                                imageUrl: widget.user.profile.avatarUrl,
+                                radius: 40,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      displayName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Color(0xFF10142D),
+                                        fontSize: 22,
+                                        height: 26 / 22,
+                                        fontWeight: FontWeight.w700,
                                       ),
-                                      const SizedBox(height: 4),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '@${widget.user.username}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Color(0xFF667085),
+                                        fontSize: 14,
+                                        height: 18 / 14,
+                                      ),
+                                    ),
+                                    if (bio != null &&
+                                        bio.trim().isNotEmpty) ...[
+                                      const SizedBox(height: 8),
                                       Text(
-                                        '@${widget.user.username}',
-                                        maxLines: 1,
+                                        bio,
+                                        maxLines: 3,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           color: Color(0xFF667085),
                                           fontSize: 14,
-                                          height: 18 / 14,
+                                          height: 20 / 14,
                                         ),
                                       ),
-                                      if (bio != null && bio.trim().isNotEmpty) ...[
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          bio,
-                                          maxLines: 3,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            color: Color(0xFF667085),
-                                            fontSize: 14,
-                                            height: 20 / 14,
-                                          ),
-                                        ),
-                                      ],
                                     ],
-                                  ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 24),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
                           SizedBox(
                             height: 56,
                             child: Row(
                               children: [
                                 _ProfileMetric(
                                   label: 'Polls',
-                                  value: widget.user.profile.pollsCount.toString(),
+                                  value:
+                                      widget.user.profile.pollsCount.toString(),
                                 ),
                                 const _ProfileDivider(),
                                 _ProfileMetric(
                                   label: 'Followers',
-                                  value: widget.user.profile.followersCount.toString(),
+                                  value: widget.user.profile.followersCount
+                                      .toString(),
                                 ),
                                 const _ProfileDivider(),
                                 _ProfileMetric(
                                   label: 'Following',
-                                  value: widget.user.profile.followingCount.toString(),
+                                  value: widget.user.profile.followingCount
+                                      .toString(),
                                 ),
                               ],
                             ),
@@ -462,7 +467,8 @@ class ProfileScreenState extends State<ProfileScreen> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(16),
                                 ),
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
                                 textStyle: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
@@ -506,77 +512,76 @@ class ProfileScreenState extends State<ProfileScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                 child: FutureBuilder<List<PollSummary>>(
-                  future: _selectedTab == 0
-                      ? _myPollsFuture
-                      : _likedPollsFuture!,
+                  future:
+                      _selectedTab == 0 ? _myPollsFuture : _likedPollsFuture!,
                   builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting &&
-                    (_selectedTab == 0
-                        ? !_hasLoadedMyPolls
-                        : !_hasLoadedLikedPolls)) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(
-                      child: SizedBox.square(
-                        dimension: 28,
-                        child: CircularProgressIndicator(strokeWidth: 3),
-                      ),
-                    ),
-                  );
-                }
+                    if (snapshot.connectionState == ConnectionState.waiting &&
+                        (_selectedTab == 0
+                            ? !_hasLoadedMyPolls
+                            : !_hasLoadedLikedPolls)) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(
+                          child: SizedBox.square(
+                            dimension: 28,
+                            child: CircularProgressIndicator(strokeWidth: 3),
+                          ),
+                        ),
+                      );
+                    }
 
-                if (snapshot.hasError &&
-                    (_selectedTab == 0
-                        ? !_hasLoadedMyPolls
-                        : !_hasLoadedLikedPolls)) {
-                  return _MyPollsErrorState(
-                    onRetry: _selectedTab == 0
-                        ? _retryMyPolls
-                        : () {
-                            setState(() {
-                              _likedPollsFuture = _loadLikedPolls();
-                            });
-                          },
-                  );
-                }
+                    if (snapshot.hasError &&
+                        (_selectedTab == 0
+                            ? !_hasLoadedMyPolls
+                            : !_hasLoadedLikedPolls)) {
+                      return _MyPollsErrorState(
+                        onRetry: _selectedTab == 0
+                            ? _retryMyPolls
+                            : () {
+                                setState(() {
+                                  _likedPollsFuture = _loadLikedPolls();
+                                });
+                              },
+                      );
+                    }
 
-                if (snapshot.hasData) {
-                  if (_selectedTab == 0) {
-                    _myPolls = snapshot.data ?? [];
-                    _hasLoadedMyPolls = true;
-                  } else {
-                    _likedPolls = snapshot.data ?? [];
-                    _hasLoadedLikedPolls = true;
-                  }
-                }
+                    if (snapshot.hasData) {
+                      if (_selectedTab == 0) {
+                        _myPolls = snapshot.data ?? [];
+                        _hasLoadedMyPolls = true;
+                      } else {
+                        _likedPolls = snapshot.data ?? [];
+                        _hasLoadedLikedPolls = true;
+                      }
+                    }
 
-                final polls = _selectedTab == 0 ? _myPolls : _likedPolls;
+                    final polls = _selectedTab == 0 ? _myPolls : _likedPolls;
 
-                if (polls.isEmpty) {
-                  return const _MyPollsEmptyState();
-                }
+                    if (polls.isEmpty) {
+                      return const _MyPollsEmptyState();
+                    }
 
-                return Column(
-                  children: [
-                    for (final poll in polls) ...[
-                      PollCard(
-                        poll: poll,
-                        accessToken: widget.accessToken,
-                        compact: true,
-                        onDeletePoll: _selectedTab == 0 &&
-                                poll.author.id == widget.user.id
-                            ? () => _deletePoll(poll)
-                            : null,
-                        onOpenComments: () => _openComments(poll),
-                        onToggleLike: _likingPollIds.contains(poll.id)
-                            ? null
-                            : () => _toggleLike(poll),
-                        isLiking: _likingPollIds.contains(poll.id),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                  ],
-                );
+                    return Column(
+                      children: [
+                        for (final poll in polls) ...[
+                          PollCard(
+                            poll: poll,
+                            accessToken: widget.accessToken,
+                            compact: true,
+                            onDeletePoll: _selectedTab == 0 &&
+                                    poll.author.id == widget.user.id
+                                ? () => _deletePoll(poll)
+                                : null,
+                            onOpenComments: () => _openComments(poll),
+                            onToggleLike: _likingPollIds.contains(poll.id)
+                                ? null
+                                : () => _toggleLike(poll),
+                            isLiking: _likingPollIds.contains(poll.id),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                      ],
+                    );
                   },
                 ),
               ),
@@ -727,9 +732,8 @@ class _ProfileTab extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: selected
-                  ? const Color(0xFF566A9D)
-                  : const Color(0xFF667085),
+              color:
+                  selected ? const Color(0xFF566A9D) : const Color(0xFF667085),
               fontSize: 15,
               fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
             ),

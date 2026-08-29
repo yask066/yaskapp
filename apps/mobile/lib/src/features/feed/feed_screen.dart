@@ -65,7 +65,8 @@ class FeedScreenState extends State<FeedScreen> {
     _ownsReportsApiClient = widget._reportsApiClient == null;
     _pollsApiClient = widget._pollsApiClient ?? PollsApiClient();
     _profilesApiClient = widget._profilesApiClient ?? ProfilesApiClient();
-    _realtimeClient = widget._realtimeClient ?? RealtimeClient();
+    _realtimeClient = widget._realtimeClient ??
+        RealtimeClient(accessToken: widget.session.accessToken);
     _reportsApiClient = widget._reportsApiClient ?? ReportsApiClient();
     _pollsFuture = _loadPolls();
     _pollVoteSubscription =
@@ -518,10 +519,10 @@ class FeedScreenState extends State<FeedScreen> {
                                   _votingPollIds.contains(poll.id)
                               ? null
                               : (option) => _vote(poll, option),
-                          onCancelVote: poll.isClosed ||
-                                  _votingPollIds.contains(poll.id)
-                              ? null
-                              : () => _cancelVote(poll),
+                          onCancelVote:
+                              poll.isClosed || _votingPollIds.contains(poll.id)
+                                  ? null
+                                  : () => _cancelVote(poll),
                           onDeletePoll: poll.author.id == widget.session.user.id
                               ? () => _deletePoll(poll)
                               : null,

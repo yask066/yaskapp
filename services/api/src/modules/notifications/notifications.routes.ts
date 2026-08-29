@@ -2,8 +2,10 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { authenticate } from '../auth/auth.utils.js';
+import { sendNotificationRead } from '../../realtime/realtime.hub.js';
 import { AdminCursorError } from '../admin/pagination.js';
 import {
+  countUnreadNotifications,
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead
@@ -46,6 +48,11 @@ export function registerNotificationRoutes(app: FastifyInstance) {
     if (!found) {
       return reply.status(404).send({ error: 'not_found', message: 'Notification was not found.' });
     }
+
+    sendNotificationRead(request.user.sub, {
+      notificationId: parsed.data.id,
+      unreadCount: await countUnreadNotifications(request.user.sub)
+    });
 
     return reply.status(204).send();
   });

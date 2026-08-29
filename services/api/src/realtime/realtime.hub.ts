@@ -28,6 +28,26 @@ type ConnectionReadyEvent = {
   type: 'connection.ready';
 };
 
+type NotificationCreatedEvent = {
+  type: 'notification.created';
+  payload: {
+    notification: {
+      id: string;
+      type: string;
+      actorId: string | null;
+      pollId: string | null;
+      commentId: string | null;
+      createdAt: string;
+    };
+    unreadCount: number;
+  };
+};
+
+type NotificationReadEvent = {
+  type: 'notification.read';
+  payload: { notificationId: string; unreadCount: number };
+};
+
 type PollDeletedEvent = {
   type: 'poll.admin_deleted';
   payload: {
@@ -75,6 +95,8 @@ type ModerationAppealResolvedEvent = {
 
 type RealtimeEvent =
   | ConnectionReadyEvent
+  | NotificationCreatedEvent
+  | NotificationReadEvent
   | PollVoteCreatedEvent
   | PollVoteUpdatedEvent
   | PollDeletedEvent
@@ -87,7 +109,7 @@ type RealtimeEvent =
   | ModerationAppealResolvedEvent;
 
 const openReadyState = 1;
-const clients = new Set<RealtimeSocket>();
+const clients = new Map<RealtimeSocket, string | undefined>();
 
 function send(socket: RealtimeSocket, event: RealtimeEvent) {
   if (socket.readyState !== undefined && socket.readyState !== openReadyState) {
@@ -97,8 +119,8 @@ function send(socket: RealtimeSocket, event: RealtimeEvent) {
   socket.send(JSON.stringify(event));
 }
 
-export function addRealtimeClient(socket: RealtimeSocket) {
-  clients.add(socket);
+export function addRealtimeClient(socket: RealtimeSocket, userId?: string) {
+  clients.set(socket, userId);
 
   send(socket, {
     type: 'connection.ready'
@@ -166,6 +188,20 @@ export function broadcastModerationAppealResolved(payload: ModerationAppealResol
   broadcast({ type: 'moderation.appeal_resolved', payload });
 }
 
+export function sendNotificationCreated(
+  userId: string,
+  payload: NotificationCreatedEvent['payload']
+) {
+  sendToUser(userId, { type: 'notification.created', payload });
+}
+
+export function sendNotificationRead(
+  userId: string,
+  payload: NotificationReadEvent['payload']
+) {
+  sendToUser(userId, { type: 'notification.read', payload });
+}
+
 function sanitizePoll(
   poll: Poll | Omit<Poll, 'viewerVoteOptionId'>
 ): Omit<Poll, 'viewerVoteOptionId'> {
@@ -175,7 +211,18 @@ function sanitizePoll(
 }
 
 function broadcast(event: RealtimeEvent) {
-  for (const client of clients) {
+  for (const client of clients.keys()) {
+    try {
+      send(client, event);
+    } catch {
+      clients.delete(client);
+    }
+  }
+}
+
+function sendToUser(userId: string, event: RealtimeEvent) {
+  for (const [client, clientUserId] of clients) {
+    if (clientUserId !== userId) continue;
     try {
       send(client, event);
     } catch {

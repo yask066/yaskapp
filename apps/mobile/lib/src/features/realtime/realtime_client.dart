@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:web_socket_channel/io.dart';
 
 import '../../core/config/api_config.dart';
 import '../polls/poll_summary.dart';
@@ -24,16 +24,26 @@ class UserModerationRealtimeEvent {
 }
 
 class CommentDeletedRealtimeEvent {
-  const CommentDeletedRealtimeEvent({required this.commentId, required this.pollId});
+  const CommentDeletedRealtimeEvent(
+      {required this.commentId, required this.pollId});
   final String commentId;
   final String pollId;
 }
 
+class NotificationRealtimeEvent {
+  const NotificationRealtimeEvent(
+      {required this.payload, required this.unreadCount});
+  final Map<String, dynamic> payload;
+  final int unreadCount;
+}
+
 class RealtimeClient {
-  RealtimeClient({ApiConfig config = const ApiConfig()}) : _config = config;
+  RealtimeClient({ApiConfig config = const ApiConfig(), this.accessToken})
+      : _config = config;
 
   final ApiConfig _config;
-  WebSocketChannel? _channel;
+  final String? accessToken;
+  IOWebSocketChannel? _channel;
   StreamSubscription<dynamic>? _subscription;
   final _pollVoteController =
       StreamController<PollVoteRealtimeEvent>.broadcast();
@@ -45,6 +55,8 @@ class RealtimeClient {
       StreamController<UserModerationRealtimeEvent>.broadcast();
   final _commentDeletedController =
       StreamController<CommentDeletedRealtimeEvent>.broadcast();
+  final _notificationController =
+      StreamController<NotificationRealtimeEvent>.broadcast();
 
   Stream<PollVoteRealtimeEvent> get pollVotes => _pollVoteController.stream;
   Stream<PollDeletedRealtimeEvent> get pollDeletions =>
@@ -55,13 +67,20 @@ class RealtimeClient {
       _userUnblockedController.stream;
   Stream<CommentDeletedRealtimeEvent> get commentDeletions =>
       _commentDeletedController.stream;
+  Stream<NotificationRealtimeEvent> get notifications =>
+      _notificationController.stream;
 
   void connect() {
     if (_channel != null) {
       return;
     }
 
-    final channel = WebSocketChannel.connect(Uri.parse(_config.websocketUrl));
+    final channel = IOWebSocketChannel.connect(
+      Uri.parse(_config.websocketUrl),
+      headers: accessToken == null
+          ? const <String, String>{}
+          : {'Authorization': 'Bearer $accessToken'},
+    );
     _channel = channel;
     _subscription = channel.stream.listen(
       _handleMessage,
@@ -92,6 +111,7 @@ class RealtimeClient {
     await _userBlockedController.close();
     await _userUnblockedController.close();
     await _commentDeletedController.close();
+    await _notificationController.close();
   }
 
   void _handleMessage(dynamic message) {
@@ -117,10 +137,25 @@ class RealtimeClient {
       return;
     }
 
-    if (decoded['type'] == 'user.blocked' || decoded['type'] == 'user.unblocked') {
+    if (decoded['type'] == 'notification.created') {
+      final payload = decoded['payload'];
+      if (payload is Map<String, dynamic> &&
+          payload['notification'] is Map<String, dynamic> &&
+          payload['unreadCount'] is int) {
+        _notificationController.add(NotificationRealtimeEvent(
+          payload: payload['notification'] as Map<String, dynamic>,
+          unreadCount: payload['unreadCount'] as int,
+        ));
+      }
+      return;
+    }
+
+    if (decoded['type'] == 'user.blocked' ||
+        decoded['type'] == 'user.unblocked') {
       final payload = decoded['payload'];
       if (payload is Map<String, dynamic> && payload['userId'] is String) {
-        final event = UserModerationRealtimeEvent(userId: payload['userId'] as String);
+        final event =
+            UserModerationRealtimeEvent(userId: payload['userId'] as String);
         if (decoded['type'] == 'user.blocked') {
           _userBlockedController.add(event);
         } else {
@@ -132,7 +167,9 @@ class RealtimeClient {
 
     if (decoded['type'] == 'comment.admin_deleted') {
       final payload = decoded['payload'];
-      if (payload is Map<String, dynamic> && payload['commentId'] is String && payload['pollId'] is String) {
+      if (payload is Map<String, dynamic> &&
+          payload['commentId'] is String &&
+          payload['pollId'] is String) {
         _commentDeletedController.add(CommentDeletedRealtimeEvent(
           commentId: payload['commentId'] as String,
           pollId: payload['pollId'] as String,
