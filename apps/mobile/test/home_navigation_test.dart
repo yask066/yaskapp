@@ -39,4 +39,39 @@ void main() {
     expect(avatar.radius, 14);
     expect(find.byIcon(Icons.person), findsNothing);
   });
+
+  testWidgets('notifies Home when the Notifications tab is opened',
+      (tester) async {
+    var opened = false;
+    const user = AuthUser(
+      id: 'user-1',
+      email: 'user@example.com',
+      username: 'user',
+      status: 'active',
+      profile: AuthUserProfile(
+        displayName: 'User',
+        pollsCount: 0,
+        followersCount: 0,
+        followingCount: 0,
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MainBottomNavigation(
+            user: user,
+            selectedIndex: 0,
+            unreadNotifications: 3,
+            onCreate: () {},
+            onSelected: (_) {},
+            onNotificationsOpened: () => opened = true,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Notifications'));
+    expect(opened, isTrue);
+  });
 }

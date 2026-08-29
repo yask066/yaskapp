@@ -102,6 +102,9 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedIndex: _selectedIndex,
         onCreate: _openCreatePoll,
         unreadNotifications: _unreadNotifications,
+        onNotificationsOpened: () {
+          setState(() => _unreadNotifications = 0);
+        },
         onSelected: (index) {
           setState(() {
             _selectedIndex = index;
@@ -122,6 +125,7 @@ class MainBottomNavigation extends StatelessWidget {
     required this.selectedIndex,
     required this.onSelected,
     required this.onCreate,
+    this.onNotificationsOpened,
     this.unreadNotifications = 0,
   });
 
@@ -129,6 +133,7 @@ class MainBottomNavigation extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelected;
   final VoidCallback onCreate;
+  final VoidCallback? onNotificationsOpened;
   final int unreadNotifications;
 
   @override
@@ -168,7 +173,10 @@ class MainBottomNavigation extends StatelessWidget {
               icon: Icons.notifications_none_outlined,
               selectedIcon: Icons.notifications,
               selected: selectedIndex == 2,
-              onTap: () => onSelected(2),
+              onTap: () {
+                onSelected(2);
+                onNotificationsOpened?.call();
+              },
               badgeCount: unreadNotifications,
             ),
             _NavItem(
