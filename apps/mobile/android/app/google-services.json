@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "462644794852",
+    "project_id": "yaskapp-74d71",
+    "storage_bucket": "yaskapp-74d71.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:462644794852:android:4852d5c2f1c849ac2123f1",
+        "android_client_info": {
+          "package_name": "com.example.yaskapp_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA7KdlhCUxy_oEUicElBskiiIVnLuuBgZ0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
