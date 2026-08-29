@@ -10,11 +10,13 @@ import 'notifications_api_client.dart';
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen(
       {required this.session,
+      this.isActive = false,
       this.apiClient,
       this.realtimeClient,
       this.onUnreadCountChanged,
       super.key});
   final AuthSession session;
+  final bool isActive;
   final NotificationsApiClient? apiClient;
   final RealtimeClient? realtimeClient;
   final ValueChanged<int>? onUnreadCountChanged;
@@ -45,7 +47,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     _realtimeSubscription =
         _realtimeClient.notifications.listen(_handleRealtimeNotification);
     _realtimeClient.connect();
-    unawaited(_load());
+    if (widget.isActive) {
+      unawaited(_load());
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant NotificationsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (shouldLoadNotifications(
+        isActive: widget.isActive, wasActive: oldWidget.isActive)) {
+      unawaited(_load());
+    }
   }
 
   @override
@@ -234,8 +247,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             if (_loadingMore)
                               const Padding(
                                 padding: EdgeInsets.all(24),
-                                child: Center(
-                                    child: CircularProgressIndicator()),
+                                child:
+                                    Center(child: CircularProgressIndicator()),
                               ),
                           ],
                         ),
@@ -244,6 +257,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 }
+
+bool shouldLoadNotifications(
+        {required bool isActive, required bool wasActive}) =>
+    isActive && !wasActive;
 
 class _NotificationSection extends StatelessWidget {
   const _NotificationSection({
@@ -295,7 +312,8 @@ class _NotificationTile extends StatelessWidget {
           radius: 22,
         ),
         title: Text(item.title,
-            style: TextStyle(fontWeight: item.isUnread ? FontWeight.w700 : FontWeight.w500)),
+            style: TextStyle(
+                fontWeight: item.isUnread ? FontWeight.w700 : FontWeight.w500)),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
           child: Text('${item.detail} · ${_time(item.createdAt)}'),

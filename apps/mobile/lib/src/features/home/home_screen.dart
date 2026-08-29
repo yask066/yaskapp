@@ -82,7 +82,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           NotificationsScreen(
             session: widget.session,
-            onUnreadCountChanged: (count) => setState(() => _unreadNotifications = count),
+            isActive: _selectedIndex == 2,
+            onUnreadCountChanged: (count) =>
+                setState(() => _unreadNotifications = count),
           ),
           ProfileScreen(
             key: _profileKey,
@@ -222,16 +224,27 @@ class _NavItem extends StatelessWidget {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                customIcon ?? Icon(selected ? selectedIcon : icon, color: selected ? navy : secondary, size: selected ? 26 : 24),
+                customIcon ??
+                    Icon(selected ? selectedIcon : icon,
+                        color: selected ? navy : secondary,
+                        size: selected ? 26 : 24),
                 if (badgeCount > 0)
                   Positioned(
                     right: -12,
                     top: -8,
                     child: Container(
-                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      constraints:
+                          const BoxConstraints(minWidth: 16, minHeight: 16),
                       padding: const EdgeInsets.symmetric(horizontal: 4),
-                      decoration: BoxDecoration(color: const Color(0xFFD92D20), borderRadius: BorderRadius.circular(10)),
-                      child: Text(badgeCount > 99 ? '99+' : '$badgeCount', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
+                      decoration: BoxDecoration(
+                          color: const Color(0xFFD92D20),
+                          borderRadius: BorderRadius.circular(10)),
+                      child: Text(badgeCount > 99 ? '99+' : '$badgeCount',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700)),
                     ),
                   ),
               ],

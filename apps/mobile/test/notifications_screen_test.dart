@@ -20,7 +20,14 @@ class _TestRealtimeClient extends RealtimeClient {
 }
 
 void main() {
-  test('notification summary exposes readable details for the notification tab', () {
+  test('notifications load only when the tab becomes active', () {
+    expect(shouldLoadNotifications(isActive: false, wasActive: false), isFalse);
+    expect(shouldLoadNotifications(isActive: true, wasActive: false), isTrue);
+    expect(shouldLoadNotifications(isActive: true, wasActive: true), isFalse);
+  });
+
+  test('notification summary exposes readable details for the notification tab',
+      () {
     final item = NotificationSummary.fromJson({
       'id': 'notification-1',
       'type': 'comment',
@@ -78,6 +85,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       home: NotificationsScreen(
         session: session,
+        isActive: true,
         apiClient: apiClient,
         realtimeClient: _TestRealtimeClient(),
       ),
@@ -87,6 +95,7 @@ void main() {
     expect(find.text('Alice started following you'), findsOneWidget);
     expect(find.text('Earlier'), findsOneWidget);
     expect(find.text('Mark all read'), findsNothing);
-    expect(requests.map((request) => request.url.path), contains('/notifications/read-all'));
+    expect(requests.map((request) => request.url.path),
+        contains('/notifications/read-all'));
   });
 }
