@@ -68,6 +68,33 @@ test('notifications API is authenticated, cursor-based and owner-scoped', async 
   });
   assert.equal(reenabledPreferences.statusCode, 200, reenabledPreferences.body);
 
+  const deviceToken = `device-token-${suffix}-abcdefghijklmnop`;
+  const registeredDevice = await app.inject({
+    method: 'POST',
+    url: '/notification-devices',
+    headers: bearer(auth.accessToken),
+    payload: { token: deviceToken, platform: 'android' }
+  });
+  assert.equal(registeredDevice.statusCode, 201, registeredDevice.body);
+  assert.ok(registeredDevice.json<{ id: string }>().id);
+
+  const repeatedDevice = await app.inject({
+    method: 'POST',
+    url: '/notification-devices',
+    headers: bearer(auth.accessToken),
+    payload: { token: deviceToken, platform: 'android' }
+  });
+  assert.equal(repeatedDevice.statusCode, 201, repeatedDevice.body);
+  assert.equal(repeatedDevice.json<{ id: string }>().id, registeredDevice.json<{ id: string }>().id);
+
+  const revokedDevice = await app.inject({
+    method: 'DELETE',
+    url: '/notification-devices',
+    headers: bearer(auth.accessToken),
+    payload: { token: deviceToken }
+  });
+  assert.equal(revokedDevice.statusCode, 204, revokedDevice.body);
+
   await db.query(
     `INSERT INTO notifications (recipient_user_id, type, payload, deduplication_key)
      VALUES ($1, 'follow', '{}'::jsonb, $2)`,

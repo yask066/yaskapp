@@ -18,6 +18,8 @@ services/api/src/db/migrations/001_initial_social_schema.sql
 - `follows`: follower/followee graph.
 - `notifications`: user notification inbox.
 - `notification_preferences`: per-user in-app and push notification settings.
+- `notification_devices`: registered Android/iOS device tokens with revocation state.
+- `notification_push_jobs`: transactional push-delivery outbox consumed by the notification worker.
 
 ## Notes
 

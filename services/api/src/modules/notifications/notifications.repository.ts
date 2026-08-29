@@ -2,7 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
 import { decodeAdminCursor, pageWithCursor } from '../admin/pagination.js';
-import { isInAppEnabled } from './notification-preferences.repository.js';
+import { isInAppEnabled, isPushEnabled } from './notification-preferences.repository.js';
 
 type QueryExecutor = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>;
 
@@ -110,7 +110,15 @@ export async function createNotification(
     ]
   );
 
-  return { created: result.rows.length === 1, id: result.rows[0]?.id ?? null };
+  const notificationId = result.rows[0]?.id ?? null;
+  if (notificationId && await isPushEnabled(input.recipientUserId, input.type, executor)) {
+    await executor.query(
+      `INSERT INTO notification_push_jobs (notification_id, recipient_user_id, type, poll_id, comment_id)
+       VALUES ($1, $2, $3, $4, $5) ON CONFLICT (notification_id) DO NOTHING`,
+      [notificationId, input.recipientUserId, input.type, input.pollId ?? null, input.commentId ?? null]
+    );
+  }
+  return { created: notificationId !== null, id: notificationId };
 }
 
 export async function listNotifications(input: {

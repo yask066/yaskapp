@@ -60,6 +60,15 @@ export async function isInAppEnabled(userId: string, type: NotificationType, exe
   return result.rows[0]?.enabled ?? true;
 }
 
+export async function isPushEnabled(userId: string, type: NotificationType, executor: QueryExecutor = db) {
+  const preference = columns[type];
+  const result = await executor.query<{ enabled: boolean }>(
+    `SELECT COALESCE((SELECT ${preference.push} FROM notification_preferences WHERE user_id = $1), FALSE) AS enabled`,
+    [userId]
+  );
+  return result.rows[0]?.enabled ?? false;
+}
+
 export async function updateNotificationPreferences(
   userId: string,
   input: NotificationPreferencesPatch,
