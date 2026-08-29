@@ -50,9 +50,8 @@ class NotificationDevicesApiClient {
   void _check(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) return;
     final decoded = response.body.isEmpty ? null : jsonDecode(response.body);
-    final message = decoded is Map<String, dynamic>
-        ? decoded['message'] as String?
-        : null;
+    final message =
+        decoded is Map<String, dynamic> ? decoded['message'] as String? : null;
     throw Exception(message ?? 'Could not update notification device.');
   }
 }

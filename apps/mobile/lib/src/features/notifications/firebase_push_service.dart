@@ -7,30 +7,30 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 class FirebasePushService {
-  FirebasePushService({FirebaseMessaging? messaging})
-      : _messaging = messaging ?? FirebaseMessaging.instance;
+  FirebasePushService({FirebaseMessaging? messaging}) : _messaging = messaging;
 
-  final FirebaseMessaging _messaging;
+  final FirebaseMessaging? _messaging;
+  FirebaseMessaging get _instance => _messaging ?? FirebaseMessaging.instance;
 
   Future<void> initialize() async {
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-    await _messaging.setAutoInitEnabled(true);
-    await _messaging.requestPermission(
+    await _instance.setAutoInitEnabled(true);
+    await _instance.requestPermission(
       alert: true,
       badge: true,
       sound: true,
       provisional: false,
     );
-    await _messaging.setForegroundNotificationPresentationOptions(
+    await _instance.setForegroundNotificationPresentationOptions(
       alert: true,
       badge: true,
       sound: true,
     );
   }
 
-  Future<String?> getToken() => _messaging.getToken();
+  Future<String?> getToken() => _instance.getToken();
 
-  Stream<String> get onTokenRefresh => _messaging.onTokenRefresh;
+  Stream<String> get onTokenRefresh => _instance.onTokenRefresh;
 
   Stream<RemoteMessage> get onMessageOpenedApp =>
       FirebaseMessaging.onMessageOpenedApp;

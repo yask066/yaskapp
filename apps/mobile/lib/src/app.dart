@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import 'features/auth/auth_api_client.dart';
@@ -5,6 +8,8 @@ import 'features/auth/auth_screen.dart';
 import 'features/auth/auth_session.dart';
 import 'features/auth/auth_session_store.dart';
 import 'features/home/home_screen.dart';
+import 'features/notifications/firebase_push_service.dart';
+import 'features/notifications/notification_devices_api_client.dart';
 import 'features/polls/polls_api_client.dart';
 
 class YaskappApp extends StatefulWidget {
@@ -26,6 +31,10 @@ class YaskappApp extends StatefulWidget {
 class _YaskappAppState extends State<YaskappApp> {
   late final AuthApiClient _authApiClient;
   late final AuthSessionStore _authSessionStore;
+  late final NotificationDevicesApiClient _notificationDevicesApiClient;
+  late final FirebasePushService _firebasePushService;
+  StreamSubscription<String>? _pushTokenSubscription;
+  String? _latestPushToken;
   late final bool _ownsAuthApiClient;
   AuthSession? _session;
   var _isBootstrapping = true;
@@ -37,6 +46,9 @@ class _YaskappAppState extends State<YaskappApp> {
     _authApiClient = widget.authApiClient ?? AuthApiClient();
     _authSessionStore =
         widget.authSessionStore ?? const SecureAuthSessionStore();
+    _notificationDevicesApiClient = NotificationDevicesApiClient();
+    _firebasePushService = FirebasePushService();
+    _initializePushRegistration();
     _bootstrapSession();
   }
 
@@ -45,6 +57,8 @@ class _YaskappAppState extends State<YaskappApp> {
     if (_ownsAuthApiClient) {
       _authApiClient.close();
     }
+    _pushTokenSubscription?.cancel();
+    _notificationDevicesApiClient.close();
 
     super.dispose();
   }
@@ -75,6 +89,7 @@ class _YaskappAppState extends State<YaskappApp> {
           expiresIn: 'persisted',
         );
       });
+      unawaited(_registerPushToken(accessToken));
     } catch (_) {
       await _authSessionStore.clear();
     } finally {
@@ -96,9 +111,21 @@ class _YaskappAppState extends State<YaskappApp> {
     setState(() {
       _session = session;
     });
+    unawaited(_registerPushToken(session.accessToken));
   }
 
   Future<void> _clearSession() async {
+    final token = _latestPushToken;
+    if (token != null) {
+      try {
+        await _notificationDevicesApiClient.revoke(
+          accessToken: _session?.accessToken ?? '',
+          token: token,
+        );
+      } catch (_) {
+        // Logout must still succeed if the API is temporarily unavailable.
+      }
+    }
     await _authSessionStore.clear();
 
     if (!mounted) {
@@ -108,6 +135,41 @@ class _YaskappAppState extends State<YaskappApp> {
     setState(() {
       _session = null;
     });
+  }
+
+  void _initializePushRegistration() {
+    try {
+      _pushTokenSubscription = _firebasePushService.onTokenRefresh.listen(
+        (token) {
+          _latestPushToken = token;
+          final accessToken = _session?.accessToken;
+          if (accessToken != null) {
+            unawaited(_registerPushToken(accessToken, token));
+          }
+        },
+      );
+    } catch (_) {
+      // Firebase may be unavailable in local widget tests or unsupported builds.
+    }
+  }
+
+  Future<void> _registerPushToken(String accessToken, [String? token]) async {
+    try {
+      final pushToken = token ?? await _firebasePushService.getToken();
+      if (pushToken == null ||
+          pushToken.isEmpty ||
+          !Platform.isAndroid && !Platform.isIOS) {
+        return;
+      }
+      _latestPushToken = pushToken;
+      await _notificationDevicesApiClient.register(
+        accessToken: accessToken,
+        token: pushToken,
+        platform: Platform.isIOS ? 'ios' : 'android',
+      );
+    } catch (_) {
+      // Token registration is best-effort and will retry on the next refresh/login.
+    }
   }
 
   void _updateUser(AuthUser user) {
