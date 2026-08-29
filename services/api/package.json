@@ -13,6 +13,7 @@
     "avatars:cleanup": "tsx src/jobs/cleanup-avatar-objects.ts",
     "poll-images:cleanup": "tsx src/jobs/cleanup-poll-image-objects.ts",
     "notifications:cleanup": "tsx src/jobs/cleanup-notifications.ts",
+    "notifications:push-worker": "tsx src/jobs/run-notification-push-worker.ts",
     "test": "npm run db:migrate && node --import tsx --test --test-reporter spec \"src/**/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -25,6 +26,7 @@
     "@yaskapp/shared": "0.1.0",
     "dotenv": "^16.4.5",
     "fastify": "^5.10.0",
+    "firebase-admin": "^14.3.0",
     "ioredis": "^5.4.1",
     "pg": "^8.12.0",
     "sharp": "^0.35.3",

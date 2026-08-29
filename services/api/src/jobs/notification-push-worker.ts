@@ -1,4 +1,6 @@
 import { db } from '../config/database.js';
+import { applicationDefault, getApps, initializeApp } from 'firebase-admin/app';
+import { getMessaging } from 'firebase-admin/messaging';
 import { listActiveNotificationDevices, revokeNotificationDevice } from '../modules/notifications/notification-devices.repository.js';
 
 export type PushProvider = {
@@ -8,6 +10,32 @@ export type PushProvider = {
     data: { notificationId: string; type: string; pollId?: string; commentId?: string };
   }) => Promise<'sent' | 'invalid_token'>;
 };
+
+export function createFirebasePushProvider(): PushProvider {
+  const app = getApps()[0] ?? initializeApp({ credential: applicationDefault() });
+  const messaging = getMessaging(app);
+
+  return {
+    async send(input) {
+      try {
+        await messaging.send({
+          token: input.token,
+          notification: { title: 'Yaskapp', body: 'You have a new notification' },
+          data: input.data,
+          android: { priority: 'high' },
+          apns: { payload: { aps: { sound: 'default' } } }
+        });
+        return 'sent';
+      } catch (error) {
+        const code = (error as { errorInfo?: { code?: string } }).errorInfo?.code;
+        if (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token') {
+          return 'invalid_token';
+        }
+        throw error;
+      }
+    }
+  };
+}
 
 export async function deliverPendingPushNotifications(provider: PushProvider, limit = 50) {
   const client = await db.connect();
