@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -97,5 +99,123 @@ void main() {
     expect(find.text('Mark all read'), findsNothing);
     expect(requests.map((request) => request.url.path),
         contains('/notifications/read-all'));
+  });
+
+  testWidgets('inactive notification tab does not load until activated',
+      (tester) async {
+    final requests = <http.Request>[];
+    final apiClient = NotificationsApiClient(
+      config: const ApiConfig(baseUrl: 'http://test'),
+      httpClient: MockClient((request) async {
+        requests.add(request);
+        if (request.url.path == '/notifications/read-all') {
+          return http.Response('{"unreadCount":0}', 200);
+        }
+        return http.Response(
+          '{"items":[],"nextCursor":null,"unreadCount":0}',
+          200,
+        );
+      }),
+    );
+    final session = AuthSession(
+      user: AuthUser(
+        id: 'user-1',
+        email: 'user@example.com',
+        username: 'user',
+        status: 'active',
+        profile: AuthUserProfile(
+          displayName: 'User',
+          pollsCount: 0,
+          followersCount: 0,
+          followingCount: 0,
+        ),
+      ),
+      accessToken: 'token',
+      tokenType: 'Bearer',
+      expiresIn: '1h',
+    );
+    final realtimeClient = _TestRealtimeClient();
+
+    await tester.pumpWidget(MaterialApp(
+      home: NotificationsScreen(
+        session: session,
+        isActive: false,
+        apiClient: apiClient,
+        realtimeClient: realtimeClient,
+      ),
+    ));
+    await tester.pump();
+    expect(requests, isEmpty);
+
+    await tester.pumpWidget(MaterialApp(
+      home: NotificationsScreen(
+        session: session,
+        isActive: true,
+        apiClient: apiClient,
+        realtimeClient: realtimeClient,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(requests.map((request) => request.url.path),
+        contains('/notifications'));
+  });
+
+  testWidgets('does not mark notifications read after leaving during loading',
+      (tester) async {
+    final responseCompleter = Completer<http.Response>();
+    final requests = <http.Request>[];
+    final apiClient = NotificationsApiClient(
+      config: const ApiConfig(baseUrl: 'http://test'),
+      httpClient: MockClient((request) async {
+        requests.add(request);
+        return responseCompleter.future;
+      }),
+    );
+    final session = AuthSession(
+      user: AuthUser(
+        id: 'user-1',
+        email: 'user@example.com',
+        username: 'user',
+        status: 'active',
+        profile: AuthUserProfile(
+          displayName: 'User',
+          pollsCount: 0,
+          followersCount: 0,
+          followingCount: 0,
+        ),
+      ),
+      accessToken: 'token',
+      tokenType: 'Bearer',
+      expiresIn: '1h',
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: NotificationsScreen(
+        session: session,
+        isActive: true,
+        apiClient: apiClient,
+        realtimeClient: _TestRealtimeClient(),
+      ),
+    ));
+    await tester.pump();
+
+    await tester.pumpWidget(MaterialApp(
+      home: NotificationsScreen(
+        session: session,
+        isActive: false,
+        apiClient: apiClient,
+        realtimeClient: _TestRealtimeClient(),
+      ),
+    ));
+    responseCompleter.complete(http.Response(
+      '{"items":[],"nextCursor":null,"unreadCount":1}',
+      200,
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(requests.map((request) => request.url.path),
+        isNot(contains('/notifications/read-all')));
   });
 }

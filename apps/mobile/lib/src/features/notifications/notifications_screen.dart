@@ -92,6 +92,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _loading = false;
         _loadingMore = false;
       });
+      if (!widget.isActive) return;
       widget.onUnreadCountChanged?.call(page.unreadCount);
       if (!append && page.unreadCount > 0) {
         await _markAllRead();
