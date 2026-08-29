@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../auth/auth_session.dart';
+import '../../core/widgets/user_avatar.dart';
 import '../realtime/realtime_client.dart';
 import 'notifications_api_client.dart';
 
@@ -143,6 +144,50 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     } catch (_) {}
   }
 
+  Future<void> _openDetails(NotificationSummary item) async {
+    await _markRead(item);
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                UserAvatar(
+                  displayName: item.actor?.displayName ?? 'Someone',
+                  username: item.actor?.username ?? 'unknown',
+                  imageUrl: item.actor?.avatarUrl,
+                  radius: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(item.title,
+                      style: Theme.of(context).textTheme.titleMedium),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Text(item.detail),
+            const SizedBox(height: 12),
+            _DetailRow(label: 'Type', value: _typeLabel(item.type)),
+            _DetailRow(label: 'Related to', value: item.targetLabel),
+            _DetailRow(label: 'Created', value: _dateTime(item.createdAt)),
+            if (!item.isTargetAvailable)
+              const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: Text('The related content is no longer available.'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -160,21 +205,76 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ? const Center(child: Text('No notifications yet'))
                   : RefreshIndicator(
                       onRefresh: _load,
-                      child: ListView.builder(
-                          itemCount:
-                              _items.length + (_nextCursor == null ? 0 : 1),
-                          itemBuilder: (context, index) {
-                            if (index == _items.length) {
-                              if (!_loadingMore) unawaited(_load(append: true));
-                              return const Padding(
-                                  padding: EdgeInsets.all(24),
-                                  child: Center(
-                                      child: CircularProgressIndicator()));
-                            }
-                            final item = _items[index];
-                            return _NotificationTile(
-                                item: item, onTap: () => _markRead(item));
-                          })),
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: (notification) {
+                          if (notification.metrics.extentAfter < 240 &&
+                              _nextCursor != null &&
+                              !_loadingMore) {
+                            unawaited(_load(append: true));
+                          }
+                          return false;
+                        },
+                        child: ListView(
+                          padding: const EdgeInsets.only(bottom: 24),
+                          children: [
+                            if (_items.any((item) => item.isUnread))
+                              _NotificationSection(
+                                title: 'New',
+                                items: _items
+                                    .where((item) => item.isUnread)
+                                    .toList(),
+                                onTap: _openDetails,
+                              ),
+                            if (_items.any((item) => !item.isUnread))
+                              _NotificationSection(
+                                title: 'Earlier',
+                                items: _items
+                                    .where((item) => !item.isUnread)
+                                    .toList(),
+                                onTap: _openDetails,
+                              ),
+                            if (_loadingMore)
+                              const Padding(
+                                padding: EdgeInsets.all(24),
+                                child: Center(
+                                    child: CircularProgressIndicator()),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+    );
+  }
+}
+
+class _NotificationSection extends StatelessWidget {
+  const _NotificationSection({
+    required this.title,
+    required this.items,
+    required this.onTap,
+  });
+
+  final String title;
+  final List<NotificationSummary> items;
+  final ValueChanged<NotificationSummary> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+          child: Text(title,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  )),
+        ),
+        ...items.map((item) => _NotificationTile(
+              item: item,
+              onTap: () => onTap(item),
+            )),
+      ],
     );
   }
 }
@@ -186,22 +286,22 @@ class _NotificationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actor = item.actor?.displayName ?? 'Someone';
-    final text = switch (item.type) {
-      'poll_vote' => '$actor voted in your poll',
-      'comment' => '$actor commented on your poll',
-      'follow' => '$actor started following you',
-      'like' => '$actor liked your poll',
-      _ => 'You have a new notification'
-    };
     return ListTile(
         onTap: onTap,
         tileColor: item.isUnread ? const Color(0xFFF4F6FF) : null,
-        leading: CircleAvatar(
-            child: Text(actor.isEmpty ? '?' : actor[0].toUpperCase())),
-        title: Text(text),
-        subtitle: Text(item.isTargetAvailable
-            ? _time(item.createdAt)
-            : 'Content unavailable'),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+        leading: UserAvatar(
+          displayName: actor,
+          username: item.actor?.username ?? 'unknown',
+          imageUrl: item.actor?.avatarUrl,
+          radius: 22,
+        ),
+        title: Text(item.title,
+            style: TextStyle(fontWeight: item.isUnread ? FontWeight.w700 : FontWeight.w500)),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text('${item.detail} · ${_time(item.createdAt)}'),
+        ),
         trailing: item.isUnread
             ? const Icon(Icons.circle, size: 10, color: Color(0xFF566A9D))
             : null);
@@ -210,6 +310,37 @@ class _NotificationTile extends StatelessWidget {
   String _time(DateTime value) =>
       '${value.day.toString().padLeft(2, '0')}.${value.month.toString().padLeft(2, '0')}.${value.year}';
 }
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(width: 92, child: Text(label)),
+            Expanded(child: Text(value)),
+          ],
+        ),
+      );
+}
+
+String _typeLabel(String type) => switch (type) {
+      'poll_vote' => 'Poll vote',
+      'comment' => 'Comment',
+      'comment_reply' => 'Comment reply',
+      'follow' => 'New follower',
+      'like' => 'Like',
+      _ => 'Activity',
+    };
+
+String _dateTime(DateTime value) =>
+    '${value.day.toString().padLeft(2, '0')}.${value.month.toString().padLeft(2, '0')}.${value.year} '
+    '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 
 class _ErrorState extends StatelessWidget {
   const _ErrorState({required this.onRetry});

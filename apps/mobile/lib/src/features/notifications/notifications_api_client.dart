@@ -62,6 +62,34 @@ class NotificationSummary {
   final DateTime createdAt;
   final bool isTargetAvailable;
   bool get isUnread => readAt == null;
+
+  String get title {
+    final actorName = actor?.displayName ?? 'Someone';
+    return switch (type) {
+      'poll_vote' => '$actorName voted in your poll',
+      'comment' => '$actorName commented on your poll',
+      'comment_reply' => '$actorName replied to your comment',
+      'follow' => '$actorName started following you',
+      'like' => '$actorName liked your poll',
+      _ => 'You have a new notification',
+    };
+  }
+
+  String get detail => switch (type) {
+        'poll_vote' => 'Open the poll to view the updated results',
+        'comment' => 'Open the comment to view the discussion',
+        'comment_reply' => 'Open the discussion to view the reply',
+        'follow' => 'View this profile to see more details',
+        'like' => 'Open the poll to view its activity',
+        _ => 'Open this notification to view more details',
+      };
+
+  String get targetLabel {
+    if (!isTargetAvailable) return 'Content unavailable';
+    if (commentId != null) return 'Poll and comment';
+    if (pollId != null) return 'Poll';
+    return 'Profile';
+  }
 }
 
 class NotificationsPage {
