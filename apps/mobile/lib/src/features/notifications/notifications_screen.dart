@@ -57,7 +57,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _load({bool append = false}) async {
-    if (append ? _loadingMore : _loading) return;
+    if (append && _loadingMore) return;
     setState(() {
       if (append)
         _loadingMore = true;

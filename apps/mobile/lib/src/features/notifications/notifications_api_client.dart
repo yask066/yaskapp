@@ -122,11 +122,13 @@ class NotificationsApiClient {
       'unreadOnly': '$unreadOnly',
       if (cursor != null) 'cursor': cursor
     };
-    final response = await _httpClient.get(
-      Uri.parse(_config.baseUrl)
-          .replace(path: '/notifications', queryParameters: query),
-      headers: {'authorization': 'Bearer $accessToken'},
-    );
+    final response = await _httpClient
+        .get(
+          Uri.parse(_config.baseUrl)
+              .replace(path: '/notifications', queryParameters: query),
+          headers: {'authorization': 'Bearer $accessToken'},
+        )
+        .timeout(const Duration(seconds: 10));
     final body = _decode(response);
     final items = body['items'];
     if (items is! List<dynamic>)
