@@ -60,11 +60,14 @@ function sortResults(items: SearchResult[], sort: SearchSort) {
   });
 }
 
-function toCursor(item: SearchResult, sort: SearchSort) {
+function toCursor(item: SearchResult, query: string, type: SearchType, sort: SearchSort) {
   return {
     ...(sort === 'newest' ? {} : { score: item.score }),
     createdAt: item.type === 'poll' ? item.poll.createdAt : item.user.createdAt,
-    id: item.type === 'poll' ? item.poll.id : item.user.id
+    id: item.type === 'poll' ? item.poll.id : item.user.id,
+    query,
+    type,
+    sort
   };
 }
 
@@ -89,7 +92,7 @@ export async function searchWithRepositories(input: {
   let cursor;
   if (input.cursor) {
     try {
-      cursor = decodeSearchCursor(input.cursor);
+      cursor = decodeSearchCursor(input.cursor, { query, type, sort });
     } catch {
       throw new SearchValidationError('Search cursor is invalid.');
     }
@@ -123,7 +126,7 @@ export async function searchWithRepositories(input: {
   return {
     items,
     nextCursor: hasNextPage && items[items.length - 1]
-      ? encodeSearchCursor(toCursor(items[items.length - 1], sort))
+      ? encodeSearchCursor(toCursor(items[items.length - 1], query, type, sort))
       : null
   };
 }

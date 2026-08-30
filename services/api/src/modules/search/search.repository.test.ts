@@ -5,6 +5,7 @@ import {
   buildPollSearchQuery,
   buildUserSearchQuery,
   decodeSearchCursor,
+  encodeSearchCursor,
   mapPollSearchRow,
   mapUserSearchRow,
   type SearchRepositoryInput
@@ -77,10 +78,11 @@ test('search repository escapes ILIKE wildcards in user queries', () => {
 });
 
 test('search repository decodes opaque cursor values and maps poll/user rows', () => {
-  const encoded = Buffer.from(
-    JSON.stringify({ score: 0.75, createdAt: '2026-08-30T09:00:00.000Z', id: 'row-1' }),
-    'utf8'
-  ).toString('base64url');
+  const encoded = encodeSearchCursor({
+    score: 0.75,
+    createdAt: '2026-08-30T09:00:00.000Z',
+    id: 'row-1'
+  });
   assert.deepEqual(decodeSearchCursor(encoded), {
     score: 0.75,
     createdAt: '2026-08-30T09:00:00.000Z',
@@ -130,4 +132,31 @@ test('search repository decodes opaque cursor values and maps poll/user rows', (
   assert.equal(user.user.id, 'user-1');
   assert.equal(user.user.profile.displayName, 'Alice');
   assert.equal(user.score, 0.7);
+});
+
+test('search repository rejects cursors with invalid pagination values', () => {
+  for (const cursor of [
+    { score: 0.75, createdAt: 'not-a-date', id: 'row-1' },
+    { score: 0.75, createdAt: '2026-08-30T09:00:00.000Z', id: '' },
+    { score: Infinity, createdAt: '2026-08-30T09:00:00.000Z', id: 'row-1' }
+  ]) {
+    const encoded = Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+    assert.throws(() => decodeSearchCursor(encoded), /Invalid search cursor/);
+  }
+});
+
+test('search repository rejects tampered cursors', () => {
+  const encoded = encodeSearchCursor({
+    createdAt: '2026-08-30T09:00:00.000Z',
+    id: 'row-1'
+  });
+  const [encodedPayload] = encoded.split('.');
+  const payload = JSON.parse(Buffer.from(encodedPayload!, 'base64url').toString('utf8')) as {
+    createdAt: string;
+    id: string;
+  };
+  payload.id = 'row-2';
+  const tampered = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+
+  assert.throws(() => decodeSearchCursor(tampered), /Invalid search cursor/);
 });

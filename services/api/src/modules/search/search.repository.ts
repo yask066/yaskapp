@@ -1,3 +1,6 @@
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+import { env } from '../../config/env.js';
 import { db } from '../../config/database.js';
 import { avatarUrlForUser } from '../profiles/avatar-url.js';
 import type {
@@ -159,27 +162,71 @@ export function buildUserSearchQuery(input: SearchInput): Query {
 }
 
 export function encodeSearchCursor(cursor: SearchCursor) {
-  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+  const payload = Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+  const signature = createHmac('sha256', env.JWT_SECRET).update(payload).digest('base64url');
+  return `${payload}.${signature}`;
 }
 
-export function decodeSearchCursor(value: string): SearchCursor {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8'));
-  } catch {
+export function decodeSearchCursor(
+  value: string,
+  expected?: { query: string; type: SearchInput['type']; sort: SearchInput['sort'] }
+): SearchCursor {
+  const [payload, signature] = value.split('.');
+  if (!payload || !signature) {
     throw new Error('Invalid search cursor.');
   }
 
+  const expectedSignature = createHmac('sha256', env.JWT_SECRET)
+    .update(payload)
+    .digest();
+  const actualSignature = Buffer.from(signature, 'base64url');
   if (
-    typeof parsed !== 'object' || parsed === null ||
-    typeof (parsed as Record<string, unknown>).createdAt !== 'string' ||
-    typeof (parsed as Record<string, unknown>).id !== 'string' ||
-    ('score' in parsed && typeof (parsed as Record<string, unknown>).score !== 'number')
+    actualSignature.length !== expectedSignature.length ||
+    !timingSafeEqual(actualSignature, expectedSignature)
   ) {
     throw new Error('Invalid search cursor.');
   }
 
-  return parsed as SearchCursor;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+  } catch {
+    throw new Error('Invalid search cursor.');
+  }
+
+  if (typeof parsed !== 'object' || parsed === null) {
+    throw new Error('Invalid search cursor.');
+  }
+
+  const cursor = parsed as Record<string, unknown>;
+  if (
+    typeof cursor.createdAt !== 'string' ||
+    Number.isNaN(Date.parse(cursor.createdAt)) ||
+    typeof cursor.id !== 'string' ||
+    cursor.id.trim().length === 0 ||
+    ('score' in cursor && (typeof cursor.score !== 'number' || !Number.isFinite(cursor.score)))
+  ) {
+    throw new Error('Invalid search cursor.');
+  }
+
+  const hasContext = 'query' in cursor || 'type' in cursor || 'sort' in cursor;
+  if (hasContext && (
+    typeof cursor.query !== 'string' ||
+    !['all', 'polls', 'users'].includes(cursor.type as string) ||
+    !['relevance', 'newest', 'popular'].includes(cursor.sort as string)
+  )) {
+    throw new Error('Invalid search cursor.');
+  }
+
+  if (expected && (
+    cursor.query !== expected.query ||
+    cursor.type !== expected.type ||
+    cursor.sort !== expected.sort
+  )) {
+    throw new Error('Invalid search cursor.');
+  }
+
+  return cursor as SearchCursor;
 }
 
 export function mapPollSearchRow(row: SearchPollRow): SearchPollRecord {

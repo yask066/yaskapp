@@ -8,6 +8,9 @@ export type SearchCursor = {
   score?: number;
   createdAt: string;
   id: string;
+  query?: string;
+  type?: SearchType;
+  sort?: SearchSort;
 };
 
 export type SearchInput = {

@@ -6,6 +6,7 @@ import {
   searchWithRepositories,
   type SearchRepositories
 } from './search.service.js';
+import { encodeSearchCursor } from './search.repository.js';
 import { parseSearchQuery } from './search.routes.js';
 
 const repositories: SearchRepositories = {
@@ -123,4 +124,27 @@ test('search service restricts result type while preserving supported sorting', 
     repositories
   });
   assert.deepEqual(users.items.map((item) => item.type), ['user']);
+});
+
+test('search service rejects a cursor bound to a different query context', async () => {
+  const cursor = encodeSearchCursor({
+    score: 0.8,
+    createdAt: '2026-08-30T09:00:00.000Z',
+    id: 'user-1',
+    query: 'other query',
+    type: 'users',
+    sort: 'popular'
+  });
+
+  await assert.rejects(
+    () => searchWithRepositories({
+      viewerId: 'viewer-1',
+      query: 'climate',
+      type: 'users',
+      sort: 'popular',
+      cursor,
+      repositories
+    }),
+    /Search cursor is invalid/
+  );
 });
