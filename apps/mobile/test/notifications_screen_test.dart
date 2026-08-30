@@ -22,6 +22,19 @@ class _TestRealtimeClient extends RealtimeClient {
 }
 
 void main() {
+  test('formats notification age using the largest suitable unit', () {
+    final now = DateTime(2026, 8, 30, 12);
+
+    expect(notificationAgeLabel(now, now: now), '0 seconds ago');
+    expect(notificationAgeLabel(now.subtract(const Duration(seconds: 12)), now: now), '12 seconds ago');
+    expect(notificationAgeLabel(now.subtract(const Duration(minutes: 5)), now: now), '5 minutes ago');
+    expect(notificationAgeLabel(now.subtract(const Duration(hours: 2)), now: now), '2 hours ago');
+    expect(notificationAgeLabel(now.subtract(const Duration(days: 3)), now: now), '3 days ago');
+    expect(notificationAgeLabel(now.subtract(const Duration(days: 14)), now: now), '2 weeks ago');
+    expect(notificationAgeLabel(now.subtract(const Duration(days: 60)), now: now), '2 months ago');
+    expect(notificationAgeLabel(now.subtract(const Duration(days: 730)), now: now), '2 years ago');
+  });
+
   test('notifications load only when the tab becomes active', () {
     expect(shouldLoadNotifications(isActive: false, wasActive: false), isFalse);
     expect(shouldLoadNotifications(isActive: true, wasActive: false), isTrue);

@@ -263,6 +263,43 @@ bool shouldLoadNotifications(
         {required bool isActive, required bool wasActive}) =>
     isActive && !wasActive;
 
+String notificationAgeLabel(DateTime value, {DateTime? now}) {
+  final seconds = (now ?? DateTime.now()).difference(value).inSeconds;
+  final ageInSeconds = seconds < 0 ? 0 : seconds;
+
+  if (ageInSeconds < 60) {
+    return _ageLabel(ageInSeconds, 'second');
+  }
+
+  final minutes = ageInSeconds ~/ 60;
+  if (minutes < 60) {
+    return _ageLabel(minutes, 'minute');
+  }
+
+  final hours = minutes ~/ 60;
+  if (hours < 24) {
+    return _ageLabel(hours, 'hour');
+  }
+
+  final days = hours ~/ 24;
+  if (days < 7) {
+    return _ageLabel(days, 'day');
+  }
+
+  if (days < 30) {
+    return _ageLabel(days ~/ 7, 'week');
+  }
+
+  if (days < 365) {
+    return _ageLabel(days ~/ 30, 'month');
+  }
+
+  return _ageLabel(days ~/ 365, 'year');
+}
+
+String _ageLabel(int value, String unit) =>
+    '$value $unit${value == 1 ? '' : 's'} ago';
+
 class _NotificationSection extends StatelessWidget {
   const _NotificationSection({
     required this.title,
@@ -317,15 +354,15 @@ class _NotificationTile extends StatelessWidget {
                 fontWeight: item.isUnread ? FontWeight.w700 : FontWeight.w500)),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
-          child: Text('${item.detail} · ${_time(item.createdAt)}'),
+          child: Text(
+            '${item.detail} · ${notificationAgeLabel(item.createdAt)}',
+          ),
         ),
         trailing: item.isUnread
             ? const Icon(Icons.circle, size: 10, color: Color(0xFF566A9D))
             : null);
   }
 
-  String _time(DateTime value) =>
-      '${value.day.toString().padLeft(2, '0')}.${value.month.toString().padLeft(2, '0')}.${value.year}';
 }
 
 class _DetailRow extends StatelessWidget {
