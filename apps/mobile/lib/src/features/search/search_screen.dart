@@ -94,6 +94,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _handleQueryChanged() {
     _debounce?.cancel();
+    ++_requestId;
     final query = _queryController.text.trim();
 
     if (query.length < 2) {

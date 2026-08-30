@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yaskapp_mobile/src/features/auth/auth_session.dart';
@@ -63,6 +65,27 @@ void main() {
     expect(find.text('No results found.'), findsOneWidget);
   });
 
+  testWidgets('ignores an in-flight response after the query is cleared',
+      (tester) async {
+    final pending = Completer<SearchPage>();
+    final client = _FakeSearchApiClient(pending: pending);
+    await tester.pumpWidget(_app(client));
+
+    await tester.enterText(find.byType(TextField), 'climate');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+
+    await tester.enterText(find.byType(TextField), 'a');
+    await tester.pump();
+    pending.complete(
+      SearchPage(items: [_pollResult()], nextCursor: null),
+    );
+    await tester.pump();
+
+    expect(find.text('Climate?'), findsNothing);
+    expect(find.text('Enter at least 2 characters to search.'), findsOneWidget);
+  });
+
   testWidgets('filter changes preserve query and reset pagination',
       (tester) async {
     final client = _FakeSearchApiClient(
@@ -125,9 +148,10 @@ UserSearchResult _userResult() {
 }
 
 class _FakeSearchApiClient extends SearchApiClient {
-  _FakeSearchApiClient({this.pages = const []});
+  _FakeSearchApiClient({this.pages = const [], this.pending});
 
   final List<Object> pages;
+  final Completer<SearchPage>? pending;
   final calls = <_SearchCall>[];
   var _index = 0;
 
@@ -141,6 +165,7 @@ class _FakeSearchApiClient extends SearchApiClient {
     int limit = 20,
   }) async {
     calls.add(_SearchCall(query: query, type: type, cursor: cursor));
+    if (pending != null) return pending!.future;
     final page = pages.isEmpty
         ? const SearchPage(items: [], nextCursor: null)
         : pages[_index++ % pages.length];
