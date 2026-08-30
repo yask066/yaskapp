@@ -97,6 +97,21 @@ export function buildPollSearchQuery(input: SearchInput): Query {
         p.comments_count,
         p.likes_count,
         p.allow_vote_cancellation,
+        COALESCE(
+          (
+            SELECT json_agg(
+              json_build_object(
+                'id', po.id,
+                'text', po.text,
+                'position', po.position,
+                'votesCount', po.votes_count
+              ) ORDER BY po.position ASC
+            )
+            FROM poll_options po
+            WHERE po.poll_id = p.id
+          ),
+          '[]'::json
+        ) AS options,
         p.created_at,
         p.updated_at,
         p.ends_at,
@@ -259,7 +274,7 @@ export function mapPollSearchRow(row: SearchPollRow): SearchPollRecord {
       allowVoteCancellation: row.allow_vote_cancellation,
       viewerHasLiked: false,
       viewerVoteOptionId: null,
-      options: [],
+      options: row.options,
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
       endsAt: row.ends_at?.toISOString() ?? null

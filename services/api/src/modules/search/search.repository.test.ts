@@ -64,6 +64,7 @@ test('poll search also matches a partial question', () => {
 
   assert.match(text, /p\.question ILIKE \$2/);
   assert.match(text, /to_tsvector\('simple', p\.question\) @@ plainto_tsquery\('simple', \$1\)/);
+  assert.match(text, /json_agg\([\s\S]*json_build_object\(/);
   assert.deepEqual(values, ['climate change', '%climate change%', 21]);
 });
 
@@ -120,6 +121,10 @@ test('search repository decodes opaque cursor values and maps poll/user rows', (
     comments_count: 1,
     likes_count: 3,
     allow_vote_cancellation: true,
+    options: [
+      { id: 'option-1', text: 'Yes', position: 0, votesCount: 4 },
+      { id: 'option-2', text: 'No', position: 1, votesCount: 0 }
+    ],
     created_at: new Date('2026-08-30T10:00:00.000Z'),
     updated_at: new Date('2026-08-30T10:00:00.000Z'),
     ends_at: null,
@@ -127,6 +132,10 @@ test('search repository decodes opaque cursor values and maps poll/user rows', (
   });
   assert.equal(poll.poll.id, 'poll-1');
   assert.equal(poll.poll.author.username, 'alice');
+  assert.deepEqual(poll.poll.options, [
+    { id: 'option-1', text: 'Yes', position: 0, votesCount: 4 },
+    { id: 'option-2', text: 'No', position: 1, votesCount: 0 }
+  ]);
   assert.equal(poll.score, 0.9);
 
   const user = mapUserSearchRow({

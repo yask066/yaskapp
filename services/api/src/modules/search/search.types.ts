@@ -1,4 +1,4 @@
-import type { Poll } from '../polls/polls.repository.js';
+import type { Poll, PollOption } from '../polls/polls.repository.js';
 import type { PublicProfile } from '../profiles/profiles.repository.js';
 
 export type SearchType = 'all' | 'polls' | 'users';
@@ -37,6 +37,7 @@ export type SearchPollRow = {
   comments_count: number;
   likes_count: number;
   allow_vote_cancellation: boolean;
+  options: PollOption[];
   created_at: Date;
   updated_at: Date;
   ends_at: Date | null;
