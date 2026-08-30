@@ -17,6 +17,10 @@ function normalizedQuery(query: string) {
   return query.trim().replace(/\s+/g, ' ');
 }
 
+function escapeLikePattern(value: string) {
+  return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
 function cursorPredicate(
   expression: string,
   cursor: SearchCursor | undefined,
@@ -109,7 +113,8 @@ export function buildPollSearchQuery(input: SearchInput): Query {
 
 export function buildUserSearchQuery(input: SearchInput): Query {
   const query = normalizedQuery(input.query);
-  const values: unknown[] = [query, `%${query}%`, `%${query}%`, input.viewerId];
+  const likeQuery = `%${escapeLikePattern(query)}%`;
+  const values: unknown[] = [query, likeQuery, likeQuery, input.viewerId];
   const scoreExpression = input.sort === 'popular' ? userPopularityScore : userScore;
   const cursor = cursorPredicate(scoreExpression, input.cursor, values, 'u.created_at', 'u.id');
   const orderBy = input.sort === 'newest'
@@ -144,7 +149,7 @@ export function buildUserSearchQuery(input: SearchInput): Query {
       JOIN profiles pr ON pr.user_id = u.id
       WHERE u.status = 'active'
         AND u.deleted_at IS NULL
-        AND (u.username::text ILIKE $2 OR pr.display_name ILIKE $3)
+        AND (u.username::text ILIKE $2 ESCAPE '\\' OR pr.display_name ILIKE $3 ESCAPE '\\')
         ${cursor}
       ORDER BY ${orderBy}
       LIMIT ${limitPlaceholder}

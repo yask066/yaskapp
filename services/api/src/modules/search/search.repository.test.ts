@@ -58,6 +58,24 @@ test('search repository query supports newest and popular ordering with username
   assert.deepEqual(popular.values, ['climate change', '%climate change%', '%climate change%', 'viewer-id', 21]);
 });
 
+test('search repository escapes ILIKE wildcards in user queries', () => {
+  const { text, values } = buildUserSearchQuery({
+    ...baseInput,
+    type: 'users',
+    query: '100%_match\\name'
+  });
+
+  assert.ok(text.includes("u.username::text ILIKE $2 ESCAPE '\\'"));
+  assert.ok(text.includes("pr.display_name ILIKE $3 ESCAPE '\\'"));
+  assert.deepEqual(values, [
+    '100%_match\\name',
+    '%100\\%\\_match\\\\name%',
+    '%100\\%\\_match\\\\name%',
+    'viewer-id',
+    21
+  ]);
+});
+
 test('search repository decodes opaque cursor values and maps poll/user rows', () => {
   const encoded = Buffer.from(
     JSON.stringify({ score: 0.75, createdAt: '2026-08-30T09:00:00.000Z', id: 'row-1' }),
