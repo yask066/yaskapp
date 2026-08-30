@@ -394,16 +394,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               ],
               const SizedBox(height: 42),
-              TextButton(
-                onPressed: _isSubmitting || _isAvatarSubmitting
-                    ? null
-                    : widget.onLogout,
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.red,
-                  textStyle: const TextStyle(fontSize: 17),
-                ),
-                child: const Text('Log out'),
-              ),
             ],
           ),
         ),

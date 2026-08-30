@@ -10,6 +10,29 @@ import 'package:yaskapp_mobile/src/features/auth/auth_session.dart';
 import 'package:yaskapp_mobile/src/features/profile/edit_profile_screen.dart';
 
 void main() {
+  testWidgets('does not show Log out on the edit profile screen',
+      (tester) async {
+    final apiClient = AuthApiClient(
+      config: const ApiConfig(baseUrl: 'http://api.test'),
+      httpClient: MockClient((_) async {
+        return http.Response(jsonEncode({'user': _userJson(null)}), 200);
+      }),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EditProfileScreen(
+          user: _user(null),
+          accessToken: 'access-token',
+          authApiClient: apiClient,
+          onLogout: () {},
+        ),
+      ),
+    );
+
+    expect(find.text('Log out'), findsNothing);
+  });
+
   testWidgets('shows Not selected for a legacy profile', (tester) async {
     final apiClient = AuthApiClient(
       config: const ApiConfig(baseUrl: 'http://api.test'),
