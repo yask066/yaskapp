@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -39,19 +40,24 @@ class SearchApiClient {
     int limit = 20,
   }) async {
     final normalizedQuery = query.trim().replaceAll(RegExp(r'\s+'), ' ');
-    final response = await _httpClient.get(
-      _config.uri(
-        '/search',
-        queryParameters: {
-          'q': normalizedQuery,
-          'type': type.name,
-          'sort': sort.name,
-          if (cursor != null) 'cursor': cursor,
-          'limit': limit.toString(),
-        },
-      ),
-      headers: {'authorization': 'Bearer $accessToken'},
-    );
+    late http.Response response;
+    try {
+      response = await _httpClient.get(
+        _config.uri(
+          '/search',
+          queryParameters: {
+            'q': normalizedQuery,
+            'type': type.name,
+            'sort': sort.name,
+            if (cursor != null) 'cursor': cursor,
+            'limit': limit.toString(),
+          },
+        ),
+        headers: {'authorization': 'Bearer $accessToken'},
+      );
+    } on Object {
+      throw const SearchApiException('Could not complete search request.');
+    }
 
     try {
       return SearchPage.fromJson(_decodeObject(response));

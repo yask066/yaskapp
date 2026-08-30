@@ -10,7 +10,9 @@ import 'package:yaskapp_mobile/src/features/search/search_result.dart';
 void main() {
   const config = ApiConfig(baseUrl: 'http://api.test');
 
-  test('builds authenticated search request with defaults and decodes mixed results', () async {
+  test(
+      'builds authenticated search request with defaults and decodes mixed results',
+      () async {
     late http.Request request;
     final client = SearchApiClient(
       config: config,
@@ -57,7 +59,8 @@ void main() {
       config: config,
       httpClient: MockClient((request) async {
         requestedUri = request.url;
-        return http.Response(jsonEncode({'items': [], 'nextCursor': null}), 200);
+        return http.Response(
+            jsonEncode({'items': [], 'nextCursor': null}), 200);
       }),
     );
 
@@ -84,7 +87,8 @@ void main() {
       config: config,
       httpClient: MockClient((_) async {
         return http.Response(
-          jsonEncode({'error': 'validation_error', 'message': 'Invalid query.'}),
+          jsonEncode(
+              {'error': 'validation_error', 'message': 'Invalid query.'}),
           400,
         );
       }),
@@ -103,7 +107,12 @@ void main() {
       config: config,
       httpClient: MockClient((_) async {
         return http.Response(
-          jsonEncode({'items': [{'type': 'unknown'}], 'nextCursor': null}),
+          jsonEncode({
+            'items': [
+              {'type': 'unknown'}
+            ],
+            'nextCursor': null
+          }),
           200,
         );
       }),
@@ -112,6 +121,24 @@ void main() {
     await expectLater(
       malformedClient.search(accessToken: 'token', query: 'valid'),
       throwsA(isA<SearchApiException>()),
+    );
+  });
+
+  test('maps network failures to SearchApiException', () async {
+    final client = SearchApiClient(
+      config: config,
+      httpClient: MockClient((_) async {
+        throw http.ClientException('socket unavailable');
+      }),
+    );
+
+    await expectLater(
+      client.search(accessToken: 'token', query: 'valid'),
+      throwsA(isA<SearchApiException>().having(
+        (error) => error.message,
+        'message',
+        'Could not complete search request.',
+      )),
     );
   });
 }
