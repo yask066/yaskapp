@@ -340,21 +340,22 @@ class ProfileScreenState extends State<ProfileScreen> {
                     PopupMenuItem(
                       value: 'notifications',
                       child: SizedBox(
-                        width: 144,
-                        child: Text('Notifications', maxLines: 1, softWrap: false),
+                        width: 220,
+                        child:
+                            Text('Notifications', maxLines: 1, softWrap: false),
                       ),
                     ),
                     PopupMenuItem(
                       value: 'reports',
                       child: SizedBox(
-                        width: 144,
+                        width: 220,
                         child: Text('My reports', maxLines: 1, softWrap: false),
                       ),
                     ),
                     PopupMenuItem(
                       value: 'edit',
                       child: SizedBox(
-                        width: 144,
+                        width: 220,
                         child: Text(
                           'Edit profile',
                           maxLines: 1,
@@ -365,7 +366,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                     PopupMenuItem(
                       value: 'logout',
                       child: SizedBox(
-                        width: 144,
+                        width: 220,
                         child: Text('Logout', maxLines: 1, softWrap: false),
                       ),
                     ),

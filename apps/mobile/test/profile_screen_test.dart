@@ -9,6 +9,36 @@ import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
 import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
 
 void main() {
+  testWidgets('profile settings menu gives labels enough width',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ProfileScreen(
+          user: _user,
+          accessToken: 'access-token',
+          authApiClient: AuthApiClient(httpClient: _NoopHttpClient()),
+          onLogout: () {},
+          onUserUpdated: (_) {},
+          pollsApiClient: _FakePollsApiClient(initialPolls: const []),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+
+    final menuItemWidth = tester.widget<SizedBox>(
+      find
+          .ancestor(
+            of: find.text('Notifications'),
+            matching: find.byType(SizedBox),
+          )
+          .first,
+    );
+    expect(menuItemWidth.width, greaterThanOrEqualTo(220));
+  });
+
   testWidgets('refreshes my polls when requested after a new poll is created',
       (tester) async {
     final poll = _poll(commentsCount: 0, likesCount: 5, votesCount: 8);
