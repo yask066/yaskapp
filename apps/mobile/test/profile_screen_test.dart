@@ -11,13 +11,15 @@ import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
 void main() {
   testWidgets('profile opens a dedicated settings page',
       (tester) async {
+    var loggedOut = false;
+
     await tester.pumpWidget(
       MaterialApp(
         home: ProfileScreen(
           user: _user,
           accessToken: 'access-token',
           authApiClient: AuthApiClient(httpClient: _NoopHttpClient()),
-          onLogout: () {},
+          onLogout: () => loggedOut = true,
           onUserUpdated: (_) {},
           pollsApiClient: _FakePollsApiClient(initialPolls: const []),
         ),
@@ -35,6 +37,12 @@ void main() {
     expect(find.text('Logout'), findsOneWidget);
     final logoutText = tester.widget<Text>(find.text('Logout'));
     expect(logoutText.style?.color, Colors.red);
+
+    await tester.tap(find.text('Logout'));
+    await tester.pumpAndSettle();
+
+    expect(loggedOut, isTrue);
+    expect(find.text('Settings'), findsNothing);
   });
 
   testWidgets('refreshes my polls when requested after a new poll is created',

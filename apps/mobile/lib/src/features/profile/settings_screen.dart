@@ -59,7 +59,10 @@ class SettingsScreen extends StatelessWidget {
             icon: Icons.logout,
             label: 'Logout',
             color: Colors.red,
-            onTap: onLogout,
+            onTap: () {
+              onLogout();
+              Navigator.of(context).pop();
+            },
           ),
         ],
       ),
