@@ -19,6 +19,7 @@ import { registerNotificationRoutes } from './modules/notifications/notification
 import { registerPollRoutes } from './modules/polls/polls.routes.js';
 import { registerPollImageRoutes } from './modules/polls/poll-image.routes.js';
 import { registerProfileRoutes } from './modules/profiles/profiles.routes.js';
+import { registerSearchRoutes } from './modules/search/search.routes.js';
 import { registerRealtimeRoutes } from './realtime/realtime.routes.js';
 
 export function buildApp() {
@@ -162,6 +163,7 @@ export function buildApp() {
   registerPollRoutes(app);
   registerPollImageRoutes(app);
   registerProfileRoutes(app);
+  registerSearchRoutes(app);
   registerRealtimeRoutes(app);
 
   return app;

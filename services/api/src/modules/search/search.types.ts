@@ -59,3 +59,12 @@ export type SearchUserRow = {
 
 export type SearchPollRecord = { poll: Poll; score: number };
 export type SearchUserRecord = { user: PublicProfile; score: number };
+
+export type SearchResult =
+  | { type: 'poll'; poll: Poll; score: number }
+  | { type: 'user'; user: PublicProfile; score: number };
+
+export type SearchPage = {
+  items: SearchResult[];
+  nextCursor: string | null;
+};
