@@ -13,6 +13,9 @@ import '../profile/public_profile_screen.dart';
 import '../realtime/realtime_client.dart';
 import '../reports/report_dialog.dart';
 import '../reports/reports_api_client.dart';
+import '../../core/analytics/search_analytics.dart';
+import '../search/search_api_client.dart';
+import '../search/search_screen.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({
@@ -22,17 +25,23 @@ class FeedScreen extends StatefulWidget {
     ProfilesApiClient? profilesApiClient,
     RealtimeClient? realtimeClient,
     ReportsApiClient? reportsApiClient,
+    SearchApiClient? searchApiClient,
+    SearchAnalytics? searchAnalytics,
     this.onPollCreated,
   })  : _pollsApiClient = pollsApiClient,
         _profilesApiClient = profilesApiClient,
         _realtimeClient = realtimeClient,
-        _reportsApiClient = reportsApiClient;
+        _reportsApiClient = reportsApiClient,
+        _searchApiClient = searchApiClient,
+        _searchAnalytics = searchAnalytics;
 
   final AuthSession session;
   final PollsApiClient? _pollsApiClient;
   final ProfilesApiClient? _profilesApiClient;
   final RealtimeClient? _realtimeClient;
   final ReportsApiClient? _reportsApiClient;
+  final SearchApiClient? _searchApiClient;
+  final SearchAnalytics? _searchAnalytics;
   final ValueChanged<PollSummary>? onPollCreated;
 
   @override
@@ -339,6 +348,20 @@ class FeedScreenState extends State<FeedScreen> {
 
   Future<void> openCreatePoll() => _openCreatePoll();
 
+  Future<void> _openSearch() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => SearchScreen(
+          session: widget.session,
+          searchApiClient: widget._searchApiClient,
+          pollsApiClient: _pollsApiClient,
+          profilesApiClient: _profilesApiClient,
+          analytics: widget._searchAnalytics,
+        ),
+      ),
+    );
+  }
+
   Future<void> _openComments(PollSummary poll) async {
     final updatedPoll = await Navigator.of(context).push<PollSummary>(
       MaterialPageRoute<PollSummary>(
@@ -409,7 +432,7 @@ class FeedScreenState extends State<FeedScreen> {
                     height: 40,
                     child: IconButton(
                       tooltip: 'Search',
-                      onPressed: () {},
+                      onPressed: _openSearch,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints.tightFor(
                         width: 40,

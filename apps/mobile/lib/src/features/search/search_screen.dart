@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/analytics/search_analytics.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../auth/auth_session.dart';
 import '../polls/poll_card.dart';
@@ -20,6 +21,7 @@ class SearchScreen extends StatefulWidget {
     this.searchApiClient,
     this.pollsApiClient,
     this.profilesApiClient,
+    this.analytics,
     super.key,
   });
 
@@ -27,6 +29,7 @@ class SearchScreen extends StatefulWidget {
   final SearchApiClient? searchApiClient;
   final PollsApiClient? pollsApiClient;
   final ProfilesApiClient? profilesApiClient;
+  final SearchAnalytics? analytics;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -42,6 +45,7 @@ class _SearchScreenState extends State<SearchScreen> {
   late final bool _ownsSearchApiClient;
   late final bool _ownsPollsApiClient;
   late final bool _ownsProfilesApiClient;
+  late final SearchAnalytics _analytics;
 
   Timer? _debounce;
   List<SearchResult> _items = [];
@@ -63,6 +67,8 @@ class _SearchScreenState extends State<SearchScreen> {
     _searchApiClient = widget.searchApiClient ?? SearchApiClient();
     _pollsApiClient = widget.pollsApiClient ?? PollsApiClient();
     _profilesApiClient = widget.profilesApiClient ?? ProfilesApiClient();
+    _analytics = widget.analytics ?? const NoopSearchAnalytics();
+    _analytics.searchOpened();
     _queryController.addListener(_handleQueryChanged);
     _scrollController.addListener(_handleScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -157,12 +163,24 @@ class _SearchScreenState extends State<SearchScreen> {
         _items = reset ? page.items : [..._items, ...page.items];
         _nextCursor = page.nextCursor;
         _hasSearched = true;
+        if (page.items.isEmpty && reset) {
+          _analytics.empty(
+            queryLength: query.length,
+            type: _type,
+            sort: _sort,
+          );
+        }
       });
     } catch (error) {
       if (!mounted || requestId != _requestId) return;
       setState(() {
         _error = error;
         _hasSearched = true;
+        _analytics.error(
+          queryLength: query.length,
+          type: _type,
+          sort: _sort,
+        );
       });
     } finally {
       if (mounted && requestId == _requestId) {
@@ -181,12 +199,14 @@ class _SearchScreenState extends State<SearchScreen> {
   void _selectType(SearchType type) {
     if (_type == type) return;
     setState(() => _type = type);
+    _analytics.filterChanged(type: _type, sort: _sort);
     if (_queryController.text.trim().length >= 2) _runSearch();
   }
 
   void _selectSort(SearchSort sort) {
     if (_sort == sort) return;
     setState(() => _sort = sort);
+    _analytics.filterChanged(type: _type, sort: _sort);
     if (_queryController.text.trim().length >= 2) _runSearch();
   }
 
@@ -228,7 +248,14 @@ class _SearchScreenState extends State<SearchScreen> {
           controller: _queryController,
           focusNode: _queryFocusNode,
           textInputAction: TextInputAction.search,
-          onSubmitted: (_) => _runSearch(),
+          onSubmitted: (_) {
+            _analytics.searchSubmitted(
+              queryLength: _queryController.text.trim().length,
+              type: _type,
+              sort: _sort,
+            );
+            _runSearch();
+          },
           decoration: InputDecoration(
             hintText: 'Search polls and users',
             border: InputBorder.none,
@@ -338,6 +365,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildResult(SearchResult result) {
     if (result is PollSearchResult) {
+      _analytics.resultClicked(
+        resultType: 'poll',
+        position: _items.indexOf(result),
+      );
       return PollCard(
         poll: result.poll,
         accessToken: widget.session.accessToken,
@@ -347,6 +378,10 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     final user = (result as UserSearchResult).user;
+    _analytics.resultClicked(
+      resultType: 'user',
+      position: _items.indexOf(result),
+    );
     return Card(
       margin: EdgeInsets.zero,
       child: InkWell(

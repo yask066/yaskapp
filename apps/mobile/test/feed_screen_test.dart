@@ -8,6 +8,8 @@ import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_card.dart';
 import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
 import 'package:yaskapp_mobile/src/features/realtime/realtime_client.dart';
+import 'package:yaskapp_mobile/src/features/search/search_api_client.dart';
+import 'package:yaskapp_mobile/src/features/search/search_screen.dart';
 
 void main() {
   testWidgets('shows one feed without category tabs', (tester) async {
@@ -27,6 +29,26 @@ void main() {
     expect(find.text('Trending'), findsNothing);
     expect(find.byTooltip('Search'), findsOneWidget);
     expect(find.byTooltip('Notifications'), findsNothing);
+  });
+
+  testWidgets('opens SearchScreen with the current session', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FeedScreen(
+          session: _session,
+          pollsApiClient: _FakePollsApiClient(initialPolls: const []),
+          realtimeClient: _FakeRealtimeClient(),
+          searchApiClient: _FakeSearchApiClient(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Search'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SearchScreen), findsOneWidget);
+    expect(find.byType(TextField), findsOneWidget);
   });
 
   testWidgets('ties share medal colors and zero-vote options stay readable', (
@@ -464,6 +486,11 @@ class _FakePollsApiClient extends PollsApiClient {
     return createCommentResult!;
   }
 
+  @override
+  void close() {}
+}
+
+class _FakeSearchApiClient extends SearchApiClient {
   @override
   void close() {}
 }
