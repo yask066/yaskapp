@@ -28,15 +28,8 @@ void main() {
     await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
 
-    final menuItemWidth = tester.widget<SizedBox>(
-      find
-          .ancestor(
-            of: find.text('Notifications'),
-            matching: find.byType(SizedBox),
-          )
-          .first,
-    );
-    expect(menuItemWidth.width, greaterThanOrEqualTo(220));
+    final menuItem = find.byType(PopupMenuItem).first;
+    expect(tester.getSize(menuItem).width, greaterThanOrEqualTo(220));
   });
 
   testWidgets('refreshes my polls when requested after a new poll is created',

@@ -309,10 +309,6 @@ class ProfileScreenState extends State<ProfileScreen> {
                 PopupMenuButton<String>(
                   tooltip: 'Settings',
                   icon: const Icon(Icons.settings_outlined, size: 24),
-                  constraints: const BoxConstraints.tightFor(
-                    width: 40,
-                    height: 40,
-                  ),
                   onSelected: (value) {
                     if (value == 'edit') {
                       _openEditProfile(context);
