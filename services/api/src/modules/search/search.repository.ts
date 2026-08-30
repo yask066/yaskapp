@@ -45,6 +45,7 @@ function cursorPredicate(
 const pollScore = `(
   CASE WHEN lower(p.question) = lower($1) THEN 1 ELSE 0 END
   + ts_rank_cd(to_tsvector('simple', p.question), plainto_tsquery('simple', $1))
+  + CASE WHEN lower(p.question) LIKE lower($2) THEN 0.1 ELSE 0 END
 )`;
 
 const pollPopularityScore = `(
@@ -64,7 +65,8 @@ const userPopularityScore = '(pr.followers_count * 2 + pr.polls_count)';
 
 export function buildPollSearchQuery(input: SearchInput): Query {
   const query = normalizedQuery(input.query);
-  const values: unknown[] = [query, input.viewerId];
+  const likeQuery = `%${escapeLikePattern(query)}%`;
+  const values: unknown[] = [query, likeQuery, input.viewerId];
   const scoreExpression = input.sort === 'popular' ? pollPopularityScore : pollScore;
   const cursor = cursorPredicate(scoreExpression, input.cursor, values, 'p.created_at', 'p.id');
   const orderBy = input.sort === 'newest'
@@ -106,7 +108,10 @@ export function buildPollSearchQuery(input: SearchInput): Query {
         AND p.visibility = 'public'
         AND u.status = 'active'
         AND u.deleted_at IS NULL
-        AND to_tsvector('simple', p.question) @@ plainto_tsquery('simple', $1)
+        AND (
+          to_tsvector('simple', p.question) @@ plainto_tsquery('simple', $1)
+          OR p.question ILIKE $2 ESCAPE '\\'
+        )
         ${cursor}
       ORDER BY ${orderBy}
       LIMIT ${limitPlaceholder}

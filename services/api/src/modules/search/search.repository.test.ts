@@ -33,6 +33,7 @@ test('search repository query covers public visibility, matching, relevance and 
   assert.match(text, /LIMIT \$\d+/);
   assert.deepEqual(values, [
     'climate change',
+    '%climate change%',
     'viewer-id',
     0.8,
     '2026-08-30T10:00:00.000Z',
@@ -44,7 +45,7 @@ test('search repository query covers public visibility, matching, relevance and 
 test('search repository query supports newest and popular ordering with username/display-name matching', () => {
   const newest = buildPollSearchQuery({ ...baseInput, sort: 'newest', cursor: undefined });
   assert.match(newest.text, /ORDER BY p\.created_at DESC, p\.id DESC/);
-  assert.deepEqual(newest.values, ['climate change', 'viewer-id', 21]);
+  assert.deepEqual(newest.values, ['climate change', '%climate change%', 'viewer-id', 21]);
 
   const popularPoll = buildPollSearchQuery({ ...baseInput, sort: 'popular', cursor: undefined });
   const popularPollSelect = popularPoll.text.split('FROM polls')[0];
@@ -57,6 +58,14 @@ test('search repository query supports newest and popular ordering with username
   assert.match(popular.text, /ORDER BY .*followers_count.*polls_count.*u\.created_at.*u\.id/s);
   assert.match(popularUserSelect, /pr\.followers_count \* 2 \+ pr\.polls_count\) AS score/);
   assert.deepEqual(popular.values, ['climate change', '%climate change%', '%climate change%', 'viewer-id', 21]);
+});
+
+test('poll search also matches a partial question', () => {
+  const { text, values } = buildPollSearchQuery({ ...baseInput, type: 'polls' });
+
+  assert.match(text, /p\.question ILIKE \$2/);
+  assert.match(text, /to_tsvector\('simple', p\.question\) @@ plainto_tsquery\('simple', \$1\)/);
+  assert.deepEqual(values, ['climate change', '%climate change%', 'viewer-id', 21]);
 });
 
 test('user search does not require pg_trgm to execute', () => {
