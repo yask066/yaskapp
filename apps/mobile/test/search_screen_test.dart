@@ -47,6 +47,24 @@ void main() {
     expect(find.text('@ada'), findsOneWidget);
   });
 
+  testWidgets('does not run a second search after submitting debounced input',
+      (tester) async {
+    final client = _FakeSearchApiClient(
+      pages: [
+        const SearchPage(items: [], nextCursor: null),
+        const SearchPage(items: [], nextCursor: null),
+      ],
+    );
+    await tester.pumpWidget(_app(client));
+
+    await tester.enterText(find.byType(TextField), 'climate');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(client.calls, hasLength(1));
+  });
+
   testWidgets('records result click only after tapping a result',
       (tester) async {
     final analytics = _RecordingSearchAnalytics();

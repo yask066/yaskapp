@@ -136,6 +136,12 @@ class _SearchScreenState extends State<SearchScreen> {
     await _loadSearch(reset: true);
   }
 
+  void _submitSearch() {
+    _debounce?.cancel();
+    _debounce = null;
+    _runSearch();
+  }
+
   Future<void> _loadMore() async {
     if (_nextCursor == null || _isLoading || _isLoadingMore || !_hasSearched) {
       return;
@@ -415,7 +421,7 @@ class _SearchScreenState extends State<SearchScreen> {
               type: _type,
               sort: _sort,
             );
-            _runSearch();
+            _submitSearch();
           },
           decoration: InputDecoration(
             hintText: 'Search polls and users',
