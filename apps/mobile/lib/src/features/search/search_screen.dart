@@ -104,6 +104,8 @@ class _SearchScreenState extends State<SearchScreen> {
           _nextCursor = null;
           _error = null;
           _hasSearched = false;
+          _isLoading = false;
+          _isLoadingMore = false;
         });
       }
       return;
@@ -237,6 +239,13 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  void _recordResultClick(SearchResult result) {
+    _analytics.resultClicked(
+      resultType: result is PollSearchResult ? 'poll' : 'user',
+      position: _items.indexOf(result),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -366,27 +375,25 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildResult(SearchResult result) {
     if (result is PollSearchResult) {
-      _analytics.resultClicked(
-        resultType: 'poll',
-        position: _items.indexOf(result),
-      );
       return PollCard(
         poll: result.poll,
         accessToken: widget.session.accessToken,
         compact: true,
-        onOpenComments: () => _openPoll(result.poll),
+        onOpenComments: () {
+          _recordResultClick(result);
+          _openPoll(result.poll);
+        },
       );
     }
 
     final user = (result as UserSearchResult).user;
-    _analytics.resultClicked(
-      resultType: 'user',
-      position: _items.indexOf(result),
-    );
     return Card(
       margin: EdgeInsets.zero,
       child: InkWell(
-        onTap: () => _openUser(user),
+        onTap: () {
+          _recordResultClick(result);
+          _openUser(user);
+        },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yaskapp_mobile/src/core/analytics/search_analytics.dart';
 import 'package:yaskapp_mobile/src/features/auth/auth_session.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
 import 'package:yaskapp_mobile/src/features/profile/public_profile.dart';
@@ -43,6 +44,23 @@ void main() {
     expect(client.calls.single.query, 'climate');
     expect(find.text('Climate?'), findsOneWidget);
     expect(find.text('@ada'), findsOneWidget);
+  });
+
+  testWidgets('records result click only after tapping a result',
+      (tester) async {
+    final analytics = _RecordingSearchAnalytics();
+    final client = _FakeSearchApiClient(
+      pages: [SearchPage(items: [_userResult()], nextCursor: null)],
+    );
+    await tester.pumpWidget(_app(client, analytics: analytics));
+
+    await tester.enterText(find.byType(TextField), 'climate');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+
+    expect(analytics.resultClicks, isEmpty);
+    await tester.tap(find.text('@ada'));
+    expect(analytics.resultClicks, [(resultType: 'user', position: 0)]);
   });
 
   testWidgets('shows empty and retryable error states', (tester) async {
@@ -107,9 +125,13 @@ void main() {
   });
 }
 
-Widget _app(SearchApiClient client) {
+Widget _app(SearchApiClient client, {SearchAnalytics? analytics}) {
   return MaterialApp(
-    home: SearchScreen(session: _session(), searchApiClient: client),
+    home: SearchScreen(
+      session: _session(),
+      searchApiClient: client,
+      analytics: analytics,
+    ),
   );
 }
 
@@ -180,6 +202,42 @@ class _SearchCall {
   final String query;
   final SearchType type;
   final String? cursor;
+}
+
+class _RecordingSearchAnalytics extends SearchAnalytics {
+  final resultClicks = <({String resultType, int position})>[];
+
+  @override
+  void resultClicked({required String resultType, required int position}) {
+    resultClicks.add((resultType: resultType, position: position));
+  }
+
+  @override
+  void searchOpened() {}
+
+  @override
+  void searchSubmitted({
+    required int queryLength,
+    required SearchType type,
+    required SearchSort sort,
+  }) {}
+
+  @override
+  void filterChanged({required SearchType type, required SearchSort sort}) {}
+
+  @override
+  void empty({
+    required int queryLength,
+    required SearchType type,
+    required SearchSort sort,
+  }) {}
+
+  @override
+  void error({
+    required int queryLength,
+    required SearchType type,
+    required SearchSort sort,
+  }) {}
 }
 
 class PollSummaryFixture {
