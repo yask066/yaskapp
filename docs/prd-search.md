@@ -1,9 +1,9 @@
 # PRD: Поиск опросов и пользователей
 
-**Статус:** Draft for review  
-**Дата:** 30 августа 2026 года  
-**Продукт:** Yaskapp mobile  
-**Владелец:** Product / Engineering  
+**Статус:** Draft for review
+**Дата:** 30 августа 2026 года
+**Продукт:** Yaskapp mobile
+**Владелец:** Product / Engineering
 
 ## 1. Краткое описание
 
