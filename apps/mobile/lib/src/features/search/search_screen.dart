@@ -492,7 +492,12 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     if (_error != null && _items.isEmpty) {
-      return _ErrorState(onRetry: _runSearch);
+      return _ErrorState(
+        message: _error is SearchApiException
+            ? (_error as SearchApiException).message
+            : null,
+        onRetry: _runSearch,
+      );
     }
 
     if (!_hasSearched) {
@@ -617,9 +622,10 @@ class _SearchScreenState extends State<SearchScreen> {
 }
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.onRetry});
+  const _ErrorState({required this.onRetry, this.message});
 
   final VoidCallback onRetry;
+  final String? message;
 
   @override
   Widget build(BuildContext context) {
@@ -629,7 +635,7 @@ class _ErrorState extends StatelessWidget {
         children: [
           const Icon(Icons.cloud_off_outlined),
           const SizedBox(height: 12),
-          const Text('Could not complete search.'),
+          Text(message ?? 'Could not complete search.'),
           const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: onRetry,

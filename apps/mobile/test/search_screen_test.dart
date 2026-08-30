@@ -124,6 +124,22 @@ void main() {
     expect(find.text('No results found.'), findsOneWidget);
   });
 
+  testWidgets('shows a useful API error message when search fails',
+      (tester) async {
+    final client = _FakeSearchApiClient(
+      pages: [
+        const SearchApiException('Search service is unavailable.'),
+      ],
+    );
+    await tester.pumpWidget(_app(client));
+
+    await tester.enterText(find.byType(TextField), 'missing');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+
+    expect(find.text('Search service is unavailable.'), findsOneWidget);
+  });
+
   testWidgets('ignores an in-flight response after the query is cleared',
       (tester) async {
     final pending = Completer<SearchPage>();
