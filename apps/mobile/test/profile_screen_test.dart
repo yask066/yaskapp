@@ -37,6 +37,9 @@ void main() {
       ),
       findsNothing,
     );
+    final logoutText = tester.widget<Text>(find.text('Logout'));
+    expect(logoutText.style?.color, Colors.red);
+    expect(logoutText.style?.fontWeight, FontWeight.w400);
   });
 
   testWidgets('refreshes my polls when requested after a new poll is created',

@@ -350,7 +350,15 @@ class ProfileScreenState extends State<ProfileScreen> {
                       value: 'logout',
                       child: SizedBox(
                         width: 220,
-                        child: Text('Logout', maxLines: 1, softWrap: false),
+                        child: Text(
+                          'Logout',
+                          maxLines: 1,
+                          softWrap: false,
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
                       ),
                     ),
                   ],
