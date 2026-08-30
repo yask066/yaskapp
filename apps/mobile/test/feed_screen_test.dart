@@ -25,6 +25,8 @@ void main() {
     expect(find.text('For you'), findsNothing);
     expect(find.text('Following'), findsNothing);
     expect(find.text('Trending'), findsNothing);
+    expect(find.byTooltip('Search'), findsOneWidget);
+    expect(find.byTooltip('Notifications'), findsNothing);
   });
 
   testWidgets('ties share medal colors and zero-vote options stay readable', (

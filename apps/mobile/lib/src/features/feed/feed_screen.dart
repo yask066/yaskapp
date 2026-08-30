@@ -424,43 +424,6 @@ class FeedScreenState extends State<FeedScreen> {
                     ),
                   ),
                   const SizedBox(width: 20),
-                  SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: IconButton(
-                      tooltip: 'Notifications',
-                      onPressed: () {},
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints.tightFor(
-                        width: 40,
-                        height: 40,
-                      ),
-                      icon: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Image.asset(
-                            'assets/branding/notification_icon.png',
-                            width: 28,
-                            height: 28,
-                            fit: BoxFit.contain,
-                          ),
-                          Positioned(
-                            top: -3,
-                            right: -2,
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFFA7F2D),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 20),
                 ],
               ),
               SliverToBoxAdapter(
