@@ -10,9 +10,8 @@ import '../polls/poll_comments_screen.dart';
 import '../polls/poll_summary.dart';
 import '../polls/polls_api_client.dart';
 import '../realtime/realtime_client.dart';
-import '../reports/my_reports_screen.dart';
-import '../notifications/notification_preferences_screen.dart';
 import 'edit_profile_screen.dart';
+import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
@@ -306,62 +305,19 @@ class ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               actions: [
-                PopupMenuButton<String>(
+                IconButton(
                   tooltip: 'Settings',
                   icon: const Icon(Icons.settings_outlined, size: 24),
-                  onSelected: (value) {
-                    if (value == 'reports') {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => MyReportsScreen(
-                            accessToken: widget.accessToken,
-                          ),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => SettingsScreen(
+                          accessToken: widget.accessToken,
+                          onLogout: widget.onLogout,
                         ),
-                      );
-                    } else if (value == 'notifications') {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => NotificationPreferencesScreen(
-                            accessToken: widget.accessToken,
-                          ),
-                        ),
-                      );
-                    } else if (value == 'logout') {
-                      widget.onLogout();
-                    }
+                      ),
+                    );
                   },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(
-                      value: 'notifications',
-                      child: SizedBox(
-                        width: 220,
-                        child:
-                            Text('Notifications', maxLines: 1, softWrap: false),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'reports',
-                      child: SizedBox(
-                        width: 220,
-                        child: Text('My reports', maxLines: 1, softWrap: false),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'logout',
-                      child: SizedBox(
-                        width: 220,
-                        child: Text(
-                          'Logout',
-                          maxLines: 1,
-                          softWrap: false,
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
                 const SizedBox(width: 20),
               ],

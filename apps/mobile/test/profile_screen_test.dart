@@ -9,7 +9,7 @@ import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
 import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
 
 void main() {
-  testWidgets('profile settings menu gives labels enough width',
+  testWidgets('profile opens a dedicated settings page',
       (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -28,18 +28,13 @@ void main() {
     await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
 
-    final menuItem = find.byType(PopupMenuItem).first;
-    expect(tester.getSize(menuItem).width, greaterThanOrEqualTo(220));
-    expect(
-      find.descendant(
-        of: find.byType(PopupMenuItem),
-        matching: find.text('Edit profile'),
-      ),
-      findsNothing,
-    );
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.byType(PopupMenuItem), findsNothing);
+    expect(find.text('Notifications'), findsOneWidget);
+    expect(find.text('My reports'), findsOneWidget);
+    expect(find.text('Logout'), findsOneWidget);
     final logoutText = tester.widget<Text>(find.text('Logout'));
     expect(logoutText.style?.color, Colors.red);
-    expect(logoutText.style?.fontWeight, FontWeight.w400);
   });
 
   testWidgets('refreshes my polls when requested after a new poll is created',
