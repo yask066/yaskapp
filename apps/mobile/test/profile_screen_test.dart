@@ -30,6 +30,13 @@ void main() {
 
     final menuItem = find.byType(PopupMenuItem).first;
     expect(tester.getSize(menuItem).width, greaterThanOrEqualTo(220));
+    expect(
+      find.descendant(
+        of: find.byType(PopupMenuItem),
+        matching: find.text('Edit profile'),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('refreshes my polls when requested after a new poll is created',

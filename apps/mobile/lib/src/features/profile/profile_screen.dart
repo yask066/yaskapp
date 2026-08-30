@@ -310,9 +310,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                   tooltip: 'Settings',
                   icon: const Icon(Icons.settings_outlined, size: 24),
                   onSelected: (value) {
-                    if (value == 'edit') {
-                      _openEditProfile(context);
-                    } else if (value == 'reports') {
+                    if (value == 'reports') {
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
                           builder: (_) => MyReportsScreen(
@@ -346,17 +344,6 @@ class ProfileScreenState extends State<ProfileScreen> {
                       child: SizedBox(
                         width: 220,
                         child: Text('My reports', maxLines: 1, softWrap: false),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: SizedBox(
-                        width: 220,
-                        child: Text(
-                          'Edit profile',
-                          maxLines: 1,
-                          softWrap: false,
-                        ),
                       ),
                     ),
                     PopupMenuItem(
