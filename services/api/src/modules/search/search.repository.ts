@@ -90,7 +90,7 @@ export function buildPollSearchQuery(input: SearchInput): Query {
         p.created_at,
         p.updated_at,
         p.ends_at,
-        ${pollScore} AS score
+        ${scoreExpression} AS score
       FROM polls p
       JOIN users u ON u.id = p.author_id
       JOIN profiles pr ON pr.user_id = p.author_id
@@ -139,7 +139,7 @@ export function buildUserSearchQuery(input: SearchInput): Query {
           SELECT 1 FROM follows f
           WHERE f.follower_id = $4::uuid AND f.followee_id = u.id
         )) AS viewer_is_following,
-        ${userScore} AS score
+        ${scoreExpression} AS score
       FROM users u
       JOIN profiles pr ON pr.user_id = u.id
       WHERE u.status = 'active'

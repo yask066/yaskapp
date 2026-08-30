@@ -45,10 +45,16 @@ test('search repository query supports newest and popular ordering with username
   assert.match(newest.text, /ORDER BY p\.created_at DESC, p\.id DESC/);
   assert.deepEqual(newest.values, ['climate change', 'viewer-id', 21]);
 
+  const popularPoll = buildPollSearchQuery({ ...baseInput, sort: 'popular', cursor: undefined });
+  const popularPollSelect = popularPoll.text.split('FROM polls')[0];
+  assert.match(popularPollSelect, /p\.votes_count \* 2[\s\S]*p\.likes_count \* 1\.5[\s\S]*p\.comments_count[\s\S]*AS score/);
+
   const popular = buildUserSearchQuery({ ...baseInput, type: 'users', sort: 'popular' });
+  const popularUserSelect = popular.text.split('FROM users')[0];
   assert.match(popular.text, /u\.username::text ILIKE/);
   assert.match(popular.text, /pr\.display_name ILIKE/);
   assert.match(popular.text, /ORDER BY .*followers_count.*polls_count.*u\.created_at.*u\.id/s);
+  assert.match(popularUserSelect, /pr\.followers_count \* 2 \+ pr\.polls_count\) AS score/);
   assert.deepEqual(popular.values, ['climate change', '%climate change%', '%climate change%', 'viewer-id', 21]);
 });
 
