@@ -231,26 +231,23 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
             children: [
-              _CreateFieldCard(
-                minHeight: 96,
-                child: TextFormField(
-                  controller: _questionController,
-                  minLines: 1,
-                  maxLines: 6,
-                  maxLength: 280,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: _fieldDecoration(
-                    hintText: 'Ask your question...',
-                    prefixIcon: const Icon(Icons.help_outline_rounded),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Required';
-                    }
-
-                    return null;
-                  },
+              TextFormField(
+                controller: _questionController,
+                minLines: 1,
+                maxLines: 6,
+                maxLength: 280,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: _fieldDecoration(
+                  hintText: 'Ask your question...',
+                  prefixIcon: const Icon(Icons.help_outline_rounded),
                 ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Required';
+                  }
+
+                  return null;
+                },
               ),
               _CounterText(
                 controller: _questionController,
@@ -312,38 +309,35 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    _CreateFieldCard(
-                      minHeight: 64,
-                      child: TextFormField(
-                        controller: _optionControllers[index],
-                        maxLength: 160,
-                        decoration: _fieldDecoration(
-                          hintText: 'Option ${index + 1}',
-                          prefixIcon: const Icon(
-                            Icons.radio_button_unchecked,
-                            size: 24,
-                          ),
-                          suffixIcon: _optionControllers.length > 2
-                              ? IconButton(
-                                  tooltip: 'Remove option',
-                                  onPressed: () => _removeOption(index),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints.tightFor(
-                                    width: 36,
-                                    height: 36,
-                                  ),
-                                  icon: const Icon(Icons.close, size: 20),
-                                )
-                              : null,
+                    TextFormField(
+                      controller: _optionControllers[index],
+                      maxLength: 160,
+                      decoration: _fieldDecoration(
+                        hintText: 'Option ${index + 1}',
+                        prefixIcon: const Icon(
+                          Icons.radio_button_unchecked,
+                          size: 24,
                         ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Required';
-                          }
-
-                          return null;
-                        },
+                        suffixIcon: _optionControllers.length > 2
+                            ? IconButton(
+                                tooltip: 'Remove option',
+                                onPressed: () => _removeOption(index),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints.tightFor(
+                                  width: 36,
+                                  height: 36,
+                                ),
+                                icon: const Icon(Icons.close, size: 20),
+                              )
+                            : null,
                       ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Required';
+                        }
+
+                        return null;
+                      },
                     ),
                     _CounterText(
                       controller: _optionControllers[index],
@@ -445,11 +439,11 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide.none,
+        borderSide: const BorderSide(color: Color(0xFFD0D5DD)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide.none,
+        borderSide: const BorderSide(color: Color(0xFFD0D5DD)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
@@ -463,32 +457,6 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
         borderRadius: BorderRadius.circular(16),
         borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
       ),
-    );
-  }
-}
-
-class _CreateFieldCard extends StatelessWidget {
-  const _CreateFieldCard({required this.child, required this.minHeight});
-
-  final Widget child;
-  final double minHeight;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: BoxConstraints(minHeight: minHeight),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14050C3F),
-            blurRadius: 12,
-            offset: Offset(0, 5),
-          ),
-        ],
-      ),
-      child: child,
     );
   }
 }
