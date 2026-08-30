@@ -66,7 +66,7 @@ const userPopularityScore = '(pr.followers_count * 2 + pr.polls_count)';
 export function buildPollSearchQuery(input: SearchInput): Query {
   const query = normalizedQuery(input.query);
   const likeQuery = `%${escapeLikePattern(query)}%`;
-  const values: unknown[] = [query, likeQuery, input.viewerId];
+  const values: unknown[] = [query, likeQuery];
   const scoreExpression = input.sort === 'popular' ? pollPopularityScore : pollScore;
   const cursor = cursorPredicate(scoreExpression, input.cursor, values, 'p.created_at', 'p.id');
   const orderBy = input.sort === 'newest'
