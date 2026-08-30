@@ -59,6 +59,14 @@ test('search repository query supports newest and popular ordering with username
   assert.deepEqual(popular.values, ['climate change', '%climate change%', '%climate change%', 'viewer-id', 21]);
 });
 
+test('user search does not require pg_trgm to execute', () => {
+  const { text } = buildUserSearchQuery({ ...baseInput, type: 'users' });
+
+  assert.doesNotMatch(text, /similarity\(/);
+  assert.match(text, /u\.username::text ILIKE \$2/);
+  assert.match(text, /pr\.display_name ILIKE \$3/);
+});
+
 test('search repository escapes ILIKE wildcards in user queries', () => {
   const { text, values } = buildUserSearchQuery({
     ...baseInput,

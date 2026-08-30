@@ -56,7 +56,8 @@ const pollPopularityScore = `(
 const userScore = `(
   CASE WHEN lower(u.username::text) = lower($1) THEN 1 ELSE 0 END
   + CASE WHEN lower(pr.display_name) = lower($1) THEN 0.8 ELSE 0 END
-  + GREATEST(similarity(u.username::text, $1), similarity(pr.display_name, $1))
+  + CASE WHEN lower(u.username::text) LIKE lower($2) THEN 0.2 ELSE 0 END
+  + CASE WHEN lower(pr.display_name) LIKE lower($3) THEN 0.1 ELSE 0 END
 )`;
 
 const userPopularityScore = '(pr.followers_count * 2 + pr.polls_count)';
