@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yaskapp_mobile/src/core/analytics/search_analytics.dart';
 import 'package:yaskapp_mobile/src/features/auth/auth_session.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
+import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
 import 'package:yaskapp_mobile/src/features/profile/public_profile.dart';
 import 'package:yaskapp_mobile/src/features/search/search_api_client.dart';
 import 'package:yaskapp_mobile/src/features/search/search_result.dart';
@@ -50,7 +51,9 @@ void main() {
       (tester) async {
     final analytics = _RecordingSearchAnalytics();
     final client = _FakeSearchApiClient(
-      pages: [SearchPage(items: [_userResult()], nextCursor: null)],
+      pages: [
+        SearchPage(items: [_userResult()], nextCursor: null)
+      ],
     );
     await tester.pumpWidget(_app(client, analytics: analytics));
 
@@ -61,6 +64,26 @@ void main() {
     expect(analytics.resultClicks, isEmpty);
     await tester.tap(find.text('@ada'));
     expect(analytics.resultClicks, [(resultType: 'user', position: 0)]);
+  });
+
+  testWidgets('wires poll voting actions from search results', (tester) async {
+    final pollsClient = _FakePollsApiClient(PollSummaryFixture.poll);
+    final client = _FakeSearchApiClient(
+      pages: [
+        SearchPage(items: [_pollResult()], nextCursor: null)
+      ],
+    );
+    await tester.pumpWidget(
+      _app(client, pollsApiClient: pollsClient),
+    );
+
+    await tester.enterText(find.byType(TextField), 'climate');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+    await tester.tap(find.text('Yes'));
+    await tester.pump();
+
+    expect(pollsClient.votedOptionId, 'option-1');
   });
 
   testWidgets('shows empty and retryable error states', (tester) async {
@@ -125,11 +148,16 @@ void main() {
   });
 }
 
-Widget _app(SearchApiClient client, {SearchAnalytics? analytics}) {
+Widget _app(
+  SearchApiClient client, {
+  SearchAnalytics? analytics,
+  PollsApiClient? pollsApiClient,
+}) {
   return MaterialApp(
     home: SearchScreen(
       session: _session(),
       searchApiClient: client,
+      pollsApiClient: pollsApiClient,
       analytics: analytics,
     ),
   );
@@ -163,7 +191,7 @@ PollSearchResult _pollResult() {
 }
 
 UserSearchResult _userResult() {
-  return UserSearchResult(
+  return const UserSearchResult(
     score: 0.8,
     user: PublicProfileFixture.profile,
   );
@@ -238,6 +266,23 @@ class _RecordingSearchAnalytics extends SearchAnalytics {
     required SearchType type,
     required SearchSort sort,
   }) {}
+}
+
+class _FakePollsApiClient extends PollsApiClient {
+  _FakePollsApiClient(this.poll) : super();
+
+  final PollSummary poll;
+  String? votedOptionId;
+
+  @override
+  Future<PollSummary> vote({
+    required String pollId,
+    required String optionId,
+    required String accessToken,
+  }) async {
+    votedOptionId = optionId;
+    return poll.copyWith(viewerVoteOptionId: optionId);
+  }
 }
 
 class PollSummaryFixture {

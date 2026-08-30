@@ -356,6 +356,7 @@ class FeedScreenState extends State<FeedScreen> {
           searchApiClient: widget._searchApiClient,
           pollsApiClient: _pollsApiClient,
           profilesApiClient: _profilesApiClient,
+          reportsApiClient: widget._reportsApiClient,
           analytics: widget._searchAnalytics,
         ),
       ),
