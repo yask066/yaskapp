@@ -36,7 +36,8 @@ import {
 const uuidSchema = z.string().uuid();
 
 const listPollsQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(50).default(20)
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  sort: z.enum(['newest', 'popular']).default('newest')
 }).strict();
 
 const createPollSchema = z.object({
@@ -200,7 +201,11 @@ export function registerPollRoutes(app: FastifyInstance) {
       return validationError(reply, parsedQuery.error);
     }
 
-    const items = await listPublicPolls(parsedQuery.data.limit, request.user?.sub);
+    const items = await listPublicPolls(
+      parsedQuery.data.limit,
+      request.user?.sub,
+      parsedQuery.data.sort
+    );
 
     return {
       items

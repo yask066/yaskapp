@@ -15,7 +15,9 @@ import 'package:yaskapp_mobile/src/features/search/search_screen.dart';
 void main() {
   testWidgets('shows discovery sections before a query is entered',
       (tester) async {
-    await tester.pumpWidget(_app(_FakeSearchApiClient()));
+    await tester.pumpWidget(_app(_FakeSearchApiClient(),
+        pollsApiClient: _FakePollsApiClient(PollSummaryFixture.poll)));
+    await tester.pump();
 
     expect(find.text('Recent searches'), findsOneWidget);
     expect(find.text('Explore popular searches'), findsOneWidget);
@@ -23,6 +25,7 @@ void main() {
     expect(find.text('Top polls'), findsOneWidget);
     expect(find.text('Find something interesting'), findsOneWidget);
     expect(find.text('Formula 1'), findsWidgets);
+    expect(find.text('Which feature should be next?'), findsOneWidget);
   });
 
   testWidgets('clears the query from the search bar', (tester) async {
@@ -344,6 +347,15 @@ class _FakePollsApiClient extends PollsApiClient {
 
   final PollSummary poll;
   String? votedOptionId;
+
+  @override
+  Future<List<PollSummary>> listPolls({
+    int limit = 20,
+    String? accessToken,
+    String sort = 'newest',
+  }) async {
+    return [poll];
+  }
 
   @override
   Future<PollSummary> vote({

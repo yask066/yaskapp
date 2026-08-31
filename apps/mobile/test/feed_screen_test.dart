@@ -439,6 +439,7 @@ class _FakePollsApiClient extends PollsApiClient {
   Future<List<PollSummary>> listPolls({
     int limit = 20,
     String? accessToken,
+    String sort = 'newest',
   }) async {
     listPollsCalls++;
     return initialPolls;

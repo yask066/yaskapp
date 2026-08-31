@@ -420,7 +420,11 @@ export async function deletePollRecord(input: {
   }
 }
 
-export async function listPublicPollRecords(limit: number, viewerId?: string) {
+export async function listPublicPollRecords(
+  limit: number,
+  viewerId?: string,
+  sort: 'newest' | 'popular' = 'newest'
+) {
   const client = await db.connect();
 
   try {
@@ -430,10 +434,13 @@ export async function listPublicPollRecords(limit: number, viewerId?: string) {
         FROM polls
         WHERE visibility = 'public'
           AND deleted_at IS NULL
-        ORDER BY created_at DESC, id DESC
+        ORDER BY
+          CASE WHEN $2 = 'popular' THEN votes_count * 2 + likes_count * 1.5 + comments_count ELSE 0 END DESC,
+          created_at DESC,
+          id DESC
         LIMIT $1
       `,
-      [limit]
+      [limit, sort]
     );
 
     return hydratePolls(

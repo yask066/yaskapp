@@ -56,13 +56,16 @@ class _SearchScreenState extends State<SearchScreen> {
   Timer? _debounce;
   List<SearchResult> _items = [];
   List<PublicProfile> _topUsers = [];
+  List<PollSummary> _topPolls = [];
   String? _nextCursor;
   Object? _error;
   Object? _topUsersError;
+  Object? _topPollsError;
   var _hasSearched = false;
   var _isLoading = false;
   var _isLoadingMore = false;
   var _isLoadingTopUsers = true;
+  var _isLoadingTopPolls = true;
   var _requestId = 0;
   var _type = SearchType.all;
   var _sort = SearchSort.relevance;
@@ -84,6 +87,7 @@ class _SearchScreenState extends State<SearchScreen> {
     _analytics = widget.analytics ?? const NoopSearchAnalytics();
     _analytics.searchOpened();
     _loadTopUsers();
+    _loadTopPolls();
     _queryController.addListener(_handleQueryChanged);
     _scrollController.addListener(_handleScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -818,17 +822,28 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildTopPolls() {
-    const polls = [
-      (
-        'Who will win the 2026 Formula 1 World Championship?',
-        'Max Verstappen',
-        '42%'
-      ),
-      ('Which programming language do you use most?', 'Kotlin', '58%'),
-      ('Which team will win the Champions League?', 'Real Madrid', '40%'),
-    ];
+    if (_isLoadingTopPolls) {
+      return _discoveryCard(const Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(child: CircularProgressIndicator()),
+      ));
+    }
+    if (_topPollsError != null) {
+      return _discoveryCard(ListTile(
+        leading: const Icon(Icons.cloud_off_outlined),
+        title: const Text('Could not load polls.'),
+        trailing:
+            TextButton(onPressed: _loadTopPolls, child: const Text('Retry')),
+      ));
+    }
+    if (_topPolls.isEmpty) {
+      return _discoveryCard(const Padding(
+        padding: EdgeInsets.all(20),
+        child: Text('No polls to show yet.'),
+      ));
+    }
     return Column(
-      children: polls
+      children: _topPolls
           .map((poll) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: _discoveryCard(
@@ -837,30 +852,72 @@ class _SearchScreenState extends State<SearchScreen> {
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(poll.$1,
+                          Text(poll.question,
                               style: const TextStyle(
                                   fontWeight: FontWeight.w700, fontSize: 16)),
                           const SizedBox(height: 14),
                           Row(children: [
-                            Expanded(child: Text(poll.$2)),
+                            Expanded(child: Text(_leadingOption(poll).text)),
                             const SizedBox(width: 12),
                             Expanded(
                                 child: LinearProgressIndicator(
-                                    value: .55,
+                                    value: _leadingOptionRatio(poll),
                                     minHeight: 5,
                                     borderRadius: BorderRadius.circular(5))),
                             const SizedBox(width: 12),
-                            Text(poll.$3)
+                            Text(
+                                '${(_leadingOptionRatio(poll) * 100).round()}%')
                           ]),
                           const SizedBox(height: 10),
-                          const Text('1.2K votes  •  3 hours ago',
-                              style: TextStyle(color: Color(0xFF667085))),
+                          Text(
+                              '${poll.votesCount} votes  •  ${_formatPollAge(poll)}',
+                              style: const TextStyle(color: Color(0xFF667085))),
                         ]),
                   ),
                 ),
               ))
           .toList(),
     );
+  }
+
+  Future<void> _loadTopPolls() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingTopPolls = true;
+        _topPollsError = null;
+      });
+    }
+    try {
+      final polls = await _pollsApiClient.listPolls(
+        accessToken: widget.session.accessToken,
+        limit: 3,
+        sort: 'popular',
+      );
+      if (mounted) setState(() => _topPolls = polls);
+    } catch (error) {
+      if (mounted) setState(() => _topPollsError = error);
+    } finally {
+      if (mounted) setState(() => _isLoadingTopPolls = false);
+    }
+  }
+
+  PollOptionSummary _leadingOption(PollSummary poll) {
+    return poll.options.reduce(
+        (left, right) => left.votesCount >= right.votesCount ? left : right);
+  }
+
+  double _leadingOptionRatio(PollSummary poll) {
+    if (poll.votesCount == 0) return 0;
+    return (_leadingOption(poll).votesCount / poll.votesCount)
+        .clamp(0, 1)
+        .toDouble();
+  }
+
+  String _formatPollAge(PollSummary poll) {
+    final age = DateTime.now().difference(poll.createdAt);
+    if (age.inDays > 0) return '${age.inDays}d ago';
+    if (age.inHours > 0) return '${age.inHours}h ago';
+    return '${age.inMinutes.clamp(1, 59)}m ago';
   }
 
   Widget _discoveryCard(Widget child) => Container(

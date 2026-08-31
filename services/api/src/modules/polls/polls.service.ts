@@ -85,8 +85,12 @@ export async function createPoll(input: CreatePollInput) {
   });
 }
 
-export async function listPublicPolls(limit: number, viewerId?: string) {
-  return listPublicPollRecords(limit, viewerId);
+export async function listPublicPolls(
+  limit: number,
+  viewerId?: string,
+  sort: 'newest' | 'popular' = 'newest'
+) {
+  return listPublicPollRecords(limit, viewerId, sort);
 }
 
 export async function deletePoll(input: { pollId: string; authorId: string }) {

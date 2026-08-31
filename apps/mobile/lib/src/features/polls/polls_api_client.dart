@@ -63,11 +63,13 @@ class PollsApiClient {
   Future<List<PollSummary>> listPolls({
     int limit = 20,
     String? accessToken,
+    String sort = 'newest',
   }) async {
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls',
       queryParameters: {
         'limit': limit.toString(),
+        if (sort != 'newest') 'sort': sort,
       },
     );
     final response = await _httpClient.get(

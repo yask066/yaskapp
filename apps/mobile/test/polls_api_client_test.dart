@@ -118,6 +118,33 @@ void main() {
     expect(polls.single.id, 'poll-1');
   });
 
+  test('lists popular public polls with sort parameter', () async {
+    late http.Request request;
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(
+          jsonEncode({
+            'items': [_pollJson(commentsCount: 2)]
+          }),
+          200,
+        );
+      }),
+    );
+
+    final polls = await client.listPolls(
+      accessToken: 'access-token',
+      limit: 3,
+      sort: 'popular',
+    );
+
+    expect(request.url.path, '/polls');
+    expect(request.url.queryParameters, {'limit': '3', 'sort': 'popular'});
+    expect(request.headers['authorization'], 'Bearer access-token');
+    expect(polls.single.id, 'poll-1');
+  });
+
   test('lists public polls for a user', () async {
     late http.Request request;
     final client = PollsApiClient(
