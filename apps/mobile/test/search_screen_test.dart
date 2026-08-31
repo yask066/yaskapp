@@ -7,6 +7,7 @@ import 'package:yaskapp_mobile/src/features/auth/auth_session.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
 import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
 import 'package:yaskapp_mobile/src/features/profile/public_profile.dart';
+import 'package:yaskapp_mobile/src/features/profile/profiles_api_client.dart';
 import 'package:yaskapp_mobile/src/features/search/search_api_client.dart';
 import 'package:yaskapp_mobile/src/features/search/search_result.dart';
 import 'package:yaskapp_mobile/src/features/search/search_screen.dart';
@@ -217,9 +218,20 @@ Widget _app(
       session: _session(),
       searchApiClient: client,
       pollsApiClient: pollsApiClient,
+      profilesApiClient: _FakeProfilesApiClient(),
       analytics: analytics,
     ),
   );
+}
+
+class _FakeProfilesApiClient extends ProfilesApiClient {
+  @override
+  Future<List<PublicProfile>> listPopularUsers({
+    String? accessToken,
+    int limit = 3,
+  }) async {
+    return const [PublicProfileFixture.profile];
+  }
 }
 
 AuthSession _session() {

@@ -55,16 +55,20 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Timer? _debounce;
   List<SearchResult> _items = [];
+  List<PublicProfile> _topUsers = [];
   String? _nextCursor;
   Object? _error;
+  Object? _topUsersError;
   var _hasSearched = false;
   var _isLoading = false;
   var _isLoadingMore = false;
+  var _isLoadingTopUsers = true;
   var _requestId = 0;
   var _type = SearchType.all;
   var _sort = SearchSort.relevance;
   final Set<String> _votingPollIds = {};
   final Set<String> _likingPollIds = {};
+  final Set<String> _followingUserIds = {};
 
   @override
   void initState() {
@@ -79,6 +83,7 @@ class _SearchScreenState extends State<SearchScreen> {
     _reportsApiClient = widget.reportsApiClient ?? ReportsApiClient();
     _analytics = widget.analytics ?? const NoopSearchAnalytics();
     _analytics.searchOpened();
+    _loadTopUsers();
     _queryController.addListener(_handleQueryChanged);
     _scrollController.addListener(_handleScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -214,6 +219,54 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _clearQuery() {
     _queryController.clear();
+  }
+
+  Future<void> _loadTopUsers() async {
+    try {
+      final users = await _profilesApiClient
+          .listPopularUsers(accessToken: widget.session.accessToken, limit: 3)
+          .timeout(const Duration(seconds: 10));
+      if (!mounted) return;
+      setState(() {
+        _topUsers = users;
+        _topUsersError = null;
+        _isLoadingTopUsers = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _topUsersError = error;
+        _isLoadingTopUsers = false;
+      });
+    }
+  }
+
+  Future<void> _toggleFollow(PublicProfile user) async {
+    if (_followingUserIds.contains(user.id)) return;
+    setState(() => _followingUserIds.add(user.id));
+    try {
+      final relationship = user.viewerIsFollowing
+          ? await _profilesApiClient.unfollow(
+              userId: user.id, accessToken: widget.session.accessToken)
+          : await _profilesApiClient.follow(
+              userId: user.id, accessToken: widget.session.accessToken);
+      if (!mounted) return;
+      final index = _topUsers.indexWhere((item) => item.id == user.id);
+      if (index != -1) {
+        setState(() {
+          _topUsers[index] = user.copyWith(
+            followersCount: relationship.followeeFollowersCount,
+            viewerIsFollowing: relationship.following,
+          );
+        });
+      }
+    } on ProfilesApiException catch (error) {
+      _showSnackBar(error.message);
+    } catch (_) {
+      _showSnackBar('Could not update follow.');
+    } finally {
+      if (mounted) setState(() => _followingUserIds.remove(user.id));
+    }
   }
 
   void _selectType(SearchType type) {
@@ -461,7 +514,8 @@ class _SearchScreenState extends State<SearchScreen> {
                       ? null
                       : IconButton(
                           tooltip: 'Clear',
-                          icon: const Icon(Icons.cancel, color: Color(0xFFB6B8C0)),
+                          icon: const Icon(Icons.cancel,
+                              color: Color(0xFFB6B8C0)),
                           onPressed: _clearQuery,
                         ),
                 ),
@@ -502,13 +556,16 @@ class _SearchScreenState extends State<SearchScreen> {
                       showCheckmark: _type == type,
                       checkmarkColor: Colors.white,
                       labelStyle: TextStyle(
-                        color: _type == type ? Colors.white : const Color(0xFF101828),
+                        color: _type == type
+                            ? Colors.white
+                            : const Color(0xFF101828),
                         fontWeight: FontWeight.w600,
                       ),
                       backgroundColor: const Color(0xFFF5F6FA),
                       selectedColor: const Color(0xFF4D6FC4),
                       side: BorderSide.none,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 9),
                       onSelected: (_) => _selectType(type),
                     ),
                   );
@@ -566,7 +623,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
     if (!_hasSearched) {
       if (queryLength == 1) {
-        return const Center(child: Text('Enter at least 2 characters to search.'));
+        return const Center(
+            child: Text('Enter at least 2 characters to search.'));
       }
       return _buildDiscoveryContent();
     }
@@ -601,10 +659,21 @@ class _SearchScreenState extends State<SearchScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSectionHeader('Recent searches', 'Clear'),
-          _buildChipWrap(['Formula 1', 'Programming', 'test user', 'Football', 'Kotlin'], Icons.history),
+          _buildChipWrap(
+              ['Formula 1', 'Programming', 'test user', 'Football', 'Kotlin'],
+              Icons.history),
           const SizedBox(height: 24),
           _buildSectionHeader('Explore popular searches'),
-          _buildChipWrap(['Formula 1', 'Football', 'Gaming', 'Movies', 'Technology', 'Travel', 'Music', 'Science'], Icons.trending_up),
+          _buildChipWrap([
+            'Formula 1',
+            'Football',
+            'Gaming',
+            'Movies',
+            'Technology',
+            'Travel',
+            'Music',
+            'Science'
+          ], Icons.trending_up),
           const SizedBox(height: 24),
           _buildSectionHeader('Top users', 'View all'),
           _buildTopUsers(),
@@ -627,7 +696,9 @@ class _SearchScreenState extends State<SearchScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Find something interesting', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                      Text('Find something interesting',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w700)),
                       SizedBox(height: 5),
                       Text('Search for polls, topics or people on Yask.'),
                     ],
@@ -647,9 +718,13 @@ class _SearchScreenState extends State<SearchScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          Text(title,
+              style:
+                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
           if (action != null)
-            Text(action, style: const TextStyle(color: Color(0xFF315FC4), fontWeight: FontWeight.w600)),
+            Text(action,
+                style: const TextStyle(
+                    color: Color(0xFF315FC4), fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -668,7 +743,8 @@ class _SearchScreenState extends State<SearchScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
                 onPressed: () {
                   _queryController.text = label;
-                  _queryController.selection = TextSelection.collapsed(offset: label.length);
+                  _queryController.selection =
+                      TextSelection.collapsed(offset: label.length);
                 },
               ))
           .toList(),
@@ -676,26 +752,59 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildTopUsers() {
-    const users = [
-      ('FormulaFan', '@formulafan', '12.4K followers'),
-      ('CodeMaster', '@codemaster', '8.7K followers'),
-      ('PollKing', '@pollking', '5.1K followers'),
-    ];
+    if (_isLoadingTopUsers) {
+      return _discoveryCard(const Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(child: CircularProgressIndicator()),
+      ));
+    }
+    if (_topUsersError != null) {
+      return _discoveryCard(ListTile(
+        leading: const Icon(Icons.cloud_off_outlined),
+        title: const Text('Could not load users.'),
+        trailing:
+            TextButton(onPressed: _loadTopUsers, child: const Text('Retry')),
+      ));
+    }
+    if (_topUsers.isEmpty) {
+      return _discoveryCard(const Padding(
+        padding: EdgeInsets.all(20),
+        child: Text('No users to show yet.'),
+      ));
+    }
     return _discoveryCard(
       Column(
-        children: users
+        children: _topUsers
             .map((user) => Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   child: Row(
                     children: [
-                      CircleAvatar(radius: 27, backgroundColor: const Color(0xFFDDE5F7), child: Text(user.$1.substring(0, 1))),
+                      UserAvatar(
+                        displayName: user.displayName,
+                        username: user.username,
+                        imageUrl: user.avatarUrl,
+                      ),
                       const SizedBox(width: 12),
-                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(user.$1, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                        Text(user.$2, style: const TextStyle(color: Color(0xFF667085))),
-                        Text(user.$3, style: const TextStyle(color: Color(0xFF667085))),
-                      ])),
-                      OutlinedButton(onPressed: () {}, child: const Text('Follow')),
+                      Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            Text(user.displayName,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700, fontSize: 16)),
+                            Text('@${user.username}',
+                                style:
+                                    const TextStyle(color: Color(0xFF667085))),
+                            Text('${user.followersCount} followers',
+                                style:
+                                    const TextStyle(color: Color(0xFF667085))),
+                          ])),
+                      OutlinedButton(
+                        onPressed: () => _toggleFollow(user),
+                        child: Text(
+                            user.viewerIsFollowing ? 'Following' : 'Follow'),
+                      ),
                     ],
                   ),
                 ))
@@ -706,7 +815,11 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildTopPolls() {
     const polls = [
-      ('Who will win the 2026 Formula 1 World Championship?', 'Max Verstappen', '42%'),
+      (
+        'Who will win the 2026 Formula 1 World Championship?',
+        'Max Verstappen',
+        '42%'
+      ),
       ('Which programming language do you use most?', 'Kotlin', '58%'),
       ('Which team will win the Champions League?', 'Real Madrid', '40%'),
     ];
@@ -717,13 +830,28 @@ class _SearchScreenState extends State<SearchScreen> {
                 child: _discoveryCard(
                   Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(poll.$1, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                      const SizedBox(height: 14),
-                      Row(children: [Expanded(child: Text(poll.$2)), const SizedBox(width: 12), Expanded(child: LinearProgressIndicator(value: .55, minHeight: 5, borderRadius: BorderRadius.circular(5))), const SizedBox(width: 12), Text(poll.$3)]),
-                      const SizedBox(height: 10),
-                      const Text('1.2K votes  •  3 hours ago', style: TextStyle(color: Color(0xFF667085))),
-                    ]),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(poll.$1,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 16)),
+                          const SizedBox(height: 14),
+                          Row(children: [
+                            Expanded(child: Text(poll.$2)),
+                            const SizedBox(width: 12),
+                            Expanded(
+                                child: LinearProgressIndicator(
+                                    value: .55,
+                                    minHeight: 5,
+                                    borderRadius: BorderRadius.circular(5))),
+                            const SizedBox(width: 12),
+                            Text(poll.$3)
+                          ]),
+                          const SizedBox(height: 10),
+                          const Text('1.2K votes  •  3 hours ago',
+                              style: TextStyle(color: Color(0xFF667085))),
+                        ]),
                   ),
                 ),
               ))
@@ -737,7 +865,10 @@ class _SearchScreenState extends State<SearchScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: const Color(0xFFE7EAF1)),
-          boxShadow: const [BoxShadow(color: Color(0x0D101828), blurRadius: 12, offset: Offset(0, 4))],
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x0D101828), blurRadius: 12, offset: Offset(0, 4))
+          ],
         ),
         child: child,
       );

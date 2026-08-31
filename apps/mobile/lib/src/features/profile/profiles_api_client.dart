@@ -102,6 +102,21 @@ class ProfilesApiClient {
     return _decodeProfiles(response, 'Following response is invalid.');
   }
 
+  Future<List<PublicProfile>> listPopularUsers({
+    String? accessToken,
+    int limit = 3,
+  }) async {
+    final response = await _httpClient.get(
+      _config.uri(
+        '/users',
+        queryParameters: {'sort': 'popular', 'limit': limit.toString()},
+      ),
+      headers: _authHeaders(accessToken),
+    );
+
+    return _decodeProfiles(response, 'Popular users response is invalid.');
+  }
+
   Map<String, String> _authHeaders(String? accessToken) {
     return {
       if (accessToken != null) 'authorization': 'Bearer $accessToken',

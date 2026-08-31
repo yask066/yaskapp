@@ -59,6 +59,20 @@ test('search repository query supports newest and popular ordering with username
   assert.deepEqual(popular.values, ['climate change', '%climate change%', '%climate change%', 'viewer-id', 21]);
 });
 
+test('popular user query can list all active users without a search term', () => {
+  const popular = buildUserSearchQuery({
+    viewerId: 'viewer-id',
+    query: '',
+    type: 'users',
+    sort: 'popular',
+    limit: 3
+  });
+
+  assert.deepEqual(popular.values, ['', '%%', '%%', 'viewer-id', 4]);
+  assert.match(popular.text, /u\.status = 'active'/);
+  assert.match(popular.text, /ORDER BY .*followers_count.*polls_count/s);
+});
+
 test('poll search also matches a partial question', () => {
   const { text, values } = buildPollSearchQuery({ ...baseInput, type: 'polls' });
 

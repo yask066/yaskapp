@@ -3,6 +3,7 @@ import {
   findPublicProfileRecord,
   listFollowerRecords,
   listFollowingRecords,
+  listPopularProfileRecords,
   updateProfileRecord
 } from './profiles.repository.js';
 import {
@@ -92,6 +93,10 @@ export async function getPublicProfile(userId: string, viewerId?: string) {
 
 export async function listFollowing(userId: string, limit: number) {
   return listFollowingRecords(userId, limit);
+}
+
+export async function listPopularUsers(viewerId: string | undefined, limit: number) {
+  return listPopularProfileRecords(viewerId, limit);
 }
 
 export async function listFollowers(

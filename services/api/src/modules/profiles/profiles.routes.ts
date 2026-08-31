@@ -22,6 +22,7 @@ import {
   listFollowers,
   listFollowing,
   listMyPolls,
+  listPopularUsers,
   listUserPolls,
   unfollowUser,
   updateProfile
@@ -49,6 +50,11 @@ const listMyPollsQuerySchema = z.object({
 
 const listProfilesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(50)
+}).strict();
+
+const listPopularUsersQuerySchema = z.object({
+  sort: z.literal('popular').default('popular'),
+  limit: z.coerce.number().int().min(1).max(50).default(3)
 }).strict();
 
 const followParamsSchema = z.object({
@@ -212,6 +218,22 @@ export function registerProfileRoutes(app: FastifyInstance) {
       } catch (error) {
         return profileError(reply, error);
       }
+    }
+  );
+
+  app.get(
+    '/users',
+    { preHandler: optionalAuthenticate },
+    async (request, reply) => {
+      const parsedQuery = listPopularUsersQuerySchema.safeParse(request.query);
+
+      if (!parsedQuery.success) {
+        return validationError(reply, parsedQuery.error);
+      }
+
+      return {
+        items: await listPopularUsers(request.user?.sub, parsedQuery.data.limit)
+      };
     }
   );
 

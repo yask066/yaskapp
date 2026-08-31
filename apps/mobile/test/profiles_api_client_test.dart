@@ -62,10 +62,13 @@ void main() {
     );
 
     expect(requests.map((request) => request.method), ['POST', 'DELETE']);
-    expect(requests.every(
-      (request) => request.url.path == '/users/user-2/follow' &&
-          request.headers['authorization'] == 'Bearer access-token',
-    ), isTrue);
+    expect(
+        requests.every(
+          (request) =>
+              request.url.path == '/users/user-2/follow' &&
+              request.headers['authorization'] == 'Bearer access-token',
+        ),
+        isTrue);
     expect(followed.following, isTrue);
     expect(unfollowed.following, isFalse);
   });
@@ -76,7 +79,11 @@ void main() {
       config: config,
       httpClient: MockClient((request) async {
         requestedUris.add(request.url);
-        return http.Response(jsonEncode({'items': [_profileJson()]}), 200);
+        return http.Response(
+            jsonEncode({
+              'items': [_profileJson()]
+            }),
+            200);
       }),
     );
 
@@ -95,6 +102,32 @@ void main() {
     expect(requestedUris[1].queryParameters['limit'], '25');
     expect(followers.single.id, 'user-1');
     expect(following.single.displayName, 'Ada Lovelace');
+  });
+
+  test('loads popular users with viewer relationship', () async {
+    late http.Request request;
+    final client = ProfilesApiClient(
+      config: config,
+      httpClient: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(
+            jsonEncode({
+              'items': [_profileJson()]
+            }),
+            200);
+      }),
+    );
+
+    final users = await client.listPopularUsers(
+      accessToken: 'access-token',
+      limit: 3,
+    );
+
+    expect(request.url.path, '/users');
+    expect(request.url.queryParameters['sort'], 'popular');
+    expect(request.url.queryParameters['limit'], '3');
+    expect(request.headers['authorization'], 'Bearer access-token');
+    expect(users.single.displayName, 'Ada Lovelace');
   });
 }
 
