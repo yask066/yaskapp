@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
 import { decodeAdminCursor, pageWithCursor } from '../admin/pagination.js';
+import { avatarUrlForUser } from '../profiles/avatar-url.js';
 import { isInAppEnabled, isPushEnabled } from './notification-preferences.repository.js';
 import { incrementNotificationMetric } from './notifications.metrics.js';
 
@@ -31,7 +32,7 @@ export type NotificationRecord = {
     id: string;
     username: string;
     displayName: string;
-    avatarObjectKey: string | null;
+    avatarUrl: string | null;
   } | null;
   pollId: string | null;
   commentId: string | null;
@@ -57,7 +58,7 @@ type NotificationRow = {
   comment_deleted_at: Date | null;
 };
 
-function mapNotification(row: NotificationRow): NotificationRecord {
+export function mapNotification(row: NotificationRow): NotificationRecord {
   return {
     id: row.id,
     type: row.type,
@@ -66,7 +67,7 @@ function mapNotification(row: NotificationRow): NotificationRecord {
           id: row.actor_id,
           username: row.actor_username,
           displayName: row.actor_display_name,
-          avatarObjectKey: row.actor_avatar_object_key
+          avatarUrl: avatarUrlForUser(row.actor_id, row.actor_avatar_object_key)
         }
       : null,
     pollId: row.poll_id,
