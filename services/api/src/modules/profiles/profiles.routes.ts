@@ -231,9 +231,17 @@ export function registerProfileRoutes(app: FastifyInstance) {
         return validationError(reply, parsedQuery.error);
       }
 
-      return {
-        items: await listPopularUsers(request.user.sub, parsedQuery.data.limit)
-      };
+      try {
+        return {
+          items: await listPopularUsers(request.user.sub, parsedQuery.data.limit)
+        };
+      } catch (error) {
+        request.log.error(error, 'Failed to load popular users');
+        return reply.status(503).send({
+          error: 'popular_users_unavailable',
+          message: 'Popular users are temporarily unavailable.'
+        });
+      }
     }
   );
 

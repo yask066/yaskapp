@@ -759,9 +759,13 @@ class _SearchScreenState extends State<SearchScreen> {
       ));
     }
     if (_topUsersError != null) {
+      final error = _topUsersError;
+      final message = error is ProfilesApiException
+          ? '${error.message}${error.statusCode == null ? '' : ' (${error.statusCode})'}'
+          : 'Could not load users.';
       return _discoveryCard(ListTile(
         leading: const Icon(Icons.cloud_off_outlined),
-        title: const Text('Could not load users.'),
+        title: Text(message),
         trailing:
             TextButton(onPressed: _loadTopUsers, child: const Text('Retry')),
       ));
