@@ -223,7 +223,7 @@ export function registerProfileRoutes(app: FastifyInstance) {
 
   app.get(
     '/users',
-    { preHandler: optionalAuthenticate },
+    { preHandler: authenticate },
     async (request, reply) => {
       const parsedQuery = listPopularUsersQuerySchema.safeParse(request.query);
 
@@ -232,7 +232,7 @@ export function registerProfileRoutes(app: FastifyInstance) {
       }
 
       return {
-        items: await listPopularUsers(request.user?.sub, parsedQuery.data.limit)
+        items: await listPopularUsers(request.user.sub, parsedQuery.data.limit)
       };
     }
   );

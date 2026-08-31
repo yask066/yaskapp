@@ -95,7 +95,7 @@ export async function listFollowing(userId: string, limit: number) {
   return listFollowingRecords(userId, limit);
 }
 
-export async function listPopularUsers(viewerId: string | undefined, limit: number) {
+export async function listPopularUsers(viewerId: string, limit: number) {
   return listPopularProfileRecords(viewerId, limit);
 }
 

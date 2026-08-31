@@ -259,9 +259,9 @@ export async function listFollowerRecords(
   );
 }
 
-export async function listPopularProfileRecords(viewerId: string | undefined, limit: number) {
+export async function listPopularProfileRecords(viewerId: string, limit: number) {
   const records = await searchUserRecords({
-    viewerId: viewerId ?? (null as unknown as string),
+    viewerId,
     query: '',
     type: 'users',
     sort: 'popular',
