@@ -208,13 +208,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Notifications')),
-      body: _loading
+      backgroundColor: const Color(0xFFF7F8FC),
+      body: SafeArea(
+        bottom: false,
+        child: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? _ErrorState(onRetry: _load)
               : _items.isEmpty
-                  ? const Center(child: Text('No notifications yet'))
+                  ? const _EmptyState()
                   : RefreshIndicator(
                       onRefresh: _load,
                       child: NotificationListener<ScrollNotification>(
@@ -227,24 +229,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           return false;
                         },
                         child: ListView(
-                          padding: const EdgeInsets.only(bottom: 24),
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                           children: [
-                            if (_items.any((item) => item.isUnread))
+                            _NotificationsHeader(onMarkAllRead: _markAllRead),
+                            const SizedBox(height: 28),
+                            for (final section in _groupedSections()) ...[
                               _NotificationSection(
-                                title: 'New',
-                                items: _items
-                                    .where((item) => item.isUnread)
-                                    .toList(),
+                                title: section.$1,
+                                items: section.$2,
                                 onTap: _openDetails,
                               ),
-                            if (_items.any((item) => !item.isUnread))
-                              _NotificationSection(
-                                title: 'Earlier',
-                                items: _items
-                                    .where((item) => !item.isUnread)
-                                    .toList(),
-                                onTap: _openDetails,
-                              ),
+                              const SizedBox(height: 24),
+                            ],
                             if (_loadingMore)
                               const Padding(
                                 padding: EdgeInsets.all(24),
@@ -255,7 +251,33 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         ),
                       ),
                     ),
+      ),
     );
+  }
+
+  List<(String, List<NotificationSummary>)> _groupedSections() {
+    final now = DateTime.now();
+    final today = <NotificationSummary>[];
+    final yesterday = <NotificationSummary>[];
+    final earlier = <NotificationSummary>[];
+    for (final item in _items) {
+      final date = item.createdAt;
+      final difference = DateTime(now.year, now.month, now.day)
+          .difference(DateTime(date.year, date.month, date.day))
+          .inDays;
+      if (difference == 0) {
+        today.add(item);
+      } else if (difference == 1) {
+        yesterday.add(item);
+      } else {
+        earlier.add(item);
+      }
+    }
+    return [
+      if (today.isNotEmpty) ('Today', today),
+      if (yesterday.isNotEmpty) ('Yesterday', yesterday),
+      if (earlier.isNotEmpty) ('Earlier', earlier),
+    ];
   }
 }
 
@@ -317,16 +339,31 @@ class _NotificationSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
           child: Text(title,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  )),
+              style: const TextStyle(
+                color: Color(0xFF344054),
+                fontSize: 23,
+                fontWeight: FontWeight.w700,
+              )),
         ),
-        ...items.map((item) => _NotificationTile(
-              item: item,
-              onTap: () => onTap(item),
-            )),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              for (var index = 0; index < items.length; index++) ...[
+                _NotificationTile(item: items[index], onTap: () => onTap(items[index])),
+                if (index < items.length - 1)
+                  const Divider(height: 1, indent: 84, endIndent: 16),
+              ],
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -339,31 +376,159 @@ class _NotificationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actor = item.actor?.displayName ?? 'Someone';
-    return ListTile(
-        onTap: onTap,
-        tileColor: item.isUnread ? const Color(0xFFF4F6FF) : null,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-        leading: UserAvatar(
-          displayName: actor,
-          username: item.actor?.username ?? 'unknown',
-          imageUrl: item.actor?.avatarUrl,
-          radius: 22,
+    final accent = _notificationAccent(item.type);
+    return InkWell(
+      key: ValueKey('notification-card-${item.id}'),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 20, 14, 20),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                UserAvatar(
+                  displayName: actor,
+                  username: item.actor?.username ?? 'unknown',
+                  imageUrl: item.actor?.avatarUrl,
+                  radius: 27,
+                ),
+                Positioned(
+                  right: -7,
+                  bottom: -5,
+                  child: Container(
+                    key: ValueKey('notification-event-${item.type}'),
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: Icon(_notificationIcon(item.type), color: Colors.white, size: 18),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 22),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: const Color(0xFF101828),
+                        fontSize: 16,
+                        height: 1.25,
+                        fontWeight: item.isUnread ? FontWeight.w700 : FontWeight.w500,
+                      )),
+                  const SizedBox(height: 7),
+                  Text(item.detail,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Color(0xFF667085), fontSize: 14, height: 1.25)),
+                  const SizedBox(height: 8),
+                  Text(notificationAgeLabel(item.createdAt),
+                      style: const TextStyle(color: Color(0xFF667085), fontSize: 13)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            _PollPreview(item: item),
+            if (item.isUnread) ...[
+              const SizedBox(width: 9),
+              const Icon(Icons.circle, size: 10, color: Color(0xFF2F6FED)),
+            ],
+          ],
         ),
-        title: Text(item.title,
-            style: TextStyle(
-                fontWeight: item.isUnread ? FontWeight.w700 : FontWeight.w500)),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            '${item.detail} · ${notificationAgeLabel(item.createdAt)}',
-          ),
-        ),
-        trailing: item.isUnread
-            ? const Icon(Icons.circle, size: 10, color: Color(0xFF566A9D))
-            : null);
+      ),
+    );
   }
 
 }
+
+class _NotificationsHeader extends StatelessWidget {
+  const _NotificationsHeader({required this.onMarkAllRead});
+  final VoidCallback onMarkAllRead;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        height: 86,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFF0F1F4)),
+        ),
+        child: Row(
+          children: [
+            IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.arrow_back, size: 30, color: Color(0xFF101828))),
+            const SizedBox(width: 12),
+            const Expanded(child: Text('Notifications', style: TextStyle(color: Color(0xFF101828), fontSize: 25, fontWeight: FontWeight.w700))),
+            TextButton.icon(
+              onPressed: onMarkAllRead,
+              icon: const Icon(Icons.check, size: 28),
+              label: const Text('Mark all as read', style: TextStyle(fontSize: 16)),
+              style: TextButton.styleFrom(foregroundColor: const Color(0xFF2F6FED)),
+            ),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, size: 28, color: Color(0xFF101828)),
+              onSelected: (_) => onMarkAllRead(),
+              itemBuilder: (_) => const [PopupMenuItem(value: 'read', child: Text('Mark all as read'))],
+            ),
+          ],
+        ),
+      );
+}
+
+class _PollPreview extends StatelessWidget {
+  const _PollPreview({required this.item});
+  final NotificationSummary item;
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 76,
+        height: 76,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          gradient: LinearGradient(
+            colors: [_notificationAccent(item.type).withValues(alpha: .9), const Color(0xFF172B4D)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        padding: const EdgeInsets.all(8),
+        alignment: Alignment.bottomLeft,
+        child: Text(
+          item.pollId == null ? 'Profile' : item.type == 'like' ? 'Your poll' : 'Poll',
+          maxLines: 2,
+          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+        ),
+      );
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+  @override
+  Widget build(BuildContext context) => const Center(child: Text('No notifications yet', style: TextStyle(color: Color(0xFF667085))));
+}
+
+Color _notificationAccent(String type) => switch (type) {
+      'comment' || 'comment_reply' => const Color(0xFF2F6FED),
+      'like' => const Color(0xFFF45B69),
+      'poll_vote' => const Color(0xFF55C98B),
+      _ => const Color(0xFF667085),
+    };
+
+IconData _notificationIcon(String type) => switch (type) {
+      'comment' || 'comment_reply' => Icons.chat_bubble,
+      'like' => Icons.favorite,
+      'poll_vote' => Icons.check,
+      'follow' => Icons.person_add,
+      _ => Icons.notifications,
+    };
 
 class _DetailRow extends StatelessWidget {
   const _DetailRow({required this.label, required this.value});

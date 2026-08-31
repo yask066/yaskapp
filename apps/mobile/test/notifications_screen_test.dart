@@ -119,6 +119,54 @@ void main() {
         contains('/notifications/read-all'));
   });
 
+  testWidgets('renders reference-style header and grouped notification cards',
+      (tester) async {
+    final apiClient = NotificationsApiClient(
+      config: const ApiConfig(baseUrl: 'http://test'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/notifications/read-all') {
+          return http.Response('{"unreadCount":0}', 200);
+        }
+        return http.Response(
+          '{"items":['
+          '{"id":"today","type":"comment","actor":{"username":"alice","displayName":"Alice","avatarUrl":null},"pollId":"poll-1","commentId":"comment-1","readAt":null,"createdAt":"2026-08-31T10:00:00.000Z","isTargetAvailable":true},'
+          '{"id":"yesterday","type":"like","actor":{"username":"bob","displayName":"Bob","avatarUrl":null},"pollId":"poll-2","commentId":null,"readAt":"2026-08-30T10:00:00.000Z","createdAt":"2026-08-30T10:00:00.000Z","isTargetAvailable":true},'
+          '{"id":"earlier","type":"poll_vote","actor":{"username":"cara","displayName":"Cara","avatarUrl":null},"pollId":"poll-3","commentId":null,"readAt":"2026-08-28T10:00:00.000Z","createdAt":"2026-08-28T10:00:00.000Z","isTargetAvailable":true}'
+          '],"nextCursor":null,"unreadCount":1}',
+          200,
+        );
+      }),
+    );
+    final session = AuthSession(
+      user: AuthUser(
+        id: 'user-1',
+        email: 'user@example.com',
+        username: 'user',
+        status: 'active',
+        profile: AuthUserProfile(
+          displayName: 'User', pollsCount: 0, followersCount: 0, followingCount: 0,
+        ),
+      ),
+      accessToken: 'token', tokenType: 'Bearer', expiresIn: '1h',
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: NotificationsScreen(
+        session: session, isActive: true, apiClient: apiClient,
+        realtimeClient: _TestRealtimeClient(),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Notifications'), findsOneWidget);
+    expect(find.text('Mark all as read'), findsOneWidget);
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.text('Yesterday'), findsOneWidget);
+    expect(find.text('Earlier'), findsOneWidget);
+    expect(find.byKey(const ValueKey('notification-card-today')), findsOneWidget);
+    expect(find.byKey(const ValueKey('notification-event-comment')), findsOneWidget);
+  });
+
   testWidgets('inactive notification tab does not load until activated',
       (tester) async {
     final requests = <http.Request>[];
