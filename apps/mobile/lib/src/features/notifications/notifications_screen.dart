@@ -467,7 +467,7 @@ class _NotificationsHeader extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Expanded(child: Text('Notifications', style: TextStyle(color: Color(0xFF101828), fontSize: 22, fontWeight: FontWeight.w700))),
+            const Expanded(child: Text('Notifications', style: TextStyle(color: Color(0xFF101828), fontSize: 20, fontWeight: FontWeight.w700))),
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert, size: 28, color: Color(0xFF101828)),
               onSelected: (_) => onMarkAllRead(),

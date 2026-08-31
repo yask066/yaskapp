@@ -162,7 +162,7 @@ void main() {
     expect(find.byIcon(Icons.arrow_back), findsNothing);
     expect(
       tester.widget<Text>(find.text('Notifications')).style?.fontSize,
-      22,
+      20,
     );
     expect(find.text('Mark all as read'), findsNothing);
     expect(find.text('Today'), findsOneWidget);
