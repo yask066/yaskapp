@@ -159,6 +159,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Notifications'), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_back), findsNothing);
     expect(
       tester.widget<Text>(find.text('Notifications')).style?.fontSize,
       22,
