@@ -343,7 +343,7 @@ class _NotificationSection extends StatelessWidget {
           child: Text(title,
               style: const TextStyle(
                 color: Color(0xFF344054),
-                fontSize: 23,
+                fontSize: 17,
                 fontWeight: FontWeight.w700,
               )),
         ),
@@ -381,7 +381,7 @@ class _NotificationTile extends StatelessWidget {
       key: ValueKey('notification-card-${item.id}'),
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 20, 14, 20),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -392,21 +392,22 @@ class _NotificationTile extends StatelessWidget {
                   displayName: actor,
                   username: item.actor?.username ?? 'unknown',
                   imageUrl: item.actor?.avatarUrl,
-                  radius: 27,
+                  key: ValueKey('notification-avatar-${item.id}'),
+                  radius: 26,
                 ),
                 Positioned(
                   right: -7,
                   bottom: -5,
                   child: Container(
                     key: ValueKey('notification-event-${item.type}'),
-                    width: 32,
-                    height: 32,
+                    width: 28,
+                    height: 28,
                     decoration: BoxDecoration(
                       color: accent,
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
                     ),
-                    child: Icon(_notificationIcon(item.type), color: Colors.white, size: 18),
+                    child: Icon(_notificationIcon(item.type), color: Colors.white, size: 16),
                   ),
                 ),
               ],
@@ -456,8 +457,9 @@ class _NotificationsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        height: 86,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        key: const ValueKey('notifications-header'),
+        height: 68,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
@@ -467,7 +469,7 @@ class _NotificationsHeader extends StatelessWidget {
           children: [
             IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.arrow_back, size: 30, color: Color(0xFF101828))),
             const SizedBox(width: 12),
-            const Expanded(child: Text('Notifications', style: TextStyle(color: Color(0xFF101828), fontSize: 25, fontWeight: FontWeight.w700))),
+            const Expanded(child: Text('Notifications', style: TextStyle(color: Color(0xFF101828), fontSize: 24, fontWeight: FontWeight.w700))),
             TextButton.icon(
               onPressed: onMarkAllRead,
               icon: const Icon(Icons.check, size: 28),
@@ -489,8 +491,9 @@ class _PollPreview extends StatelessWidget {
   final NotificationSummary item;
   @override
   Widget build(BuildContext context) => Container(
-        width: 76,
-        height: 76,
+        key: ValueKey('notification-preview-${item.id}'),
+        width: 68,
+        height: 68,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(10),
           gradient: LinearGradient(

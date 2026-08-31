@@ -165,6 +165,12 @@ void main() {
     expect(find.text('Earlier'), findsOneWidget);
     expect(find.byKey(const ValueKey('notification-card-today')), findsOneWidget);
     expect(find.byKey(const ValueKey('notification-event-comment')), findsOneWidget);
+
+    final header = tester.getSize(find.byKey(const ValueKey('notifications-header')));
+    expect(header.height, 68);
+    expect(tester.getSize(find.byKey(const ValueKey('notification-avatar-today'))).width, 52);
+    expect(tester.getSize(find.byKey(const ValueKey('notification-event-comment'))).width, 28);
+    expect(tester.getSize(find.byKey(const ValueKey('notification-preview-today'))).width, 68);
   });
 
   testWidgets('inactive notification tab does not load until activated',
