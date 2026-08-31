@@ -159,6 +159,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Notifications'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('Notifications')).style?.fontSize,
+      22,
+    );
     expect(find.text('Mark all as read'), findsNothing);
     expect(find.text('Today'), findsOneWidget);
     expect(find.text('Yesterday'), findsOneWidget);
