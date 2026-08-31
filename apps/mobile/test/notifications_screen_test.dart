@@ -159,7 +159,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Notifications'), findsOneWidget);
-    expect(find.text('Mark all as read'), findsOneWidget);
+    expect(find.text('Mark all as read'), findsNothing);
     expect(find.text('Today'), findsOneWidget);
     expect(find.text('Yesterday'), findsOneWidget);
     expect(find.text('Earlier'), findsOneWidget);

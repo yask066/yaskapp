@@ -469,13 +469,7 @@ class _NotificationsHeader extends StatelessWidget {
           children: [
             IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.arrow_back, size: 30, color: Color(0xFF101828))),
             const SizedBox(width: 12),
-            const Expanded(child: Text('Notifications', style: TextStyle(color: Color(0xFF101828), fontSize: 24, fontWeight: FontWeight.w700))),
-            TextButton.icon(
-              onPressed: onMarkAllRead,
-              icon: const Icon(Icons.check, size: 28),
-              label: const Text('Mark all as read', style: TextStyle(fontSize: 16)),
-              style: TextButton.styleFrom(foregroundColor: const Color(0xFF2F6FED)),
-            ),
+            const Expanded(child: Text('Notifications', style: TextStyle(color: Color(0xFF101828), fontSize: 25, fontWeight: FontWeight.w700))),
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert, size: 28, color: Color(0xFF101828)),
               onSelected: (_) => onMarkAllRead(),
