@@ -10,6 +10,7 @@ import 'package:yaskapp_mobile/src/features/auth/auth_session.dart';
 import 'package:yaskapp_mobile/src/features/notifications/notifications_api_client.dart';
 import 'package:yaskapp_mobile/src/features/notifications/notifications_screen.dart';
 import 'package:yaskapp_mobile/src/features/realtime/realtime_client.dart';
+import 'package:yaskapp_mobile/src/core/widgets/user_avatar.dart';
 
 class _TestRealtimeClient extends RealtimeClient {
   _TestRealtimeClient() : super(accessToken: 'token');
@@ -74,7 +75,7 @@ void main() {
           return http.Response('{"unreadCount":0}', 200);
         }
         return http.Response(
-          '{"items":[{"id":"notification-1","type":"follow","actor":{"username":"alice","displayName":"Alice"},"pollId":null,"commentId":null,"readAt":null,"createdAt":"2026-08-29T10:00:00.000Z","isTargetAvailable":true}],"nextCursor":null,"unreadCount":1}',
+          '{"items":[{"id":"notification-1","type":"follow","actor":{"username":"alice","displayName":"Alice","avatarUrl":"/media/avatars/alice"},"pollId":null,"commentId":null,"readAt":null,"createdAt":"2026-08-29T10:00:00.000Z","isTargetAvailable":true}],"nextCursor":null,"unreadCount":1}',
           200,
         );
       }),
@@ -110,6 +111,10 @@ void main() {
     expect(find.text('Alice started following you'), findsOneWidget);
     expect(find.text('Earlier'), findsOneWidget);
     expect(find.text('Mark all read'), findsNothing);
+    final avatar = tester.widget<UserAvatar>(find.byType(UserAvatar));
+    expect(avatar.displayName, 'Alice');
+    expect(avatar.username, 'alice');
+    expect(avatar.imageUrl, '/media/avatars/alice');
     expect(requests.map((request) => request.url.path),
         contains('/notifications/read-all'));
   });
