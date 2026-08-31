@@ -12,6 +12,31 @@ import 'package:yaskapp_mobile/src/features/search/search_result.dart';
 import 'package:yaskapp_mobile/src/features/search/search_screen.dart';
 
 void main() {
+  testWidgets('shows discovery sections before a query is entered',
+      (tester) async {
+    await tester.pumpWidget(_app(_FakeSearchApiClient()));
+
+    expect(find.text('Recent searches'), findsOneWidget);
+    expect(find.text('Explore popular searches'), findsOneWidget);
+    expect(find.text('Top users'), findsOneWidget);
+    expect(find.text('Top polls'), findsOneWidget);
+    expect(find.text('Find something interesting'), findsOneWidget);
+    expect(find.text('Formula 1'), findsWidgets);
+  });
+
+  testWidgets('clears the query from the search bar', (tester) async {
+    await tester.pumpWidget(_app(_FakeSearchApiClient()));
+
+    await tester.enterText(find.byType(TextField), 'climate');
+    await tester.pump();
+    await tester.tap(find.byTooltip('Clear'));
+    await tester.pump();
+
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.text('Search polls and users'), findsOneWidget);
+    expect(find.byTooltip('Clear'), findsNothing);
+  });
+
   testWidgets('focuses search input and does not request for a short query',
       (tester) async {
     final client = _FakeSearchApiClient();

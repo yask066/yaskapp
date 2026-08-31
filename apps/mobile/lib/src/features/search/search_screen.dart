@@ -406,40 +406,78 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FC),
-      appBar: AppBar(
-        titleSpacing: 0,
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        title: TextField(
-          controller: _queryController,
-          focusNode: _queryFocusNode,
-          textInputAction: TextInputAction.search,
-          onSubmitted: (_) {
-            _analytics.searchSubmitted(
-              queryLength: _queryController.text.trim().length,
-              type: _type,
-              sort: _sort,
-            );
-            _submitSearch();
-          },
-          decoration: InputDecoration(
-            hintText: 'Search polls and users',
-            border: InputBorder.none,
-            suffixIcon: _queryController.text.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: 'Clear',
-                    icon: const Icon(Icons.clear),
-                    onPressed: _clearQuery,
-                  ),
-          ),
-        ),
-      ),
+      backgroundColor: Colors.white,
       body: Column(
         children: [
+          SafeArea(bottom: false, child: _buildSearchHeader()),
           _buildControls(),
           Expanded(child: _buildContent()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: 'Back',
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(Icons.arrow_back, size: 28),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Container(
+              height: 58,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F6FA),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFE4E7EF)),
+              ),
+              child: TextField(
+                controller: _queryController,
+                focusNode: _queryFocusNode,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) {
+                  _analytics.searchSubmitted(
+                    queryLength: _queryController.text.trim().length,
+                    type: _type,
+                    sort: _sort,
+                  );
+                  _submitSearch();
+                },
+                decoration: InputDecoration(
+                  hintText: 'Search polls and users',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF667085),
+                    fontSize: 17,
+                  ),
+                  prefixIcon: const Icon(Icons.search, size: 30),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 17),
+                  suffixIcon: _queryController.text.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Clear',
+                          icon: const Icon(Icons.cancel, color: Color(0xFFB6B8C0)),
+                          onPressed: _clearQuery,
+                        ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            height: 58,
+            width: 58,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F6FA),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Icon(Icons.tune, size: 27),
+          ),
         ],
       ),
     );
@@ -448,7 +486,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildControls() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
       child: Row(
         children: [
           Expanded(
@@ -458,9 +496,19 @@ class _SearchScreenState extends State<SearchScreen> {
                 children: SearchType.values.map((type) {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
+                    child: FilterChip(
                       label: Text(_typeLabel(type)),
                       selected: _type == type,
+                      showCheckmark: _type == type,
+                      checkmarkColor: Colors.white,
+                      labelStyle: TextStyle(
+                        color: _type == type ? Colors.white : const Color(0xFF101828),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      backgroundColor: const Color(0xFFF5F6FA),
+                      selectedColor: const Color(0xFF4D6FC4),
+                      side: BorderSide.none,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                       onSelected: (_) => _selectType(type),
                     ),
                   );
@@ -468,16 +516,32 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ),
           ),
-          DropdownButton<SearchSort>(
-            value: _sort,
-            underline: const SizedBox.shrink(),
-            items: SearchSort.values.map((sort) {
-              return DropdownMenuItem(
-                  value: sort, child: Text(_sortLabel(sort)));
-            }).toList(),
-            onChanged: (sort) {
-              if (sort != null) _selectSort(sort);
-            },
+          PopupMenuButton<SearchSort>(
+            tooltip: 'Sort results',
+            initialValue: _sort,
+            onSelected: _selectSort,
+            itemBuilder: (context) => SearchSort.values
+                .map((sort) => PopupMenuItem(
+                      value: sort,
+                      child: Text(_sortLabel(sort)),
+                    ))
+                .toList(),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F6FA),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Sort by: ${_sortLabel(_sort)}',
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.keyboard_arrow_down, size: 20),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -501,15 +565,10 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     if (!_hasSearched) {
-      return Center(
-        child: Text(
-          queryLength == 1
-              ? 'Enter at least 2 characters to search.'
-              : 'Search for a poll or a user.',
-          style:
-              TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
-        ),
-      );
+      if (queryLength == 1) {
+        return const Center(child: Text('Enter at least 2 characters to search.'));
+      }
+      return _buildDiscoveryContent();
     }
 
     if (_items.isEmpty) {
@@ -534,6 +593,154 @@ class _SearchScreenState extends State<SearchScreen> {
       },
     );
   }
+
+  Widget _buildDiscoveryContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader('Recent searches', 'Clear'),
+          _buildChipWrap(['Formula 1', 'Programming', 'test user', 'Football', 'Kotlin'], Icons.history),
+          const SizedBox(height: 24),
+          _buildSectionHeader('Explore popular searches'),
+          _buildChipWrap(['Formula 1', 'Football', 'Gaming', 'Movies', 'Technology', 'Travel', 'Music', 'Science'], Icons.trending_up),
+          const SizedBox(height: 24),
+          _buildSectionHeader('Top users', 'View all'),
+          _buildTopUsers(),
+          const SizedBox(height: 24),
+          _buildSectionHeader('Top polls', 'View all'),
+          _buildTopPolls(),
+          const SizedBox(height: 24),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F7FC),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.manage_search, size: 58, color: Color(0xFF4D6FC4)),
+                SizedBox(width: 18),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Find something interesting', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                      SizedBox(height: 5),
+                      Text('Search for polls, topics or people on Yask.'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, [String? action]) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          if (action != null)
+            Text(action, style: const TextStyle(color: Color(0xFF315FC4), fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChipWrap(List<String> labels, IconData icon) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: labels
+          .map((label) => ActionChip(
+                avatar: Icon(icon, size: 18),
+                label: Text(label),
+                backgroundColor: const Color(0xFFF5F6FA),
+                side: BorderSide.none,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+                onPressed: () {
+                  _queryController.text = label;
+                  _queryController.selection = TextSelection.collapsed(offset: label.length);
+                },
+              ))
+          .toList(),
+    );
+  }
+
+  Widget _buildTopUsers() {
+    const users = [
+      ('FormulaFan', '@formulafan', '12.4K followers'),
+      ('CodeMaster', '@codemaster', '8.7K followers'),
+      ('PollKing', '@pollking', '5.1K followers'),
+    ];
+    return _discoveryCard(
+      Column(
+        children: users
+            .map((user) => Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Row(
+                    children: [
+                      CircleAvatar(radius: 27, backgroundColor: const Color(0xFFDDE5F7), child: Text(user.$1.substring(0, 1))),
+                      const SizedBox(width: 12),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(user.$1, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                        Text(user.$2, style: const TextStyle(color: Color(0xFF667085))),
+                        Text(user.$3, style: const TextStyle(color: Color(0xFF667085))),
+                      ])),
+                      OutlinedButton(onPressed: () {}, child: const Text('Follow')),
+                    ],
+                  ),
+                ))
+            .toList(),
+      ),
+    );
+  }
+
+  Widget _buildTopPolls() {
+    const polls = [
+      ('Who will win the 2026 Formula 1 World Championship?', 'Max Verstappen', '42%'),
+      ('Which programming language do you use most?', 'Kotlin', '58%'),
+      ('Which team will win the Champions League?', 'Real Madrid', '40%'),
+    ];
+    return Column(
+      children: polls
+          .map((poll) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _discoveryCard(
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(poll.$1, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                      const SizedBox(height: 14),
+                      Row(children: [Expanded(child: Text(poll.$2)), const SizedBox(width: 12), Expanded(child: LinearProgressIndicator(value: .55, minHeight: 5, borderRadius: BorderRadius.circular(5))), const SizedBox(width: 12), Text(poll.$3)]),
+                      const SizedBox(height: 10),
+                      const Text('1.2K votes  •  3 hours ago', style: TextStyle(color: Color(0xFF667085))),
+                    ]),
+                  ),
+                ),
+              ))
+          .toList(),
+    );
+  }
+
+  Widget _discoveryCard(Widget child) => Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE7EAF1)),
+          boxShadow: const [BoxShadow(color: Color(0x0D101828), blurRadius: 12, offset: Offset(0, 4))],
+        ),
+        child: child,
+      );
 
   Widget _buildResult(SearchResult result) {
     if (result is PollSearchResult) {
