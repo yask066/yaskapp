@@ -182,6 +182,38 @@ export function buildUserSearchQuery(input: SearchInput): Query {
   };
 }
 
+export function buildPopularUsersQuery(viewerId: string, limit: number): Query {
+  return {
+    text: `
+      SELECT
+        u.id,
+        u.username::text AS username,
+        u.status,
+        u.created_at,
+        u.updated_at,
+        pr.display_name,
+        pr.bio,
+        pr.country_code,
+        pr.avatar_object_key,
+        pr.polls_count,
+        pr.followers_count,
+        pr.following_count,
+        EXISTS (
+          SELECT 1 FROM follows f
+          WHERE f.follower_id = $1::uuid AND f.followee_id = u.id
+        ) AS viewer_is_following,
+        (pr.followers_count * 2 + pr.polls_count) AS score
+      FROM users u
+      JOIN profiles pr ON pr.user_id = u.id
+      WHERE u.status = 'active'
+        AND u.deleted_at IS NULL
+      ORDER BY score DESC, u.created_at DESC, u.id DESC
+      LIMIT $2
+    `,
+    values: [viewerId, limit]
+  };
+}
+
 export function encodeSearchCursor(cursor: SearchCursor) {
   const payload = Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
   const signature = createHmac('sha256', env.JWT_SECRET).update(payload).digest('base64url');
@@ -313,5 +345,10 @@ export async function searchPollRecords(input: SearchInput) {
 
 export async function searchUserRecords(input: SearchInput) {
   const result = await db.query<SearchUserRow>(buildUserSearchQuery(input));
+  return result.rows.map(mapUserSearchRow);
+}
+
+export async function searchPopularUserRecords(viewerId: string, limit: number) {
+  const result = await db.query<SearchUserRow>(buildPopularUsersQuery(viewerId, limit));
   return result.rows.map(mapUserSearchRow);
 }

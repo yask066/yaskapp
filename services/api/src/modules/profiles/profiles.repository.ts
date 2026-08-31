@@ -1,6 +1,6 @@
 import { db } from '../../config/database.js';
 import { avatarUrlForUser } from './avatar-url.js';
-import { searchUserRecords } from '../search/search.repository.js';
+import { searchPopularUserRecords } from '../search/search.repository.js';
 import type { PublicUser, UserWithProfileRow } from '../auth/auth.repository.js';
 
 type UpdateProfileInput = {
@@ -260,13 +260,7 @@ export async function listFollowerRecords(
 }
 
 export async function listPopularProfileRecords(viewerId: string, limit: number) {
-  const records = await searchUserRecords({
-    viewerId,
-    query: '',
-    type: 'users',
-    sort: 'popular',
-    limit
-  });
+  const records = await searchPopularUserRecords(viewerId, limit);
 
   return records.map((record) => record.user);
 }

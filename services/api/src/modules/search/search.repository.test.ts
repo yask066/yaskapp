@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import {
   buildPollSearchQuery,
+  buildPopularUsersQuery,
   buildUserSearchQuery,
   decodeSearchCursor,
   encodeSearchCursor,
@@ -71,6 +72,16 @@ test('popular user query can list all active users without a search term', () =>
   assert.deepEqual(popular.values, ['', '%%', '%%', 'viewer-id', 4]);
   assert.match(popular.text, /u\.status = 'active'/);
   assert.match(popular.text, /ORDER BY .*followers_count.*polls_count/s);
+});
+
+test('popular users query uses direct profile ranking and viewer relationship', () => {
+  const popular = buildPopularUsersQuery('viewer-id', 3);
+
+  assert.deepEqual(popular.values, ['viewer-id', 3]);
+  assert.match(popular.text, /FROM users u[\s\S]*JOIN profiles pr ON pr\.user_id = u\.id/);
+  assert.match(popular.text, /pr\.followers_count \* 2 \+ pr\.polls_count/);
+  assert.match(popular.text, /u\.status = 'active'/);
+  assert.match(popular.text, /viewer_is_following/);
 });
 
 test('poll search also matches a partial question', () => {
