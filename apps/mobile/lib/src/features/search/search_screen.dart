@@ -15,6 +15,7 @@ import '../profile/public_profile_screen.dart';
 import '../reports/report_dialog.dart';
 import '../reports/reports_api_client.dart';
 import 'search_api_client.dart';
+import 'search_history.dart';
 import 'search_result.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -24,6 +25,7 @@ class SearchScreen extends StatefulWidget {
     this.pollsApiClient,
     this.profilesApiClient,
     this.reportsApiClient,
+    this.searchHistory,
     this.analytics,
     super.key,
   });
@@ -33,6 +35,7 @@ class SearchScreen extends StatefulWidget {
   final PollsApiClient? pollsApiClient;
   final ProfilesApiClient? profilesApiClient;
   final ReportsApiClient? reportsApiClient;
+  final SearchHistoryStore? searchHistory;
   final SearchAnalytics? analytics;
 
   @override
@@ -52,11 +55,13 @@ class _SearchScreenState extends State<SearchScreen> {
   late final ReportsApiClient _reportsApiClient;
   late final bool _ownsReportsApiClient;
   late final SearchAnalytics _analytics;
+  late final SearchHistoryStore _searchHistory;
 
   Timer? _debounce;
   List<SearchResult> _items = [];
   List<PublicProfile> _topUsers = [];
   List<PollSummary> _topPolls = [];
+  List<String> _recentSearches = [];
   String? _nextCursor;
   Object? _error;
   Object? _topUsersError;
@@ -85,7 +90,10 @@ class _SearchScreenState extends State<SearchScreen> {
     _profilesApiClient = widget.profilesApiClient ?? ProfilesApiClient();
     _reportsApiClient = widget.reportsApiClient ?? ReportsApiClient();
     _analytics = widget.analytics ?? const NoopSearchAnalytics();
+    _searchHistory = widget.searchHistory ??
+        SecureSearchHistoryStore(userId: widget.session.user.id);
     _analytics.searchOpened();
+    _loadSearchHistory();
     _loadTopUsers();
     _loadTopPolls();
     _queryController.addListener(_handleQueryChanged);
@@ -93,6 +101,12 @@ class _SearchScreenState extends State<SearchScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _queryFocusNode.requestFocus();
     });
+  }
+
+  Future<void> _loadSearchHistory() async {
+    final history = await _searchHistory.read();
+    if (!mounted) return;
+    setState(() => _recentSearches = history);
   }
 
   @override
@@ -200,6 +214,10 @@ class _SearchScreenState extends State<SearchScreen> {
           );
         }
       });
+      if (reset) {
+        await _searchHistory.add(query);
+        if (mounted) await _loadSearchHistory();
+      }
     } catch (error) {
       if (!mounted || requestId != _requestId) return;
       setState(() {
@@ -662,10 +680,15 @@ class _SearchScreenState extends State<SearchScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionHeader('Recent searches', 'Clear'),
-          _buildChipWrap(
-              ['Formula 1', 'Programming', 'test user', 'Football', 'Kotlin'],
-              Icons.history),
+          _buildSectionHeader(
+            'Recent searches',
+            action: _recentSearches.isEmpty ? null : 'Clear',
+            onAction: _recentSearches.isEmpty ? null : _clearSearchHistory,
+          ),
+          if (_recentSearches.isNotEmpty)
+            _buildChipWrap(_recentSearches, Icons.history)
+          else
+            const Text('Your recent searches will appear here.'),
           const SizedBox(height: 24),
           _buildSectionHeader('Explore popular searches'),
           _buildChipWrap([
@@ -679,10 +702,10 @@ class _SearchScreenState extends State<SearchScreen> {
             'Science'
           ], Icons.trending_up),
           const SizedBox(height: 24),
-          _buildSectionHeader('Top users', 'View all'),
+          _buildSectionHeader('Top users', action: 'View all'),
           _buildTopUsers(),
           const SizedBox(height: 24),
-          _buildSectionHeader('Top polls', 'View all'),
+          _buildSectionHeader('Top polls', action: 'View all'),
           _buildTopPolls(),
           const SizedBox(height: 24),
           Container(
@@ -716,7 +739,8 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title, [String? action]) {
+  Widget _buildSectionHeader(String title,
+      {String? action, VoidCallback? onAction}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -726,12 +750,18 @@ class _SearchScreenState extends State<SearchScreen> {
               style:
                   const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
           if (action != null)
-            Text(action,
-                style: const TextStyle(
-                    color: Color(0xFF315FC4), fontWeight: FontWeight.w600)),
+            TextButton(
+              onPressed: onAction,
+              child: Text(action),
+            ),
         ],
       ),
     );
+  }
+
+  Future<void> _clearSearchHistory() async {
+    await _searchHistory.clear();
+    if (mounted) setState(() => _recentSearches = []);
   }
 
   Widget _buildChipWrap(List<String> labels, IconData icon) {

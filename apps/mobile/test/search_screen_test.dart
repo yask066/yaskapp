@@ -9,6 +9,7 @@ import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
 import 'package:yaskapp_mobile/src/features/profile/public_profile.dart';
 import 'package:yaskapp_mobile/src/features/profile/profiles_api_client.dart';
 import 'package:yaskapp_mobile/src/features/search/search_api_client.dart';
+import 'package:yaskapp_mobile/src/features/search/search_history.dart';
 import 'package:yaskapp_mobile/src/features/search/search_result.dart';
 import 'package:yaskapp_mobile/src/features/search/search_screen.dart';
 
@@ -24,8 +25,42 @@ void main() {
     expect(find.text('Top users'), findsOneWidget);
     expect(find.text('Top polls'), findsOneWidget);
     expect(find.text('Find something interesting'), findsOneWidget);
-    expect(find.text('Formula 1'), findsWidgets);
+    expect(find.text('Formula 1'), findsOneWidget);
     expect(find.text('Which feature should be next?'), findsOneWidget);
+  });
+
+  testWidgets(
+      'shows the latest successful searches in reverse chronological order',
+      (tester) async {
+    final history = MemorySearchHistoryStore();
+    final client = _FakeSearchApiClient();
+    await tester.pumpWidget(_app(client, searchHistory: history));
+
+    await tester.enterText(find.byType(TextField), 'climate');
+    await tester.pumpAndSettle(const Duration(milliseconds: 500));
+    await tester.enterText(find.byType(TextField), 'movies');
+    await tester.pumpAndSettle(const Duration(milliseconds: 500));
+    await tester.enterText(find.byType(TextField), 'climate');
+    await tester.pumpAndSettle(const Duration(milliseconds: 500));
+    await tester.tap(find.byTooltip('Clear'));
+    await tester.pump();
+
+    final climate = tester.getTopLeft(find.text('climate'));
+    final movies = tester.getTopLeft(find.text('movies'));
+    expect(climate.dy, lessThan(movies.dy));
+    expect(find.text('Programming'), findsNothing);
+  });
+
+  test('persists and clears recent searches', () async {
+    final history = MemorySearchHistoryStore();
+
+    await history.add('  climate   change ');
+    await history.add('movies');
+    await history.add('climate change');
+
+    expect(await history.read(), ['climate change', 'movies']);
+    await history.clear();
+    expect(await history.read(), isEmpty);
   });
 
   testWidgets('clears the query from the search bar', (tester) async {
@@ -215,6 +250,7 @@ Widget _app(
   SearchApiClient client, {
   SearchAnalytics? analytics,
   PollsApiClient? pollsApiClient,
+  SearchHistoryStore? searchHistory,
 }) {
   return MaterialApp(
     home: SearchScreen(
@@ -223,6 +259,7 @@ Widget _app(
       pollsApiClient: pollsApiClient,
       profilesApiClient: _FakeProfilesApiClient(),
       analytics: analytics,
+      searchHistory: searchHistory,
     ),
   );
 }

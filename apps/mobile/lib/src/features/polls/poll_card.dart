@@ -9,6 +9,7 @@ class PollCard extends StatelessWidget {
     required this.poll,
     this.accessToken,
     this.onVote,
+    this.onEditPoll,
     this.onCancelVote,
     this.onDeletePoll,
     this.onReport,
@@ -24,6 +25,7 @@ class PollCard extends StatelessWidget {
   final PollSummary poll;
   final String? accessToken;
   final ValueChanged<PollOptionSummary>? onVote;
+  final VoidCallback? onEditPoll;
   final VoidCallback? onCancelVote;
   final VoidCallback? onDeletePoll;
   final VoidCallback? onReport;
@@ -71,6 +73,7 @@ class PollCard extends StatelessWidget {
         poll.selectedOptionIndex != null &&
         onCancelVote != null;
     final canDeletePoll = onDeletePoll != null;
+    final canEditPoll = onEditPoll != null;
     final canReport = onReport != null;
 
     return Card(
@@ -138,17 +141,22 @@ class PollCard extends StatelessWidget {
                   height: 40,
                   child: PopupMenuButton<_PollAction>(
                     tooltip: 'More',
-                    enabled: canCancelVote || canDeletePoll || canReport,
+                    enabled: canEditPoll ||
+                        canCancelVote ||
+                        canDeletePoll ||
+                        canReport,
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 190),
-                    menuPadding: const EdgeInsets.symmetric(vertical: 6),
+                    constraints: const BoxConstraints(minWidth: 220),
+                    menuPadding: const EdgeInsets.symmetric(vertical: 8),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    elevation: 4,
+                    elevation: 6,
                     icon: Icon(Icons.more_vert, size: compact ? 20 : 22),
                     onSelected: (action) {
-                      if (action == _PollAction.cancelVote) {
+                      if (action == _PollAction.editPoll) {
+                        onEditPoll?.call();
+                      } else if (action == _PollAction.cancelVote) {
                         onCancelVote?.call();
                       } else if (action == _PollAction.deletePoll) {
                         onDeletePoll?.call();
@@ -157,42 +165,50 @@ class PollCard extends StatelessWidget {
                       }
                     },
                     itemBuilder: (context) => [
+                      if (canEditPoll) ...[
+                        const PopupMenuItem<_PollAction>(
+                          value: _PollAction.editPoll,
+                          height: 52,
+                          child: _PollMenuRow(
+                            icon: Icons.edit_outlined,
+                            label: 'Edit poll',
+                          ),
+                        ),
+                        const PopupMenuDivider(),
+                      ],
                       if (canCancelVote)
                         const PopupMenuItem<_PollAction>(
                           value: _PollAction.cancelVote,
-                          height: 48,
-                          child: Row(
-                            children: [
-                              Icon(Icons.clear, size: 20),
-                              SizedBox(width: 12),
-                              Text('Cancel vote'),
-                            ],
+                          height: 52,
+                          child: _PollMenuRow(
+                            icon: Icons.undo,
+                            label: 'Cancel vote',
                           ),
                         ),
-                      if (canDeletePoll)
+                      if (canDeletePoll) ...[
+                        if (canCancelVote) const PopupMenuDivider(),
                         const PopupMenuItem<_PollAction>(
                           value: _PollAction.deletePoll,
-                          height: 48,
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete_outline, size: 20),
-                              SizedBox(width: 12),
-                              Text('Delete poll'),
-                            ],
+                          height: 52,
+                          child: _PollMenuRow(
+                            icon: Icons.delete_outline,
+                            label: 'Delete poll',
+                            destructive: true,
                           ),
                         ),
-                      if (canReport)
+                      ],
+                      if (canReport) ...[
+                        if (canDeletePoll || canCancelVote || canEditPoll)
+                          const PopupMenuDivider(),
                         const PopupMenuItem<_PollAction>(
                           value: _PollAction.report,
-                          height: 48,
-                          child: Row(
-                            children: [
-                              Icon(Icons.flag_outlined, size: 20),
-                              SizedBox(width: 12),
-                              Text('Report'),
-                            ],
+                          height: 52,
+                          child: _PollMenuRow(
+                            icon: Icons.flag_outlined,
+                            label: 'Report',
                           ),
                         ),
+                      ],
                     ],
                   ),
                 ),
@@ -204,7 +220,7 @@ class PollCard extends StatelessWidget {
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Color(0xFF10142D),
+                color: const Color(0xFF10142D),
                 fontSize: 15,
                 height: compact ? 22 / 15 : 24 / 15,
                 fontWeight: FontWeight.bold,
@@ -311,7 +327,40 @@ class PollCard extends StatelessWidget {
   }
 }
 
-enum _PollAction { cancelVote, deletePoll, report }
+enum _PollAction { editPoll, cancelVote, deletePoll, report }
+
+class _PollMenuRow extends StatelessWidget {
+  const _PollMenuRow({
+    required this.icon,
+    required this.label,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = destructive
+        ? Theme.of(context).colorScheme.error
+        : const Color(0xFF17233D);
+    return Row(
+      children: [
+        Icon(icon, size: 24, color: color),
+        const SizedBox(width: 16),
+        Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 16,
+            fontWeight: destructive ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _PollOptionButton extends StatelessWidget {
   const _PollOptionButton({

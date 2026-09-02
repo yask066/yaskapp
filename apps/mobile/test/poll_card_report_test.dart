@@ -10,7 +10,7 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: PollCard(
-            poll: _poll(),
+            poll: _poll(allowVoteCancellation: true, selectedOptionIndex: 0),
             onReport: () => reported = true,
           ),
         ),
@@ -25,7 +25,37 @@ void main() {
     expect(reported, isTrue);
   });
 
-  testWidgets('sends the access token when loading a poll image', (tester) async {
+  testWidgets('renders the poll actions with hierarchy and optional edit',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PollCard(
+            poll: _poll(allowVoteCancellation: true, selectedOptionIndex: 0),
+            onEditPoll: () {},
+            onCancelVote: () {},
+            onDeletePoll: () {},
+            onReport: () {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('More'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit poll'), findsOneWidget);
+    expect(find.text('Cancel vote'), findsOneWidget);
+    expect(find.text('Delete poll'), findsOneWidget);
+    expect(find.text('Report'), findsOneWidget);
+    expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.undo), findsOneWidget);
+    expect(find.byIcon(Icons.delete_outline), findsOneWidget);
+    expect(find.byType(PopupMenuDivider), findsNWidgets(3));
+  });
+
+  testWidgets('sends the access token when loading a poll image',
+      (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -45,12 +75,18 @@ void main() {
   });
 }
 
-PollSummary _poll({String? imageUrl}) => PollSummary.fromJson({
+PollSummary _poll({
+  String? imageUrl,
+  bool allowVoteCancellation = false,
+  int? selectedOptionIndex,
+}) =>
+    PollSummary.fromJson({
       'id': 'poll-1',
       'question': 'Question',
       'createdAt': '2026-08-25T12:00:00.000Z',
       'isClosed': false,
-      'allowVoteCancellation': false,
+      'allowVoteCancellation': allowVoteCancellation,
+      'selectedOptionIndex': selectedOptionIndex,
       'votesCount': 0,
       'commentsCount': 0,
       'likesCount': 0,
