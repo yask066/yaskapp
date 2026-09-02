@@ -438,7 +438,6 @@ class _NotificationTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            _PollPreview(item: item),
             if (item.isUnread) ...[
               const SizedBox(width: 9),
               const Icon(Icons.circle, size: 10, color: Color(0xFF2F6FED)),
@@ -474,32 +473,6 @@ class _NotificationsHeader extends StatelessWidget {
               itemBuilder: (_) => const [PopupMenuItem(value: 'read', child: Text('Mark all as read'))],
             ),
           ],
-        ),
-      );
-}
-
-class _PollPreview extends StatelessWidget {
-  const _PollPreview({required this.item});
-  final NotificationSummary item;
-  @override
-  Widget build(BuildContext context) => Container(
-        key: ValueKey('notification-preview-${item.id}'),
-        width: 68,
-        height: 68,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          gradient: LinearGradient(
-            colors: [_notificationAccent(item.type).withValues(alpha: .9), const Color(0xFF172B4D)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        padding: const EdgeInsets.all(8),
-        alignment: Alignment.bottomLeft,
-        child: Text(
-          item.pollId == null ? 'Profile' : item.type == 'like' ? 'Your poll' : 'Poll',
-          maxLines: 2,
-          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
         ),
       );
 }

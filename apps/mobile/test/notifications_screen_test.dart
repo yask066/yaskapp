@@ -175,7 +175,7 @@ void main() {
     expect(header.height, 68);
     expect(tester.getSize(find.byKey(const ValueKey('notification-avatar-today'))).width, 52);
     expect(tester.getSize(find.byKey(const ValueKey('notification-event-comment'))).width, 28);
-    expect(tester.getSize(find.byKey(const ValueKey('notification-preview-today'))).width, 68);
+    expect(find.byKey(const ValueKey('notification-preview-today')), findsNothing);
   });
 
   testWidgets('inactive notification tab does not load until activated',
