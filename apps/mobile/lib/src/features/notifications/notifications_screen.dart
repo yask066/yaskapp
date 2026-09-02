@@ -417,15 +417,7 @@ class _NotificationTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: const Color(0xFF101828),
-                        fontSize: 16,
-                        height: 1.25,
-                        fontWeight: item.isUnread ? FontWeight.w700 : FontWeight.w500,
-                      )),
+                  _NotificationTitle(item: item),
                   const SizedBox(height: 7),
                   Text(item.detail,
                       maxLines: 2,
@@ -448,6 +440,61 @@ class _NotificationTile extends StatelessWidget {
     );
   }
 
+}
+
+class _NotificationTitle extends StatelessWidget {
+  const _NotificationTitle({required this.item});
+
+  final NotificationSummary item;
+
+  @override
+  Widget build(BuildContext context) {
+    final actorName = item.actor?.displayName ?? 'Someone';
+    final titleStyle = TextStyle(
+      color: const Color(0xFF101828),
+      fontSize: 16,
+      height: 1.25,
+      fontWeight: item.isUnread ? FontWeight.w700 : FontWeight.w500,
+    );
+    final actorIndex = item.title.indexOf(actorName);
+    if (actorIndex < 0) {
+      return Text(item.title,
+          maxLines: 2, overflow: TextOverflow.ellipsis, style: titleStyle);
+    }
+
+    final actorEnd = actorIndex + actorName.length;
+    final accent = _notificationAccent(item.type);
+    return RichText(
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      text: TextSpan(
+        style: titleStyle,
+        children: [
+          TextSpan(text: item.title.substring(0, actorIndex)),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Container(
+              key: ValueKey('notification-actor-chip-${item.id}'),
+              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+              decoration: BoxDecoration(
+                border: Border.all(color: accent, width: 1.5),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                actorName,
+                key: ValueKey('notification-actor-${item.id}'),
+                style: titleStyle.copyWith(
+                  color: accent,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          TextSpan(text: item.title.substring(actorEnd)),
+        ],
+      ),
+    );
+  }
 }
 
 class _NotificationsHeader extends StatelessWidget {

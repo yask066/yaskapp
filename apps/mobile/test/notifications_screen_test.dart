@@ -176,6 +176,17 @@ void main() {
     expect(tester.getSize(find.byKey(const ValueKey('notification-avatar-today'))).width, 52);
     expect(tester.getSize(find.byKey(const ValueKey('notification-event-comment'))).width, 28);
     expect(find.byKey(const ValueKey('notification-preview-today')), findsNothing);
+
+    final actorName = tester.widget<Text>(
+      find.byKey(const ValueKey('notification-actor-today')),
+    );
+    expect(actorName.style?.fontWeight, FontWeight.w700);
+    expect(actorName.style?.color, const Color(0xFF2F6FED));
+    final actorChip = tester.widget<Container>(
+      find.byKey(const ValueKey('notification-actor-chip-today')),
+    );
+    final actorDecoration = actorChip.decoration! as BoxDecoration;
+    expect(actorDecoration.border?.top.color, const Color(0xFF2F6FED));
   });
 
   testWidgets('inactive notification tab does not load until activated',
