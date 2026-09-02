@@ -173,21 +173,51 @@ class _ReportDialogState extends State<_ReportDialog> {
                 ),
               ),
               const SizedBox(height: 10),
-              TextFormField(
-                controller: _descriptionController,
-                enabled: !_isSubmitting,
-                maxLines: 4,
-                maxLength: 2000,
-                decoration:
-                    const InputDecoration(hintText: 'Tell us what is wrong'),
-                buildCounter: (context,
-                        {required currentLength,
-                        required isFocused,
-                        maxLength}) =>
-                    Align(
-                        alignment: Alignment.centerRight,
-                        child: Text('$currentLength / ${maxLength ?? 2000}',
-                            style: const TextStyle(color: Color(0xFF8290A6)))),
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 14, 12, 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7F8FC),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFFDCE2EE)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Icon(Icons.edit_outlined,
+                          size: 21, color: Color(0xFF8290A6)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _descriptionController,
+                        enabled: !_isSubmitting,
+                        maxLines: 3,
+                        maxLength: 2000,
+                        decoration: const InputDecoration(
+                          hintText: 'Add more details (optional)',
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        buildCounter: (context,
+                                {required currentLength,
+                                required isFocused,
+                                maxLength}) =>
+                            Align(
+                                alignment: Alignment.centerRight,
+                                child: Text(
+                                    '$currentLength / ${maxLength ?? 2000}',
+                                    style: const TextStyle(
+                                        color: Color(0xFF8290A6)))),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 18),
               Container(

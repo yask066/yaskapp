@@ -26,6 +26,8 @@ void main() {
             'Help us keep Yask safe by letting us know\nwhat’s wrong with this content.'),
         findsOneWidget);
     expect(find.text('Details · Optional'), findsOneWidget);
+    expect(find.text('Add more details (optional)'), findsOneWidget);
+    expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
     expect(
         find.text(
             'Your report is anonymous.\nWe’ll review it as soon as possible.'),
