@@ -1,6 +1,7 @@
 import {
   createPollCommentRecord,
   createPollRecord,
+  deletePollCommentRecord,
   deletePollRecord,
   cancelVoteRecord,
   createVoteRecord,
@@ -73,6 +74,12 @@ export type CreatePollCommentInput = {
   pollId: string;
   authorId: string;
   body: string;
+};
+
+export type DeletePollCommentInput = {
+  pollId: string;
+  commentId: string;
+  authorId: string;
 };
 
 function normalizeOptionalText(value: string | undefined) {
@@ -155,6 +162,14 @@ export async function createPollComment(input: CreatePollCommentInput) {
     comment: result.comment,
     poll: result.poll
   };
+}
+
+export async function deletePollComment(input: DeletePollCommentInput) {
+  const result = await deletePollCommentRecord(input);
+
+  if (result.status === 'not_found') {
+    throw new PollNotFoundError('Comment was not found.');
+  }
 }
 
 export async function voteOnPoll(input: CreateVoteInput) {

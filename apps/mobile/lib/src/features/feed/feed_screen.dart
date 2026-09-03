@@ -370,6 +370,7 @@ class FeedScreenState extends State<FeedScreen> {
           poll: poll,
           accessToken: widget.session.accessToken,
           pollsApiClient: _pollsApiClient,
+          currentUserId: widget.session.user.id,
         ),
       ),
     );

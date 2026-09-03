@@ -233,6 +233,27 @@ void main() {
     expect(result.poll.commentsCount, 1);
   });
 
+  test('deletes a poll comment through the comment route', () async {
+    late http.Request sentRequest;
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((request) async {
+        sentRequest = request;
+        return http.Response('', 204);
+      }),
+    );
+
+    await client.deleteComment(
+      pollId: 'poll-1',
+      commentId: 'comment-1',
+      accessToken: 'access-token',
+    );
+
+    expect(sentRequest.method, 'DELETE');
+    expect(sentRequest.url.path, '/polls/poll-1/comments/comment-1');
+    expect(sentRequest.headers['authorization'], 'Bearer access-token');
+  });
+
   test('likes a comment through the comment-like route', () async {
     late http.Request sentRequest;
     final client = PollsApiClient(

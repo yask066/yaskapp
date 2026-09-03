@@ -418,6 +418,24 @@ class PollsApiClient {
     return _decodeCommentResponse(response, 'Unlike comment response is invalid.');
   }
 
+  Future<void> deleteComment({
+    required String pollId,
+    required String commentId,
+    required String accessToken,
+  }) async {
+    final uri = Uri.parse(_config.baseUrl).replace(
+      path: '/polls/$pollId/comments/$commentId',
+    );
+    final response = await _httpClient.delete(
+      uri,
+      headers: {'authorization': 'Bearer $accessToken'},
+    );
+
+    if (response.statusCode != 204) {
+      _decodeObject(response);
+    }
+  }
+
   Future<CreatePollCommentResult> createComment({
     required String pollId,
     required String body,

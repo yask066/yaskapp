@@ -24,6 +24,7 @@ import {
   cancelVote,
   createPoll,
   createPollComment,
+  deletePollComment,
   deletePoll,
   likePoll,
   likeComment,
@@ -368,6 +369,22 @@ export function registerPollRoutes(app: FastifyInstance) {
         userId: request.user.sub
       });
       return reply.status(201).send(result);
+    } catch (error) {
+      return pollError(reply, error);
+    }
+  });
+
+  app.delete('/polls/:pollId/comments/:commentId', { preHandler: authenticate }, async (request, reply) => {
+    const parsedParams = commentLikeParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) return validationError(reply, parsedParams.error);
+
+    try {
+      await deletePollComment({
+        pollId: parsedParams.data.pollId,
+        commentId: parsedParams.data.commentId,
+        authorId: request.user.sub
+      });
+      return reply.status(204).send();
     } catch (error) {
       return pollError(reply, error);
     }

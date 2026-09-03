@@ -260,6 +260,7 @@ class ProfileScreenState extends State<ProfileScreen> {
           poll: poll,
           accessToken: widget.accessToken,
           pollsApiClient: _pollsApiClient,
+          currentUserId: widget.user.id,
         ),
       ),
     );

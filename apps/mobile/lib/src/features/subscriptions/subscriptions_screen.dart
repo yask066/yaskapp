@@ -233,6 +233,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
           poll: poll,
           accessToken: widget.session.accessToken,
           pollsApiClient: _pollsApiClient,
+          currentUserId: widget.session.user.id,
         ),
       ),
     );

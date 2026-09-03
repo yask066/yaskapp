@@ -329,6 +329,112 @@ void main() {
     final countRect = tester.getRect(find.text('0').last);
     expect(countRect.left - iconRect.right, closeTo(1, 0.01));
   });
+
+  testWidgets('shows delete in the poll-style menu for the current user comment',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          currentUserId: 'author-1',
+          pollsApiClient: _FakePollsApiClient(
+            commentsFuture: Future.value([_comment]),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('More').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete comment'), findsOneWidget);
+    expect(find.text('Report'), findsNothing);
+    expect(find.byIcon(Icons.delete_outline), findsOneWidget);
+  });
+
+  testWidgets('shows report in the poll-style menu for another user comment',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          currentUserId: 'viewer-1',
+          pollsApiClient: _FakePollsApiClient(
+            commentsFuture: Future.value([_comment]),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('More').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Report'), findsOneWidget);
+    expect(find.text('Delete comment'), findsNothing);
+    expect(find.byIcon(Icons.flag_outlined), findsOneWidget);
+  });
+
+  testWidgets('opens the report dialog from another user comment menu',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          currentUserId: 'viewer-1',
+          pollsApiClient: _FakePollsApiClient(
+            commentsFuture: Future.value([_comment]),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('More').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Report'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Report content'), findsOneWidget);
+  });
+
+  testWidgets('confirms and removes the current user comment', (tester) async {
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([_comment]),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _pollWithComment,
+          accessToken: 'access-token',
+          currentUserId: 'author-1',
+          pollsApiClient: pollsApiClient,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('More').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete comment'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete comment?'), findsOneWidget);
+    expect(find.text('This comment will be removed permanently.'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(pollsApiClient.deleteCommentCalls, 1);
+    expect(find.text('A useful comment.'), findsNothing);
+    expect(find.text('No comments yet'), findsOneWidget);
+    expect(find.text('0 comments'), findsOneWidget);
+  });
 }
 
 final _poll = PollSummary(
@@ -428,15 +534,19 @@ class _FakePollsApiClient extends PollsApiClient {
     required this.commentsFuture,
     Future<CreatePollCommentResult>? createCommentFuture,
     Future<PollCommentSummary>? likeCommentFuture,
+    Future<void>? deleteCommentFuture,
   }) : createCommentFuture =
             createCommentFuture ?? Future.value(_createCommentResult),
-       likeCommentFuture = likeCommentFuture ?? Future.value(_likedComment);
+       likeCommentFuture = likeCommentFuture ?? Future.value(_likedComment),
+       deleteCommentFuture = deleteCommentFuture ?? Future.value();
 
   final Future<List<PollCommentSummary>> commentsFuture;
   final Future<CreatePollCommentResult> createCommentFuture;
   final Future<PollCommentSummary> likeCommentFuture;
+  final Future<void> deleteCommentFuture;
   int createCommentCalls = 0;
   int likeCommentCalls = 0;
+  int deleteCommentCalls = 0;
 
   @override
   Future<List<PollCommentSummary>> listComments({
@@ -466,6 +576,16 @@ class _FakePollsApiClient extends PollsApiClient {
   }) {
     likeCommentCalls++;
     return likeCommentFuture;
+  }
+
+  @override
+  Future<void> deleteComment({
+    required String pollId,
+    required String commentId,
+    required String accessToken,
+  }) {
+    deleteCommentCalls++;
+    return deleteCommentFuture;
   }
 
   @override

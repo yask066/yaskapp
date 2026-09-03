@@ -2233,6 +2233,69 @@ test('creating a poll comment requires authentication', async () => {
   assert.equal(response.json<{ error: string }>().error, 'unauthorized');
 });
 
+test('comment authors can delete their own comment and other users cannot', async () => {
+  const author = await registerTestUser();
+  const otherUser = await registerTestUser();
+
+  const createPollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(author.accessToken),
+    payload: {
+      question: 'Who can delete this comment?',
+      options: ['The author', 'Nobody']
+    }
+  });
+  assert.equal(createPollResponse.statusCode, 201, createPollResponse.body);
+
+  const poll = createPollResponse.json<PollResponse>().poll;
+  const createCommentResponse = await app.inject({
+    method: 'POST',
+    url: `/polls/${poll.id}/comments`,
+    headers: bearer(author.accessToken),
+    payload: { body: 'Only the author should delete this.' }
+  });
+  assert.equal(createCommentResponse.statusCode, 201, createCommentResponse.body);
+
+  const comment = createCommentResponse.json<CreateCommentResponse>().comment;
+  const otherDeleteResponse = await app.inject({
+    method: 'DELETE',
+    url: `/polls/${poll.id}/comments/${comment.id}`,
+    headers: bearer(otherUser.accessToken)
+  });
+  assert.equal(otherDeleteResponse.statusCode, 404, otherDeleteResponse.body);
+
+  const deleteResponse = await app.inject({
+    method: 'DELETE',
+    url: `/polls/${poll.id}/comments/${comment.id}`,
+    headers: bearer(author.accessToken)
+  });
+  assert.equal(deleteResponse.statusCode, 204, deleteResponse.body);
+
+  const listResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${poll.id}/comments`
+  });
+  assert.equal(listResponse.statusCode, 200, listResponse.body);
+  assert.deepEqual(listResponse.json<ListCommentsResponse>().items, []);
+
+  const counterResponse = await db.query<{ comments_count: number }>(
+    'SELECT comments_count FROM polls WHERE id = $1',
+    [poll.id]
+  );
+  assert.equal(counterResponse.rows[0]?.comments_count, 0);
+});
+
+test('deleting a poll comment requires authentication', async () => {
+  const response = await app.inject({
+    method: 'DELETE',
+    url: '/polls/00000000-0000-0000-0000-000000000000/comments/00000000-0000-0000-0000-000000000000'
+  });
+
+  assert.equal(response.statusCode, 401, response.body);
+  assert.equal(response.json<{ error: string }>().error, 'unauthorized');
+});
+
 test('poll comment creation validates request body', async () => {
   const registered = await registerTestUser();
 

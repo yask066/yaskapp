@@ -17,6 +17,7 @@ class PollCommentsScreen extends StatefulWidget {
     required this.poll,
     required this.accessToken,
     required this.pollsApiClient,
+    this.currentUserId,
     this.reportsApiClient,
     super.key,
   });
@@ -24,6 +25,7 @@ class PollCommentsScreen extends StatefulWidget {
   final PollSummary poll;
   final String accessToken;
   final PollsApiClient pollsApiClient;
+  final String? currentUserId;
   final ReportsApiClient? reportsApiClient;
 
   @override
@@ -36,6 +38,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
   late PollSummary _poll;
   List<PollCommentSummary>? _comments;
   bool _isSubmittingComment = false;
+  bool _isDeletingComment = false;
   final Set<String> _likingCommentIds = {};
   late final ReportsApiClient _reportsApiClient;
   late final bool _ownsReportsApiClient;
@@ -167,6 +170,70 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
       _showSnackBar('Could not update comment like.');
     } finally {
       if (mounted) setState(() => _likingCommentIds.remove(comment.id));
+    }
+  }
+
+  Future<void> _deleteComment(PollCommentSummary comment) async {
+    if (_isDeletingComment) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete comment?'),
+        content: const Text('This comment will be removed permanently.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() => _isDeletingComment = true);
+
+    try {
+      await widget.pollsApiClient.deleteComment(
+        pollId: _poll.id,
+        commentId: comment.id,
+        accessToken: widget.accessToken,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      final updatedComments = (_comments ?? [])
+          .where((item) => item.id != comment.id)
+          .toList();
+      final updatedPoll = _poll.copyWith(
+        commentsCount: _poll.commentsCount > 0 ? _poll.commentsCount - 1 : 0,
+      );
+
+      setState(() {
+        _poll = updatedPoll;
+        _comments = updatedComments;
+        _commentsFuture = Future.value(updatedComments);
+      });
+      _showSnackBar('Comment deleted.');
+    } on PollsApiException catch (error) {
+      _showSnackBar(error.userMessage);
+    } catch (_) {
+      _showSnackBar('Could not delete comment.');
+    } finally {
+      if (mounted) {
+        setState(() => _isDeletingComment = false);
+      }
     }
   }
 
@@ -304,7 +371,13 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                             for (final comment in comments) ...[
                               _CommentTile(
                                 comment: comment,
-                                onReport: () => _reportComment(comment),
+                                onDelete: widget.currentUserId == comment.author.id
+                                    ? () => _deleteComment(comment)
+                                    : null,
+                                onReport: widget.currentUserId != null &&
+                                        widget.currentUserId != comment.author.id
+                                    ? () => _reportComment(comment)
+                                    : null,
                                 onToggleLike: _likingCommentIds.contains(comment.id)
                                     ? null
                                     : () => _toggleCommentLike(comment),
@@ -499,9 +572,15 @@ class _CommentsErrorState extends StatelessWidget {
 }
 
 class _CommentTile extends StatelessWidget {
-  const _CommentTile({required this.comment, this.onReport, this.onToggleLike});
+  const _CommentTile({
+    required this.comment,
+    this.onDelete,
+    this.onReport,
+    this.onToggleLike,
+  });
 
   final PollCommentSummary comment;
+  final VoidCallback? onDelete;
   final VoidCallback? onReport;
   final VoidCallback? onToggleLike;
 
@@ -586,14 +665,48 @@ class _CommentTile extends StatelessWidget {
                           color: _commentsSecondaryText, fontSize: 14),
                     ),
                     const Spacer(),
-                    if (onReport != null)
-                      IconButton(
-                        tooltip: 'More',
-                        onPressed: onReport,
-                        icon: const Icon(
-                          Icons.more_horiz,
-                          color: _commentsPrimaryText,
-                          size: 20,
+                    if (onDelete != null || onReport != null)
+                      SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: PopupMenuButton<_CommentAction>(
+                          tooltip: 'More',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 220),
+                          menuPadding: const EdgeInsets.symmetric(vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 6,
+                          icon: const Icon(Icons.more_vert, size: 22),
+                          onSelected: (action) {
+                            if (action == _CommentAction.deleteComment) {
+                              onDelete?.call();
+                            } else if (action == _CommentAction.report) {
+                              onReport?.call();
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            if (onDelete != null)
+                              const PopupMenuItem<_CommentAction>(
+                                value: _CommentAction.deleteComment,
+                                height: 52,
+                                child: _CommentMenuRow(
+                                  icon: Icons.delete_outline,
+                                  label: 'Delete comment',
+                                  destructive: true,
+                                ),
+                              ),
+                            if (onReport != null)
+                              const PopupMenuItem<_CommentAction>(
+                                value: _CommentAction.report,
+                                height: 52,
+                                child: _CommentMenuRow(
+                                  icon: Icons.flag_outlined,
+                                  label: 'Report',
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                   ],
@@ -603,6 +716,41 @@ class _CommentTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+enum _CommentAction { deleteComment, report }
+
+class _CommentMenuRow extends StatelessWidget {
+  const _CommentMenuRow({
+    required this.icon,
+    required this.label,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = destructive
+        ? Theme.of(context).colorScheme.error
+        : const Color(0xFF17233D);
+    return Row(
+      children: [
+        Icon(icon, size: 24, color: color),
+        const SizedBox(width: 16),
+        Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 16,
+            fontWeight: destructive ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 }

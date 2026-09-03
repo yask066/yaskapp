@@ -423,6 +423,57 @@ export async function deletePollRecord(input: {
   }
 }
 
+export async function deletePollCommentRecord(input: {
+  pollId: string;
+  commentId: string;
+  authorId: string;
+}) {
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `
+        UPDATE comments c
+        SET deleted_at = now(), updated_at = now()
+        FROM polls p
+        WHERE c.id = $1
+          AND c.poll_id = $2
+          AND c.author_id = $3
+          AND c.deleted_at IS NULL
+          AND p.id = c.poll_id
+          AND p.visibility = 'public'
+          AND p.deleted_at IS NULL
+        RETURNING c.id
+      `,
+      [input.commentId, input.pollId, input.authorId]
+    );
+
+    if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    await client.query(
+      `
+        UPDATE polls
+        SET comments_count = GREATEST(comments_count - 1, 0), updated_at = now()
+        WHERE id = $1
+      `,
+      [input.pollId]
+    );
+
+    await client.query('COMMIT');
+    return { status: 'deleted' as const };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function listPublicPollRecords(
   limit: number,
   viewerId?: string,

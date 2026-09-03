@@ -312,6 +312,7 @@ class _SearchScreenState extends State<SearchScreen> {
           poll: poll,
           accessToken: widget.session.accessToken,
           pollsApiClient: _pollsApiClient,
+          currentUserId: widget.session.user.id,
         ),
       ),
     );
