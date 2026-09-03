@@ -13,6 +13,7 @@
 !.env.example
 backups/
 infra/docker/secrets/
+.worktrees/
 
 # Node.js
 node_modules/
