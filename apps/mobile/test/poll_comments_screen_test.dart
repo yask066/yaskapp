@@ -330,6 +330,46 @@ void main() {
     expect(countRect.left - iconRect.right, closeTo(1, 0.01));
   });
 
+  testWidgets('aligns comment actions to the left edge of the comment body', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          pollsApiClient: _FakePollsApiClient(
+            commentsFuture: Future.value([_comment]),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final likeButton = find.byKey(const ValueKey('like-comment-comment-1'));
+    await tester.scrollUntilVisible(
+      likeButton,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    final bodyRect = tester.getRect(find.text('A useful comment.'));
+    final iconRect = tester.getRect(
+      find.descendant(
+        of: likeButton,
+        matching: find.byIcon(Icons.favorite_border),
+      ),
+    );
+    final replyRect = tester.getRect(find.text('Reply'));
+
+    expect(iconRect.left, closeTo(bodyRect.left, 0.01));
+    expect(replyRect.left, closeTo(bodyRect.left + 45, 0.5));
+  });
+
   testWidgets('shows delete in the poll-style menu for the current user comment',
       (tester) async {
     await tester.pumpWidget(

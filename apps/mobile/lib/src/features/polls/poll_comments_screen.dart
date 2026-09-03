@@ -644,8 +644,11 @@ class _CommentTile extends StatelessWidget {
                       tooltip: comment.viewerHasLiked ? 'Unlike comment' : 'Like comment',
                       onPressed: onToggleLike,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints.tightFor(width: 24, height: 24),
-                      alignment: Alignment.centerRight,
+                      constraints: const BoxConstraints.tightFor(width: 18, height: 24),
+                      style: IconButton.styleFrom(
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      alignment: Alignment.centerLeft,
                       icon: Icon(
                         comment.viewerHasLiked ? Icons.favorite : Icons.favorite_border,
                         size: 18,
@@ -655,10 +658,10 @@ class _CommentTile extends StatelessWidget {
                     const SizedBox(width: 1),
                     Text(
                       '${comment.likesCount}',
-                      style: TextStyle(
+                      style: const TextStyle(
                           color: _commentsSecondaryText, fontSize: 14),
                     ),
-                    const SizedBox(width: 20),
+                    const SizedBox(width: 12),
                     const Text(
                       'Reply',
                       style: TextStyle(
