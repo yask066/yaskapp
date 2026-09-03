@@ -76,6 +76,7 @@ const commentsParamsSchema = z.object({
 }).strict();
 
 const commentLikeParamsSchema = z.object({
+  pollId: uuidSchema,
   commentId: uuidSchema
 }).strict();
 
@@ -356,12 +357,13 @@ export function registerPollRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/comments/:commentId/likes', { preHandler: authenticate }, async (request, reply) => {
+  app.post('/polls/:pollId/comments/:commentId/likes', { preHandler: authenticate }, async (request, reply) => {
     const parsedParams = commentLikeParamsSchema.safeParse(request.params);
     if (!parsedParams.success) return validationError(reply, parsedParams.error);
 
     try {
       const result = await likeComment({
+        pollId: parsedParams.data.pollId,
         commentId: parsedParams.data.commentId,
         userId: request.user.sub
       });
@@ -371,12 +373,13 @@ export function registerPollRoutes(app: FastifyInstance) {
     }
   });
 
-  app.delete('/comments/:commentId/likes', { preHandler: authenticate }, async (request, reply) => {
+  app.delete('/polls/:pollId/comments/:commentId/likes', { preHandler: authenticate }, async (request, reply) => {
     const parsedParams = commentLikeParamsSchema.safeParse(request.params);
     if (!parsedParams.success) return validationError(reply, parsedParams.error);
 
     try {
       const result = await unlikeComment({
+        pollId: parsedParams.data.pollId,
         commentId: parsedParams.data.commentId,
         userId: request.user.sub
       });

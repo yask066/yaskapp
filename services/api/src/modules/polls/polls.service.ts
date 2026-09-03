@@ -57,6 +57,7 @@ export type UnlikePollInput = {
 };
 
 export type LikeCommentInput = {
+  pollId: string;
   commentId: string;
   userId: string;
 };

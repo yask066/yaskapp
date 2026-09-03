@@ -253,12 +253,13 @@ void main() {
     );
 
     final comment = await client.likeComment(
+      pollId: 'poll-1',
       commentId: 'comment-1',
       accessToken: 'access-token',
     );
 
     expect(sentRequest.method, 'POST');
-    expect(sentRequest.url.path, '/comments/comment-1/likes');
+    expect(sentRequest.url.path, '/polls/poll-1/comments/comment-1/likes');
     expect(sentRequest.headers['authorization'], 'Bearer access-token');
     expect(comment.likesCount, 1);
     expect(comment.viewerHasLiked, isTrue);

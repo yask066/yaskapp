@@ -794,12 +794,12 @@ async function findCommentForUpdate(client: PoolClient, commentId: string) {
   return result.rows[0] ?? null;
 }
 
-export async function likeCommentRecord(input: { commentId: string; userId: string }) {
+export async function likeCommentRecord(input: { pollId: string; commentId: string; userId: string }) {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
     const comment = await findCommentForUpdate(client, input.commentId);
-    if (!comment) {
+    if (!comment || comment.poll_id !== input.pollId) {
       await client.query('ROLLBACK');
       return { status: 'not_found' as const };
     }
@@ -840,12 +840,12 @@ export async function likeCommentRecord(input: { commentId: string; userId: stri
   }
 }
 
-export async function unlikeCommentRecord(input: { commentId: string; userId: string }) {
+export async function unlikeCommentRecord(input: { pollId: string; commentId: string; userId: string }) {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
     const comment = await findCommentForUpdate(client, input.commentId);
-    if (!comment) {
+    if (!comment || comment.poll_id !== input.pollId) {
       await client.query('ROLLBACK');
       return { status: 'not_found' as const };
     }

@@ -387,11 +387,12 @@ class PollsApiClient {
   }
 
   Future<PollCommentSummary> likeComment({
+    required String pollId,
     required String commentId,
     required String accessToken,
   }) async {
     final uri = Uri.parse(_config.baseUrl).replace(
-      path: '/comments/$commentId/likes',
+      path: '/polls/$pollId/comments/$commentId/likes',
     );
     final response = await _httpClient.post(
       uri,
@@ -402,11 +403,12 @@ class PollsApiClient {
   }
 
   Future<PollCommentSummary> unlikeComment({
+    required String pollId,
     required String commentId,
     required String accessToken,
   }) async {
     final uri = Uri.parse(_config.baseUrl).replace(
-      path: '/comments/$commentId/likes',
+      path: '/polls/$pollId/comments/$commentId/likes',
     );
     final response = await _httpClient.delete(
       uri,

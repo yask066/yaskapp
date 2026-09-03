@@ -143,10 +143,12 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
     try {
       final updated = comment.viewerHasLiked
           ? await widget.pollsApiClient.unlikeComment(
+              pollId: _poll.id,
               commentId: comment.id,
               accessToken: widget.accessToken,
             )
           : await widget.pollsApiClient.likeComment(
+              pollId: _poll.id,
               commentId: comment.id,
               accessToken: widget.accessToken,
             );

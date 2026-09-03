@@ -423,6 +423,7 @@ class _FakePollsApiClient extends PollsApiClient {
 
   @override
   Future<PollCommentSummary> likeComment({
+    required String pollId,
     required String commentId,
     required String accessToken,
   }) {
