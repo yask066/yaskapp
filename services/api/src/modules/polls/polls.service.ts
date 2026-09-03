@@ -5,10 +5,12 @@ import {
   cancelVoteRecord,
   createVoteRecord,
   likePollRecord,
+  likeCommentRecord,
   listPollCommentRecords,
   listPublicPollRecords,
   listSubscriptionPollRecords,
-  unlikePollRecord
+  unlikePollRecord,
+  unlikeCommentRecord
 } from './polls.repository.js';
 import { deletePollImageObject, PollImageStorageError } from './poll-images.service.js';
 import type { PollVisibility } from './polls.repository.js';
@@ -53,6 +55,13 @@ export type UnlikePollInput = {
   pollId: string;
   userId: string;
 };
+
+export type LikeCommentInput = {
+  commentId: string;
+  userId: string;
+};
+
+export type UnlikeCommentInput = LikeCommentInput;
 
 export type ListPollCommentsInput = {
   pollId: string;
@@ -113,7 +122,7 @@ export async function listSubscriptionPolls(followerId: string, limit: number) {
   return listSubscriptionPollRecords(followerId, limit);
 }
 
-export async function listPollComments(input: ListPollCommentsInput) {
+export async function listPollComments(input: ListPollCommentsInput & { viewerId?: string }) {
   const result = await listPollCommentRecords(input);
 
   if (result.status === 'not_found') {
@@ -232,4 +241,20 @@ export async function unlikePoll(input: UnlikePollInput) {
   return {
     poll: result.poll
   };
+}
+
+export async function likeComment(input: LikeCommentInput) {
+  const result = await likeCommentRecord(input);
+  if (result.status === 'not_found') {
+    throw new PollNotFoundError('Comment was not found.');
+  }
+  return { comment: result.comment };
+}
+
+export async function unlikeComment(input: UnlikeCommentInput) {
+  const result = await unlikeCommentRecord(input);
+  if (result.status === 'not_found') {
+    throw new PollNotFoundError('Comment was not found.');
+  }
+  return { comment: result.comment };
 }

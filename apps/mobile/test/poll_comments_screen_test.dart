@@ -257,6 +257,41 @@ void main() {
     expect(find.text('Could not load comments'), findsOneWidget);
     expect(find.text('Retry'), findsOneWidget);
   });
+
+  testWidgets('likes a comment and updates its count', (tester) async {
+    tester.view.physicalSize = const Size(400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([_comment]),
+      likeCommentFuture: Future.value(_likedComment),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          pollsApiClient: pollsApiClient,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final likeButton = find.byKey(const ValueKey('like-comment-comment-1'));
+    await tester.scrollUntilVisible(
+      likeButton,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(likeButton);
+    await tester.pumpAndSettle();
+
+    expect(pollsApiClient.likeCommentCalls, 1);
+    expect(find.text('1'), findsOneWidget);
+    expect(find.byTooltip('Unlike comment'), findsOneWidget);
+  });
 }
 
 final _poll = PollSummary(
@@ -331,6 +366,21 @@ final _comment = PollCommentSummary(
   updatedAt: DateTime(2026, 7, 17, 12, 1),
 );
 
+final _likedComment = PollCommentSummary(
+  id: 'comment-1',
+  pollId: 'poll-1',
+  author: const PollAuthorSummary(
+    id: 'author-1',
+    username: 'author',
+    displayName: 'Author',
+  ),
+  body: 'A useful comment.',
+  likesCount: 1,
+  viewerHasLiked: true,
+  createdAt: DateTime(2026, 7, 17, 12, 1),
+  updatedAt: DateTime(2026, 7, 17, 12, 1),
+);
+
 final _createCommentResult = CreatePollCommentResult(
   comment: _comment,
   poll: _pollWithComment,
@@ -340,17 +390,22 @@ class _FakePollsApiClient extends PollsApiClient {
   _FakePollsApiClient({
     required this.commentsFuture,
     Future<CreatePollCommentResult>? createCommentFuture,
+    Future<PollCommentSummary>? likeCommentFuture,
   }) : createCommentFuture =
-            createCommentFuture ?? Future.value(_createCommentResult);
+            createCommentFuture ?? Future.value(_createCommentResult),
+       likeCommentFuture = likeCommentFuture ?? Future.value(_likedComment);
 
   final Future<List<PollCommentSummary>> commentsFuture;
   final Future<CreatePollCommentResult> createCommentFuture;
+  final Future<PollCommentSummary> likeCommentFuture;
   int createCommentCalls = 0;
+  int likeCommentCalls = 0;
 
   @override
   Future<List<PollCommentSummary>> listComments({
     required String pollId,
     int limit = 50,
+    String? accessToken,
   }) {
     return commentsFuture;
   }
@@ -364,6 +419,15 @@ class _FakePollsApiClient extends PollsApiClient {
     createCommentCalls++;
 
     return createCommentFuture;
+  }
+
+  @override
+  Future<PollCommentSummary> likeComment({
+    required String commentId,
+    required String accessToken,
+  }) {
+    likeCommentCalls++;
+    return likeCommentFuture;
   }
 
   @override

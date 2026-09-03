@@ -233,6 +233,37 @@ void main() {
     expect(result.poll.commentsCount, 1);
   });
 
+  test('likes a comment through the comment-like route', () async {
+    late http.Request sentRequest;
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((request) async {
+        sentRequest = request;
+        return http.Response(
+          jsonEncode({
+            'comment': {
+              ..._commentJson(),
+              'likesCount': 1,
+              'viewerHasLiked': true,
+            },
+          }),
+          201,
+        );
+      }),
+    );
+
+    final comment = await client.likeComment(
+      commentId: 'comment-1',
+      accessToken: 'access-token',
+    );
+
+    expect(sentRequest.method, 'POST');
+    expect(sentRequest.url.path, '/comments/comment-1/likes');
+    expect(sentRequest.headers['authorization'], 'Bearer access-token');
+    expect(comment.likesCount, 1);
+    expect(comment.viewerHasLiked, isTrue);
+  });
+
   test('creates a poll with an image as multipart form data', () async {
     late http.BaseRequest sentRequest;
     final client = PollsApiClient(
@@ -281,6 +312,7 @@ Map<String, dynamic> _commentJson() {
     },
     'body': 'A useful comment.',
     'likesCount': 0,
+    'viewerHasLiked': false,
     'createdAt': '2026-07-21T10:00:00.000Z',
     'updatedAt': '2026-07-21T10:00:00.000Z',
   };

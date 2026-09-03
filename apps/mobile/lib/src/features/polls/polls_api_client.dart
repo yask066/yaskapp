@@ -357,6 +357,7 @@ class PollsApiClient {
   Future<List<PollCommentSummary>> listComments({
     required String pollId,
     int limit = 50,
+    String? accessToken,
   }) async {
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls/$pollId/comments',
@@ -364,7 +365,12 @@ class PollsApiClient {
         'limit': limit.toString(),
       },
     );
-    final response = await _httpClient.get(uri);
+    final response = await _httpClient.get(
+      uri,
+      headers: {
+        if (accessToken != null) 'authorization': 'Bearer $accessToken',
+      },
+    );
     final body = _decodeObject(response);
 
     final items = body['items'];
@@ -378,6 +384,36 @@ class PollsApiClient {
           (item) => PollCommentSummary.fromJson(item as Map<String, dynamic>),
         )
         .toList();
+  }
+
+  Future<PollCommentSummary> likeComment({
+    required String commentId,
+    required String accessToken,
+  }) async {
+    final uri = Uri.parse(_config.baseUrl).replace(
+      path: '/comments/$commentId/likes',
+    );
+    final response = await _httpClient.post(
+      uri,
+      headers: {'authorization': 'Bearer $accessToken'},
+    );
+
+    return _decodeCommentResponse(response, 'Like comment response is invalid.');
+  }
+
+  Future<PollCommentSummary> unlikeComment({
+    required String commentId,
+    required String accessToken,
+  }) async {
+    final uri = Uri.parse(_config.baseUrl).replace(
+      path: '/comments/$commentId/likes',
+    );
+    final response = await _httpClient.delete(
+      uri,
+      headers: {'authorization': 'Bearer $accessToken'},
+    );
+
+    return _decodeCommentResponse(response, 'Unlike comment response is invalid.');
   }
 
   Future<CreatePollCommentResult> createComment({
@@ -421,6 +457,20 @@ class PollsApiClient {
     }
 
     return PollSummary.fromJson(poll);
+  }
+
+  PollCommentSummary _decodeCommentResponse(
+    http.Response response,
+    String errorMessage,
+  ) {
+    final body = _decodeObject(response);
+    final comment = body['comment'];
+
+    if (comment is! Map<String, dynamic>) {
+      throw PollsApiException(errorMessage);
+    }
+
+    return PollCommentSummary.fromJson(comment);
   }
 
   Map<String, dynamic> _decodeObject(http.Response response) {

@@ -26,10 +26,12 @@ import {
   createPollComment,
   deletePoll,
   likePoll,
+  likeComment,
   listPollComments,
   listPublicPolls,
   listSubscriptionPolls,
   unlikePoll,
+  unlikeComment,
   voteOnPoll
 } from './polls.service.js';
 
@@ -71,6 +73,10 @@ const likeParamsSchema = z.object({
 
 const commentsParamsSchema = z.object({
   pollId: uuidSchema
+}).strict();
+
+const commentLikeParamsSchema = z.object({
+  commentId: uuidSchema
 }).strict();
 
 const commentsQuerySchema = z.object({
@@ -326,7 +332,7 @@ export function registerPollRoutes(app: FastifyInstance) {
     }
   );
 
-  app.get('/polls/:pollId/comments', async (request, reply) => {
+  app.get('/polls/:pollId/comments', { preHandler: optionalAuthenticate }, async (request, reply) => {
     const parsedParams = commentsParamsSchema.safeParse(request.params);
 
     if (!parsedParams.success) {
@@ -342,8 +348,39 @@ export function registerPollRoutes(app: FastifyInstance) {
     try {
       return await listPollComments({
         pollId: parsedParams.data.pollId,
-        limit: parsedQuery.data.limit
+        limit: parsedQuery.data.limit,
+        viewerId: request.user?.sub
       });
+    } catch (error) {
+      return pollError(reply, error);
+    }
+  });
+
+  app.post('/comments/:commentId/likes', { preHandler: authenticate }, async (request, reply) => {
+    const parsedParams = commentLikeParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) return validationError(reply, parsedParams.error);
+
+    try {
+      const result = await likeComment({
+        commentId: parsedParams.data.commentId,
+        userId: request.user.sub
+      });
+      return reply.status(201).send(result);
+    } catch (error) {
+      return pollError(reply, error);
+    }
+  });
+
+  app.delete('/comments/:commentId/likes', { preHandler: authenticate }, async (request, reply) => {
+    const parsedParams = commentLikeParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) return validationError(reply, parsedParams.error);
+
+    try {
+      const result = await unlikeComment({
+        commentId: parsedParams.data.commentId,
+        userId: request.user.sub
+      });
+      return reply.send(result);
     } catch (error) {
       return pollError(reply, error);
     }
