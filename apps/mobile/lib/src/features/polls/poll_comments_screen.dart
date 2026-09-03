@@ -566,13 +566,14 @@ class _CommentTile extends StatelessWidget {
                       onPressed: onToggleLike,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints.tightFor(width: 24, height: 24),
+                      alignment: Alignment.centerRight,
                       icon: Icon(
                         comment.viewerHasLiked ? Icons.favorite : Icons.favorite_border,
                         size: 18,
                         color: comment.viewerHasLiked ? Colors.redAccent : _commentsSecondaryText,
                       ),
                     ),
-                    const SizedBox(width: 0.5),
+                    const SizedBox(width: 2),
                     Text(
                       '${comment.likesCount}',
                       style: TextStyle(

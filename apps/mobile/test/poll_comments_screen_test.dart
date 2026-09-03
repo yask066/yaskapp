@@ -320,9 +320,14 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
 
-    final buttonRect = tester.getRect(likeButton);
+    final iconRect = tester.getRect(
+      find.descendant(
+        of: likeButton,
+        matching: find.byIcon(Icons.favorite_border),
+      ),
+    );
     final countRect = tester.getRect(find.text('0').last);
-    expect(countRect.left - buttonRect.right, closeTo(0.5, 0.01));
+    expect(countRect.left - iconRect.right, closeTo(2, 0.01));
   });
 }
 
