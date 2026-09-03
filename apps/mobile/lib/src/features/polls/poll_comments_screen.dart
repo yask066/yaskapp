@@ -572,7 +572,7 @@ class _CommentTile extends StatelessWidget {
                         color: comment.viewerHasLiked ? Colors.redAccent : _commentsSecondaryText,
                       ),
                     ),
-                    const SizedBox(width: 2),
+                    const SizedBox(width: 1),
                     Text(
                       '${comment.likesCount}',
                       style: TextStyle(
