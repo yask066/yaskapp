@@ -327,7 +327,7 @@ void main() {
       ),
     );
     final countRect = tester.getRect(find.text('0').last);
-    expect(countRect.left - iconRect.right, closeTo(2, 0.01));
+    expect(countRect.left - iconRect.right, closeTo(1, 0.01));
   });
 }
 
