@@ -36,6 +36,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
   late PollSummary _poll;
   List<PollCommentSummary>? _comments;
   bool _isSubmittingComment = false;
+  final Set<String> _likingCommentIds = {};
   late final ReportsApiClient _reportsApiClient;
   late final bool _ownsReportsApiClient;
 
@@ -66,7 +67,10 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
   }
 
   Future<List<PollCommentSummary>> _loadComments() {
-    return widget.pollsApiClient.listComments(pollId: _poll.id).then((
+    return widget.pollsApiClient.listComments(
+      pollId: _poll.id,
+      accessToken: widget.accessToken,
+    ).then((
       comments,
     ) {
       _comments = comments;
@@ -126,6 +130,41 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
           _isSubmittingComment = false;
         });
       }
+    }
+  }
+
+  Future<void> _toggleCommentLike(PollCommentSummary comment) async {
+    if (_likingCommentIds.contains(comment.id)) {
+      return;
+    }
+
+    setState(() => _likingCommentIds.add(comment.id));
+
+    try {
+      final updated = comment.viewerHasLiked
+          ? await widget.pollsApiClient.unlikeComment(
+              commentId: comment.id,
+              accessToken: widget.accessToken,
+            )
+          : await widget.pollsApiClient.likeComment(
+              commentId: comment.id,
+              accessToken: widget.accessToken,
+            );
+      if (!mounted) return;
+
+      final comments = (_comments ?? []).map((item) {
+        return item.id == updated.id ? updated : item;
+      }).toList();
+      setState(() {
+        _comments = comments;
+        _commentsFuture = Future.value(comments);
+      });
+    } on PollsApiException catch (error) {
+      _showSnackBar(error.message);
+    } catch (_) {
+      _showSnackBar('Could not update comment like.');
+    } finally {
+      if (mounted) setState(() => _likingCommentIds.remove(comment.id));
     }
   }
 
@@ -264,6 +303,9 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                               _CommentTile(
                                 comment: comment,
                                 onReport: () => _reportComment(comment),
+                                onToggleLike: _likingCommentIds.contains(comment.id)
+                                    ? null
+                                    : () => _toggleCommentLike(comment),
                               ),
                               const Divider(
                                 height: 1,
@@ -455,10 +497,11 @@ class _CommentsErrorState extends StatelessWidget {
 }
 
 class _CommentTile extends StatelessWidget {
-  const _CommentTile({required this.comment, this.onReport});
+  const _CommentTile({required this.comment, this.onReport, this.onToggleLike});
 
   final PollCommentSummary comment;
   final VoidCallback? onReport;
+  final VoidCallback? onToggleLike;
 
   @override
   Widget build(BuildContext context) {
@@ -515,14 +558,21 @@ class _CommentTile extends StatelessWidget {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Icon(
-                      Icons.favorite_border,
-                      size: 18,
-                      color: _commentsSecondaryText,
+                    IconButton(
+                      key: ValueKey('like-comment-${comment.id}'),
+                      tooltip: comment.viewerHasLiked ? 'Unlike comment' : 'Like comment',
+                      onPressed: onToggleLike,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints.tightFor(width: 24, height: 24),
+                      icon: Icon(
+                        comment.viewerHasLiked ? Icons.favorite : Icons.favorite_border,
+                        size: 18,
+                        color: comment.viewerHasLiked ? Colors.redAccent : _commentsSecondaryText,
+                      ),
                     ),
                     const SizedBox(width: 8),
-                    const Text(
-                      'Like',
+                    Text(
+                      '${comment.likesCount}',
                       style: TextStyle(
                           color: _commentsSecondaryText, fontSize: 14),
                     ),

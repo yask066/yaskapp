@@ -54,6 +54,7 @@ class PollCommentSummary {
     required this.author,
     required this.body,
     required this.likesCount,
+    this.viewerHasLiked = false,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -66,6 +67,7 @@ class PollCommentSummary {
           PollAuthorSummary.fromJson(json['author'] as Map<String, dynamic>),
       body: json['body'] as String,
       likesCount: json['likesCount'] as int,
+      viewerHasLiked: json['viewerHasLiked'] as bool? ?? false,
       createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
       updatedAt: DateTime.parse(json['updatedAt'] as String).toLocal(),
     );
@@ -76,6 +78,7 @@ class PollCommentSummary {
   final PollAuthorSummary author;
   final String body;
   final int likesCount;
+  final bool viewerHasLiked;
   final DateTime createdAt;
   final DateTime updatedAt;
 

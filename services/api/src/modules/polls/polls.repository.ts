@@ -28,6 +28,7 @@ export type PollComment = {
   author: PollAuthor;
   body: string;
   likesCount: number;
+  viewerHasLiked: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -107,6 +108,7 @@ type PollCommentRow = {
   author_avatar_object_key: string | null;
   body: string;
   likes_count: number;
+  viewer_has_liked: boolean;
   created_at: Date;
   updated_at: Date;
 };
@@ -167,6 +169,7 @@ function mapComment(row: PollCommentRow): PollComment {
     },
     body: row.body,
     likesCount: row.likes_count,
+    viewerHasLiked: row.viewer_has_liked,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString()
   };
@@ -594,7 +597,7 @@ export async function findViewablePollImageRecord(
   return result.rows[0] ?? null;
 }
 
-export async function listPollCommentRecords(input: { pollId: string; limit: number }) {
+export async function listPollCommentRecords(input: { pollId: string; limit: number; viewerId?: string }) {
   const client = await db.connect();
 
   try {
@@ -624,6 +627,10 @@ export async function listPollCommentRecords(input: { pollId: string; limit: num
           pr.avatar_object_key AS author_avatar_object_key,
           c.body,
           c.likes_count,
+          EXISTS (
+            SELECT 1 FROM likes l
+            WHERE l.comment_id = c.id AND l.user_id = $3
+          ) AS viewer_has_liked,
           c.created_at,
           c.updated_at
         FROM comments c
@@ -635,7 +642,7 @@ export async function listPollCommentRecords(input: { pollId: string; limit: num
         ORDER BY c.created_at ASC
         LIMIT $2
       `,
-      [input.pollId, input.limit]
+      [input.pollId, input.limit, input.viewerId ?? null]
     );
 
     return {
@@ -694,6 +701,7 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
           pr.avatar_object_key AS author_avatar_object_key,
           c.body,
           c.likes_count,
+          false AS viewer_has_liked,
           c.created_at,
           c.updated_at
         FROM inserted_comment c
@@ -751,6 +759,125 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
       comment: mapComment(comment),
       poll
     };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function findCommentForUpdate(client: PoolClient, commentId: string) {
+  const result = await client.query<PollCommentRow>(
+    `
+      SELECT
+        c.id, c.poll_id, c.author_id,
+        u.username::text AS author_username,
+        pr.display_name AS author_display_name,
+        pr.avatar_object_key AS author_avatar_object_key,
+        c.body, c.likes_count,
+        false AS viewer_has_liked,
+        c.created_at, c.updated_at
+      FROM comments c
+      JOIN polls p ON p.id = c.poll_id
+      JOIN users u ON u.id = c.author_id
+      JOIN profiles pr ON pr.user_id = c.author_id
+      WHERE c.id = $1
+        AND p.visibility = 'public'
+        AND p.deleted_at IS NULL
+        AND c.deleted_at IS NULL
+      FOR UPDATE OF c
+    `,
+    [commentId]
+  );
+
+  return result.rows[0] ?? null;
+}
+
+export async function likeCommentRecord(input: { commentId: string; userId: string }) {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const comment = await findCommentForUpdate(client, input.commentId);
+    if (!comment) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    const result = await client.query(
+      `INSERT INTO likes (user_id, comment_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [input.userId, input.commentId]
+    );
+    if (result.rowCount === 1) {
+      await client.query(
+        'UPDATE comments SET likes_count = likes_count + 1 WHERE id = $1',
+        [input.commentId]
+      );
+    }
+
+    const updated = await client.query<PollCommentRow>(
+      `
+        SELECT c.id, c.poll_id, c.author_id,
+          u.username::text AS author_username,
+          pr.display_name AS author_display_name,
+          pr.avatar_object_key AS author_avatar_object_key,
+          c.body, c.likes_count, true AS viewer_has_liked,
+          c.created_at, c.updated_at
+        FROM comments c
+        JOIN users u ON u.id = c.author_id
+        JOIN profiles pr ON pr.user_id = c.author_id
+        WHERE c.id = $1
+      `,
+      [input.commentId]
+    );
+    await client.query('COMMIT');
+    return { status: 'liked' as const, comment: mapComment(updated.rows[0]) };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function unlikeCommentRecord(input: { commentId: string; userId: string }) {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const comment = await findCommentForUpdate(client, input.commentId);
+    if (!comment) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    const result = await client.query(
+      'DELETE FROM likes WHERE user_id = $1 AND comment_id = $2',
+      [input.userId, input.commentId]
+    );
+    if (result.rowCount === 1) {
+      await client.query(
+        'UPDATE comments SET likes_count = GREATEST(likes_count - 1, 0) WHERE id = $1',
+        [input.commentId]
+      );
+    }
+
+    const updated = await client.query<PollCommentRow>(
+      `
+        SELECT c.id, c.poll_id, c.author_id,
+          u.username::text AS author_username,
+          pr.display_name AS author_display_name,
+          pr.avatar_object_key AS author_avatar_object_key,
+          c.body, c.likes_count, false AS viewer_has_liked,
+          c.created_at, c.updated_at
+        FROM comments c
+        JOIN users u ON u.id = c.author_id
+        JOIN profiles pr ON pr.user_id = c.author_id
+        WHERE c.id = $1
+      `,
+      [input.commentId]
+    );
+    await client.query('COMMIT');
+    return { status: 'unliked' as const, comment: mapComment(updated.rows[0]) };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
