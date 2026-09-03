@@ -292,6 +292,38 @@ void main() {
     expect(find.text('1'), findsOneWidget);
     expect(find.byTooltip('Unlike comment'), findsOneWidget);
   });
+
+  testWidgets('places comment like count half as close to the heart', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          pollsApiClient: _FakePollsApiClient(
+            commentsFuture: Future.value([_comment]),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final likeButton = find.byKey(const ValueKey('like-comment-comment-1'));
+    await tester.scrollUntilVisible(
+      likeButton,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    final buttonRect = tester.getRect(likeButton);
+    final countRect = tester.getRect(find.text('0').last);
+    expect(countRect.left - buttonRect.right, closeTo(0.5, 0.01));
+  });
 }
 
 final _poll = PollSummary(
