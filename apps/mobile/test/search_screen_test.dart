@@ -215,6 +215,23 @@ void main() {
     expect(pollsClient.votedOptionId, 'option-1');
   });
 
+  testWidgets('opens the preview when tapping a top poll', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        _FakeSearchApiClient(),
+        pollsApiClient: _FakePollsApiClient(PollSummaryFixture.poll),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Climate?'));
+    await tester.tap(find.text('Climate?'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(find.text('Poll details'), findsOneWidget);
+  });
+
   testWidgets('shows empty and retryable error states', (tester) async {
     final client = _FakeSearchApiClient(
       pages: [

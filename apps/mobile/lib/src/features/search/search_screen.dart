@@ -911,33 +911,37 @@ class _SearchScreenState extends State<SearchScreen> {
       children: _topPolls
           .map((poll) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: _discoveryCard(
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(poll.question,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w700, fontSize: 16)),
-                          const SizedBox(height: 14),
-                          Row(children: [
-                            Expanded(child: Text(_leadingOption(poll).text)),
-                            const SizedBox(width: 12),
-                            Expanded(
-                                child: LinearProgressIndicator(
-                                    value: _leadingOptionRatio(poll),
-                                    minHeight: 5,
-                                    borderRadius: BorderRadius.circular(5))),
-                            const SizedBox(width: 12),
+                child: GestureDetector(
+                  key: ValueKey('search-top-poll-${poll.id}'),
+                  onTap: () => _openPollPreview(poll),
+                  child: _discoveryCard(
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(poll.question,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700, fontSize: 16)),
+                            const SizedBox(height: 14),
+                            Row(children: [
+                              Expanded(child: Text(_leadingOption(poll).text)),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                  child: LinearProgressIndicator(
+                                      value: _leadingOptionRatio(poll),
+                                      minHeight: 5,
+                                      borderRadius: BorderRadius.circular(5))),
+                              const SizedBox(width: 12),
+                              Text(
+                                  '${(_leadingOptionRatio(poll) * 100).round()}%')
+                            ]),
+                            const SizedBox(height: 10),
                             Text(
-                                '${(_leadingOptionRatio(poll) * 100).round()}%')
+                                '${poll.votesCount} votes  •  ${_formatPollAge(poll)}',
+                                style: const TextStyle(color: Color(0xFF667085))),
                           ]),
-                          const SizedBox(height: 10),
-                          Text(
-                              '${poll.votesCount} votes  •  ${_formatPollAge(poll)}',
-                              style: const TextStyle(color: Color(0xFF667085))),
-                        ]),
+                    ),
                   ),
                 ),
               ))
