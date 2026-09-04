@@ -39,7 +39,6 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
   List<PollCommentSummary>? _comments;
   bool _isSubmittingComment = false;
   bool _isDeletingComment = false;
-  final Set<String> _likingCommentIds = {};
   late final ReportsApiClient _reportsApiClient;
   late final bool _ownsReportsApiClient;
 
@@ -136,13 +135,9 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
     }
   }
 
-  Future<void> _toggleCommentLike(PollCommentSummary comment) async {
-    if (_likingCommentIds.contains(comment.id)) {
-      return;
-    }
-
-    setState(() => _likingCommentIds.add(comment.id));
-
+  Future<PollCommentSummary?> _toggleCommentLike(
+    PollCommentSummary comment,
+  ) async {
     try {
       final updated = comment.viewerHasLiked
           ? await widget.pollsApiClient.unlikeComment(
@@ -155,21 +150,20 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
               commentId: comment.id,
               accessToken: widget.accessToken,
             );
-      if (!mounted) return;
+      if (!mounted) {
+        return updated;
+      }
 
-      final comments = (_comments ?? []).map((item) {
+      _comments = (_comments ?? []).map((item) {
         return item.id == updated.id ? updated : item;
       }).toList();
-      setState(() {
-        _comments = comments;
-        _commentsFuture = Future.value(comments);
-      });
+      return updated;
     } on PollsApiException catch (error) {
       _showSnackBar(error.message);
+      return null;
     } catch (_) {
       _showSnackBar('Could not update comment like.');
-    } finally {
-      if (mounted) setState(() => _likingCommentIds.remove(comment.id));
+      return null;
     }
   }
 
@@ -378,9 +372,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                                         widget.currentUserId != comment.author.id
                                     ? () => _reportComment(comment)
                                     : null,
-                                onToggleLike: _likingCommentIds.contains(comment.id)
-                                    ? null
-                                    : () => _toggleCommentLike(comment),
+                                onToggleLike: _toggleCommentLike,
                               ),
                               const Divider(
                                 height: 1,
@@ -421,9 +413,9 @@ class _CommentComposer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
-        border: const Border(top: BorderSide(color: _commentsDivider)),
+        border: Border(top: BorderSide(color: _commentsDivider)),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
@@ -571,7 +563,7 @@ class _CommentsErrorState extends StatelessWidget {
   }
 }
 
-class _CommentTile extends StatelessWidget {
+class _CommentTile extends StatefulWidget {
   const _CommentTile({
     required this.comment,
     this.onDelete,
@@ -582,10 +574,58 @@ class _CommentTile extends StatelessWidget {
   final PollCommentSummary comment;
   final VoidCallback? onDelete;
   final VoidCallback? onReport;
-  final VoidCallback? onToggleLike;
+  final Future<PollCommentSummary?> Function(PollCommentSummary comment)?
+      onToggleLike;
+
+  @override
+  State<_CommentTile> createState() => _CommentTileState();
+}
+
+class _CommentTileState extends State<_CommentTile> {
+  late PollCommentSummary _comment;
+  bool _isLiking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _comment = widget.comment;
+  }
+
+  @override
+  void didUpdateWidget(covariant _CommentTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_isLiking && oldWidget.comment != widget.comment) {
+      _comment = widget.comment;
+    }
+  }
+
+  Future<void> _toggleLike() async {
+    if (_isLiking || widget.onToggleLike == null) {
+      return;
+    }
+
+    setState(() => _isLiking = true);
+
+    try {
+      final updated = await widget.onToggleLike!(_comment);
+      if (!mounted) {
+        return;
+      }
+
+      if (updated != null) {
+        setState(() => _comment = updated);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLiking = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final comment = _comment;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
@@ -641,18 +681,25 @@ class _CommentTile extends StatelessWidget {
                   children: [
                     IconButton(
                       key: ValueKey('like-comment-${comment.id}'),
-                      tooltip: comment.viewerHasLiked ? 'Unlike comment' : 'Like comment',
-                      onPressed: onToggleLike,
+                      tooltip: comment.viewerHasLiked
+                          ? 'Unlike comment'
+                          : 'Like comment',
+                      onPressed: _isLiking ? null : _toggleLike,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints.tightFor(width: 18, height: 24),
+                      constraints:
+                          const BoxConstraints.tightFor(width: 18, height: 24),
                       style: IconButton.styleFrom(
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                       alignment: Alignment.centerLeft,
                       icon: Icon(
-                        comment.viewerHasLiked ? Icons.favorite : Icons.favorite_border,
+                        comment.viewerHasLiked
+                            ? Icons.favorite
+                            : Icons.favorite_border,
                         size: 18,
-                        color: comment.viewerHasLiked ? Colors.redAccent : _commentsSecondaryText,
+                        color: comment.viewerHasLiked
+                            ? Colors.redAccent
+                            : _commentsSecondaryText,
                       ),
                     ),
                     const SizedBox(width: 1),
@@ -668,7 +715,7 @@ class _CommentTile extends StatelessWidget {
                           color: _commentsSecondaryText, fontSize: 14),
                     ),
                     const Spacer(),
-                    if (onDelete != null || onReport != null)
+                    if (widget.onDelete != null || widget.onReport != null)
                       SizedBox(
                         width: 40,
                         height: 40,
@@ -684,13 +731,13 @@ class _CommentTile extends StatelessWidget {
                           icon: const Icon(Icons.more_vert, size: 22),
                           onSelected: (action) {
                             if (action == _CommentAction.deleteComment) {
-                              onDelete?.call();
+                              widget.onDelete?.call();
                             } else if (action == _CommentAction.report) {
-                              onReport?.call();
+                              widget.onReport?.call();
                             }
                           },
                           itemBuilder: (context) => [
-                            if (onDelete != null)
+                            if (widget.onDelete != null)
                               const PopupMenuItem<_CommentAction>(
                                 value: _CommentAction.deleteComment,
                                 height: 52,
@@ -700,7 +747,7 @@ class _CommentTile extends StatelessWidget {
                                   destructive: true,
                                 ),
                               ),
-                            if (onReport != null)
+                            if (widget.onReport != null)
                               const PopupMenuItem<_CommentAction>(
                                 value: _CommentAction.report,
                                 height: 52,

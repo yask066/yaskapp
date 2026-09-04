@@ -293,6 +293,46 @@ void main() {
     expect(find.byTooltip('Unlike comment'), findsOneWidget);
   });
 
+  testWidgets('updates a comment like without reloading the comments screen', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final likeCommentCompleter = Completer<PollCommentSummary>();
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([_comment]),
+      likeCommentFuture: likeCommentCompleter.future,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          pollsApiClient: pollsApiClient,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final likeButton = find.byKey(const ValueKey('like-comment-comment-1'));
+    await tester.scrollUntilVisible(
+      likeButton,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(likeButton);
+    await tester.pump();
+
+    likeCommentCompleter.complete(_likedComment);
+    await tester.pump();
+
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('1'), findsOneWidget);
+  });
+
   testWidgets('places comment like count half as close to the heart', (
     tester,
   ) async {
