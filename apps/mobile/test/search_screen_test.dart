@@ -308,6 +308,34 @@ void main() {
     expect(client.calls.last.query, 'climate');
     expect(client.calls.last.cursor, isNull);
   });
+
+  testWidgets('places sort menu in the top-right search header button',
+      (tester) async {
+    final client = _FakeSearchApiClient(
+      pages: [
+        const SearchPage(items: [], nextCursor: null),
+        const SearchPage(items: [], nextCursor: null),
+      ],
+    );
+    await tester.pumpWidget(_app(client));
+
+    await tester.enterText(find.byType(TextField), 'climate');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+
+    final sortButton = find.byTooltip('Sort results');
+    expect(sortButton, findsOneWidget);
+    expect(
+      tester.getTopLeft(sortButton).dy,
+      lessThan(tester.getTopLeft(find.byType(FilterChip).first).dy),
+    );
+
+    await tester.tap(sortButton);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Relevance'), findsOneWidget);
+    expect(find.text('Newest'), findsOneWidget);
+    expect(find.text('Popular'), findsOneWidget);
+  });
 }
 
 Widget _app(

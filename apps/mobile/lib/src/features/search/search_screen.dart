@@ -580,14 +580,25 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
           ),
           const SizedBox(width: 10),
-          Container(
-            height: 58,
-            width: 58,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F6FA),
-              borderRadius: BorderRadius.circular(18),
+          PopupMenuButton<SearchSort>(
+            tooltip: 'Sort results',
+            initialValue: _sort,
+            onSelected: _selectSort,
+            itemBuilder: (context) => SearchSort.values
+                .map((sort) => PopupMenuItem(
+                      value: sort,
+                      child: Text(_sortLabel(sort)),
+                    ))
+                .toList(),
+            child: Container(
+              height: 58,
+              width: 58,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F6FA),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Icon(Icons.tune, size: 27),
             ),
-            child: const Icon(Icons.tune, size: 27),
           ),
         ],
       ),
@@ -627,33 +638,6 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                   );
                 }).toList(),
-              ),
-            ),
-          ),
-          PopupMenuButton<SearchSort>(
-            tooltip: 'Sort results',
-            initialValue: _sort,
-            onSelected: _selectSort,
-            itemBuilder: (context) => SearchSort.values
-                .map((sort) => PopupMenuItem(
-                      value: sort,
-                      child: Text(_sortLabel(sort)),
-                    ))
-                .toList(),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F6FA),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Sort by: ${_sortLabel(_sort)}',
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.keyboard_arrow_down, size: 20),
-                ],
               ),
             ),
           ),
