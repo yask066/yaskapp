@@ -305,7 +305,7 @@ class _SearchScreenState extends State<SearchScreen> {
     if (_queryController.text.trim().length >= 2) _runSearch();
   }
 
-  Future<void> _openPoll(PollSummary poll) async {
+  Future<PollSummary?> _openPoll(PollSummary poll) async {
     final updatedPoll = await Navigator.of(context).push<PollSummary>(
       MaterialPageRoute<PollSummary>(
         builder: (_) => PollCommentsScreen(
@@ -314,6 +314,29 @@ class _SearchScreenState extends State<SearchScreen> {
           pollsApiClient: _pollsApiClient,
           currentUserId: widget.session.user.id,
         ),
+      ),
+    );
+    if (updatedPoll != null && mounted) _replacePoll(updatedPoll);
+    return updatedPoll;
+  }
+
+  Future<void> _openPollPreview(PollSummary poll) async {
+    final updatedPoll = await showDialog<PollSummary>(
+      context: context,
+      builder: (_) => _PollPreviewDialog(
+        poll: poll,
+        accessToken: widget.session.accessToken,
+        onVote: _vote,
+        onCancelVote: _cancelVote,
+        onToggleLike: _toggleLike,
+        onOpenComments: _openPoll,
+        onOpenAuthor: _openAuthor,
+        onDeletePoll: (poll) async {
+          if (await _deletePoll(poll) && mounted) {
+            Navigator.of(context).pop();
+          }
+        },
+        onReport: _reportPoll,
       ),
     );
     if (updatedPoll != null && mounted) _replacePoll(updatedPoll);
@@ -358,8 +381,11 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
-  Future<void> _vote(PollSummary poll, PollOptionSummary option) async {
-    if (_votingPollIds.contains(poll.id) || poll.isClosed) return;
+  Future<PollSummary?> _vote(
+    PollSummary poll,
+    PollOptionSummary option,
+  ) async {
+    if (_votingPollIds.contains(poll.id) || poll.isClosed) return null;
     setState(() => _votingPollIds.add(poll.id));
     try {
       final updated = await _pollsApiClient.vote(
@@ -368,6 +394,7 @@ class _SearchScreenState extends State<SearchScreen> {
         accessToken: widget.session.accessToken,
       );
       if (mounted) _replacePoll(updated);
+      return updated;
     } on PollsApiException catch (error) {
       _showSnackBar(error.userMessage);
     } catch (_) {
@@ -375,10 +402,11 @@ class _SearchScreenState extends State<SearchScreen> {
     } finally {
       if (mounted) setState(() => _votingPollIds.remove(poll.id));
     }
+    return null;
   }
 
-  Future<void> _cancelVote(PollSummary poll) async {
-    if (_votingPollIds.contains(poll.id) || poll.isClosed) return;
+  Future<PollSummary?> _cancelVote(PollSummary poll) async {
+    if (_votingPollIds.contains(poll.id) || poll.isClosed) return null;
     setState(() => _votingPollIds.add(poll.id));
     try {
       final updated = await _pollsApiClient.cancelVote(
@@ -386,6 +414,7 @@ class _SearchScreenState extends State<SearchScreen> {
         accessToken: widget.session.accessToken,
       );
       if (mounted) _replacePoll(updated);
+      return updated;
     } on PollsApiException catch (error) {
       _showSnackBar(error.userMessage);
     } catch (_) {
@@ -393,10 +422,11 @@ class _SearchScreenState extends State<SearchScreen> {
     } finally {
       if (mounted) setState(() => _votingPollIds.remove(poll.id));
     }
+    return null;
   }
 
-  Future<void> _toggleLike(PollSummary poll) async {
-    if (_likingPollIds.contains(poll.id)) return;
+  Future<PollSummary?> _toggleLike(PollSummary poll) async {
+    if (_likingPollIds.contains(poll.id)) return null;
     setState(() => _likingPollIds.add(poll.id));
     try {
       final updated = poll.viewerHasLiked
@@ -409,6 +439,7 @@ class _SearchScreenState extends State<SearchScreen> {
               accessToken: widget.session.accessToken,
             );
       if (mounted) _replacePoll(updated);
+      return updated;
     } on PollsApiException catch (error) {
       _showSnackBar(error.userMessage);
     } catch (_) {
@@ -416,9 +447,10 @@ class _SearchScreenState extends State<SearchScreen> {
     } finally {
       if (mounted) setState(() => _likingPollIds.remove(poll.id));
     }
+    return null;
   }
 
-  Future<void> _deletePoll(PollSummary poll) async {
+  Future<bool> _deletePoll(PollSummary poll) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -436,22 +468,24 @@ class _SearchScreenState extends State<SearchScreen> {
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !mounted) return false;
     try {
       await _pollsApiClient.deletePoll(
         pollId: poll.id,
         accessToken: widget.session.accessToken,
       );
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() => _items.removeWhere(
             (item) => item is PollSearchResult && item.poll.id == poll.id,
           ));
       _showSnackBar('Poll deleted.');
+      return true;
     } on PollsApiException catch (error) {
       _showSnackBar(error.userMessage);
     } catch (_) {
       _showSnackBar('Could not delete poll.');
     }
+    return false;
   }
 
   Future<void> _reportPoll(PollSummary poll) {
@@ -967,35 +1001,42 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildResult(SearchResult result) {
     if (result is PollSearchResult) {
-      return PollCard(
-        poll: result.poll,
-        accessToken: widget.session.accessToken,
-        compact: true,
-        onOpenAuthor: () => _openAuthor(result.poll),
-        onVote: result.poll.isClosed ||
-                result.poll.selectedOptionIndex != null ||
-                _votingPollIds.contains(result.poll.id)
-            ? null
-            : (option) => _vote(result.poll, option),
-        onCancelVote:
-            result.poll.isClosed || _votingPollIds.contains(result.poll.id)
-                ? null
-                : () => _cancelVote(result.poll),
-        onDeletePoll: result.poll.author.id == widget.session.user.id
-            ? () => _deletePoll(result.poll)
-            : null,
-        onReport: result.poll.author.id == widget.session.user.id
-            ? null
-            : () => _reportPoll(result.poll),
-        isVoting: _votingPollIds.contains(result.poll.id),
-        onOpenComments: () {
+      return GestureDetector(
+        key: ValueKey('search-poll-result-${result.poll.id}'),
+        onTap: () {
           _recordResultClick(result);
-          _openPoll(result.poll);
+          _openPollPreview(result.poll);
         },
-        onToggleLike: _likingPollIds.contains(result.poll.id)
-            ? null
-            : () => _toggleLike(result.poll),
-        isLiking: _likingPollIds.contains(result.poll.id),
+        child: PollCard(
+          poll: result.poll,
+          accessToken: widget.session.accessToken,
+          compact: true,
+          onOpenAuthor: () => _openAuthor(result.poll),
+          onVote: result.poll.isClosed ||
+                  result.poll.selectedOptionIndex != null ||
+                  _votingPollIds.contains(result.poll.id)
+              ? null
+              : (option) => _vote(result.poll, option),
+          onCancelVote:
+              result.poll.isClosed || _votingPollIds.contains(result.poll.id)
+                  ? null
+                  : () => _cancelVote(result.poll),
+          onDeletePoll: result.poll.author.id == widget.session.user.id
+              ? () => _deletePoll(result.poll)
+              : null,
+          onReport: result.poll.author.id == widget.session.user.id
+              ? null
+              : () => _reportPoll(result.poll),
+          isVoting: _votingPollIds.contains(result.poll.id),
+          onOpenComments: () {
+            _recordResultClick(result);
+            _openPoll(result.poll);
+          },
+          onToggleLike: _likingPollIds.contains(result.poll.id)
+              ? null
+              : () => _toggleLike(result.poll),
+          isLiking: _likingPollIds.contains(result.poll.id),
+        ),
       );
     }
 
@@ -1049,6 +1090,155 @@ class _SearchScreenState extends State<SearchScreen> {
         SearchSort.newest => 'Newest',
         SearchSort.popular => 'Popular',
       };
+}
+
+class _PollPreviewDialog extends StatefulWidget {
+  const _PollPreviewDialog({
+    required this.poll,
+    required this.accessToken,
+    required this.onVote,
+    required this.onCancelVote,
+    required this.onToggleLike,
+    required this.onOpenComments,
+    required this.onOpenAuthor,
+    required this.onDeletePoll,
+    required this.onReport,
+  });
+
+  final PollSummary poll;
+  final String accessToken;
+  final Future<PollSummary?> Function(
+    PollSummary poll,
+    PollOptionSummary option,
+  ) onVote;
+  final Future<PollSummary?> Function(PollSummary poll) onCancelVote;
+  final Future<PollSummary?> Function(PollSummary poll) onToggleLike;
+  final Future<PollSummary?> Function(PollSummary poll) onOpenComments;
+  final Future<void> Function(PollSummary poll) onOpenAuthor;
+  final Future<void> Function(PollSummary poll)? onDeletePoll;
+  final Future<void> Function(PollSummary poll)? onReport;
+
+  @override
+  State<_PollPreviewDialog> createState() => _PollPreviewDialogState();
+}
+
+class _PollPreviewDialogState extends State<_PollPreviewDialog> {
+  late PollSummary _poll;
+  var _isVoting = false;
+  var _isLiking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _poll = widget.poll;
+  }
+
+  Future<void> _vote(PollOptionSummary option) async {
+    if (_isVoting || _poll.isClosed) return;
+    setState(() => _isVoting = true);
+    try {
+      final updatedPoll = await widget.onVote(_poll, option);
+      if (mounted && updatedPoll != null) setState(() => _poll = updatedPoll);
+    } finally {
+      if (mounted) setState(() => _isVoting = false);
+    }
+  }
+
+  Future<void> _cancelVote() async {
+    if (_isVoting || _poll.isClosed) return;
+    setState(() => _isVoting = true);
+    try {
+      final updatedPoll = await widget.onCancelVote(_poll);
+      if (mounted && updatedPoll != null) setState(() => _poll = updatedPoll);
+    } finally {
+      if (mounted) setState(() => _isVoting = false);
+    }
+  }
+
+  Future<void> _toggleLike() async {
+    if (_isLiking) return;
+    setState(() => _isLiking = true);
+    try {
+      final updatedPoll = await widget.onToggleLike(_poll);
+      if (mounted && updatedPoll != null) setState(() => _poll = updatedPoll);
+    } finally {
+      if (mounted) setState(() => _isLiking = false);
+    }
+  }
+
+  Future<void> _openComments() async {
+    final updatedPoll = await widget.onOpenComments(_poll);
+    if (mounted && updatedPoll != null) setState(() => _poll = updatedPoll);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canVote = !_poll.isClosed &&
+        _poll.selectedOptionIndex == null &&
+        !_isVoting;
+    final canCancelVote = !_poll.isClosed &&
+        _poll.selectedOptionIndex != null &&
+        !_isVoting;
+
+    return Dialog(
+      key: const ValueKey('poll-preview-dialog'),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * .88,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Poll details',
+                      style: TextStyle(
+                        color: Color(0xFF10142D),
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.of(context).pop(_poll),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                child: PollCard(
+                  poll: _poll,
+                  accessToken: widget.accessToken,
+                  onOpenAuthor: () => widget.onOpenAuthor(_poll),
+                  onVote: canVote ? _vote : null,
+                  onCancelVote: canCancelVote ? _cancelVote : null,
+                  onDeletePoll: widget.onDeletePoll == null
+                      ? null
+                      : () => widget.onDeletePoll!(_poll),
+                  onReport: widget.onReport == null
+                      ? null
+                      : () => widget.onReport!(_poll),
+                  onOpenComments: _openComments,
+                  onToggleLike: _isLiking ? null : _toggleLike,
+                  isVoting: _isVoting,
+                  isLiking: _isLiking,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ErrorState extends StatelessWidget {

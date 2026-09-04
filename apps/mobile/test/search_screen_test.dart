@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yaskapp_mobile/src/core/analytics/search_analytics.dart';
 import 'package:yaskapp_mobile/src/features/auth/auth_session.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
+import 'package:yaskapp_mobile/src/features/polls/poll_card.dart';
 import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
 import 'package:yaskapp_mobile/src/features/profile/public_profile.dart';
 import 'package:yaskapp_mobile/src/features/profile/profiles_api_client.dart';
@@ -163,6 +164,52 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pump();
     await tester.tap(find.text('Yes'));
+    await tester.pump();
+
+    expect(pollsClient.votedOptionId, 'option-1');
+  });
+
+  testWidgets('opens the full poll card in a modal when tapping a poll result',
+      (tester) async {
+    final client = _FakeSearchApiClient(
+      pages: [
+        SearchPage(items: [_pollResult()], nextCursor: null)
+      ],
+    );
+    await tester.pumpWidget(_app(client));
+
+    await tester.enterText(find.byType(TextField), 'climate');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+
+    await tester.tap(find.text('Climate?'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(find.byType(PollCard), findsNWidgets(2));
+    expect(find.text('Poll details'), findsOneWidget);
+  });
+
+  testWidgets('allows voting from the poll preview modal', (tester) async {
+    final pollsClient = _FakePollsApiClient(PollSummaryFixture.poll);
+    final client = _FakeSearchApiClient(
+      pages: [
+        SearchPage(items: [_pollResult()], nextCursor: null)
+      ],
+    );
+    await tester.pumpWidget(
+      _app(client, pollsApiClient: pollsClient),
+    );
+
+    await tester.enterText(find.byType(TextField), 'climate');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+    await tester.tap(find.text('Climate?'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.descendant(of: find.byType(Dialog), matching: find.text('Yes')),
+    );
     await tester.pump();
 
     expect(pollsClient.votedOptionId, 'option-1');
