@@ -127,6 +127,53 @@ void main() {
     expect(find.byIcon(Icons.favorite), findsOneWidget);
   });
 
+  testWidgets('removes a poll after unliking it from liked polls',
+      (tester) async {
+    final likedPoll = _poll(
+      commentsCount: 0,
+      likesCount: 6,
+      votesCount: 8,
+    ).copyWith(viewerHasLiked: true);
+    final unlikedPoll = likedPoll.copyWith(
+      viewerHasLiked: false,
+      likesCount: 5,
+    );
+    final pollsApiClient = _FakePollsApiClient(
+      initialPolls: const [],
+      likedTabPolls: [likedPoll],
+      likedPoll: unlikedPoll,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ProfileScreen(
+          user: _user,
+          accessToken: 'access-token',
+          authApiClient: AuthApiClient(httpClient: _NoopHttpClient()),
+          onLogout: () {},
+          onUserUpdated: (_) {},
+          pollsApiClient: pollsApiClient,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Liked polls'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Which feature should we build next?'),
+      300,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Unlike'), findsOneWidget);
+    await tester.tap(find.byTooltip('Unlike'));
+    await tester.pumpAndSettle();
+
+    expect(pollsApiClient.unlikeCalls, 1);
+    expect(find.text('Which feature should we build next?'), findsNothing);
+  });
+
   testWidgets(
     'updates my polls comments count after returning from comments',
     (tester) async {
@@ -267,13 +314,16 @@ class _FakePollsApiClient extends PollsApiClient {
     this.comments = const [],
     this.createCommentResult,
     this.likedPoll,
+    this.likedTabPolls = const [],
   }) : super(httpClient: _NoopHttpClient());
 
   final List<PollSummary> initialPolls;
   final List<PollCommentSummary> comments;
   final CreatePollCommentResult? createCommentResult;
   final PollSummary? likedPoll;
+  final List<PollSummary> likedTabPolls;
   int likeCalls = 0;
+  int unlikeCalls = 0;
 
   @override
   Future<List<PollSummary>> listMyPolls({
@@ -287,8 +337,18 @@ class _FakePollsApiClient extends PollsApiClient {
   Future<List<PollCommentSummary>> listComments({
     required String pollId,
     int limit = 50,
+    String? accessToken,
   }) async {
     return SynchronousFuture(comments);
+  }
+
+  @override
+  Future<List<PollSummary>> listPolls({
+    int limit = 20,
+    String? accessToken,
+    String sort = 'newest',
+  }) async {
+    return SynchronousFuture(likedTabPolls);
   }
 
   @override
@@ -306,6 +366,7 @@ class _FakePollsApiClient extends PollsApiClient {
     required String accessToken,
   }) async {
     likeCalls++;
+    unlikeCalls++;
     return SynchronousFuture(likedPoll!);
   }
 
@@ -330,25 +391,4 @@ class _NoopHttpClient extends http.BaseClient {
 
   @override
   void close() {}
-}
-
-extension on PollSummary {
-  PollSummary copyWith({
-    bool? viewerHasLiked,
-    int? likesCount,
-    int? commentsCount,
-  }) {
-    return PollSummary(
-      id: id,
-      author: author,
-      question: question,
-      options: options,
-      votesCount: votesCount,
-      commentsCount: commentsCount ?? this.commentsCount,
-      likesCount: likesCount ?? this.likesCount,
-      viewerHasLiked: viewerHasLiked ?? this.viewerHasLiked,
-      createdAt: createdAt,
-      votedOptionIndex: votedOptionIndex,
-    );
-  }
 }

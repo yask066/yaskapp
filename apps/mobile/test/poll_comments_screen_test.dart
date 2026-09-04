@@ -293,6 +293,35 @@ void main() {
     expect(find.byTooltip('Unlike comment'), findsOneWidget);
   });
 
+  testWidgets('likes the poll from the comments screen', (tester) async {
+    tester.view.physicalSize = const Size(400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([]),
+      likePollFuture: Future.value(_likedPoll),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          pollsApiClient: pollsApiClient,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.favorite_border));
+    await tester.pumpAndSettle();
+
+    expect(pollsApiClient.likePollCalls, 1);
+    expect(find.byIcon(Icons.favorite), findsOneWidget);
+    expect(find.byTooltip('Unlike'), findsOneWidget);
+  });
+
   testWidgets('updates a comment like without reloading the comments screen', (
     tester,
   ) async {
@@ -412,6 +441,10 @@ void main() {
 
   testWidgets('shows delete in the poll-style menu for the current user comment',
       (tester) async {
+    tester.view.physicalSize = const Size(400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
     await tester.pumpWidget(
       MaterialApp(
         home: PollCommentsScreen(
@@ -436,6 +469,10 @@ void main() {
 
   testWidgets('shows report in the poll-style menu for another user comment',
       (tester) async {
+    tester.view.physicalSize = const Size(400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
     await tester.pumpWidget(
       MaterialApp(
         home: PollCommentsScreen(
@@ -460,6 +497,10 @@ void main() {
 
   testWidgets('opens the report dialog from another user comment menu',
       (tester) async {
+    tester.view.physicalSize = const Size(400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
     await tester.pumpWidget(
       MaterialApp(
         home: PollCommentsScreen(
@@ -483,6 +524,10 @@ void main() {
   });
 
   testWidgets('confirms and removes the current user comment', (tester) async {
+    tester.view.physicalSize = const Size(400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
     final pollsApiClient = _FakePollsApiClient(
       commentsFuture: Future.value([_comment]),
     );
@@ -544,6 +589,11 @@ final _poll = PollSummary(
   likesCount: 0,
   viewerHasLiked: false,
   createdAt: DateTime(2026, 7, 17, 12),
+);
+
+final _likedPoll = _poll.copyWith(
+  likesCount: 1,
+  viewerHasLiked: true,
 );
 
 final _pollWithComment = PollSummary(
@@ -614,18 +664,22 @@ class _FakePollsApiClient extends PollsApiClient {
     required this.commentsFuture,
     Future<CreatePollCommentResult>? createCommentFuture,
     Future<PollCommentSummary>? likeCommentFuture,
+    Future<PollSummary>? likePollFuture,
     Future<void>? deleteCommentFuture,
   }) : createCommentFuture =
             createCommentFuture ?? Future.value(_createCommentResult),
        likeCommentFuture = likeCommentFuture ?? Future.value(_likedComment),
+       likePollFuture = likePollFuture ?? Future.value(_likedPoll),
        deleteCommentFuture = deleteCommentFuture ?? Future.value();
 
   final Future<List<PollCommentSummary>> commentsFuture;
   final Future<CreatePollCommentResult> createCommentFuture;
   final Future<PollCommentSummary> likeCommentFuture;
+  final Future<PollSummary> likePollFuture;
   final Future<void> deleteCommentFuture;
   int createCommentCalls = 0;
   int likeCommentCalls = 0;
+  int likePollCalls = 0;
   int deleteCommentCalls = 0;
 
   @override
@@ -656,6 +710,15 @@ class _FakePollsApiClient extends PollsApiClient {
   }) {
     likeCommentCalls++;
     return likeCommentFuture;
+  }
+
+  @override
+  Future<PollSummary> likePoll({
+    required String pollId,
+    required String accessToken,
+  }) {
+    likePollCalls++;
+    return likePollFuture;
   }
 
   @override

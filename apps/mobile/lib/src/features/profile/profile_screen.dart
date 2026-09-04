@@ -129,6 +129,7 @@ class ProfileScreenState extends State<ProfileScreen> {
   void _syncMyPolls(List<PollSummary> polls) {
     setState(() {
       _myPolls = polls;
+      _myPollsFuture = Future.value(polls);
     });
   }
 
@@ -162,12 +163,7 @@ class ProfileScreenState extends State<ProfileScreen> {
         return;
       }
 
-      _syncMyPolls(
-        _myPolls
-            .map((currentPoll) =>
-                currentPoll.id == updatedPoll.id ? updatedPoll : currentPoll)
-            .toList(),
-      );
+      _syncPollLike(updatedPoll);
     } on PollsApiException catch (error) {
       _showSnackBar(error.message);
     } catch (_) {
@@ -179,6 +175,35 @@ class ProfileScreenState extends State<ProfileScreen> {
         });
       }
     }
+  }
+
+  void _syncPollLike(PollSummary updatedPoll) {
+    final updatedMyPolls = _myPolls
+        .map((currentPoll) =>
+            currentPoll.id == updatedPoll.id ? updatedPoll : currentPoll)
+        .toList();
+
+    final updatedLikedPolls = _hasLoadedLikedPolls
+        ? updatedPoll.viewerHasLiked
+            ? [
+                for (final currentPoll in _likedPolls)
+                  if (currentPoll.id != updatedPoll.id) currentPoll,
+                if (!_likedPolls.any((poll) => poll.id == updatedPoll.id))
+                  updatedPoll,
+              ]
+            : _likedPolls
+                .where((currentPoll) => currentPoll.id != updatedPoll.id)
+                .toList()
+        : _likedPolls;
+
+    setState(() {
+      _myPolls = updatedMyPolls;
+      _myPollsFuture = Future.value(updatedMyPolls);
+      if (_hasLoadedLikedPolls) {
+        _likedPolls = updatedLikedPolls;
+        _likedPollsFuture = Future.value(updatedLikedPolls);
+      }
+    });
   }
 
   Future<void> _deletePoll(PollSummary poll) async {

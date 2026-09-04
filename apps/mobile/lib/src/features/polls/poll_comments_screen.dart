@@ -39,6 +39,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
   List<PollCommentSummary>? _comments;
   bool _isSubmittingComment = false;
   bool _isDeletingComment = false;
+  bool _isLikingPoll = false;
   late final ReportsApiClient _reportsApiClient;
   late final bool _ownsReportsApiClient;
 
@@ -164,6 +165,40 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
     } catch (_) {
       _showSnackBar('Could not update comment like.');
       return null;
+    }
+  }
+
+  Future<void> _togglePollLike() async {
+    if (_isLikingPoll) {
+      return;
+    }
+
+    setState(() => _isLikingPoll = true);
+
+    try {
+      final updated = _poll.viewerHasLiked
+          ? await widget.pollsApiClient.unlikePoll(
+              pollId: _poll.id,
+              accessToken: widget.accessToken,
+            )
+          : await widget.pollsApiClient.likePoll(
+              pollId: _poll.id,
+              accessToken: widget.accessToken,
+            );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() => _poll = updated);
+    } on PollsApiException catch (error) {
+      _showSnackBar(error.message);
+    } catch (_) {
+      _showSnackBar('Could not update like.');
+    } finally {
+      if (mounted) {
+        setState(() => _isLikingPoll = false);
+      }
     }
   }
 
@@ -305,7 +340,12 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                           children: [
                             PollCard(
-                                poll: _poll, accessToken: widget.accessToken),
+                              poll: _poll,
+                              accessToken: widget.accessToken,
+                              onToggleLike:
+                                  _isLikingPoll ? null : _togglePollLike,
+                              isLiking: _isLikingPoll,
+                            ),
                             const _CommentsLoadingState(),
                           ],
                         );
@@ -316,7 +356,12 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                           children: [
                             PollCard(
-                                poll: _poll, accessToken: widget.accessToken),
+                              poll: _poll,
+                              accessToken: widget.accessToken,
+                              onToggleLike:
+                                  _isLikingPoll ? null : _togglePollLike,
+                              isLiking: _isLikingPoll,
+                            ),
                             _CommentsErrorState(onRetry: _retryComments),
                           ],
                         );
@@ -328,7 +373,12 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                         children: [
                           PollCard(
-                              poll: _poll, accessToken: widget.accessToken),
+                            poll: _poll,
+                            accessToken: widget.accessToken,
+                            onToggleLike:
+                                _isLikingPoll ? null : _togglePollLike,
+                            isLiking: _isLikingPoll,
+                          ),
                           const SizedBox(height: 26),
                           Row(
                             children: [
