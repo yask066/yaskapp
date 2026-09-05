@@ -11,6 +11,15 @@ test('development IP serves moderation panel under /admin', () => {
   assert.match(caddyfile, /handle_path \/admin\/\*\s*\{[\s\S]*?reverse_proxy moderation-web:80/);
 });
 
+test('development IP serves the moderation panel at the root path', () => {
+  const developmentIpSite = caddyfile.split('{$STAGING_API_DOMAIN')[0];
+
+  assert.match(
+    developmentIpSite,
+    /handle\s*\{\s*reverse_proxy moderation-web:80\s*\}/,
+  );
+});
+
 test('moderation panel uses stable asset paths for the /admin mount', () => {
   assert.match(html, /href="\/src\/styles\.css"/);
   assert.match(html, /src="\/src\/main\.js"/);

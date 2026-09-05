@@ -26,7 +26,7 @@ http://{$STAGING_PUBLIC_IP:127.0.0.1} {
         reverse_proxy api:3000
     }
     handle {
-        reverse_proxy api:3000
+        reverse_proxy moderation-web:80
     }
 }
 

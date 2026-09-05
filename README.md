@@ -49,10 +49,10 @@ docker compose -f infra/docker/docker-compose.staging.yml up -d --build
 
 Before a domain is available, set `STAGING_PUBLIC_IP` in
 `services/api/.env.staging` to the VPS public IP. The staging stack then serves
-the moderation panel at `http://<STAGING_PUBLIC_IP>/admin`. Pass the same
-address to Flutter through `API_BASE_URL` and `API_WEBSOCKET_URL`. This is an
-HTTP-only development route; switch to the domain-based HTTPS configuration
-before production use.
+the moderation panel at `http://<STAGING_PUBLIC_IP>/` (with the legacy
+`/admin` path retained). Pass the same address to Flutter through
+`API_BASE_URL` and `API_WEBSOCKET_URL`. This is an HTTP-only development
+route; switch to the domain-based HTTPS configuration before production use.
 
 PowerShell example:
 
