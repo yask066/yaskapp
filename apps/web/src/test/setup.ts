@@ -4,7 +4,7 @@ import { render, type RenderOptions } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { createElement, type ReactElement, type ReactNode } from 'react';
 
-function TestProviders({ children }: { children: ReactNode }) {
+export function renderWithProviders(ui: ReactElement, options?: Omit<RenderOptions, 'wrapper'>) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -12,13 +12,13 @@ function TestProviders({ children }: { children: ReactNode }) {
     },
   });
 
-  return createElement(
-    QueryClientProvider,
-    { client: queryClient },
-    createElement(MemoryRouter, null, children),
-  );
-}
+  function TestProviders({ children }: { children: ReactNode }) {
+    return createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(MemoryRouter, null, children),
+    );
+  }
 
-export function renderWithProviders(ui: ReactElement, options?: Omit<RenderOptions, 'wrapper'>) {
   return render(ui, { wrapper: TestProviders, ...options });
 }
