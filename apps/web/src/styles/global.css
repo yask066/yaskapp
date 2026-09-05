@@ -1,0 +1,54 @@
+:root {
+  color-scheme: light;
+  --color-brand: #566A9D;
+  --color-accent: #FA7F2D;
+  --color-page: #F6F7FB;
+  --color-surface: #FFFFFF;
+  --color-text: #1F2937;
+  --color-text-muted: #667085;
+  --color-border: #D0D5DD;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 0.05);
+  --shadow-md: 0 4px 12px rgb(16 24 40 / 0.1);
+  --content-header-height: 64px;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --content-header-height: 72px;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--color-page);
+  color: var(--color-text);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+}

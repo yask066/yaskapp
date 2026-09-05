@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "services/*",
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
     "api:dev": "npm run dev -w @yaskapp/api",
