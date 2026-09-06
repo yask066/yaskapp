@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { Poll } from '../api/models';
 import { Avatar } from './Avatar';
 
@@ -27,7 +28,7 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
         <Avatar name={authorName} src={poll.author.avatarUrl} />
         <p>{viewerId === poll.author.id ? 'You' : authorName}</p>
       </header>
-      <h2 id={`poll-${poll.id}-question`}>{poll.question}</h2>
+      <h2 id={`poll-${poll.id}-question`}><Link to={`/polls/${poll.id}`}>{poll.question}</Link></h2>
       {poll.imageUrl ? <img src={poll.imageUrl} alt="" /> : null}
       <section aria-label="Vote on this poll">
         <fieldset>

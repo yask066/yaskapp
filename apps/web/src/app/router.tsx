@@ -3,6 +3,7 @@ import { AppLayout } from '../components/AppLayout';
 import { AuthPage } from '../features/auth/AuthPage';
 import { FeedPage } from '../features/feed/FeedPage';
 import { CreatePollPage } from '../features/polls/CreatePollPage';
+import { PollDetailPage } from '../features/comments/PollDetailPage';
 import { useSession } from './session-provider';
 
 function LoadingMain() {
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { index: true, element: <FeedPage /> },
+      { path: 'polls/:pollId', element: <PollDetailPage /> },
       {
         element: <PublicOnlyRoute />,
         children: [
