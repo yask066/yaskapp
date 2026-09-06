@@ -52,6 +52,8 @@ test('renders polls returned from GET /polls?limit=20 with a Vote button', async
 
   expect(await screen.findByText('Which option?')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Vote' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Comments (0)' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Comments (0)' })).toHaveAccessibleDescription('Comments are not available yet.');
 });
 
 test('reissues the feed request when Retry is selected after a failed load', async () => {

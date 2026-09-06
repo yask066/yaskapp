@@ -53,7 +53,10 @@ export function PollCard({ poll, viewerId, onVote, onLike, onOpenComments }: Pol
           Like ({poll.likesCount})
         </button>
         {!onLike ? <p id={`poll-${poll.id}-like-help`}>Sign in to like this poll.</p> : null}
-        <button type="button" onClick={() => onOpenComments?.(poll)}>Comments ({poll.commentsCount})</button>
+        <button type="button" disabled={!onOpenComments} onClick={() => onOpenComments?.(poll)} aria-describedby={onOpenComments ? undefined : `poll-${poll.id}-comments-help`}>
+          Comments ({poll.commentsCount})
+        </button>
+        {!onOpenComments ? <p id={`poll-${poll.id}-comments-help`}>Comments are not available yet.</p> : null}
       </footer>
     </article>
   );
