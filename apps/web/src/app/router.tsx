@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router
 import { AppLayout } from '../components/AppLayout';
 import { AuthPage } from '../features/auth/AuthPage';
 import { FeedPage } from '../features/feed/FeedPage';
+import { CreatePollPage } from '../features/polls/CreatePollPage';
 import { useSession } from './session-provider';
 
 function LoadingMain() {
@@ -48,7 +49,7 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute />,
         children: [
           { path: 'search', element: <ProtectedPlaceholder title="Search" /> },
-          { path: 'polls/new', element: <ProtectedPlaceholder title="Create poll" /> },
+          { path: 'polls/new', element: <CreatePollPage /> },
           { path: 'profile', element: <ProtectedPlaceholder title="Profile" /> },
         ],
       },

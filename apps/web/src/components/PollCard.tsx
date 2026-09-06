@@ -1,26 +1,25 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import type { Poll } from '../api/models';
 import { Avatar } from './Avatar';
 
 interface PollCardProps {
   poll: Poll;
   viewerId?: string | null;
-  onVote?: (poll: Poll, optionId: string) => void;
-  onLike?: (poll: Poll) => void;
+  onVote?: (pollId: string, optionId: string) => void;
+  onCancelVote?: (pollId: string) => void;
+  onLike?: (pollId: string, viewerHasLiked: boolean) => void;
+  onDelete?: (pollId: string) => void;
   onOpenComments?: (poll: Poll) => void;
 }
 
-export function PollCard({ poll, viewerId, onVote, onLike, onOpenComments }: PollCardProps) {
+export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelete, onOpenComments }: PollCardProps) {
   const [selectedOptionId, setSelectedOptionId] = useState(poll.viewerVoteOptionId ?? '');
   const authorName = poll.author.displayName || poll.author.username;
-  const canVote = Boolean(onVote && selectedOptionId);
-  const voteHelp = viewerId ? 'Voting is not available yet.' : 'Sign in to vote on this poll.';
-  const likeHelp = viewerId ? 'Liking is not available yet.' : 'Sign in to like this poll.';
-
-  function submitVote(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (onVote && selectedOptionId) onVote(poll, selectedOptionId);
-  }
+  const isClosed = Boolean(poll.endsAt && new Date(poll.endsAt).getTime() <= Date.now());
+  const hasVoted = Boolean(poll.viewerVoteOptionId);
+  const voteHelp = viewerId ? 'Voting is not available for this poll.' : 'Sign in to vote on this poll.';
+  const likeHelp = viewerId ? 'Liking is not available for this poll.' : 'Sign in to like this poll.';
+  useEffect(() => setSelectedOptionId(poll.viewerVoteOptionId ?? ''), [poll.viewerVoteOptionId]);
 
   return (
     <article aria-labelledby={`poll-${poll.id}-question`}>
@@ -30,28 +29,31 @@ export function PollCard({ poll, viewerId, onVote, onLike, onOpenComments }: Pol
       </header>
       <h2 id={`poll-${poll.id}-question`}>{poll.question}</h2>
       {poll.imageUrl ? <img src={poll.imageUrl} alt="" /> : null}
-      <form onSubmit={submitVote}>
+      <section aria-label="Vote on this poll">
         <fieldset>
           <legend>Choose an option</legend>
           {poll.options.map((option) => (
-            <label key={option.id}>
+            <div key={option.id}>
+              <label>
               <input
                 type="radio"
                 name={`poll-${poll.id}`}
                 value={option.id}
                 checked={selectedOptionId === option.id}
-                disabled={!onVote}
+                disabled={!onVote || hasVoted || isClosed}
                 onChange={() => setSelectedOptionId(option.id)}
               />
-              {option.text} ({option.votesCount})
-            </label>
+              {option.text} {hasVoted ? `(${option.votesCount}, ${poll.votesCount ? Math.round((option.votesCount / poll.votesCount) * 100) : 0}%)` : `(${option.votesCount})`}
+              </label>
+              <button type="button" disabled={!onVote || hasVoted || isClosed || selectedOptionId !== option.id} onClick={() => onVote?.(poll.id, option.id)} aria-describedby={onVote ? undefined : `poll-${poll.id}-vote-help`}>Vote for {option.text}</button>
+            </div>
           ))}
         </fieldset>
-        <button type="submit" disabled={!canVote} aria-describedby={onVote ? undefined : `poll-${poll.id}-vote-help`}>Vote</button>
         {!onVote ? <p id={`poll-${poll.id}-vote-help`}>{voteHelp}</p> : null}
-      </form>
+        {hasVoted && poll.allowVoteCancellation && !isClosed && onCancelVote ? <button type="button" onClick={() => onCancelVote(poll.id)}>Cancel vote</button> : null}
+      </section>
       <footer>
-        <button type="button" disabled={!onLike} onClick={() => onLike?.(poll)} aria-describedby={onLike ? undefined : `poll-${poll.id}-like-help`}>
+        <button type="button" disabled={!onLike} onClick={() => onLike?.(poll.id, poll.viewerHasLiked)} aria-pressed={poll.viewerHasLiked} aria-describedby={onLike ? undefined : `poll-${poll.id}-like-help`}>
           Like ({poll.likesCount})
         </button>
         {!onLike ? <p id={`poll-${poll.id}-like-help`}>{likeHelp}</p> : null}
@@ -59,6 +61,7 @@ export function PollCard({ poll, viewerId, onVote, onLike, onOpenComments }: Pol
           Comments ({poll.commentsCount})
         </button>
         {!onOpenComments ? <p id={`poll-${poll.id}-comments-help`}>Comments are not available yet.</p> : null}
+        {viewerId === poll.author.id && onDelete ? <button type="button" onClick={() => { if (window.confirm('Delete this poll?')) onDelete(poll.id); }}>Delete</button> : null}
       </footer>
     </article>
   );

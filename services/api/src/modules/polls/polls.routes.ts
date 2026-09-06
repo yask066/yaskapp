@@ -49,7 +49,7 @@ const createPollSchema = z.object({
   options: z
     .array(z.string().trim().min(1).max(160))
     .min(2)
-    .max(5)
+    .max(6)
     .refine((options) => {
       const normalizedOptions = options.map((option) => option.toLowerCase());
 

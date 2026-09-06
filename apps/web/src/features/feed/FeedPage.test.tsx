@@ -59,8 +59,8 @@ test('renders polls returned from GET /polls?limit=20 with a Vote button', async
   renderFeed();
 
   expect(await screen.findByText('Which option?')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Vote' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Vote' })).toHaveAccessibleDescription('Sign in to vote on this poll.');
+  expect(screen.getByRole('button', { name: 'Vote for First' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Vote for First' })).toHaveAccessibleDescription('Sign in to vote on this poll.');
   expect(screen.getByRole('button', { name: 'Comments (0)' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Comments (0)' })).toHaveAccessibleDescription('Comments are not available yet.');
 });
@@ -105,8 +105,9 @@ test('waits for a restored session before loading viewer-specific polls', async 
   renderFeed();
 
   expect(await screen.findByText('You')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Vote' })).toHaveAccessibleDescription('Voting is not available yet.');
-  expect(screen.getByRole('button', { name: 'Like (2)' })).toHaveAccessibleDescription('Liking is not available yet.');
+  expect(screen.getByRole('button', { name: 'Vote for First' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Like (2)' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Like (2)' })).toHaveAttribute('aria-pressed', 'false');
   expect(requests).toEqual(['me', 'polls']);
 });
 

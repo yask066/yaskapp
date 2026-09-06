@@ -25,6 +25,22 @@ export function vote(pollId: string, optionId: string): Promise<Poll> {
   return apiClient.send(`/polls/${pollId}/votes`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ optionId }) }, (value) => responseField(value, 'poll', decodePoll));
 }
 
+export function cancelVote(pollId: string): Promise<Poll> {
+  return apiClient.send(`/polls/${pollId}/votes`, { method: 'DELETE' }, (value) => responseField(value, 'poll', decodePoll));
+}
+
+export function likePoll(pollId: string): Promise<Poll> {
+  return apiClient.send(`/polls/${pollId}/likes`, { method: 'POST' }, (value) => responseField(value, 'poll', decodePoll));
+}
+
+export function unlikePoll(pollId: string): Promise<Poll> {
+  return apiClient.send(`/polls/${pollId}/likes`, { method: 'DELETE' }, (value) => responseField(value, 'poll', decodePoll));
+}
+
+export function deletePoll(pollId: string): Promise<void> {
+  return apiClient.send(`/polls/${pollId}`, { method: 'DELETE' }, () => undefined);
+}
+
 export function listComments(pollId: string): Promise<PollComment[]> {
   return apiClient.get(`/polls/${pollId}/comments?limit=50`, (body) => responseItems(body, decodePollComment));
 }

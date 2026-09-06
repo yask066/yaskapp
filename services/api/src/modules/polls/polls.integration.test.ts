@@ -637,7 +637,7 @@ test('authentication rejects invalid credentials and duplicate registration', as
   assert.equal(wrongPasswordResponse.json<{ error: string }>().error, 'unauthorized');
 });
 
-test('poll creation rejects invalid dates and option counts', async () => {
+test('poll creation rejects invalid dates and supports up to six options', async () => {
   const registered = await registerTestUser();
 
   const pastPollResponse = await app.inject({
@@ -653,7 +653,7 @@ test('poll creation rejects invalid dates and option counts', async () => {
 
   assert.equal(pastPollResponse.statusCode, 400, pastPollResponse.body);
 
-  const tooManyOptionsResponse = await app.inject({
+  const sixOptionsResponse = await app.inject({
     method: 'POST',
     url: '/polls',
     headers: bearer(registered.accessToken),
@@ -663,7 +663,7 @@ test('poll creation rejects invalid dates and option counts', async () => {
     }
   });
 
-  assert.equal(tooManyOptionsResponse.statusCode, 400, tooManyOptionsResponse.body);
+  assert.equal(sixOptionsResponse.statusCode, 201, sixOptionsResponse.body);
 });
 
 after(async () => {
