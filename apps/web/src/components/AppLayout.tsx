@@ -10,13 +10,11 @@ export function AppLayout() {
       <a className="skip-link" href="#main-content">Skip to main content</a>
       <header>
         <a aria-label="Yaskapp" href="/">Yaskapp</a>
-        <nav aria-label="Primary navigation">
-          {status === 'authenticated' ? <>
+        {status === 'authenticated' ? <nav aria-label="Primary navigation">
             <Link to="/">Feed</Link>
             <Link to="/search">Search</Link>
             <Link to="/polls/new">Create poll</Link>
-          </> : null}
-        </nav>
+          </nav> : null}
         {status === 'anonymous' ? <nav aria-label="Account navigation"><Link to="/login">Login</Link><Link to="/register">Register</Link></nav> : null}
         {status === 'authenticated' && user ? (
           <nav aria-label="Account navigation">

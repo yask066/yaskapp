@@ -14,6 +14,8 @@ export function PollCard({ poll, viewerId, onVote, onLike, onOpenComments }: Pol
   const [selectedOptionId, setSelectedOptionId] = useState(poll.viewerVoteOptionId ?? '');
   const authorName = poll.author.displayName || poll.author.username;
   const canVote = Boolean(onVote && selectedOptionId);
+  const voteHelp = viewerId ? 'Voting is not available yet.' : 'Sign in to vote on this poll.';
+  const likeHelp = viewerId ? 'Liking is not available yet.' : 'Sign in to like this poll.';
 
   function submitVote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -46,13 +48,13 @@ export function PollCard({ poll, viewerId, onVote, onLike, onOpenComments }: Pol
           ))}
         </fieldset>
         <button type="submit" disabled={!canVote} aria-describedby={onVote ? undefined : `poll-${poll.id}-vote-help`}>Vote</button>
-        {!onVote ? <p id={`poll-${poll.id}-vote-help`}>Sign in to vote on this poll.</p> : null}
+        {!onVote ? <p id={`poll-${poll.id}-vote-help`}>{voteHelp}</p> : null}
       </form>
       <footer>
         <button type="button" disabled={!onLike} onClick={() => onLike?.(poll)} aria-describedby={onLike ? undefined : `poll-${poll.id}-like-help`}>
           Like ({poll.likesCount})
         </button>
-        {!onLike ? <p id={`poll-${poll.id}-like-help`}>Sign in to like this poll.</p> : null}
+        {!onLike ? <p id={`poll-${poll.id}-like-help`}>{likeHelp}</p> : null}
         <button type="button" disabled={!onOpenComments} onClick={() => onOpenComments?.(poll)} aria-describedby={onOpenComments ? undefined : `poll-${poll.id}-comments-help`}>
           Comments ({poll.commentsCount})
         </button>

@@ -4,9 +4,13 @@ import { AuthPage } from '../features/auth/AuthPage';
 import { FeedPage } from '../features/feed/FeedPage';
 import { useSession } from './session-provider';
 
-function PublicOnlyRoute() {
+function LoadingMain() {
+  return <main id="main-content"><p role="status">Loading your session…</p></main>;
+}
+
+export function PublicOnlyRoute() {
   const { status } = useSession();
-  if (status === 'loading') return <p role="status">Loading your session…</p>;
+  if (status === 'loading') return <LoadingMain />;
   if (status === 'authenticated') return <Navigate to="/" replace />;
   return <Outlet />;
 }
@@ -14,7 +18,7 @@ function PublicOnlyRoute() {
 export function ProtectedRoute() {
   const { status } = useSession();
   const location = useLocation();
-  if (status === 'loading') return <p role="status">Loading your session…</p>;
+  if (status === 'loading') return <LoadingMain />;
   if (status === 'anonymous') {
     return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
   }

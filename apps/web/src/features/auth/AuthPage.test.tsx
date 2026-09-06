@@ -40,3 +40,22 @@ test('submitting Login and Password signs in and returns to the feed', async () 
   expect(signIn).toHaveBeenCalledWith({ login: 'member@example.com', password: 'passphrase' });
   expect(await screen.findByRole('heading', { name: 'Feed' })).toBeInTheDocument();
 });
+
+test('rejects a protocol-relative next destination after sign in', async () => {
+  const user = userEvent.setup();
+
+  render(
+    <MemoryRouter initialEntries={['/login?next=//example.com']}>
+      <Routes>
+        <Route path="/login" element={<AuthPage mode="login" />} />
+        <Route path="/" element={<h1>Feed</h1>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  await user.type(screen.getByLabelText('Login'), 'member@example.com');
+  await user.type(screen.getByLabelText('Password'), 'passphrase');
+  await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+  expect(await screen.findByRole('heading', { name: 'Feed' })).toBeInTheDocument();
+});

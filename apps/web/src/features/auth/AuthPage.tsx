@@ -11,7 +11,7 @@ interface AuthPageProps {
 
 function destination(search: string) {
   const next = new URLSearchParams(search).get('next');
-  return next?.startsWith('/') ? next : '/';
+  return next?.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : '/';
 }
 
 export function AuthPage({ mode }: AuthPageProps) {
@@ -39,7 +39,7 @@ export function AuthPage({ mode }: AuthPageProps) {
       } else {
         await signIn({ login: String(formData.get('login') ?? ''), password: String(formData.get('password') ?? '') });
       }
-      navigate(destination(location.search), { replace: true });
+      await Promise.resolve(navigate(destination(location.search), { replace: true }));
     } catch (error) {
       setServerError(error instanceof ApiError ? error.message : 'Something went wrong. Please try again.');
     } finally {

@@ -5,6 +5,8 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { MemoryRouter } from 'react-router-dom';
 import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
+import { SessionProvider } from '../../app/session-provider';
+import { apiClient } from '../../api/client';
 import { FeedPage } from './FeedPage';
 
 const poll = {
@@ -29,15 +31,21 @@ function renderFeed() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <FeedPage />
-      </MemoryRouter>
+      <SessionProvider>
+        <MemoryRouter>
+          <FeedPage />
+        </MemoryRouter>
+      </SessionProvider>
     </QueryClientProvider>,
   );
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  sessionStorage.clear();
+  apiClient.clearAccessToken();
+});
 afterAll(() => server.close());
 
 test('renders polls returned from GET /polls?limit=20 with a Vote button', async () => {
@@ -52,8 +60,54 @@ test('renders polls returned from GET /polls?limit=20 with a Vote button', async
 
   expect(await screen.findByText('Which option?')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Vote' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Vote' })).toHaveAccessibleDescription('Sign in to vote on this poll.');
   expect(screen.getByRole('button', { name: 'Comments (0)' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Comments (0)' })).toHaveAccessibleDescription('Comments are not available yet.');
+});
+
+test('waits for a restored session before loading viewer-specific polls', async () => {
+  sessionStorage.setItem('yaskapp.access-token', 'saved-token');
+  const requests: string[] = [];
+  const viewerPoll = {
+    ...poll,
+    author: { ...poll.author, id: 'user-1' },
+  };
+  server.use(
+    http.get('/auth/me', ({ request }) => {
+      requests.push('me');
+      expect(request.headers.get('authorization')).toBe('Bearer saved-token');
+      return HttpResponse.json({
+        user: {
+          id: 'user-1',
+          email: 'member@example.com',
+          username: 'member',
+          status: 'active',
+          profile: {
+            displayName: 'Member',
+            pollsCount: 0,
+            followersCount: 0,
+            followingCount: 0,
+            countryCode: 'BY',
+            bio: null,
+            avatarObjectKey: null,
+            avatarUrl: null,
+          },
+        },
+      });
+    }),
+    http.get('/polls', ({ request }) => {
+      requests.push('polls');
+      expect(request.headers.get('authorization')).toBe('Bearer saved-token');
+      return HttpResponse.json({ items: [viewerPoll] });
+    }),
+  );
+
+  renderFeed();
+
+  expect(await screen.findByText('You')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Vote' })).toHaveAccessibleDescription('Voting is not available yet.');
+  expect(screen.getByRole('button', { name: 'Like (2)' })).toHaveAccessibleDescription('Liking is not available yet.');
+  expect(requests).toEqual(['me', 'polls']);
 });
 
 test('reissues the feed request when Retry is selected after a failed load', async () => {
