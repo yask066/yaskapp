@@ -62,6 +62,13 @@ jobs:
           docker run --network host --rm minio/mc:latest mb --ignore-existing ci/yaskapp-media
       - run: npm run api:typecheck
       - run: npm run api:test
+      - name: Public web checks
+        run: |
+          npm run typecheck -w @yaskapp/web
+          npm run lint -w @yaskapp/web
+          npm run test -w @yaskapp/web -- --run
+          npm run build -w @yaskapp/web
+          node --test infra/docker/test/ip-admin-routing.test.mjs apps/web/test/smoke.test.mjs
       - name: Moderation web syntax and smoke tests
         working-directory: apps/moderation-web
         run: |

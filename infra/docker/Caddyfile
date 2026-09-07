@@ -59,3 +59,35 @@ http://{$STAGING_PUBLIC_IP:127.0.0.1} {
         reverse_proxy moderation-web:80
     }
 }
+
+{$WEB_HOST:web-staging.example.com} {
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    }
+
+    handle /auth/* {
+        reverse_proxy api:3000
+    }
+    handle /polls* {
+        reverse_proxy api:3000
+    }
+    handle /users* {
+        reverse_proxy api:3000
+    }
+    handle /profiles* {
+        reverse_proxy api:3000
+    }
+    handle /search* {
+        reverse_proxy api:3000
+    }
+    handle /media/* {
+        reverse_proxy api:3000
+    }
+    handle {
+        reverse_proxy web:80
+    }
+}

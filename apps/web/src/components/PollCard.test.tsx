@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
+import { renderWithProviders } from '../test/setup';
 import { PollCard } from './PollCard';
 
 const poll = {
@@ -14,7 +15,7 @@ const poll = {
 test('submits the selected option from its own Vote button', async () => {
   const onVote = vi.fn();
   const user = userEvent.setup();
-  render(<PollCard poll={poll} viewerId="user-1" onVote={onVote} />);
+  renderWithProviders(<PollCard poll={poll} viewerId="user-1" onVote={onVote} />);
 
   await user.click(screen.getByRole('radio', { name: 'First (3)' }));
   await user.click(screen.getByRole('button', { name: 'Vote for First' }));

@@ -18,3 +18,13 @@ test('API Linux builds resolve the esbuild binary matching the tsx host', () => 
     esbuild.optionalDependencies['@esbuild/linux-x64'],
   );
 });
+
+test('Vite Linux builds resolve the esbuild binary matching Vite', () => {
+  const viteEsbuild = lockfile.packages['node_modules/vite/node_modules/esbuild'];
+  const viteLinuxBinary = lockfile.packages['node_modules/vite/node_modules/@esbuild/linux-x64'];
+
+  assert.equal(
+    viteLinuxBinary.version,
+    viteEsbuild.optionalDependencies['@esbuild/linux-x64'],
+  );
+});

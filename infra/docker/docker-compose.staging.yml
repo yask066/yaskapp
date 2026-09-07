@@ -158,6 +158,19 @@ services:
     expose:
       - "80"
 
+  web:
+    image: yaskapp-web:staging
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+    logging: *default-logging
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    expose:
+      - "80"
+
   https:
     image: caddy:2-alpine
     env_file:
@@ -167,6 +180,8 @@ services:
       api:
         condition: service_healthy
       moderation-web:
+        condition: service_started
+      web:
         condition: service_started
     restart: unless-stopped
     ports:

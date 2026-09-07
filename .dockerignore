@@ -14,4 +14,6 @@ services/api/.env
 services/api/.env.*
 !services/api/.env.staging.example
 **/*.test.ts
+**/*.test.tsx
 **/test
+**/*.tsbuildinfo

@@ -66,6 +66,14 @@ flutter run `
 The staging Compose flow runs the `migrate` job after PostgreSQL is healthy and
 starts the API only after that job exits successfully.
 
+The public web client is served from `https://<WEB_HOST>` (the example uses
+`web-staging.example.com`). Set `WEB_HOST` in `services/api/.env.staging` and
+include `https://<WEB_HOST>` in `CORS_ORIGINS`. For local browser development,
+run `npm run api:dev` and `npm run dev -w @yaskapp/web`; use
+`VITE_API_PROXY_TARGET` to change the development proxy target, or
+`VITE_API_BASE_URL` to call an explicit API base URL. Browser tokens remain in
+session-only storage pending cookie authentication.
+
 API readiness is available at `/health/ready`. It returns `200` only when the
 process, PostgreSQL, and Redis are ready; otherwise it returns `503`. Docker
 uses this endpoint before allowing Caddy to depend on the API.

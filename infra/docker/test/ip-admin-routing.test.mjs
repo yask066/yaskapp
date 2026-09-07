@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
 const caddyfile = await readFile(new URL('../Caddyfile', import.meta.url), 'utf8');
+const stagingCompose = await readFile(new URL('../docker-compose.staging.yml', import.meta.url), 'utf8');
 const html = await readFile(new URL('../../../apps/moderation-web/index.html', import.meta.url), 'utf8');
 
 test('development IP serves moderation panel under /admin', () => {
@@ -23,4 +24,22 @@ test('development IP serves the moderation panel at the root path', () => {
 test('moderation panel uses stable asset paths for the /admin mount', () => {
   assert.match(html, /href="\/src\/styles\.css"/);
   assert.match(html, /src="\/src\/main\.js"/);
+});
+
+test('public web host proxies API paths before serving the SPA', () => {
+  assert.match(caddyfile, /\{\$WEB_HOST:web-staging\.example\.com\}\s*\{/);
+
+  for (const path of ['/auth/*', '/polls*', '/users*', '/profiles*', '/search*', '/media/*']) {
+    const handler = new RegExp(`handle ${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{[\\s\\S]*?reverse_proxy api:3000`);
+    assert.match(caddyfile, handler);
+  }
+
+  const publicWebHost = caddyfile.split('{$WEB_HOST:web-staging.example.com}')[1];
+  assert.match(publicWebHost, /handle\s*\{\s*reverse_proxy web:80\s*\}/);
+});
+
+test('staging Compose builds and exposes the public web service', () => {
+  assert.match(stagingCompose, /web:\s*[\s\S]*?image: yaskapp-web:staging/);
+  assert.match(stagingCompose, /web:\s*[\s\S]*?dockerfile: apps\/web\/Dockerfile/);
+  assert.match(stagingCompose, /web:\s*[\s\S]*?expose:\s*- "80"/);
 });
