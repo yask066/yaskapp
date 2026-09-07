@@ -73,6 +73,18 @@ test('renders a discovery rail alongside the feed', async () => {
   expect(screen.getByText('#Programming')).toBeInTheDocument();
 });
 
+test('collapses and expands the trends list from its button', async () => {
+  server.use(http.get('/polls', () => HttpResponse.json({ items: [poll] })));
+  const user = userEvent.setup();
+  renderFeed();
+
+  const trendsButton = await screen.findByRole('button', { name: /Trends/ });
+  expect(trendsButton).toHaveAttribute('aria-expanded', 'true');
+  await user.click(trendsButton);
+  expect(trendsButton).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByText('#Programming')).not.toBeInTheDocument();
+});
+
 test('waits for a restored session before loading viewer-specific polls', async () => {
   sessionStorage.setItem('yaskapp.access-token', 'saved-token');
   const requests: string[] = [];

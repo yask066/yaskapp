@@ -11,6 +11,7 @@ const trends = ['#Formula1', '#Programming', '#Football', '#Technology', '#Trave
 
 export function FeedPage() {
   const [sort, setSort] = useState<FeedSort>('newest');
+  const [trendsOpen, setTrendsOpen] = useState(true);
   const { status, user } = useSession();
   const mutations = usePollMutations();
   const pollsQuery = useQuery({ queryKey: ['polls', sort], queryFn: () => sort === 'newest' ? listPolls() : listPolls({ sort }), enabled: status !== 'loading' });
@@ -18,6 +19,6 @@ export function FeedPage() {
     <section className="feed-main" aria-label="Poll feed"><h1>Feed</h1><div className="feed-tabs" aria-label="Feed order"><button type="button" aria-pressed={sort === 'newest'} onClick={() => setSort('newest')}>Newest</button><button type="button" aria-pressed={sort === 'popular'} onClick={() => setSort('popular')}>Popular</button></div>
       {pollsQuery.isPending ? <AsyncState state="loading" /> : null}{pollsQuery.isError ? <AsyncState state="error" error={pollsQuery.error} onRetry={() => void pollsQuery.refetch()} /> : null}{pollsQuery.data && pollsQuery.data.length === 0 ? <AsyncState state="empty" /> : null}{mutations.error ? <p aria-live="polite">{mutations.error}</p> : null}
       <div className="feed-list">{pollsQuery.data?.map((poll) => <PollCard key={poll.id} poll={poll} viewerId={user?.id} onVote={user ? (pollId, optionId) => mutations.vote({ pollId, optionId }) : undefined} onCancelVote={user ? mutations.cancelVote : undefined} onLike={user ? (pollId, viewerHasLiked) => mutations.toggleLike({ pollId, viewerHasLiked }) : undefined} onDelete={user ? mutations.deletePoll : undefined} />)}</div></section>
-    <aside className="feed-sidebar" aria-label="Discover content"><section className="discovery-card"><h2>↗ Trends</h2><ul>{trends.map((trend, index) => <li key={trend}><a href={`/?topic=${trend.slice(1)}`}><span>#</span><div><strong>{trend}</strong><small>{`${(12 - index * 1.6).toFixed(1)}K polls`}</small></div></a></li>)}</ul><a className="show-more" href="/search">Show more</a></section><section className="discovery-card discovery-cta"><h2>Find interesting content</h2><p>Follow users, explore topics and participate in polls.</p><a className="create-poll-link" href="/search">Explore</a></section></aside>
+    <aside className="feed-sidebar" aria-label="Discover content"><section className="discovery-card"><h2><button className="trends-toggle" type="button" aria-expanded={trendsOpen} aria-controls="trends-list" onClick={() => setTrendsOpen((open) => !open)}>↗ Trends <span aria-hidden="true">⌄</span></button></h2>{trendsOpen ? <><ul id="trends-list">{trends.map((trend, index) => <li key={trend}><a href={`/?topic=${trend.slice(1)}`}><span>#</span><div><strong>{trend}</strong><small>{`${(12 - index * 1.6).toFixed(1)}K polls`}</small></div></a></li>)}</ul><a className="show-more" href="/search">Show more</a></> : null}</section><section className="discovery-card discovery-cta"><h2>Find interesting content</h2><p>Follow users, explore topics and participate in polls.</p><a className="create-poll-link" href="/search">Explore</a></section></aside>
   </main>;
 }
