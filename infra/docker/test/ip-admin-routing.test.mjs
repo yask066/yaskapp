@@ -12,13 +12,22 @@ test('development IP serves moderation panel under /admin', () => {
   assert.match(caddyfile, /handle_path \/admin\/\*\s*\{[\s\S]*?reverse_proxy moderation-web:80/);
 });
 
-test('development IP serves the moderation panel at the root path', () => {
+test('development IP serves the public web client at the root path', () => {
   const developmentIpSite = caddyfile.split('{$STAGING_API_DOMAIN')[0];
 
   assert.match(
     developmentIpSite,
-    /handle\s*\{\s*reverse_proxy moderation-web:80\s*\}/,
+    /handle\s*\{\s*reverse_proxy web:80\s*\}/,
   );
+});
+
+test('development IP proxies public web API paths before the SPA', () => {
+  const developmentIpSite = caddyfile.split('{$STAGING_API_DOMAIN')[0];
+
+  for (const path of ['/auth/*', '/polls*', '/users*', '/profiles*', '/search*', '/media/*']) {
+    const handler = new RegExp(`handle ${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{[\\s\\S]*?reverse_proxy api:3000`);
+    assert.match(developmentIpSite, handler);
+  }
 });
 
 test('moderation panel uses stable asset paths for the /admin mount', () => {
