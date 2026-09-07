@@ -4,6 +4,9 @@ import { AuthPage } from '../features/auth/AuthPage';
 import { FeedPage } from '../features/feed/FeedPage';
 import { CreatePollPage } from '../features/polls/CreatePollPage';
 import { PollDetailPage } from '../features/comments/PollDetailPage';
+import { MyProfilePage } from '../features/profiles/MyProfilePage';
+import { PublicProfilePage } from '../features/profiles/PublicProfilePage';
+import { SearchPage } from '../features/search/SearchPage';
 import { useSession } from './session-provider';
 
 function LoadingMain() {
@@ -27,10 +30,6 @@ export function ProtectedRoute() {
   return <Outlet />;
 }
 
-function ProtectedPlaceholder({ title }: { title: string }) {
-  return <main id="main-content"><h1>{title}</h1></main>;
-}
-
 // The router is intentionally shared with the application bootstrap.
 // eslint-disable-next-line react-refresh/only-export-components
 export const router = createBrowserRouter([
@@ -40,6 +39,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <FeedPage /> },
       { path: 'polls/:pollId', element: <PollDetailPage /> },
+      { path: 'users/:userId', element: <PublicProfilePage /> },
       {
         element: <PublicOnlyRoute />,
         children: [
@@ -50,9 +50,9 @@ export const router = createBrowserRouter([
       {
         element: <ProtectedRoute />,
         children: [
-          { path: 'search', element: <ProtectedPlaceholder title="Search" /> },
+          { path: 'search', element: <SearchPage /> },
           { path: 'polls/new', element: <CreatePollPage /> },
-          { path: 'profile', element: <ProtectedPlaceholder title="Profile" /> },
+          { path: 'me', element: <MyProfilePage /> },
         ],
       },
     ],

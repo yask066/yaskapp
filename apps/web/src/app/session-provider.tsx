@@ -13,6 +13,7 @@ export interface SessionState {
   signIn(input: { login: string; password: string }): Promise<void>;
   register(input: { email: string; username: string; password: string; countryCode: string; displayName?: string }): Promise<void>;
   signOut(): void;
+  updateUser(user: AuthUser): void;
 }
 
 const SessionContext = createContext<SessionState | null>(null);
@@ -61,6 +62,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     signIn: async (input) => establishSession(await login(input)),
     register: async (input) => establishSession(await register(input)),
     signOut: clearSession,
+    updateUser: setUser,
   }), [clearSession, establishSession, status, user]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

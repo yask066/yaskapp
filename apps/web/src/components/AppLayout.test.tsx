@@ -56,7 +56,7 @@ test('provides keyboard-native account navigation and sign out controls', async 
   renderLayout();
 
   const accountNavigation = screen.getByRole('navigation', { name: 'Account navigation' });
-  expect(within(accountNavigation).getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/profile');
+  expect(within(accountNavigation).getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/me');
   expect(screen.queryByRole('menu')).not.toBeInTheDocument();
 
   await user.click(within(accountNavigation).getByRole('button', { name: 'Sign out' }));

@@ -19,7 +19,8 @@ export function AppLayout() {
         {status === 'authenticated' && user ? (
           <nav aria-label="Account navigation">
             <Avatar name={user.profile.displayName} src={user.profile.avatarUrl} size={28} />
-            <Link to="/profile">Profile</Link>
+            <span>{user.profile.displayName}</span>
+            <Link to="/me">Profile</Link>
             <button type="button" onClick={signOut}>Sign out</button>
           </nav>
         ) : null}
