@@ -22,3 +22,10 @@ test('submits the selected option from its own Vote button', async () => {
 
   expect(onVote).toHaveBeenCalledWith('poll-1', 'option-1');
 });
+
+test('exposes result percentages as progress bars after voting', () => {
+  renderWithProviders(<PollCard poll={{ ...poll, viewerVoteOptionId: 'option-1' }} viewerId="user-1" />);
+
+  expect(screen.getByRole('progressbar', { name: 'First' })).toHaveAttribute('aria-valuenow', '75');
+  expect(screen.getByRole('progressbar', { name: 'Second' })).toHaveAttribute('aria-valuenow', '25');
+});

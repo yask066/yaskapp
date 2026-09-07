@@ -23,8 +23,8 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
   useEffect(() => setSelectedOptionId(poll.viewerVoteOptionId ?? ''), [poll.viewerVoteOptionId]);
 
   return (
-    <article aria-labelledby={`poll-${poll.id}-question`}>
-      <header>
+    <article className="poll-card" aria-labelledby={`poll-${poll.id}-question`}>
+      <header className="poll-card-header">
         <Avatar name={authorName} src={poll.author.avatarUrl} />
         <p>{viewerId === poll.author.id ? 'You' : authorName}</p>
       </header>
@@ -34,7 +34,7 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
         <fieldset>
           <legend>Choose an option</legend>
           {poll.options.map((option) => (
-            <div key={option.id}>
+            <div className="poll-option" key={option.id}>
               <label>
               <input
                 type="radio"
@@ -46,6 +46,10 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
               />
               {option.text} {hasVoted ? `(${option.votesCount}, ${poll.votesCount ? Math.round((option.votesCount / poll.votesCount) * 100) : 0}%)` : `(${option.votesCount})`}
               </label>
+              {hasVoted ? (() => {
+                const percentage = poll.votesCount ? Math.round((option.votesCount / poll.votesCount) * 100) : 0;
+                return <div className="poll-result-bar" role="progressbar" aria-label={option.text} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage}><span style={{ width: `${percentage}%` }} /></div>;
+              })() : null}
               <button type="button" disabled={!onVote || hasVoted || isClosed || selectedOptionId !== option.id} onClick={() => onVote?.(poll.id, option.id)} aria-describedby={onVote ? undefined : `poll-${poll.id}-vote-help`}>Vote for {option.text}</button>
             </div>
           ))}
@@ -53,7 +57,7 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
         {!onVote ? <p id={`poll-${poll.id}-vote-help`}>{voteHelp}</p> : null}
         {hasVoted && poll.allowVoteCancellation && !isClosed && onCancelVote ? <button type="button" onClick={() => onCancelVote(poll.id)}>Cancel vote</button> : null}
       </section>
-      <footer>
+      <footer className="poll-actions">
         <button type="button" disabled={!onLike} onClick={() => onLike?.(poll.id, poll.viewerHasLiked)} aria-pressed={poll.viewerHasLiked} aria-describedby={onLike ? undefined : `poll-${poll.id}-like-help`}>
           Like ({poll.likesCount})
         </button>

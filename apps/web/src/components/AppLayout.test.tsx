@@ -63,6 +63,15 @@ test('provides keyboard-native account navigation and sign out controls', async 
   expect(signOut).toHaveBeenCalledOnce();
 });
 
+test('provides the reference-style sidebar destinations to signed-in members', () => {
+  renderLayout();
+
+  const primaryNavigation = screen.getByRole('navigation', { name: 'Primary navigation' });
+  expect(within(primaryNavigation).getByRole('link', { name: 'Feed' })).toHaveAttribute('href', '/');
+  expect(within(primaryNavigation).getByRole('link', { name: 'Explore' })).toHaveAttribute('href', '/search');
+  expect(within(primaryNavigation).getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/me');
+});
+
 test('omits the empty primary navigation for anonymous and loading sessions', () => {
   sessionStatus = 'anonymous';
   sessionUser = null;

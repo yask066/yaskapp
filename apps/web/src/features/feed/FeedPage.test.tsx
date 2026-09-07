@@ -65,6 +65,14 @@ test('renders polls returned from GET /polls?limit=20 with a Vote button', async
   expect(screen.getByRole('button', { name: 'Comments (0)' })).toHaveAccessibleDescription('Comments are not available yet.');
 });
 
+test('renders a discovery rail alongside the feed', async () => {
+  server.use(http.get('/polls', () => HttpResponse.json({ items: [poll] })));
+  renderFeed();
+
+  expect(await screen.findByRole('complementary', { name: 'Discover content' })).toBeInTheDocument();
+  expect(screen.getByText('#Programming')).toBeInTheDocument();
+});
+
 test('waits for a restored session before loading viewer-specific polls', async () => {
   sessionStorage.setItem('yaskapp.access-token', 'saved-token');
   const requests: string[] = [];
