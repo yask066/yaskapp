@@ -72,6 +72,15 @@ test('provides the reference-style sidebar destinations to signed-in members', (
   expect(within(primaryNavigation).getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/me');
 });
 
+test('provides the reference feed navigation and topic shortcuts', () => {
+  renderLayout();
+
+  const primaryNavigation = screen.getByRole('navigation', { name: 'Primary navigation' });
+  expect(within(primaryNavigation).getByRole('link', { name: 'Notifications' })).toBeInTheDocument();
+  expect(screen.getByRole('navigation', { name: 'Popular topics' })).toHaveTextContent('Formula1');
+  expect(screen.getAllByRole('link', { name: /Create poll/i })[0]).toHaveAttribute('href', '/polls/new');
+});
+
 test('omits the empty primary navigation for anonymous and loading sessions', () => {
   sessionStatus = 'anonymous';
   sessionUser = null;

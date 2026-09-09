@@ -70,7 +70,16 @@ test('renders a discovery rail alongside the feed', async () => {
   renderFeed();
 
   expect(await screen.findByRole('complementary', { name: 'Discover content' })).toBeInTheDocument();
-  expect(screen.getByText('#Programming')).toBeInTheDocument();
+  expect(screen.getByText('#Gaming')).toBeInTheDocument();
+});
+
+test('renders the reference discovery sections', async () => {
+  server.use(http.get('/polls', () => HttpResponse.json({ items: [poll] })));
+  renderFeed();
+
+  expect(await screen.findByRole('heading', { name: 'Suggested users' })).toBeInTheDocument();
+  expect(screen.getAllByRole('button', { name: 'Follow' })).toHaveLength(3);
+  expect(screen.getByText('#Gaming')).toBeInTheDocument();
 });
 
 test('collapses and expands the trends list from its button', async () => {
@@ -82,7 +91,7 @@ test('collapses and expands the trends list from its button', async () => {
   expect(trendsButton).toHaveAttribute('aria-expanded', 'true');
   await user.click(trendsButton);
   expect(trendsButton).toHaveAttribute('aria-expanded', 'false');
-  expect(screen.queryByText('#Programming')).not.toBeInTheDocument();
+  expect(screen.queryByText('#Gaming')).not.toBeInTheDocument();
 });
 
 test('waits for a restored session before loading viewer-specific polls', async () => {
