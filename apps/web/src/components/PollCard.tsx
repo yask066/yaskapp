@@ -31,7 +31,7 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
       <h2 id={`poll-${poll.id}-question`}><Link to={`/polls/${poll.id}`}>{poll.question}</Link></h2>
       {poll.imageUrl ? <img src={poll.imageUrl} alt="" /> : null}
       <section aria-label="Vote on this poll">
-        <fieldset>
+        <fieldset className="poll-options">
           <legend>Choose an option</legend>
           {poll.options.map((option) => (
             <div className="poll-option" key={option.id}>

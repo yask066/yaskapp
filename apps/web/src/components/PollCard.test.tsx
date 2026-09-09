@@ -23,6 +23,12 @@ test('submits the selected option from its own Vote button', async () => {
   expect(onVote).toHaveBeenCalledWith('poll-1', 'option-1');
 });
 
+test('marks the options container as width-constrained content', () => {
+  renderWithProviders(<PollCard poll={poll} viewerId="user-1" />);
+
+  expect(screen.getByRole('group', { name: 'Choose an option' })).toHaveClass('poll-options');
+});
+
 test('exposes result percentages as progress bars after voting', () => {
   renderWithProviders(<PollCard poll={{ ...poll, viewerVoteOptionId: 'option-1' }} viewerId="user-1" />);
 
