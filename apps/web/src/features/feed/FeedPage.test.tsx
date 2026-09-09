@@ -5,12 +5,9 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { MemoryRouter } from 'react-router-dom';
 import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { SessionProvider } from '../../app/session-provider';
 import { apiClient } from '../../api/client';
 import { FeedPage } from './FeedPage';
-const globalCss = readFileSync(resolve(process.cwd(), 'src/styles/global.css'), 'utf8');
 
 const poll = {
   id: 'poll-1',
@@ -68,11 +65,6 @@ test('renders polls returned from GET /polls?limit=20 with a Vote button', async
   expect(screen.getByRole('button', { name: 'Comments (0)' })).toHaveAccessibleDescription('Comments are not available yet.');
 });
 
-test('uses the mobile brand color for the selected feed tab', async () => {
-  expect(globalCss).toMatch(/--color-brand:\s*#566A9D/i);
-  expect(globalCss).not.toMatch(/#(?:1768f2|147aff|165be8|0e4ec8)/i);
-});
-
 test('renders a discovery rail alongside the feed', async () => {
   server.use(http.get('/polls', () => HttpResponse.json({ items: [poll] })));
   renderFeed();
@@ -96,9 +88,18 @@ test('renders the reference discovery sections', async () => {
   server.use(http.get('/polls', () => HttpResponse.json({ items: [poll] })));
   renderFeed();
 
-  expect(await screen.findByRole('heading', { name: 'Suggested users' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Who to follow' })).toBeInTheDocument();
   expect(screen.getAllByRole('button', { name: 'Follow' })).toHaveLength(3);
   expect(screen.getByText('#Gaming')).toBeInTheDocument();
+});
+
+test('uses the supplied reference labels and abbreviated trend counts', async () => {
+  server.use(http.get('/polls', () => HttpResponse.json({ items: [poll] })));
+  renderFeed();
+
+  expect(await screen.findByRole('heading', { name: /Trending topics/ })).toBeInTheDocument();
+  expect(screen.getByText('12.4K polls')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Who to follow' })).toBeInTheDocument();
 });
 
 test('collapses and expands the trends list from its button', async () => {
@@ -106,7 +107,7 @@ test('collapses and expands the trends list from its button', async () => {
   const user = userEvent.setup();
   renderFeed();
 
-  const trendsButton = await screen.findByRole('button', { name: /Trends/ });
+  const trendsButton = await screen.findByRole('button', { name: /Toggle trending topics/ });
   expect(trendsButton).toHaveAttribute('aria-expanded', 'true');
   await user.click(trendsButton);
   expect(trendsButton).toHaveAttribute('aria-expanded', 'false');

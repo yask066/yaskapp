@@ -33,7 +33,7 @@ export function AppLayout() {
           <Link className="sidebar-link" to="/me"><span aria-hidden="true">♙</span> Profile</Link>
         </nav>
         <Link className="create-poll-link sidebar-create-poll" to="/polls/new"><span aria-hidden="true">＋</span> Create poll</Link>
-        <p className="sidebar-footer"><span>About</span><span>Help</span><span>Terms</span><span>Privacy</span><span>© 2026 Yask</span></p>
+        <p className="sidebar-footer"><span>Help</span><span>Terms</span><span>Privacy</span><span>© 2025 Yask</span></p>
       </aside> : null}
       <div className="app-content"><Outlet /></div>
     </div>

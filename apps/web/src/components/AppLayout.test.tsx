@@ -82,6 +82,16 @@ test('keeps the reference sidebar focused on navigation and poll creation', () =
   expect(screen.getByRole('link', { name: /Create poll/i })).toHaveAttribute('href', '/polls/new');
 });
 
+test('uses the supplied compact left-rail footer', () => {
+  renderLayout();
+
+  expect(screen.getByText('Help')).toBeInTheDocument();
+  expect(screen.getByText('Terms')).toBeInTheDocument();
+  expect(screen.getByText('Privacy')).toBeInTheDocument();
+  expect(screen.getByText('© 2025 Yask')).toBeInTheDocument();
+  expect(screen.queryByText('About')).not.toBeInTheDocument();
+});
+
 test('omits the empty primary navigation for anonymous and loading sessions', () => {
   sessionStatus = 'anonymous';
   sessionUser = null;
