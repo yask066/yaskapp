@@ -59,3 +59,24 @@ test('rejects a protocol-relative next destination after sign in', async () => {
 
   expect(await screen.findByRole('heading', { name: 'Feed' })).toBeInTheDocument();
 });
+
+test('lets a member reveal and conceal their password', async () => {
+  const user = userEvent.setup();
+
+  render(
+    <MemoryRouter initialEntries={['/login']}>
+      <Routes>
+        <Route path="/login" element={<AuthPage mode="login" />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  const password = screen.getByLabelText('Password');
+  expect(password).toHaveAttribute('type', 'password');
+
+  await user.click(screen.getByRole('button', { name: 'Show password' }));
+  expect(password).toHaveAttribute('type', 'text');
+
+  await user.click(screen.getByRole('button', { name: 'Hide password' }));
+  expect(password).toHaveAttribute('type', 'password');
+});

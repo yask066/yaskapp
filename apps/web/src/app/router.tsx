@@ -41,13 +41,6 @@ export const router = createBrowserRouter([
       { path: 'polls/:pollId', element: <PollDetailPage /> },
       { path: 'users/:userId', element: <PublicProfilePage /> },
       {
-        element: <PublicOnlyRoute />,
-        children: [
-          { path: 'login', element: <AuthPage mode="login" /> },
-          { path: 'register', element: <AuthPage mode="register" /> },
-        ],
-      },
-      {
         element: <ProtectedRoute />,
         children: [
           { path: 'search', element: <SearchPage /> },
@@ -55,6 +48,13 @@ export const router = createBrowserRouter([
           { path: 'me', element: <MyProfilePage /> },
         ],
       },
+    ],
+  },
+  {
+    element: <PublicOnlyRoute />,
+    children: [
+      { path: 'login', element: <AuthPage mode="login" /> },
+      { path: 'register', element: <AuthPage mode="register" /> },
     ],
   },
 ]);
