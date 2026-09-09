@@ -81,6 +81,17 @@ test('renders a discovery rail alongside the feed', async () => {
   expect(screen.getByText('#Gaming')).toBeInTheDocument();
 });
 
+test('renders the reference composer and feed segments', async () => {
+  server.use(http.get('/polls', () => HttpResponse.json({ items: [poll] })));
+  renderFeed();
+
+  expect(await screen.findByRole('link', { name: 'Create poll' })).toHaveAttribute('href', '/polls/new');
+  expect(screen.getByText("What's on your mind today?")).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'For you' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: 'Following' })).toHaveAttribute('aria-pressed', 'false');
+  expect(screen.getByRole('button', { name: 'Trending' })).toHaveAttribute('aria-pressed', 'false');
+});
+
 test('renders the reference discovery sections', async () => {
   server.use(http.get('/polls', () => HttpResponse.json({ items: [poll] })));
   renderFeed();

@@ -63,22 +63,23 @@ test('provides keyboard-native account navigation and sign out controls', async 
   expect(signOut).toHaveBeenCalledOnce();
 });
 
-test('provides the reference-style sidebar destinations to signed-in members', () => {
+test('provides the reference-style Home destination to signed-in members', () => {
   renderLayout();
 
   const primaryNavigation = screen.getByRole('navigation', { name: 'Primary navigation' });
-  expect(within(primaryNavigation).getByRole('link', { name: 'Feed' })).toHaveAttribute('href', '/');
+  expect(within(primaryNavigation).getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/');
   expect(within(primaryNavigation).getByRole('link', { name: 'Explore' })).toHaveAttribute('href', '/search');
   expect(within(primaryNavigation).getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/me');
 });
 
-test('provides the reference feed navigation and topic shortcuts', () => {
+test('keeps the reference sidebar focused on navigation and poll creation', () => {
   renderLayout();
 
   const primaryNavigation = screen.getByRole('navigation', { name: 'Primary navigation' });
   expect(within(primaryNavigation).getByRole('link', { name: 'Notifications' })).toBeInTheDocument();
-  expect(screen.getByRole('navigation', { name: 'Popular topics' })).toHaveTextContent('Formula1');
-  expect(screen.getAllByRole('link', { name: /Create poll/i })[0]).toHaveAttribute('href', '/polls/new');
+  expect(screen.queryByRole('navigation', { name: 'Popular topics' })).not.toBeInTheDocument();
+  expect(screen.getAllByRole('link', { name: /Create poll/i })).toHaveLength(1);
+  expect(screen.getByRole('link', { name: /Create poll/i })).toHaveAttribute('href', '/polls/new');
 });
 
 test('omits the empty primary navigation for anonymous and loading sessions', () => {
