@@ -11,7 +11,7 @@ export function AppLayout() {
     <div className="app-shell">
       <a className="skip-link" href="#main-content">Skip to main content</a>
       <header className="app-header">
-        <Link className="app-brand" aria-label="Yaskapp" to="/"><span>Y</span>ask</Link>
+        <Link className="app-brand" aria-label="Yaskapp" to="/"><img src="/branding/yaskapp_logo.png" alt="" /></Link>
         {isAuthenticated ? <div className="app-header-actions">
           <Link className="app-search" to="/search"><MaterialIcon name="search" /><span>Search polls, users or topics…</span></Link>
         </div> : null}

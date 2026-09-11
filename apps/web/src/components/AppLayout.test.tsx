@@ -85,6 +85,7 @@ test('keeps the reference sidebar focused on navigation and poll creation', () =
 test('uses the current mobile Material icons for authenticated navigation', () => {
   renderLayout();
 
+  expect(screen.getByRole('link', { name: 'Yaskapp' }).querySelector('img[src="/branding/yaskapp_logo.png"]')).toBeInTheDocument();
   const primaryNavigation = screen.getByRole('navigation', { name: 'Primary navigation' });
   expect(primaryNavigation.querySelector('[data-icon="home"]')).toBeInTheDocument();
   expect(primaryNavigation.querySelector('[data-icon="search"]')).toBeInTheDocument();
