@@ -84,6 +84,14 @@ test('renders the reference composer and feed segments', async () => {
   expect(screen.getByRole('button', { name: 'Trending' })).toHaveAttribute('aria-pressed', 'false');
 });
 
+test('uses the mobile create-poll icon in the composer', async () => {
+  server.use(http.get('/polls', () => HttpResponse.json({ items: [poll] })));
+  renderFeed();
+
+  const composer = await screen.findByRole('region', { name: 'Create a poll' });
+  expect(composer.querySelector('img[src="/branding/create_poll_icon.png"]')).toBeInTheDocument();
+});
+
 test('renders the reference discovery sections', async () => {
   server.use(http.get('/polls', () => HttpResponse.json({ items: [poll] })));
   renderFeed();

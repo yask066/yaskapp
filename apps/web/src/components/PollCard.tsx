@@ -59,11 +59,11 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
       </section>
       <footer className="poll-actions">
         <button type="button" disabled={!onLike} onClick={() => onLike?.(poll.id, poll.viewerHasLiked)} aria-pressed={poll.viewerHasLiked} aria-describedby={onLike ? undefined : `poll-${poll.id}-like-help`}>
-          Like ({poll.likesCount})
+          <img className="poll-action-icon" src="/branding/like_icon.png" alt="" /> Like ({poll.likesCount})
         </button>
         {!onLike ? <p id={`poll-${poll.id}-like-help`}>{likeHelp}</p> : null}
         <button type="button" disabled={!onOpenComments} onClick={() => onOpenComments?.(poll)} aria-describedby={onOpenComments ? undefined : `poll-${poll.id}-comments-help`}>
-          Comments ({poll.commentsCount})
+          <img className="poll-action-icon" src="/branding/comments_icon.png" alt="" /> Comments ({poll.commentsCount})
         </button>
         {!onOpenComments ? <p id={`poll-${poll.id}-comments-help`}>Comments are not available yet.</p> : null}
         {viewerId === poll.author.id && onDelete ? <button type="button" onClick={() => { if (window.confirm('Delete this poll?')) onDelete(poll.id); }}>Delete</button> : null}

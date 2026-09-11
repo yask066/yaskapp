@@ -35,3 +35,10 @@ test('exposes result percentages as progress bars after voting', () => {
   expect(screen.getByRole('progressbar', { name: 'First' })).toHaveAttribute('aria-valuenow', '75');
   expect(screen.getByRole('progressbar', { name: 'Second' })).toHaveAttribute('aria-valuenow', '25');
 });
+
+test('uses the mobile like and comment icons for poll actions', () => {
+  renderWithProviders(<PollCard poll={poll} viewerId="user-1" onLike={vi.fn()} onOpenComments={vi.fn()} />);
+
+  expect(screen.getByRole('button', { name: 'Like (2)' }).querySelector('img[src="/branding/like_icon.png"]')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Comments (0)' }).querySelector('img[src="/branding/comments_icon.png"]')).toBeInTheDocument();
+});

@@ -82,6 +82,17 @@ test('keeps the reference sidebar focused on navigation and poll creation', () =
   expect(screen.getByRole('link', { name: /Create poll/i })).toHaveAttribute('href', '/polls/new');
 });
 
+test('uses the mobile branding icons for authenticated navigation', () => {
+  renderLayout();
+
+  const primaryNavigation = screen.getByRole('navigation', { name: 'Primary navigation' });
+  expect(primaryNavigation.querySelector('img[src="/branding/home_icon.png"]')).toBeInTheDocument();
+  expect(primaryNavigation.querySelector('img[src="/branding/search_icon.png"]')).toBeInTheDocument();
+  expect(primaryNavigation.querySelector('img[src="/branding/notification_icon.png"]')).toBeInTheDocument();
+  expect(within(primaryNavigation).getByRole('link', { name: 'Profile' }).querySelector('.avatar')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Create poll' }).querySelector('img[src="/branding/create_poll_icon.png"]')).toBeInTheDocument();
+});
+
 test('uses the supplied compact left-rail footer', () => {
   renderLayout();
 
