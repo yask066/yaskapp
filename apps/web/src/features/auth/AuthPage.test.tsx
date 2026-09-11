@@ -80,3 +80,15 @@ test('lets a member reveal and conceal their password', async () => {
   await user.click(screen.getByRole('button', { name: 'Hide password' }));
   expect(password).toHaveAttribute('type', 'password');
 });
+
+test('uses the mobile PNG logo in the authentication header', () => {
+  render(
+    <MemoryRouter initialEntries={['/login']}>
+      <Routes>
+        <Route path="/login" element={<AuthPage mode="login" />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  expect(screen.getByRole('link', { name: 'Yask home' }).querySelector('img[src="/branding/yaskapp_logo.png"]')).toBeInTheDocument();
+});

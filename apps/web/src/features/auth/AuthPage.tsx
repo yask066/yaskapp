@@ -51,7 +51,7 @@ export function AuthPage({ mode }: AuthPageProps) {
   return (
     <main id="main-content" className="auth-page">
       <section className="auth-showcase" aria-label="About Yask">
-        <a className="auth-brand" href="/" aria-label="Yask home"><span>Y</span>ask</a>
+        <a className="auth-brand" href="/" aria-label="Yask home"><img src="/branding/yaskapp_logo.png" alt="" /></a>
         <div className="auth-showcase-copy">
           <h1>Share opinions.<br />Discover people.<br />See what the world thinks.</h1>
           <p>Polls, discussions and real people.<br />All in one place.</p>
