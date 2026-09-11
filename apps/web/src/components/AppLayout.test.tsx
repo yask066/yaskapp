@@ -82,15 +82,15 @@ test('keeps the reference sidebar focused on navigation and poll creation', () =
   expect(screen.getByRole('link', { name: /Create poll/i })).toHaveAttribute('href', '/polls/new');
 });
 
-test('uses the mobile branding icons for authenticated navigation', () => {
+test('uses the current mobile Material icons for authenticated navigation', () => {
   renderLayout();
 
   const primaryNavigation = screen.getByRole('navigation', { name: 'Primary navigation' });
-  expect(primaryNavigation.querySelector('img[src="/branding/home_icon.png"]')).toBeInTheDocument();
-  expect(primaryNavigation.querySelector('img[src="/branding/search_icon.png"]')).toBeInTheDocument();
-  expect(primaryNavigation.querySelector('img[src="/branding/notification_icon.png"]')).toBeInTheDocument();
+  expect(primaryNavigation.querySelector('[data-icon="home"]')).toBeInTheDocument();
+  expect(primaryNavigation.querySelector('[data-icon="search"]')).toBeInTheDocument();
+  expect(primaryNavigation.querySelector('[data-icon="notifications_none"]')).toBeInTheDocument();
   expect(within(primaryNavigation).getByRole('link', { name: 'Profile' }).querySelector('.avatar')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Create poll' }).querySelector('img[src="/branding/create_poll_icon.png"]')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Create poll' }).querySelector('[data-icon="add"]')).toBeInTheDocument();
 });
 
 test('uses the supplied compact left-rail footer', () => {
