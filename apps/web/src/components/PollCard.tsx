@@ -39,7 +39,7 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
         <fieldset className="poll-options">
           <legend>Choose an option</legend>
           {poll.options.map((option) => (
-            <div className={`poll-option${selectedOptionId === option.id ? ' is-selected' : ''}`} key={option.id}>
+            <div className={`poll-option${selectedOptionId === option.id ? ' is-selected' : ''}${hasVoted ? ' is-results' : ''}`} key={option.id}>
               <label>
               <input
                 type="radio"
@@ -66,15 +66,15 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
         {hasVoted && poll.allowVoteCancellation && !isClosed && onCancelVote ? <button type="button" onClick={() => onCancelVote(poll.id)}>Cancel vote</button> : null}
       </section>
       <footer className="poll-actions">
-        <button type="button" disabled={!onLike} onClick={() => onLike?.(poll.id, poll.viewerHasLiked)} aria-pressed={poll.viewerHasLiked} aria-describedby={onLike ? undefined : `poll-${poll.id}-like-help`}>
-          <MaterialIcon className="poll-action-icon" name={poll.viewerHasLiked ? 'favorite' : 'favorite_border'} /> Like ({poll.likesCount})
+        <button className="poll-action-button" type="button" disabled={!onLike} onClick={() => onLike?.(poll.id, poll.viewerHasLiked)} aria-label={`Like (${poll.likesCount})`} aria-pressed={poll.viewerHasLiked} aria-describedby={onLike ? undefined : `poll-${poll.id}-like-help`}>
+          <MaterialIcon className="poll-action-icon" name={poll.viewerHasLiked ? 'favorite' : 'favorite_border'} /><span className="poll-action-label">Like</span> <span className="poll-action-count">{poll.likesCount}</span>
         </button>
         {!onLike ? <p id={`poll-${poll.id}-like-help`}>{likeHelp}</p> : null}
-        <button type="button" disabled={!onOpenComments} onClick={() => onOpenComments?.(poll)} aria-describedby={onOpenComments ? undefined : `poll-${poll.id}-comments-help`}>
-          <MaterialIcon className="poll-action-icon" name="mode_comment_outlined" /> Comments ({poll.commentsCount})
+        <button className="poll-action-button" type="button" disabled={!onOpenComments} onClick={() => onOpenComments?.(poll)} aria-label={`Comments (${poll.commentsCount})`} aria-describedby={onOpenComments ? undefined : `poll-${poll.id}-comments-help`}>
+          <MaterialIcon className="poll-action-icon" name="mode_comment_outlined" /><span className="poll-action-label">Comments</span> <span className="poll-action-count">{poll.commentsCount}</span>
         </button>
         {!onOpenComments ? <p id={`poll-${poll.id}-comments-help`}>Comments are not available yet.</p> : null}
-        {viewerId === poll.author.id && onDelete ? <button className="poll-delete-action" type="button" aria-label="Delete poll" onClick={() => { if (window.confirm('Delete this poll?')) onDelete(poll.id); }}><MaterialIcon className="poll-action-icon" name="delete_outline" /> Delete</button> : null}
+        {viewerId === poll.author.id && onDelete ? <button className="poll-action-button poll-delete-action" type="button" aria-label="Delete poll" onClick={() => { if (window.confirm('Delete this poll?')) onDelete(poll.id); }}><MaterialIcon className="poll-action-icon" name="delete_outline" /> <span className="poll-action-label">Delete</span></button> : null}
       </footer>
     </article>
   );

@@ -67,6 +67,21 @@ test('uses the selected mobile favorite icon for an already liked poll', () => {
   expect(screen.getByRole('button', { name: 'Like (2)' }).querySelector('[data-icon="favorite"]')).toBeInTheDocument();
 });
 
+test('renders the voted card with compact action counters', () => {
+  renderWithProviders(
+    <PollCard
+      poll={{ ...poll, viewerVoteOptionId: 'option-1' }}
+      viewerId="user-1"
+      onLike={vi.fn()}
+      onOpenComments={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByRole('button', { name: 'Like (2)' })).toHaveClass('poll-action-button');
+  expect(screen.getByRole('button', { name: 'Like (2)' }).querySelector('.poll-action-count')).toHaveTextContent('2');
+  expect(screen.getByRole('button', { name: 'Comments (0)' }).querySelector('.poll-action-count')).toHaveTextContent('0');
+});
+
 test('uses a drawn menu icon instead of a text glyph', () => {
   renderWithProviders(<PollCard poll={poll} viewerId="user-1" onLike={vi.fn()} onOpenComments={vi.fn()} />);
 

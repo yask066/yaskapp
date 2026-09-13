@@ -111,3 +111,22 @@ body { background: #f7f8fc; }
 @media (min-width: 1024px) { .app-shell { grid-template-columns: 290px minmax(0, 1fr); }.app-sidebar { padding: 1.4rem 1.6rem 1.2rem 2.1rem; }.app-content { padding: 1.5rem clamp(1.25rem, 3vw, 3.5rem) 2rem 1.75rem; } }
 @media (max-width: 1199px) and (min-width: 768px) { .feed-page { grid-template-columns: minmax(0, 1fr); max-width: 800px; }.feed-sidebar { display: none; }.app-shell { grid-template-columns: 220px minmax(0, 1fr); }.app-sidebar { padding-left: 1rem; }.sidebar-create-poll { padding-inline: .65rem; } }
 @media (max-width: 767px) { .poll-composer { grid-template-columns: 2.6rem minmax(0, 1fr) auto; padding: .8rem; }.composer-avatar { width: 2.45rem; height: 2.45rem; }.poll-composer > .create-poll-link { min-width: auto; padding-inline: .8rem; }.composer-actions { grid-column: 2 / -1; gap: 1rem; }.feed-tabs button { padding-inline: .35rem; font-size: .82rem; }.poll-card { padding-inline: 1rem; } }
+
+/* Poll card visual treatment from the authenticated feed reference. */
+.poll-card { padding: 1.05rem 1.35rem 1rem; border-color: #edf0f5; border-radius: 1.1rem; box-shadow: 0 5px 18px rgb(30 50 100 / .045); }
+.poll-card-header { align-items: center; gap: .7rem; }
+.poll-card-header p { font-size: .95rem; }
+.poll-card h2 { margin: .9rem 0 1.05rem; font-size: 1.32rem; line-height: 1.25; }
+.poll-options { gap: .55rem; }
+.poll-option { min-height: 2.55rem; padding: .48rem .8rem; border-radius: .72rem; background: #f7f8fb; }
+.poll-option.is-results { background: transparent; }
+.poll-option.is-results label { grid-template-columns: minmax(0, 1fr) auto; gap: .75rem; }
+.poll-option.is-results input { display: none; }
+.poll-option.is-results .poll-option-label { font-weight: 600; }
+.poll-option.is-results .poll-option-percent { font-size: .9rem; font-weight: 700; }
+.poll-option.is-results .poll-result-bar { max-width: none; margin: .25rem 0 0; height: .68rem; }
+.poll-actions { margin-top: .7rem; padding-top: .55rem; border-top: 0; }
+.poll-action-button { min-width: 3.7rem; justify-content: center; gap: .38rem; padding-inline: .25rem; }
+.poll-action-label { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.poll-action-count { color: #66708a; font-size: .84rem; }
+.poll-action-icon { width: 1.35rem; height: 1.35rem; color: #596682; }
