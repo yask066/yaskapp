@@ -36,6 +36,24 @@ test('exposes result percentages as progress bars after voting', () => {
   expect(screen.getByRole('progressbar', { name: 'Second' })).toHaveAttribute('aria-valuenow', '25');
 });
 
+test('separates option labels from vote counts and marks the selected option', () => {
+  renderWithProviders(<PollCard poll={{ ...poll, viewerVoteOptionId: 'option-1' }} viewerId="user-1" />);
+
+  expect(screen.getByText('First')).toHaveClass('poll-option-label');
+  expect(screen.getByText('3 votes')).toHaveClass('poll-option-votes');
+  expect(screen.getByText('First').closest('.poll-option')).toHaveClass('is-selected');
+  expect(screen.getByText('Second').closest('.poll-option')).not.toHaveClass('is-selected');
+});
+
+test('shows author metadata and keeps delete visually destructive', () => {
+  renderWithProviders(
+    <PollCard poll={poll} viewerId="author-1" onDelete={vi.fn()} />,
+  );
+
+  expect(screen.getByRole('time')).toHaveClass('poll-card-time');
+  expect(screen.getByRole('button', { name: 'Delete poll' })).toHaveClass('poll-delete-action');
+});
+
 test('uses the current mobile Material icons for poll actions', () => {
   renderWithProviders(<PollCard poll={poll} viewerId="user-1" onLike={vi.fn()} onOpenComments={vi.fn()} />);
 

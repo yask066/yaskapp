@@ -21,13 +21,17 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
   const hasVoted = Boolean(poll.viewerVoteOptionId);
   const voteHelp = viewerId ? 'Voting is not available for this poll.' : 'Sign in to vote on this poll.';
   const likeHelp = viewerId ? 'Liking is not available for this poll.' : 'Sign in to like this poll.';
+  const createdLabel = formatPollDate(poll.createdAt);
   useEffect(() => setSelectedOptionId(poll.viewerVoteOptionId ?? ''), [poll.viewerVoteOptionId]);
 
   return (
     <article className="poll-card" aria-labelledby={`poll-${poll.id}-question`}>
       <header className="poll-card-header">
         <Avatar name={authorName} src={poll.author.avatarUrl} />
-        <p>{viewerId === poll.author.id ? 'You' : authorName}</p>
+        <div className="poll-author-meta">
+          <p>{viewerId === poll.author.id ? 'You' : authorName}</p>
+          <time className="poll-card-time" dateTime={poll.createdAt}>{createdLabel}</time>
+        </div>
       </header>
       <h2 id={`poll-${poll.id}-question`}><Link to={`/polls/${poll.id}`}>{poll.question}</Link></h2>
       {poll.imageUrl ? <img src={poll.imageUrl} alt="" /> : null}
@@ -35,17 +39,20 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
         <fieldset className="poll-options">
           <legend>Choose an option</legend>
           {poll.options.map((option) => (
-            <div className="poll-option" key={option.id}>
+            <div className={`poll-option${selectedOptionId === option.id ? ' is-selected' : ''}`} key={option.id}>
               <label>
               <input
                 type="radio"
                 name={`poll-${poll.id}`}
                 value={option.id}
+                aria-label={`${option.text} (${option.votesCount})`}
                 checked={selectedOptionId === option.id}
                 disabled={!onVote || hasVoted || isClosed}
                 onChange={() => setSelectedOptionId(option.id)}
               />
-              {option.text} {hasVoted ? `(${option.votesCount}, ${poll.votesCount ? Math.round((option.votesCount / poll.votesCount) * 100) : 0}%)` : `(${option.votesCount})`}
+              <span className="poll-option-label">{option.text}</span>
+              <span className="poll-option-votes">{formatVotes(option.votesCount)}</span>
+              {hasVoted ? <span className="poll-option-percent">{poll.votesCount ? Math.round((option.votesCount / poll.votesCount) * 100) : 0}%</span> : null}
               </label>
               {hasVoted ? (() => {
                 const percentage = poll.votesCount ? Math.round((option.votesCount / poll.votesCount) * 100) : 0;
@@ -67,8 +74,21 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
           <MaterialIcon className="poll-action-icon" name="mode_comment_outlined" /> Comments ({poll.commentsCount})
         </button>
         {!onOpenComments ? <p id={`poll-${poll.id}-comments-help`}>Comments are not available yet.</p> : null}
-        {viewerId === poll.author.id && onDelete ? <button type="button" onClick={() => { if (window.confirm('Delete this poll?')) onDelete(poll.id); }}>Delete</button> : null}
+        {viewerId === poll.author.id && onDelete ? <button className="poll-delete-action" type="button" aria-label="Delete poll" onClick={() => { if (window.confirm('Delete this poll?')) onDelete(poll.id); }}><MaterialIcon className="poll-action-icon" name="delete_outline" /> Delete</button> : null}
       </footer>
     </article>
+  );
+}
+
+function formatVotes(count: number) {
+  return `${count} ${count === 1 ? 'vote' : 'votes'}`;
+}
+
+function formatPollDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.RelativeTimeFormat('en', { numeric: 'auto' }).format(
+    Math.round((date.getTime() - Date.now()) / 86_400_000),
+    'day',
   );
 }
