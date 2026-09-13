@@ -79,11 +79,11 @@ class PollCard extends StatelessWidget {
     return Card(
       color: Colors.white,
       margin: EdgeInsets.zero,
-      elevation: 2,
+      elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(compact ? 20 : 22),
+        side: const BorderSide(color: Color(0xFFE5E7EB)),
       ),
-      shadowColor: const Color(0x22000000),
       clipBehavior: Clip.antiAlias,
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -221,7 +221,7 @@ class PollCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: const Color(0xFF10142D),
-                fontSize: 15,
+                fontSize: compact ? 15 : 20,
                 height: compact ? 22 / 15 : 24 / 15,
                 fontWeight: FontWeight.bold,
               ),
@@ -387,23 +387,26 @@ class _PollOptionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final percent = totalVotes == 0 ? 0.0 : option.votesCount / totalVotes;
     final optionRank = rank;
-    const accentColor = Color(0xFF566A9D);
+    const accentColor = Color(0xFF1769FF);
+    final optionBackground = isSelected
+        ? const Color(0xFFEFF5FF)
+        : optionRank == 0
+            ? const Color(0xFFF6F8FC)
+            : Colors.white;
 
     final optionMinHeight = profileVariant ? 40.0 : (compact ? 36.0 : 48.0);
     final progressHeight = profileVariant || compact ? 8.0 : 10.0;
     final numericOption = int.tryParse(option.text.trim()) != null;
-    final optionLabelWidth = numericOption ? 20.0 : 68.0;
 
     return ConstrainedBox(
       constraints: BoxConstraints(minHeight: optionMinHeight),
       child: Material(
-        color:
-            optionRank == 0 ? const Color(0xFFEFF2F8) : const Color(0xFFF5F6FA),
+        color: optionBackground,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(compact ? 10 : 12),
           side: BorderSide(
-            color: isSelected ? accentColor : Colors.transparent,
-            width: 2,
+            color: isSelected ? accentColor : const Color(0xFFE6EAF1),
+            width: isSelected ? 1.5 : 1,
           ),
         ),
         clipBehavior: Clip.antiAlias,
@@ -414,12 +417,22 @@ class _PollOptionButton extends StatelessWidget {
             child: numericOption
                 ? Row(
                     children: [
-                      SizedBox(
-                        width: optionLabelWidth,
-                        child: _OptionLabel(
-                          text: option.text,
-                          compact: compact,
-                          color: accentColor,
+                      Expanded(
+                        child: Row(
+                          children: [
+                            _OptionRadio(
+                              isSelected: isSelected,
+                              color: accentColor,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _OptionLabel(
+                                text: option.text,
+                                compact: compact,
+                                color: const Color(0xFF10142D),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       SizedBox(width: compact ? 8 : 12),
@@ -431,13 +444,19 @@ class _PollOptionButton extends StatelessWidget {
                         ),
                       ),
                       SizedBox(width: compact ? 8 : 12),
-                      SizedBox(
-                        width: 42,
-                        child: _OptionPercentage(
-                          percent: percent,
-                          compact: compact,
-                          color: accentColor,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          _OptionVotesCount(
+                            votes: option.votesCount,
+                            compact: compact,
+                          ),
+                          _OptionPercentage(
+                            percent: percent,
+                            compact: compact,
+                            color: accentColor,
+                          ),
+                        ],
                       ),
                       if (isLoading) const _OptionLoading(),
                     ],
@@ -447,18 +466,32 @@ class _PollOptionButton extends StatelessWidget {
                     children: [
                       Row(
                         children: [
+                          _OptionRadio(
+                            isSelected: isSelected,
+                            color: accentColor,
+                          ),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: _OptionLabel(
                               text: option.text,
                               compact: compact,
-                              color: accentColor,
+                              color: const Color(0xFF10142D),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          _OptionPercentage(
-                            percent: percent,
-                            compact: compact,
-                            color: accentColor,
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              _OptionVotesCount(
+                                votes: option.votesCount,
+                                compact: compact,
+                              ),
+                              _OptionPercentage(
+                                percent: percent,
+                                compact: compact,
+                                color: accentColor,
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -474,6 +507,22 @@ class _PollOptionButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _OptionRadio extends StatelessWidget {
+  const _OptionRadio({required this.isSelected, required this.color});
+
+  final bool isSelected;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Icon(
+      isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+      size: 22,
+      color: isSelected ? color : const Color(0xFF7B8494),
     );
   }
 }
@@ -567,6 +616,25 @@ class _OptionPercentage extends StatelessWidget {
   }
 }
 
+class _OptionVotesCount extends StatelessWidget {
+  const _OptionVotesCount({required this.votes, required this.compact});
+
+  final int votes;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      '$votes ${votes == 1 ? 'vote' : 'votes'}',
+      style: TextStyle(
+        color: const Color(0xFF667085),
+        fontSize: compact ? 11 : 12,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+}
+
 class _OptionLoading extends StatelessWidget {
   const _OptionLoading();
 
@@ -585,7 +653,6 @@ class _OptionLoading extends StatelessWidget {
 class _Metric extends StatelessWidget {
   const _Metric({
     this.icon,
-    this.assetPath,
     required this.label,
     this.isActive = false,
     this.isLoading = false,
@@ -596,7 +663,6 @@ class _Metric extends StatelessWidget {
   });
 
   final IconData? icon;
-  final String? assetPath;
   final String label;
   final bool isActive;
   final bool isLoading;
@@ -619,18 +685,11 @@ class _Metric extends StatelessWidget {
                   strokeWidth: 2,
                   color: isActive ? colors.error : colors.primary,
                 )
-              : assetPath == null
-                  ? Icon(
-                      icon,
-                      size: 22,
-                      color: isActive ? colors.error : colors.onSurfaceVariant,
-                    )
-                  : Image.asset(
-                      assetPath!,
-                      width: 22,
-                      height: 22,
-                      fit: BoxFit.contain,
-                    ),
+              : Icon(
+                  icon,
+                  size: 22,
+                  color: isActive ? colors.error : colors.onSurfaceVariant,
+                ),
         ),
         const SizedBox(width: 6),
         if (animatedValue == null)
@@ -647,7 +706,9 @@ class _Metric extends StatelessWidget {
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOutCubic,
             builder: (context, value, child) {
-              final suffix = label.endsWith(' votes') ? ' votes' : '';
+              final suffix = label.endsWith(' votes')
+                  ? (value == 1 ? ' vote' : ' votes')
+                  : '';
               return Text(
                 '$value$suffix',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(

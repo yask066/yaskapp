@@ -54,8 +54,6 @@ void main() {
   testWidgets('ties share medal colors and zero-vote options stay readable', (
     tester,
   ) async {
-    const navy = Color(0xFF00104F);
-
     final poll = PollSummary(
       id: 'ranked-poll',
       author: const PollAuthorSummary(
@@ -110,7 +108,7 @@ void main() {
     expect(progressValues, containsAllInOrder([5 / 12, 5 / 12, 2 / 12, 0]));
     expect(
       tester.widget<Text>(find.text('No votes')).style?.color,
-      const Color(0xFF566A9D),
+      const Color(0xFF10142D),
     );
   });
 
@@ -474,6 +472,7 @@ class _FakePollsApiClient extends PollsApiClient {
   Future<List<PollCommentSummary>> listComments({
     required String pollId,
     int limit = 50,
+    String? accessToken,
   }) async {
     return comments;
   }
