@@ -107,8 +107,65 @@ test('renders the reference discovery sections', async () => {
   renderFeed();
 
   expect(await screen.findByRole('heading', { name: 'Who to follow' })).toBeInTheDocument();
-  expect(screen.getAllByRole('button', { name: 'Follow' })).toHaveLength(3);
   expect(screen.getByText('Games')).toBeInTheDocument();
+});
+
+test('renders real registered profiles in who to follow', async () => {
+  sessionStorage.setItem('yaskapp.access-token', 'saved-token');
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({
+      user: {
+        id: 'user-1',
+        email: 'member@example.com',
+        username: 'member',
+        status: 'active',
+        profile: {
+          displayName: 'Member',
+          pollsCount: 0,
+          followersCount: 0,
+          followingCount: 0,
+          countryCode: 'BY',
+          bio: null,
+          avatarObjectKey: null,
+          avatarUrl: null,
+        },
+      },
+    })),
+    http.get('/polls', () => HttpResponse.json({ items: [poll] })),
+    http.get('/users', ({ request }) => {
+      expect(request.headers.get('authorization')).toBe('Bearer saved-token');
+      expect(new URL(request.url).search).toBe('?sort=popular&limit=3');
+      return HttpResponse.json({
+        items: [
+          {
+            id: 'user-2',
+            username: 'real-user',
+            status: 'active',
+            createdAt: '2026-09-07T12:00:00.000Z',
+            updatedAt: '2026-09-07T12:00:00.000Z',
+            viewerIsFollowing: false,
+            profile: {
+              displayName: 'Real User',
+              pollsCount: 4,
+              followersCount: 12,
+              followingCount: 2,
+              countryCode: 'BY',
+              bio: null,
+              avatarObjectKey: null,
+              avatarUrl: null,
+            },
+          },
+        ],
+      });
+    }),
+  );
+
+  renderFeed();
+
+  expect(await screen.findByText('Real User')).toBeInTheDocument();
+  expect(screen.getByText('@real-user')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Real User' })).toHaveAttribute('href', '/users/user-2');
+  expect(screen.queryByText('alexdev')).not.toBeInTheDocument();
 });
 
 test('uses the supplied reference labels and abbreviated trend counts', async () => {
@@ -167,6 +224,7 @@ test('waits for a restored session before loading viewer-specific polls', async 
       expect(request.headers.get('authorization')).toBe('Bearer saved-token');
       return HttpResponse.json({ items: [viewerPoll] });
     }),
+    http.get('/users', () => HttpResponse.json({ items: [] })),
   );
 
   renderFeed();
