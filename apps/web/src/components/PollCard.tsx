@@ -35,7 +35,7 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
         <div className="poll-menu">
           <button className="poll-menu-button" type="button" aria-label="More poll actions" aria-expanded={menuOpen} aria-controls={`poll-${poll.id}-menu`} onClick={() => setMenuOpen((open) => !open)}><MaterialIcon name="more" /></button>
           {menuOpen && (canDeletePoll || canCancelVote) ? <div className="poll-menu-dropdown" id={`poll-${poll.id}-menu`} role="menu">
-            {canCancelVote ? <button className="poll-cancel-action" type="button" role="menuitem" onClick={() => { setMenuOpen(false); onCancelVote?.(poll.id); }}>Cancel vote</button> : null}
+            {canCancelVote ? <button className="poll-cancel-action" type="button" role="menuitem" onClick={() => { setMenuOpen(false); onCancelVote?.(poll.id); }}><MaterialIcon className="poll-action-icon" name="undo" /> Cancel vote</button> : null}
             {canDeletePoll ? <button className="poll-delete-action" type="button" role="menuitem" onClick={() => { setMenuOpen(false); if (window.confirm('Delete this poll?')) onDelete?.(poll.id); }}><MaterialIcon className="poll-action-icon" name="delete_outline" /> Delete poll</button> : null}
           </div> : null}
         </div>

@@ -1,6 +1,6 @@
 import type { SVGProps } from 'react';
 
-export type IconName = 'add' | 'arrow_down_left' | 'arrow_down_right' | 'chevron_down' | 'delete_outline' | 'explore' | 'favorite' | 'favorite_border' | 'fire' | 'gif' | 'home' | 'home_outlined' | 'image' | 'mode_comment_outlined' | 'more' | 'notifications' | 'notifications_none' | 'people' | 'person' | 'person_outline' | 'poll' | 'search' | 'share' | 'visibility' | 'visibility_off';
+export type IconName = 'add' | 'arrow_down_left' | 'arrow_down_right' | 'chevron_down' | 'delete_outline' | 'explore' | 'favorite' | 'favorite_border' | 'fire' | 'gif' | 'home' | 'home_outlined' | 'image' | 'mode_comment_outlined' | 'more' | 'notifications' | 'notifications_none' | 'people' | 'person' | 'person_outline' | 'poll' | 'search' | 'share' | 'undo' | 'visibility' | 'visibility_off';
 
 const paths: Record<IconName, string> = {
   add: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
@@ -26,6 +26,7 @@ const paths: Record<IconName, string> = {
   poll: 'M4 19h16v2H4v-2zm2-2h2V9H6v8zm5 0h2V4h-2v13zm5 0h2v-5h-2v5z',
   search: 'M9.5 3a6.5 6.5 0 104.04 11.59L19.95 21 21 19.95l-6.41-6.41A6.5 6.5 0 009.5 3zm0 2a4.5 4.5 0 110 9 4.5 4.5 0 010-9z',
   share: 'M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11A2.99 2.99 0 1 0 15 5c0 .24.04.47.09.7L8.04 9.81A2.99 2.99 0 1 0 8 15c.24 0 .47-.04.7-.09l7.12 4.16c-.05.21-.08.43-.08.65a3 3 0 1 0 3-3.64z',
+  undo: 'M7.5 8H14c2.76 0 5 2.24 5 5s-2.24 5-5 5H7v-2h7c1.66 0 3-1.34 3-3s-1.34-3-3-3H7.5v3L3 8l4.5-5v3z',
   visibility: 'M12 5c-5 0-9 7-9 7s4 7 9 7 9-7 9-7-4-7-9-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
   visibility_off: 'M4.27 3 3 4.27l3.04 3.04C4.6 8.66 3 12 3 12s4 7 9 7c1.61 0 3.09-.52 4.34-1.27L19.73 21 21 19.73 4.27 3zM12 17c-2.76 0-5.27-3.1-6.88-5  .64-.76 1.45-1.6 2.43-2.35l1.42 1.42A3 3 0 0 0 12 15c.38 0 .74-.07 1.07-.2l1.53 1.53c-.8.4-1.67.67-2.6.67zm0-10c2.76 0 5.27 3.1 6.88 5-.5.59-1.1 1.25-1.8 1.87l-1.43-1.43A3 3 0 0 0 12 9c-.38 0-.74.07-1.07.2L9.4 7.67A7.2 7.2 0 0 1 12 7z',
 };

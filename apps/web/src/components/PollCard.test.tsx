@@ -91,6 +91,7 @@ test('places vote cancellation inside the overflow menu', async () => {
   expect(screen.queryByRole('button', { name: 'Cancel vote' })).not.toBeInTheDocument();
 
   await user.click(screen.getByRole('button', { name: 'More poll actions' }));
+  expect(screen.getByRole('menuitem', { name: 'Cancel vote' }).querySelector('[data-icon="undo"]')).toBeInTheDocument();
   await user.click(screen.getByRole('menuitem', { name: 'Cancel vote' }));
 
   expect(onCancelVote).toHaveBeenCalledWith('poll-1');
