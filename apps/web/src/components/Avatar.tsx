@@ -9,7 +9,7 @@ function initials(name: string) {
 }
 
 export function Avatar({ name, src, size = 40 }: AvatarProps) {
-  const style = { width: size, height: size };
-  if (src) return <img className="avatar" src={src} alt={`${name}'s avatar`} style={style} />;
+  const style = { width: size, height: size, borderRadius: '50%' };
+  if (src) return <img className="avatar" src={src} alt={`${name}'s avatar`} style={{ ...style, objectFit: 'cover' }} />;
   return <span className="avatar avatar--fallback" style={{ ...style, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} aria-label={`${name}'s avatar`}>{initials(name)}</span>;
 }
