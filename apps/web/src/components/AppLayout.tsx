@@ -20,7 +20,7 @@ export function AppLayout() {
           <nav className="account-navigation" aria-label="Account navigation">
             <Link className="notification-link" to="/search?view=notifications" aria-label="Notifications"><MaterialIcon name="notifications_none" /><i /></Link>
             <Avatar name={user.profile.displayName} src={user.profile.avatarUrl} size={36} />
-            <span className="account-name">{user.profile.displayName}</span>
+            <span className="account-name">{user.profile.displayName}<MaterialIcon name="chevron_down" /></span>
             <Link className="profile-link" to="/me">Profile</Link>
             <button className="sign-out-button" type="button" onClick={signOut}>Sign out</button>
           </nav>
@@ -29,7 +29,7 @@ export function AppLayout() {
       {isAuthenticated ? <aside className="app-sidebar">
         <nav aria-label="Primary navigation">
           <Link className="sidebar-link sidebar-link-active" to="/"><MaterialIcon name="home" /> Home</Link>
-          <Link className="sidebar-link" to="/search"><MaterialIcon name="search" /> Explore</Link>
+          <Link className="sidebar-link" to="/search"><MaterialIcon name="explore" /> Explore</Link>
           <Link className="sidebar-link" to="/search?view=notifications"><MaterialIcon name="notifications_none" /> Notifications <i /></Link>
           <Link className="sidebar-link" to="/me"><span aria-hidden="true"><Avatar name={user.profile.displayName} src={user.profile.avatarUrl} size={24} /></span> Profile</Link>
         </nav>

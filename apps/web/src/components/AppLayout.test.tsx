@@ -82,13 +82,13 @@ test('keeps the reference sidebar focused on navigation and poll creation', () =
   expect(screen.getByRole('link', { name: /Create poll/i })).toHaveAttribute('href', '/polls/new');
 });
 
-test('uses the current mobile Material icons for authenticated navigation', () => {
+test('uses the reference icon set for authenticated navigation', () => {
   renderLayout();
 
   expect(screen.getByRole('link', { name: 'Yaskapp' }).querySelector('img[src="/branding/yaskapp_logo.png"]')).toBeInTheDocument();
   const primaryNavigation = screen.getByRole('navigation', { name: 'Primary navigation' });
   expect(primaryNavigation.querySelector('[data-icon="home"]')).toBeInTheDocument();
-  expect(primaryNavigation.querySelector('[data-icon="search"]')).toBeInTheDocument();
+  expect(primaryNavigation.querySelector('[data-icon="explore"]')).toBeInTheDocument();
   expect(primaryNavigation.querySelector('[data-icon="notifications_none"]')).toBeInTheDocument();
   expect(within(primaryNavigation).getByRole('link', { name: 'Profile' }).querySelector('.avatar')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Create poll' }).querySelector('[data-icon="add"]')).toBeInTheDocument();

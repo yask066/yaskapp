@@ -66,3 +66,9 @@ test('uses the selected mobile favorite icon for an already liked poll', () => {
 
   expect(screen.getByRole('button', { name: 'Like (2)' }).querySelector('[data-icon="favorite"]')).toBeInTheDocument();
 });
+
+test('uses a drawn menu icon instead of a text glyph', () => {
+  renderWithProviders(<PollCard poll={poll} viewerId="user-1" onLike={vi.fn()} onOpenComments={vi.fn()} />);
+
+  expect(screen.getByRole('button', { name: 'More poll actions' }).querySelector('[data-icon="more"]')).toBeInTheDocument();
+});

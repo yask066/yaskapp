@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ApiError } from '../../api/client';
 import { useSession } from '../../app/session-provider';
+import { MaterialIcon } from '../../components/MaterialIcon';
 
 type AuthMode = 'login' | 'register';
 
@@ -56,25 +57,25 @@ export function AuthPage({ mode }: AuthPageProps) {
           <h1>Share opinions.<br />Discover people.<br />See what the world thinks.</h1>
           <p>Polls, discussions and real people.<br />All in one place.</p>
         </div>
-        <div className="showcase-note showcase-note-top">Discover topics <span>↘</span></div>
-        <div className="showcase-note showcase-note-left">Create polls <span>↙</span></div>
+        <div className="showcase-note showcase-note-top">Discover topics <MaterialIcon name="arrow_down_right" /></div>
+        <div className="showcase-note showcase-note-left">Create polls <MaterialIcon name="arrow_down_left" /></div>
         <div className="showcase-card showcase-card-poll" aria-hidden="true">
           <div className="showcase-author"><i>AK</i><span><b>alex.r</b><small>2h ago</small></span></div>
           <strong>Which team will win<br />the 2026 Formula 1 Championship?</strong>
           <div className="showcase-bars"><span>McLaren <i style={{ width: '76%' }} /></span><span>Ferrari <i style={{ width: '50%' }} /></span><span>Red Bull <i style={{ width: '34%' }} /></span></div>
-          <footer>♧ 1.2K <span>♡ 342</span></footer>
+          <footer><span><MaterialIcon name="people" /> 1.2K</span> <span><MaterialIcon name="favorite_border" /> 342</span></footer>
         </div>
         <div className="showcase-card showcase-card-topic" aria-hidden="true">
           <div className="showcase-author"><i>SO</i><span><b>sophia</b><small>5h ago</small></span></div>
           <strong>What's your favorite season?</strong>
           <p>Spring 🌱<br />Summer ☀️<br />Autumn 🍂<br />Winter ❄️</p>
-          <footer>♧ 892 <span>♡ 421</span></footer>
+          <footer><span><MaterialIcon name="people" /> 892</span> <span><MaterialIcon name="favorite_border" /> 421</span></footer>
         </div>
         <div className="showcase-card showcase-card-code" aria-hidden="true">
           <div className="showcase-author"><i>MD</i><span><b>max_dev</b><small>1d ago</small></span></div>
           <strong>Which programming language<br />do you use most?</strong>
           <div className="showcase-bars"><span>Kotlin <i style={{ width: '70%' }} /></span><span>Python <i style={{ width: '43%' }} /></span><span>JavaScript <i style={{ width: '25%' }} /></span></div>
-          <footer>♧ 3.6K <span>♡ 520</span></footer>
+          <footer><span><MaterialIcon name="people" /> 3.6K</span> <span><MaterialIcon name="favorite_border" /> 520</span></footer>
         </div>
         <p className="auth-showcase-tagline">REAL OPINIONS.<br />REAL PEOPLE.<br />A MORE OPEN WORLD.</p>
       </section>
@@ -102,7 +103,7 @@ export function AuthPage({ mode }: AuthPageProps) {
         <p id="password-description" className="sr-only">Use a password you do not reuse elsewhere.</p>
         <div className="password-input-wrap">
           <input id="password" name="password" type={passwordVisible ? 'text' : 'password'} autoComplete={isRegistration ? 'new-password' : 'current-password'} required aria-describedby="password-description" placeholder="Enter your password" />
-          <button className="password-visibility" type="button" aria-label={passwordVisible ? 'Hide password' : 'Show password'} onClick={() => setPasswordVisible((visible) => !visible)}>{passwordVisible ? '◉' : '◌'}</button>
+          <button className="password-visibility" type="button" aria-label={passwordVisible ? 'Hide password' : 'Show password'} onClick={() => setPasswordVisible((visible) => !visible)}><MaterialIcon name={passwordVisible ? 'visibility_off' : 'visibility'} /></button>
         </div>
         {isRegistration ? <>
           <label htmlFor="countryCode">Country code</label>
