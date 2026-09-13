@@ -115,6 +115,10 @@ body { background: #f7f8fc; }
 /* Poll card visual treatment from the authenticated feed reference. */
 .poll-card { padding: 1.05rem 1.35rem 1rem; border-color: #edf0f5; border-radius: 1.1rem; box-shadow: 0 5px 18px rgb(30 50 100 / .045); }
 .poll-card-header { align-items: center; gap: .7rem; }
+.poll-menu { position: relative; margin-left: auto; }
+.poll-menu-dropdown { position: absolute; z-index: 4; top: calc(100% + .35rem); right: 0; min-width: 9.5rem; padding: .35rem; border: 1px solid #e5e9f1; border-radius: .7rem; background: #fff; box-shadow: 0 12px 28px rgb(30 50 100 / .14); }
+.poll-menu-dropdown button { display: flex; width: 100%; align-items: center; gap: .45rem; padding: .55rem .65rem; border: 0; border-radius: .45rem; background: transparent; color: #c2415b; font-weight: 650; text-align: left; }
+.poll-menu-dropdown button:hover { background: #fff1f3; color: #a92d47; }
 .poll-card-header p { font-size: .95rem; }
 .poll-card h2 { margin: .9rem 0 1.05rem; font-size: 1.32rem; line-height: 1.25; }
 .poll-options { gap: .55rem; }

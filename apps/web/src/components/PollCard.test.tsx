@@ -45,13 +45,18 @@ test('separates option labels from vote counts and marks the selected option', (
   expect(screen.getByText('Second').closest('.poll-option')).not.toHaveClass('is-selected');
 });
 
-test('shows author metadata and keeps delete visually destructive', () => {
+test('places the author delete action inside the overflow menu', async () => {
+  const user = userEvent.setup();
   renderWithProviders(
     <PollCard poll={poll} viewerId="author-1" onDelete={vi.fn()} />,
   );
 
   expect(screen.getByRole('time')).toHaveClass('poll-card-time');
-  expect(screen.getByRole('button', { name: 'Delete poll' })).toHaveClass('poll-delete-action');
+  expect(screen.queryByRole('menuitem', { name: 'Delete poll' })).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'More poll actions' }));
+
+  expect(screen.getByRole('menuitem', { name: 'Delete poll' })).toHaveClass('poll-delete-action');
 });
 
 test('uses the current mobile Material icons for poll actions', () => {

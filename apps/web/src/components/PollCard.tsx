@@ -16,6 +16,7 @@ interface PollCardProps {
 
 export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelete, onOpenComments }: PollCardProps) {
   const [selectedOptionId, setSelectedOptionId] = useState(poll.viewerVoteOptionId ?? '');
+  const [menuOpen, setMenuOpen] = useState(false);
   const authorName = poll.author.displayName || poll.author.username;
   const isClosed = Boolean(poll.endsAt && new Date(poll.endsAt).getTime() <= Date.now());
   const hasVoted = Boolean(poll.viewerVoteOptionId);
@@ -31,7 +32,12 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
         <div className="poll-author-meta">
           <p>{viewerId === poll.author.id ? 'You' : authorName} <span className="poll-author-handle" data-handle={`@${poll.author.username}`} /><time className="poll-card-time" dateTime={poll.createdAt}> · {createdLabel}</time></p>
         </div>
-        <button className="poll-menu-button" type="button" aria-label="More poll actions"><MaterialIcon name="more" /></button>
+        <div className="poll-menu">
+          <button className="poll-menu-button" type="button" aria-label="More poll actions" aria-expanded={menuOpen} aria-controls={`poll-${poll.id}-menu`} onClick={() => setMenuOpen((open) => !open)}><MaterialIcon name="more" /></button>
+          {menuOpen && viewerId === poll.author.id && onDelete ? <div className="poll-menu-dropdown" id={`poll-${poll.id}-menu`} role="menu">
+            <button className="poll-delete-action" type="button" role="menuitem" onClick={() => { setMenuOpen(false); if (window.confirm('Delete this poll?')) onDelete(poll.id); }}><MaterialIcon className="poll-action-icon" name="delete_outline" /> Delete poll</button>
+          </div> : null}
+        </div>
       </header>
       <h2 id={`poll-${poll.id}-question`}><Link to={`/polls/${poll.id}`}>{poll.question}</Link></h2>
       {poll.imageUrl ? <img src={poll.imageUrl} alt="" /> : null}
@@ -74,7 +80,6 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
           <MaterialIcon className="poll-action-icon" name="mode_comment_outlined" /><span className="poll-action-label">Comments</span> <span className="poll-action-count">{poll.commentsCount}</span>
         </button>
         {!onOpenComments ? <p id={`poll-${poll.id}-comments-help`}>Comments are not available yet.</p> : null}
-        {viewerId === poll.author.id && onDelete ? <button className="poll-action-button poll-delete-action" type="button" aria-label="Delete poll" onClick={() => { if (window.confirm('Delete this poll?')) onDelete(poll.id); }}><MaterialIcon className="poll-action-icon" name="delete_outline" /> <span className="poll-action-label">Delete</span></button> : null}
       </footer>
     </article>
   );
