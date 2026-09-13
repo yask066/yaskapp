@@ -135,5 +135,11 @@ body { background: #f7f8fc; }
 .poll-action-count { color: #66708a; font-size: .84rem; }
 .poll-action-icon { width: 1.35rem; height: 1.35rem; color: #596682; }
 
-/* Keep the per-option vote action available after selecting an answer. */
-.poll-option button { display: inline-flex; }
+/* Match the mobile client: the whole option is the immediate vote action. */
+.poll-option { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .25rem .75rem; width: 100%; min-height: 3rem; padding: .7rem .85rem; border: 0; border-radius: .75rem; background: #f7f8fc; color: inherit; text-align: left; cursor: pointer; }
+.poll-option:disabled { cursor: default; opacity: 1; }
+.poll-option-label { grid-column: 1; min-width: 0; align-self: center; }
+.poll-option-votes { display: none; }
+.poll-option-percent { grid-column: 2; align-self: center; color: #203c87; font-size: .9rem; font-weight: 700; }
+.poll-result-bar { grid-column: 1 / -1; width: 100%; max-width: none; height: .68rem; margin: .15rem 0 0; background: #e7eaf1; }
+.poll-option-loading { grid-column: 1 / -1; color: #66708a; font-size: .8rem; }

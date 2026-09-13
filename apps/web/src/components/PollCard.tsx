@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Poll } from '../api/models';
 import { Avatar } from './Avatar';
@@ -12,10 +12,10 @@ interface PollCardProps {
   onLike?: (pollId: string, viewerHasLiked: boolean) => void;
   onDelete?: (pollId: string) => void;
   onOpenComments?: (poll: Poll) => void;
+  isVoting?: boolean;
 }
 
-export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelete, onOpenComments }: PollCardProps) {
-  const [selectedOptionId, setSelectedOptionId] = useState(poll.viewerVoteOptionId ?? '');
+export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelete, onOpenComments, isVoting = false }: PollCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const authorName = poll.author.displayName || poll.author.username;
   const isClosed = Boolean(poll.endsAt && new Date(poll.endsAt).getTime() <= Date.now());
@@ -23,8 +23,6 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
   const voteHelp = viewerId ? 'Voting is not available for this poll.' : 'Sign in to vote on this poll.';
   const likeHelp = viewerId ? 'Liking is not available for this poll.' : 'Sign in to like this poll.';
   const createdLabel = formatPollDate(poll.createdAt);
-  useEffect(() => setSelectedOptionId(poll.viewerVoteOptionId ?? ''), [poll.viewerVoteOptionId]);
-
   return (
     <article className="poll-card" aria-labelledby={`poll-${poll.id}-question`}>
       <header className="poll-card-header">
@@ -45,27 +43,17 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
         <fieldset className="poll-options">
           <legend>Choose an option</legend>
           {poll.options.map((option) => (
-            <div className={`poll-option${selectedOptionId === option.id ? ' is-selected' : ''}${hasVoted ? ' is-results' : ''}`} key={option.id}>
-              <label>
-              <input
-                type="radio"
-                name={`poll-${poll.id}`}
-                value={option.id}
-                aria-label={`${option.text} (${option.votesCount})`}
-                checked={selectedOptionId === option.id}
-                disabled={!onVote || hasVoted || isClosed}
-                onChange={() => setSelectedOptionId(option.id)}
-              />
-              <span className="poll-option-label">{option.text}</span>
-              <span className="poll-option-votes">{formatVotes(option.votesCount)}</span>
-              {hasVoted ? <span className="poll-option-percent">{poll.votesCount ? Math.round((option.votesCount / poll.votesCount) * 100) : 0}%</span> : null}
-              </label>
-              {hasVoted ? (() => {
-                const percentage = poll.votesCount ? Math.round((option.votesCount / poll.votesCount) * 100) : 0;
-                return <div className="poll-result-bar" role="progressbar" aria-label={option.text} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage}><span style={{ width: `${percentage}%` }} /></div>;
-              })() : null}
-              <button type="button" disabled={!onVote || hasVoted || isClosed || selectedOptionId !== option.id} onClick={() => onVote?.(poll.id, option.id)} aria-describedby={onVote ? undefined : `poll-${poll.id}-vote-help`}>Vote for {option.text}</button>
-            </div>
+            (() => {
+              const percentage = poll.votesCount ? Math.round((option.votesCount / poll.votesCount) * 100) : 0;
+              const canVote = Boolean(onVote) && !hasVoted && !isClosed && !isVoting;
+              return <button className={`poll-option${poll.viewerVoteOptionId === option.id ? ' is-selected' : ''}${hasVoted ? ' is-results' : ''}`} key={option.id} type="button" disabled={!canVote} onClick={() => onVote?.(poll.id, option.id)} aria-label={`${option.text} (${formatVotes(option.votesCount)})`} aria-describedby={onVote ? undefined : `poll-${poll.id}-vote-help`}>
+                <span className="poll-option-label">{option.text}</span>
+                <span className="poll-option-votes">{formatVotes(option.votesCount)}</span>
+                <span className="poll-option-percent">{percentage}%</span>
+                <span className="poll-result-bar" role="progressbar" aria-label={option.text} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage}><span style={{ width: `${percentage}%` }} /></span>
+                {isVoting && poll.viewerVoteOptionId === option.id ? <span className="poll-option-loading" aria-label="Submitting vote">…</span> : null}
+              </button>;
+            })()
           ))}
         </fieldset>
         {!onVote ? <p id={`poll-${poll.id}-vote-help`}>{voteHelp}</p> : null}

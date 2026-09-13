@@ -48,7 +48,7 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
-test('renders polls returned from GET /polls?limit=20 with a Vote button', async () => {
+test('renders polls with immediately clickable answer options', async () => {
   server.use(
     http.get('/polls', ({ request }) => {
       expect(new URL(request.url).searchParams.get('limit')).toBe('20');
@@ -59,8 +59,8 @@ test('renders polls returned from GET /polls?limit=20 with a Vote button', async
   renderFeed();
 
   expect(await screen.findByText('Which option?')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Vote for First' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Vote for First' })).toHaveAccessibleDescription('Sign in to vote on this poll.');
+  expect(screen.getByRole('button', { name: 'First (3 votes)' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'First (3 votes)' })).toHaveAccessibleDescription('Sign in to vote on this poll.');
   expect(screen.getByRole('button', { name: 'Comments (0)' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Comments (0)' })).toHaveAccessibleDescription('Comments are not available yet.');
 });
@@ -172,7 +172,7 @@ test('waits for a restored session before loading viewer-specific polls', async 
   renderFeed();
 
   expect(await screen.findByText('You')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Vote for First' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'First (3 votes)' })).toBeEnabled();
   expect(screen.getByRole('button', { name: 'Like (2)' })).toBeEnabled();
   expect(screen.getByRole('button', { name: 'Like (2)' })).toHaveAttribute('aria-pressed', 'false');
   expect(requests).toEqual(['me', 'polls']);

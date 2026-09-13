@@ -1,11 +1,8 @@
 import { screen } from '@testing-library/react';
-import { readFileSync } from 'node:fs';
 import userEvent from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 import { renderWithProviders } from '../test/setup';
 import { PollCard } from './PollCard';
-
-const globalStyles = readFileSync('src/styles/global.css', 'utf8');
 
 const poll = {
   id: 'poll-1', author: { id: 'author-1', username: 'author', displayName: 'Author', avatarObjectKey: null, avatarUrl: null },
@@ -15,23 +12,37 @@ const poll = {
   createdAt: '2026-09-06T12:00:00.000Z', viewerVoteOptionId: null, endsAt: null,
 };
 
-test('submits the selected option from its own Vote button', async () => {
+test('votes immediately when an available option is clicked', async () => {
   const onVote = vi.fn();
   const user = userEvent.setup();
   renderWithProviders(<PollCard poll={poll} viewerId="user-1" onVote={onVote} />);
 
-  await user.click(screen.getByRole('radio', { name: 'First (3)' }));
-  await user.click(screen.getByRole('button', { name: 'Vote for First' }));
+  await user.click(screen.getByText('First'));
 
   expect(onVote).toHaveBeenCalledWith('poll-1', 'option-1');
 });
 
-test('keeps the vote button visible so a selected option can be submitted', () => {
+test('does not render a separate vote button', () => {
   renderWithProviders(<PollCard poll={poll} viewerId="user-1" onVote={vi.fn()} />);
 
-  expect(screen.getByRole('button', { name: 'Vote for First' })).toBeVisible();
-  const voteButtonRules = [...globalStyles.matchAll(/\.poll-option button\s*\{([^}]*)\}/g)].map((match) => match[1]);
-  expect(voteButtonRules.at(-1)).not.toContain('display: none');
+  expect(screen.queryByRole('button', { name: 'Vote for First' })).not.toBeInTheDocument();
+});
+
+test('shows result percentages before the viewer has voted', () => {
+  renderWithProviders(<PollCard poll={poll} viewerId="user-1" onVote={vi.fn()} />);
+
+  expect(screen.getByText('75%')).toBeInTheDocument();
+  expect(screen.getByRole('progressbar', { name: 'First' })).toHaveAttribute('aria-valuenow', '75');
+});
+
+test('does not submit another vote after the viewer has voted', async () => {
+  const onVote = vi.fn();
+  const user = userEvent.setup();
+  renderWithProviders(<PollCard poll={{ ...poll, viewerVoteOptionId: 'option-1' }} viewerId="user-1" onVote={onVote} />);
+
+  await user.click(screen.getByText('Second'));
+
+  expect(onVote).not.toHaveBeenCalled();
 });
 
 test('marks the options container as width-constrained content', () => {
