@@ -70,14 +70,24 @@ test('renders a discovery rail alongside the feed', async () => {
   renderFeed();
 
   expect(await screen.findByRole('complementary', { name: 'Discover content' })).toBeInTheDocument();
-  expect(screen.getByText('#Gaming')).toBeInTheDocument();
+  expect(screen.getByText('Games')).toBeInTheDocument();
+});
+
+test('renders the reference desktop discovery cards', async () => {
+  server.use(http.get('/polls', () => HttpResponse.json({ items: [poll] })));
+  renderFeed();
+
+  expect(await screen.findByRole('heading', { name: 'Trending today' })).toBeInTheDocument();
+  expect(screen.getByText('Programming')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'See all' })).toBeInTheDocument();
+  expect(screen.getByText(`© ${new Date().getFullYear()} Yask. All rights reserved.`)).toBeInTheDocument();
 });
 
 test('renders the reference composer and feed segments', async () => {
   server.use(http.get('/polls', () => HttpResponse.json({ items: [poll] })));
   renderFeed();
 
-  expect(await screen.findByRole('link', { name: 'Create poll' })).toHaveAttribute('href', '/polls/new');
+  expect(await screen.findByRole('link', { name: 'Post' })).toHaveAttribute('href', '/polls/new');
   expect(screen.getByText("What's on your mind today?")).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'For you' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByRole('button', { name: 'Following' })).toHaveAttribute('aria-pressed', 'false');
@@ -98,15 +108,15 @@ test('renders the reference discovery sections', async () => {
 
   expect(await screen.findByRole('heading', { name: 'Who to follow' })).toBeInTheDocument();
   expect(screen.getAllByRole('button', { name: 'Follow' })).toHaveLength(3);
-  expect(screen.getByText('#Gaming')).toBeInTheDocument();
+  expect(screen.getByText('Games')).toBeInTheDocument();
 });
 
 test('uses the supplied reference labels and abbreviated trend counts', async () => {
   server.use(http.get('/polls', () => HttpResponse.json({ items: [poll] })));
   renderFeed();
 
-  expect(await screen.findByRole('heading', { name: /Trending topics/ })).toBeInTheDocument();
-  expect(screen.getByText('12.4K polls')).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Trending today' })).toBeInTheDocument();
+  expect(screen.getByText('1.2K polls')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Who to follow' })).toBeInTheDocument();
 });
 
@@ -119,7 +129,7 @@ test('collapses and expands the trends list from its button', async () => {
   expect(trendsButton).toHaveAttribute('aria-expanded', 'true');
   await user.click(trendsButton);
   expect(trendsButton).toHaveAttribute('aria-expanded', 'false');
-  expect(screen.queryByText('#Gaming')).not.toBeInTheDocument();
+  expect(screen.queryByText('Games')).not.toBeInTheDocument();
 });
 
 test('waits for a restored session before loading viewer-specific polls', async () => {

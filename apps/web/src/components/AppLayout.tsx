@@ -34,7 +34,6 @@ export function AppLayout() {
           <Link className="sidebar-link" to="/me"><span aria-hidden="true"><Avatar name={user.profile.displayName} src={user.profile.avatarUrl} size={24} /></span> Profile</Link>
         </nav>
         <Link className="create-poll-link sidebar-create-poll" to="/polls/new"><MaterialIcon name="add" /> Create poll</Link>
-        <p className="sidebar-footer"><span>Help</span><span>Terms</span><span>Privacy</span><span>© 2025 Yask</span></p>
       </aside> : null}
       <div className="app-content"><Outlet /></div>
     </div>

@@ -29,9 +29,9 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
       <header className="poll-card-header">
         <Avatar name={authorName} src={poll.author.avatarUrl} />
         <div className="poll-author-meta">
-          <p>{viewerId === poll.author.id ? 'You' : authorName}</p>
-          <time className="poll-card-time" dateTime={poll.createdAt}>{createdLabel}</time>
+          <p>{viewerId === poll.author.id ? 'You' : authorName} <span className="poll-author-handle" data-handle={`@${poll.author.username}`} /><time className="poll-card-time" dateTime={poll.createdAt}> · {createdLabel}</time></p>
         </div>
+        <button className="poll-menu-button" type="button" aria-label="More poll actions"><span aria-hidden="true">•••</span></button>
       </header>
       <h2 id={`poll-${poll.id}-question`}><Link to={`/polls/${poll.id}`}>{poll.question}</Link></h2>
       {poll.imageUrl ? <img src={poll.imageUrl} alt="" /> : null}

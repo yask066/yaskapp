@@ -94,14 +94,10 @@ test('uses the current mobile Material icons for authenticated navigation', () =
   expect(screen.getByRole('link', { name: 'Create poll' }).querySelector('[data-icon="add"]')).toBeInTheDocument();
 });
 
-test('uses the supplied compact left-rail footer', () => {
+test('keeps footer links in the discovery rail instead of the left navigation', () => {
   renderLayout();
 
-  expect(screen.getByText('Help')).toBeInTheDocument();
-  expect(screen.getByText('Terms')).toBeInTheDocument();
-  expect(screen.getByText('Privacy')).toBeInTheDocument();
-  expect(screen.getByText('© 2025 Yask')).toBeInTheDocument();
-  expect(screen.queryByText('About')).not.toBeInTheDocument();
+  expect(screen.queryByText('© 2025 Yask')).not.toBeInTheDocument();
 });
 
 test('omits the empty primary navigation for anonymous and loading sessions', () => {
