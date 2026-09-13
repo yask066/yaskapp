@@ -81,6 +81,22 @@ test('places the author delete action inside the overflow menu', async () => {
   expect(screen.getByRole('menuitem', { name: 'Delete poll' })).toHaveClass('poll-delete-action');
 });
 
+test('places vote cancellation inside the overflow menu', async () => {
+  const onCancelVote = vi.fn();
+  const user = userEvent.setup();
+  renderWithProviders(
+    <PollCard poll={{ ...poll, viewerVoteOptionId: 'option-1' }} viewerId="user-1" onCancelVote={onCancelVote} />,
+  );
+
+  expect(screen.queryByRole('button', { name: 'Cancel vote' })).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'More poll actions' }));
+  await user.click(screen.getByRole('menuitem', { name: 'Cancel vote' }));
+
+  expect(onCancelVote).toHaveBeenCalledWith('poll-1');
+  expect(screen.queryByRole('menuitem', { name: 'Cancel vote' })).not.toBeInTheDocument();
+});
+
 test('uses the current mobile Material icons for poll actions', () => {
   renderWithProviders(<PollCard poll={poll} viewerId="user-1" onLike={vi.fn()} onOpenComments={vi.fn()} />);
 
