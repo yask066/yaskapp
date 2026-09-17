@@ -27,7 +27,7 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
   const createdLabel = formatPollDate(poll.createdAt);
   return (
     <article className="poll-card" aria-labelledby={`poll-${poll.id}-question`}>
-      <header className="poll-card-header">
+      <header className="poll-card-header poll-card__meta">
         <Avatar name={authorName} src={poll.author.avatarUrl} />
         <div className="poll-author-meta">
           <p>{viewerId === poll.author.id ? 'You' : authorName} <span className="poll-author-handle" data-handle={`@${poll.author.username}`} /><time className="poll-card-time" dateTime={poll.createdAt}> · {createdLabel}</time></p>
@@ -40,17 +40,17 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
           </div> : null}
         </div>
       </header>
-      <h2 id={`poll-${poll.id}-question`}><Link to={`/polls/${poll.id}`}>{poll.question}</Link></h2>
-      {poll.imageUrl ? <img src={poll.imageUrl} alt="" /> : null}
+      <h2 className="poll-card__question" id={`poll-${poll.id}-question`}><Link to={`/polls/${poll.id}`}>{poll.question}</Link></h2>
+      {poll.imageUrl ? <img className="poll-card__image" src={poll.imageUrl} alt="" /> : null}
       <section aria-label="Vote on this poll">
-        <fieldset className="poll-options">
+        <fieldset className="poll-options poll-card__options">
           <legend>Choose an option</legend>
           {poll.options.map((option) => (
             (() => {
               const percentage = poll.votesCount ? Math.round((option.votesCount / poll.votesCount) * 100) : 0;
               const canVote = Boolean(onVote) && !hasVoted && !isClosed && !isVoting;
               return <button className={`poll-option${poll.viewerVoteOptionId === option.id ? ' is-selected' : ''}${hasVoted ? ' is-results' : ''}`} key={option.id} type="button" disabled={!canVote} onClick={() => onVote?.(poll.id, option.id)} aria-label={`${option.text} (${formatVotes(option.votesCount)})`} aria-describedby={onVote ? undefined : `poll-${poll.id}-vote-help`}>
-                <span className="poll-option-label">{option.text}</span>
+                <span className="poll-option-label poll-option__content">{option.text}</span>
                 <span className="poll-option-votes">{formatVotes(option.votesCount)}</span>
                 <span className="poll-option-percent">{percentage}%</span>
                 <span className="poll-result-bar" role="progressbar" aria-label={option.text} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage}><span style={{ width: `${percentage}%` }} /></span>
@@ -61,7 +61,7 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
         </fieldset>
         {!onVote ? <p id={`poll-${poll.id}-vote-help`}>{voteHelp}</p> : null}
       </section>
-      <footer className="poll-actions">
+      <footer className="poll-actions poll-card__actions">
         <button className="poll-action-button" type="button" disabled={!onLike} onClick={() => onLike?.(poll.id, poll.viewerHasLiked)} aria-label={`Like (${poll.likesCount})`} aria-pressed={poll.viewerHasLiked} aria-describedby={onLike ? undefined : `poll-${poll.id}-like-help`}>
           <MaterialIcon className="poll-action-icon" name={poll.viewerHasLiked ? 'favorite' : 'favorite_border'} /><span className="poll-action-label">Like</span> <span className="poll-action-count">{poll.likesCount}</span>
         </button>

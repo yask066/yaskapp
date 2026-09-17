@@ -12,6 +12,14 @@ const poll = {
   createdAt: '2026-09-06T12:00:00.000Z', viewerVoteOptionId: null, endsAt: null,
 };
 
+test('exposes the new poll metadata, option, and action groups', () => {
+  const { container } = renderWithProviders(<PollCard poll={poll} viewerId="user-1" />);
+
+  expect(container.querySelector('.poll-card__meta')).toBeInTheDocument();
+  expect(container.querySelector('.poll-card__options')).toBeInTheDocument();
+  expect(container.querySelector('.poll-card__actions')).toBeInTheDocument();
+});
+
 test('votes immediately when an available option is clicked', async () => {
   const onVote = vi.fn();
   const user = userEvent.setup();

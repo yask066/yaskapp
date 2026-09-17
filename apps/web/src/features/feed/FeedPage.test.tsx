@@ -65,6 +65,16 @@ test('renders polls with immediately clickable answer options', async () => {
   expect(screen.getByRole('button', { name: 'Comments (0)' })).not.toHaveAccessibleDescription('Comments are not available yet.');
 });
 
+test('uses an editorial feed heading and restrained contextual rail', async () => {
+  server.use(http.get('/polls', () => HttpResponse.json({ items: [poll] })));
+  const { container } = renderFeed();
+
+  expect(await screen.findByRole('heading', { name: 'Your feed' })).toBeInTheDocument();
+  expect(container.querySelector('.feed-toolbar')).toBeInTheDocument();
+  expect(screen.getByRole('complementary', { name: 'Discover content' })).toHaveClass('context-rail');
+  expect(container.querySelector('.discovery-cta')).not.toBeInTheDocument();
+});
+
 test('opens the selected poll comments route from the feed card', async () => {
   server.use(http.get('/polls', () => HttpResponse.json({ items: [poll] })));
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
