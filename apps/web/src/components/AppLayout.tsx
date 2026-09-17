@@ -1,4 +1,4 @@
-import { Link, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useSession } from '../app/session-provider';
 import { Avatar } from './Avatar';
 import { MaterialIcon } from './MaterialIcon';
@@ -6,6 +6,8 @@ import { MaterialIcon } from './MaterialIcon';
 export function AppLayout() {
   const { status, user, signOut } = useSession();
   const isAuthenticated = status === 'authenticated' && user;
+  const navigationClassName = ({ isActive }: { isActive: boolean }) =>
+    `nav-link sidebar-link${isActive ? ' nav-link--active sidebar-link-active' : ''}`;
 
   return (
     <div className="app-shell">
@@ -27,11 +29,11 @@ export function AppLayout() {
         ) : null}
       </header>
       {isAuthenticated ? <aside className="app-sidebar">
-        <nav aria-label="Primary navigation">
-          <Link className="sidebar-link sidebar-link-active" to="/"><MaterialIcon name="home" /> Home</Link>
-          <Link className="sidebar-link" to="/search"><MaterialIcon name="explore" /> Explore</Link>
-          <Link className="sidebar-link" to="/search?view=notifications"><MaterialIcon name="notifications_none" /> Notifications <i /></Link>
-          <Link className="sidebar-link" to="/me"><span aria-hidden="true"><Avatar name={user.profile.displayName} src={user.profile.avatarUrl} size={24} /></span> Profile</Link>
+        <nav className="app-sidebar-navigation" aria-label="Primary navigation">
+          <NavLink end className={navigationClassName} to="/"><MaterialIcon name="home" /> Home</NavLink>
+          <NavLink className={navigationClassName} to="/search"><MaterialIcon name="explore" /> Explore</NavLink>
+          <NavLink className={navigationClassName} to="/search?view=notifications"><MaterialIcon name="notifications_none" /> Notifications</NavLink>
+          <NavLink className={navigationClassName} to="/me"><span aria-hidden="true"><Avatar name={user.profile.displayName} src={user.profile.avatarUrl} size={24} /></span> Profile</NavLink>
         </nav>
         <Link className="create-poll-link sidebar-create-poll" to="/polls/new"><MaterialIcon name="add" /> Create poll</Link>
       </aside> : null}

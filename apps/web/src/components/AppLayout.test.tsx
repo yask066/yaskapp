@@ -38,17 +38,35 @@ afterEach(() => {
   sessionUser = authenticatedUser;
 });
 
-function renderLayout() {
+function renderLayout(initialEntry = '/') {
   return render(
-    <MemoryRouter initialEntries={['/']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/" element={<AppLayout />}>
           <Route index element={<main id="main-content">Feed</main>} />
+          <Route path="*" element={<main id="main-content">Page</main>} />
         </Route>
       </Routes>
     </MemoryRouter>,
   );
 }
+
+test('renders the documentation-style shell with one retained branding image', () => {
+  const { container } = renderLayout();
+
+  expect(container.querySelector('.app-shell')).toBeInTheDocument();
+  expect(container.querySelectorAll('img[src^="/branding/"]')).toHaveLength(1);
+  expect(screen.getByRole('link', { name: 'Yaskapp' })).toContainElement(container.querySelector('img[src="/branding/yaskapp_logo.png"]'));
+  expect(screen.getByRole('navigation', { name: 'Primary navigation' })).toHaveClass('app-sidebar-navigation');
+});
+
+test('marks only the current primary destination', () => {
+  renderLayout('/search');
+
+  const navigation = screen.getByRole('navigation', { name: 'Primary navigation' });
+  expect(within(navigation).getByRole('link', { name: 'Explore' })).toHaveAttribute('aria-current', 'page');
+  expect(within(navigation).getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current');
+});
 
 test('provides keyboard-native account navigation and sign out controls', async () => {
   const user = userEvent.setup();
