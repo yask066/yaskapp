@@ -92,3 +92,15 @@ test('uses the mobile PNG logo in the authentication header', () => {
 
   expect(screen.getByRole('link', { name: 'Yask home' }).querySelector('img[src="/branding/yaskapp_logo.png"]')).toBeInTheDocument();
 });
+
+test('uses a focused auth form composition without the showcase', () => {
+  const { container } = render(
+    <MemoryRouter initialEntries={['/login']}>
+      <Routes><Route path="/login" element={<AuthPage mode="login" />} /></Routes>
+    </MemoryRouter>,
+  );
+
+  expect(container.querySelector('main.auth-page')).toBeInTheDocument();
+  expect(container.querySelector('.auth-showcase')).not.toBeInTheDocument();
+  expect(screen.getByRole('form')).toHaveClass('form-panel');
+});

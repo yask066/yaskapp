@@ -52,3 +52,17 @@ test('prepends the returned poll before returning to the feed after creation', a
   expect(await screen.findByRole('heading', { name: 'Feed' })).toBeInTheDocument();
   await waitFor(() => expect(queryClient.getQueryData<typeof createdPoll[]>(['polls', 'newest'])?.[0]).toEqual(createdPoll));
 });
+
+test('groups the poll editor into focused form sections', () => {
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={['/polls/new']}>
+        <Routes><Route path="/polls/new" element={<CreatePollPage />} /></Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+
+  expect(screen.getByRole('main')).toHaveClass('focused-page', 'poll-editor');
+  expect(screen.getByRole('form', { name: 'Create a poll' })).toHaveClass('form-panel');
+  expect(screen.getByRole('group', { name: 'Options' })).toHaveClass('poll-editor__options');
+});
