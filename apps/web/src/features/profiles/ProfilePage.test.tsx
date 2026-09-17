@@ -42,6 +42,9 @@ test('renders an authored poll and replaces profile follow state with the return
   renderPage('/users/user-2', <PublicProfilePage />);
 
   expect(await screen.findByRole('heading', { name: 'Author' })).toBeInTheDocument();
+  expect(screen.getByRole('main')).toHaveClass('profile-page');
+  expect(screen.getByLabelText('Profile statistics')).toHaveClass('profile-stats');
+  expect(screen.getByRole('region', { name: 'Polls by Author' })).toBeInTheDocument();
   expect(screen.getByText('@author')).toBeInTheDocument();
   expect(screen.getByText('Which option?')).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Follow' }));
@@ -77,6 +80,7 @@ test('uploads an avatar and preserves edited profile fields in the authenticated
 
   const avatar = new File(['avatar'], 'avatar.png', { type: 'image/png' });
   await screen.findByLabelText('Display name');
+  expect(screen.getByRole('form', { name: 'Edit profile' })).toHaveClass('form-panel');
   await user.upload(screen.getByLabelText('Avatar'), avatar);
   expect((await screen.findAllByAltText("Renamed's avatar")).length).toBeGreaterThan(0);
   await user.clear(screen.getByLabelText('Display name'));

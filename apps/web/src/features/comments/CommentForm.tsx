@@ -31,11 +31,12 @@ export function CommentForm({ onSubmit }: CommentFormProps) {
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)}>
-      <label htmlFor="comment-body">Add a comment</label>
-      <textarea id="comment-body" value={body} onChange={(event) => setBody(event.target.value)} maxLength={1000} required />
+    <form className="comment-form" onSubmit={(event) => void submit(event)}>
+      <label className="field" htmlFor="comment-body">Add a comment
+        <textarea id="comment-body" value={body} onChange={(event) => setBody(event.target.value)} maxLength={1000} required />
+      </label>
       {error ? <p role="alert">{error}</p> : null}
-      <button type="submit" disabled={isSubmitting}>Post comment</button>
+      <button className="button button--primary" type="submit" disabled={isSubmitting}>Post comment</button>
     </form>
   );
 }

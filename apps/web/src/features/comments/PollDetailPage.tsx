@@ -24,12 +24,12 @@ export function PollDetailPage() {
   });
 
   return (
-    <main id="main-content">
+    <main id="main-content" className="detail-page">
       {pollQuery.isPending ? <AsyncState state="loading" /> : null}
       {pollQuery.isError ? <AsyncState state="error" error={pollQuery.error} onRetry={() => void pollQuery.refetch()} /> : null}
       {pollQuery.data ? <PollCard poll={pollQuery.data} viewerId={user?.id} isVoting={pollMutations.isPending} onVote={user ? (id, optionId) => pollMutations.vote({ pollId: id, optionId }) : undefined} onCancelVote={user ? pollMutations.cancelVote : undefined} onLike={user ? (id, viewerHasLiked) => pollMutations.toggleLike({ pollId: id, viewerHasLiked }) : undefined} onDelete={user ? pollMutations.deletePoll : undefined} /> : null}
-      <section aria-labelledby="comments-heading">
-        <h1 id="comments-heading">Comments</h1>
+      <section className="comments-section" aria-labelledby="comments-heading">
+        <header className="page-heading"><h1 id="comments-heading">Comments</h1></header>
         {user ? <CommentForm onSubmit={async (body) => { await createMutation.mutateAsync(body); }} /> : <Link to={`/login?next=${encodeURIComponent(`/polls/${pollId}`)}`}>Login</Link>}
         {pollId ? <CommentList pollId={pollId} currentUserId={user?.id} /> : null}
       </section>

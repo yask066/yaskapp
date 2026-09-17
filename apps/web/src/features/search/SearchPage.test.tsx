@@ -22,6 +22,15 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => { server.resetHandlers(); sessionStorage.clear(); apiClient.clearAccessToken(); });
 afterAll(() => server.close());
 
+test('renders the shared search page structure', async () => {
+  server.use(http.get('/auth/me', () => HttpResponse.json({ user: currentUser })));
+  renderPage();
+
+  expect(await screen.findByRole('main')).toHaveClass('search-page');
+  expect(screen.getByRole('search')).toHaveClass('search-panel');
+  expect(screen.getByRole('tablist', { name: 'Search result type' })).toHaveClass('segmented-tabs');
+});
+
 test('submits a validated poll search and keeps the entered query after a request error', async () => {
   sessionStorage.setItem('yaskapp.access-token', 'saved-token');
   let requests = 0;

@@ -32,16 +32,15 @@ export function CommentList({ pollId, currentUserId }: CommentListProps) {
   if (commentsQuery.isError) return <p role="alert">{mutationErrorMessage(commentsQuery.error)}</p>;
 
   return (
-    <>
+    <div className="comment-list">
       {writeError ? <p role="alert">{mutationErrorMessage(writeError)}</p> : null}
       {commentsQuery.data?.length ? <ul>
-        {commentsQuery.data.map((comment) => <li key={comment.id}>
-          <p><strong>{comment.author.displayName || comment.author.username}</strong></p>
-          <p>{comment.body}</p>
-          {currentUserId ? <button type="button" aria-pressed={comment.viewerHasLiked} onClick={() => likeMutation.mutate(comment)}>Like ({comment.likesCount})</button> : null}
-          {comment.author.id === currentUserId ? <button type="button" onClick={() => { if (window.confirm('Delete this comment?')) deleteMutation.mutate(comment.id); }}>Delete</button> : null}
+        {commentsQuery.data.map((comment) => <li className="comment-card" key={comment.id}>
+          <p className="comment-card__author"><strong>{comment.author.displayName || comment.author.username}</strong> <span>@{comment.author.username}</span></p>
+          <p className="comment-card__body">{comment.body}</p>
+          <div className="comment-card__actions">{currentUserId ? <button className="button" type="button" aria-pressed={comment.viewerHasLiked} onClick={() => likeMutation.mutate(comment)}>Like ({comment.likesCount})</button> : null}{comment.author.id === currentUserId ? <button className="button" type="button" onClick={() => { if (window.confirm('Delete this comment?')) deleteMutation.mutate(comment.id); }}>Delete</button> : null}</div>
         </li>)}
       </ul> : <p>No comments yet.</p>}
-    </>
+    </div>
   );
 }
