@@ -4,10 +4,10 @@ import type { Poll } from '../../api/models';
 import { ApiError } from '../../api/client';
 
 export function replaceCachedPoll(queryClient: ReturnType<typeof useQueryClient>, poll: Poll) {
-  queryClient.getQueryCache().findAll({ queryKey: ['polls'] }).forEach((query) => {
+  [['polls'], ['user-polls']].forEach((queryKey) => queryClient.getQueryCache().findAll({ queryKey }).forEach((query) => {
     const cached = queryClient.getQueryData<Poll[]>(query.queryKey);
     if (Array.isArray(cached)) queryClient.setQueryData(query.queryKey, cached.map((item) => item.id === poll.id ? poll : item));
-  });
+  }));
   if (queryClient.getQueryData(['poll', poll.id])) queryClient.setQueryData(['poll', poll.id], poll);
 }
 

@@ -31,6 +31,7 @@ test('replaces every cached poll with the authoritative poll returned after a vo
   const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
   queryClient.setQueryData(['polls', 'newest'], [poll]);
   queryClient.setQueryData(['polls', 'popular'], [poll]);
+  queryClient.setQueryData(['user-polls', 'author-1'], [poll]);
   queryClient.setQueryData(['poll', 'poll-1'], poll);
   const user = userEvent.setup();
 
@@ -39,5 +40,6 @@ test('replaces every cached poll with the authoritative poll returned after a vo
 
   await waitFor(() => expect(queryClient.getQueryData<typeof poll[]>(['polls', 'newest'])?.[0]?.votesCount).toBe(4));
   expect(queryClient.getQueryData<typeof poll[]>(['polls', 'popular'])?.[0]).toEqual(votedPoll);
+  expect(queryClient.getQueryData<typeof poll[]>(['user-polls', 'author-1'])?.[0]).toEqual(votedPoll);
   expect(queryClient.getQueryData(['poll', 'poll-1'])).toEqual(votedPoll);
 });

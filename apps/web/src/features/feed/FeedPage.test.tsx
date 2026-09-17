@@ -61,8 +61,8 @@ test('renders polls with immediately clickable answer options', async () => {
   expect(await screen.findByText('Which option?')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'First (3 votes)' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'First (3 votes)' })).toHaveAccessibleDescription('Sign in to vote on this poll.');
-  expect(screen.getByRole('button', { name: 'Comments (0)' })).toBeDisabled();
-  expect(screen.getByRole('button', { name: 'Comments (0)' })).toHaveAccessibleDescription('Comments are not available yet.');
+  expect(screen.getByRole('button', { name: 'Comments (0)' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Comments (0)' })).not.toHaveAccessibleDescription('Comments are not available yet.');
 });
 
 test('renders a discovery rail alongside the feed', async () => {
