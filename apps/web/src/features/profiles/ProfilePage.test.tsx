@@ -23,7 +23,7 @@ const server = setupServer();
 
 function renderPage(path: string, element: React.ReactNode) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  return render(<QueryClientProvider client={queryClient}><SessionProvider><MemoryRouter initialEntries={[path]}><Routes><Route element={<AppLayout />}><Route path="/users/:userId" element={element} /><Route path="/me" element={element} /></Route></Routes></MemoryRouter></SessionProvider></QueryClientProvider>);
+  return render(<QueryClientProvider client={queryClient}><SessionProvider><MemoryRouter initialEntries={[path]}><Routes><Route element={<AppLayout />}><Route path="/users/:userId" element={element} /><Route path="/me" element={element} /><Route path="/polls/:pollId" element={<p>Comments for selected poll</p>} /></Route></Routes></MemoryRouter></SessionProvider></QueryClientProvider>);
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -47,6 +47,18 @@ test('renders an authored poll and replaces profile follow state with the return
   await user.click(screen.getByRole('button', { name: 'Follow' }));
   expect(await screen.findByRole('button', { name: 'Following' })).toBeInTheDocument();
   expect(screen.getByText(/5 followers/)).toBeInTheDocument();
+});
+
+test('opens the selected poll comments route from the profile card', async () => {
+  server.use(
+    http.get('/users/user-2', () => HttpResponse.json({ user: profile })),
+    http.get('/users/user-2/polls', () => HttpResponse.json({ items: [poll] })),
+  );
+  const user = userEvent.setup();
+  renderPage('/users/user-2', <PublicProfilePage />);
+
+  await user.click(await screen.findByRole('button', { name: 'Comments (0)' }));
+  expect(await screen.findByText('Comments for selected poll')).toBeInTheDocument();
 });
 
 test('uploads an avatar and preserves edited profile fields in the authenticated session', async () => {

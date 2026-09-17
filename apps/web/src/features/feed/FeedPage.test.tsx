@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
 import { SessionProvider } from '../../app/session-provider';
 import { apiClient } from '../../api/client';
@@ -63,6 +63,28 @@ test('renders polls with immediately clickable answer options', async () => {
   expect(screen.getByRole('button', { name: 'First (3 votes)' })).toHaveAccessibleDescription('Sign in to vote on this poll.');
   expect(screen.getByRole('button', { name: 'Comments (0)' })).toBeEnabled();
   expect(screen.getByRole('button', { name: 'Comments (0)' })).not.toHaveAccessibleDescription('Comments are not available yet.');
+});
+
+test('opens the selected poll comments route from the feed card', async () => {
+  server.use(http.get('/polls', () => HttpResponse.json({ items: [poll] })));
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const user = userEvent.setup();
+
+  render(
+    <QueryClientProvider client={queryClient}>
+      <SessionProvider>
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route path="/" element={<FeedPage />} />
+            <Route path="/polls/:pollId" element={<p>Comments for selected poll</p>} />
+          </Routes>
+        </MemoryRouter>
+      </SessionProvider>
+    </QueryClientProvider>,
+  );
+
+  await user.click(await screen.findByRole('button', { name: 'Comments (0)' }));
+  expect(await screen.findByText('Comments for selected poll')).toBeInTheDocument();
 });
 
 test('renders a discovery rail alongside the feed', async () => {
