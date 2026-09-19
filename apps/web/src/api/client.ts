@@ -8,11 +8,8 @@ export class ApiError extends Error {
 type ResponseDecoder<T> = (value: unknown) => T;
 
 export class ApiClient {
-  private accessToken: string | null = null;
   private onUnauthorized: (() => void) | null = null;
 
-  setAccessToken(token: string): void { this.accessToken = token; }
-  clearAccessToken(): void { this.accessToken = null; }
   setOnUnauthorized(callback: (() => void) | null): void { this.onUnauthorized = callback; }
 
   get<T>(path: string, decoder: ResponseDecoder<T>): Promise<T> {
@@ -25,11 +22,9 @@ export class ApiClient {
 
   private async request<T>(path: string, init: RequestInit, decoder: ResponseDecoder<T>): Promise<T> {
     const headers = new Headers(init.headers);
-    if (this.accessToken) headers.set('authorization', `Bearer ${this.accessToken}`);
-
     let response: Response;
     try {
-      response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? ''}${path}`, { ...init, headers });
+      response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? ''}${path}`, { ...init, headers, credentials: 'include' });
     } catch {
       throw new ApiError(0, 'network_error', 'The request could not be completed.');
     }

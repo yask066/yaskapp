@@ -21,6 +21,7 @@ import { registerPollImageRoutes } from './modules/polls/poll-image.routes.js';
 import { registerProfileRoutes } from './modules/profiles/profiles.routes.js';
 import { registerSearchRoutes } from './modules/search/search.routes.js';
 import { registerRealtimeRoutes } from './realtime/realtime.routes.js';
+import { parseCookieHeader } from './modules/auth/auth.cookies.js';
 
 export function buildApp() {
   const app = Fastify({
@@ -106,7 +107,8 @@ export function buildApp() {
     origin: env.CORS_ORIGINS === '*'
       ? true
       : env.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean),
-    credentials: true
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Auth-Mode']
   });
 
   app.register(multipart, {
@@ -117,7 +119,15 @@ export function buildApp() {
   });
 
   app.register(jwt, {
-    secret: env.JWT_SECRET
+    secret: env.JWT_SECRET,
+    cookie: {
+      cookieName: 'yaskapp_session',
+      signed: false
+    }
+  });
+
+  app.addHook('onRequest', async (request) => {
+    request.cookies = parseCookieHeader(request.headers.cookie);
   });
 
   app.decorateRequest('getCurrentUser', function () {

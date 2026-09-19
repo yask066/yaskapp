@@ -72,7 +72,8 @@ include `https://<WEB_HOST>` in `CORS_ORIGINS`. For local browser development,
 run `npm run api:dev` and `npm run dev -w @yaskapp/web`; use
 `VITE_API_PROXY_TARGET` to change the development proxy target, or
 `VITE_API_BASE_URL` to call an explicit API base URL. Browser tokens remain in
-session-only storage pending cookie authentication.
+The web client uses an HttpOnly cookie session; browser JavaScript does not
+read or persist JWTs. Bearer tokens remain supported for native clients.
 
 API readiness is available at `/health/ready`. It returns `200` only when the
 process, PostgreSQL, and Redis are ready; otherwise it returns `503`. Docker

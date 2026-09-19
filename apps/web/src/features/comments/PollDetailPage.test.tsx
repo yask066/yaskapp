@@ -5,7 +5,6 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
-import { apiClient } from '../../api/client';
 import { SessionProvider } from '../../app/session-provider';
 import { PollDetailPage } from './PollDetailPage';
 
@@ -46,12 +45,10 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   server.resetHandlers();
   sessionStorage.clear();
-  apiClient.clearAccessToken();
 });
 afterAll(() => server.close());
 
 test('shows a poll and comments, then adds the returned comment and authoritative count', async () => {
-  sessionStorage.setItem('yaskapp.access-token', 'saved-token');
   const createdComment = { id: 'comment-3', pollId: 'poll-1', author: { id: 'user-1', username: 'member', displayName: 'Member', avatarObjectKey: null, avatarUrl: null }, body: 'A newly added comment.', likesCount: 0, viewerHasLiked: false, createdAt: '2026-09-06T12:03:00.000Z', updatedAt: '2026-09-06T12:03:00.000Z' };
   const updatedPoll = { ...poll, commentsCount: 3 };
   server.use(
@@ -92,7 +89,6 @@ test('shows a Login link instead of a comment text area for anonymous visitors',
 });
 
 test('replaces cached feed and profile polls with the poll returned after a comment is created', async () => {
-  sessionStorage.setItem('yaskapp.access-token', 'saved-token');
   const createdComment = { id: 'comment-3', pollId: 'poll-1', author: { id: 'user-1', username: 'member', displayName: 'Member', avatarObjectKey: null, avatarUrl: null }, body: 'A newly added comment.', likesCount: 0, viewerHasLiked: false, createdAt: '2026-09-06T12:03:00.000Z', updatedAt: '2026-09-06T12:03:00.000Z' };
   const updatedPoll = { ...poll, commentsCount: 3 };
   server.use(

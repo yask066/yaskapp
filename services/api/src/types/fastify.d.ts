@@ -17,6 +17,7 @@ declare module '@fastify/jwt' {
 
 declare module 'fastify' {
   interface FastifyRequest {
+    cookies: Record<string, string>;
     getCurrentUser(): Promise<AuthenticatedUser | null>;
   }
 }

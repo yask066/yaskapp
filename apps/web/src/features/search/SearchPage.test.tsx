@@ -5,7 +5,6 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { MemoryRouter } from 'react-router-dom';
 import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
-import { apiClient } from '../../api/client';
 import { SessionProvider } from '../../app/session-provider';
 import { SearchPage } from './SearchPage';
 
@@ -19,7 +18,7 @@ function renderPage() {
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => { server.resetHandlers(); sessionStorage.clear(); apiClient.clearAccessToken(); });
+afterEach(() => { server.resetHandlers(); sessionStorage.clear(); });
 afterAll(() => server.close());
 
 test('renders the shared search page structure', async () => {
@@ -32,7 +31,6 @@ test('renders the shared search page structure', async () => {
 });
 
 test('submits a validated poll search and keeps the entered query after a request error', async () => {
-  sessionStorage.setItem('yaskapp.access-token', 'saved-token');
   let requests = 0;
   server.use(
     http.get('/auth/me', () => HttpResponse.json({ user: currentUser })),

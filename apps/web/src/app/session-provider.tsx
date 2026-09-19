@@ -1,10 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getMe, login, register } from '../api/auth';
+import { getMe, login, logout, register } from '../api/auth';
 import { ApiError, apiClient } from '../api/client';
 import type { AuthUser } from '../api/models';
 
-const accessTokenKey = 'yaskapp.access-token';
 type SessionStatus = 'loading' | 'authenticated' | 'anonymous';
 
 export interface SessionState {
@@ -22,38 +21,34 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<SessionStatus>('loading');
   const [user, setUser] = useState<AuthUser | null>(null);
+  const sessionEpoch = useRef(0);
 
   const clearSession = useCallback(() => {
-    apiClient.clearAccessToken();
-    sessionStorage.removeItem(accessTokenKey);
     queryClient.clear();
     setUser(null);
     setStatus('anonymous');
   }, [queryClient]);
 
   useEffect(() => {
+    const epoch = sessionEpoch.current;
     apiClient.setOnUnauthorized(clearSession);
-    const token = sessionStorage.getItem(accessTokenKey);
-    if (!token) { apiClient.clearAccessToken(); setStatus('anonymous'); return () => apiClient.setOnUnauthorized(null); }
-    apiClient.setAccessToken(token);
     void getMe().then((currentUser) => {
-      if (sessionStorage.getItem(accessTokenKey) !== token) return;
+      if (sessionEpoch.current !== epoch) return;
       setUser(currentUser);
       setStatus('authenticated');
     }).catch((error: unknown) => {
+      if (sessionEpoch.current !== epoch) return;
       if (error instanceof ApiError && error.status === 401) {
-        if (sessionStorage.getItem(accessTokenKey) === token) clearSession();
+        clearSession();
         return;
       }
-      if (sessionStorage.getItem(accessTokenKey) === token) setStatus('anonymous');
+      setStatus('anonymous');
     });
     return () => apiClient.setOnUnauthorized(null);
   }, [clearSession]);
 
-  const establishSession = useCallback((session: { accessToken: string; user: AuthUser }) => {
-    sessionStorage.setItem(accessTokenKey, session.accessToken);
-    apiClient.setAccessToken(session.accessToken);
-    setUser(session.user);
+  const establishSession = useCallback((nextUser: AuthUser) => {
+    setUser(nextUser);
     setStatus('authenticated');
   }, []);
 
@@ -61,7 +56,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     status, user,
     signIn: async (input) => establishSession(await login(input)),
     register: async (input) => establishSession(await register(input)),
-    signOut: clearSession,
+    signOut: () => { sessionEpoch.current += 1; clearSession(); void logout().catch(() => undefined); },
     updateUser: setUser,
   }), [clearSession, establishSession, status, user]);
 

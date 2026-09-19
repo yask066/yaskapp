@@ -27,11 +27,10 @@ function renderPage(path: string, element: React.ReactNode) {
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => { server.resetHandlers(); sessionStorage.clear(); apiClient.clearAccessToken(); });
+afterEach(() => { server.resetHandlers(); sessionStorage.clear(); });
 afterAll(() => server.close());
 
 test('renders an authored poll and replaces profile follow state with the returned relationship', async () => {
-  sessionStorage.setItem('yaskapp.access-token', 'saved-token');
   server.use(
     http.get('/auth/me', () => HttpResponse.json({ user: currentUser })),
     http.get('/users/user-2', () => HttpResponse.json({ user: profile })),
@@ -65,7 +64,6 @@ test('opens the selected poll comments route from the profile card', async () =>
 });
 
 test('uploads an avatar and preserves edited profile fields in the authenticated session', async () => {
-  sessionStorage.setItem('yaskapp.access-token', 'saved-token');
   const updatedUser = { ...currentUser, profile: { ...currentUser.profile, displayName: 'Renamed', bio: 'Updated bio.', countryCode: 'PL', avatarUrl: '/media/renamed.png' } };
   server.use(
     http.get('/auth/me', () => HttpResponse.json({ user: currentUser })),

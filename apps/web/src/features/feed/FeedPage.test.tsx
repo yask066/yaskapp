@@ -4,9 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from 'vitest';
 import { SessionProvider } from '../../app/session-provider';
-import { apiClient } from '../../api/client';
 import { FeedPage } from './FeedPage';
 
 const poll = {
@@ -41,10 +40,10 @@ function renderFeed() {
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeEach(() => server.use(http.get('/auth/me', () => HttpResponse.json({ error: 'unauthorized' }, { status: 401 }))));
 afterEach(() => {
   server.resetHandlers();
   sessionStorage.clear();
-  apiClient.clearAccessToken();
 });
 afterAll(() => server.close());
 
@@ -143,7 +142,6 @@ test('renders the reference discovery sections', async () => {
 });
 
 test('renders real registered profiles in who to follow', async () => {
-  sessionStorage.setItem('yaskapp.access-token', 'saved-token');
   server.use(
     http.get('/auth/me', () => HttpResponse.json({
       user: {
@@ -165,7 +163,8 @@ test('renders real registered profiles in who to follow', async () => {
     })),
     http.get('/polls', () => HttpResponse.json({ items: [poll] })),
     http.get('/users', ({ request }) => {
-      expect(request.headers.get('authorization')).toBe('Bearer saved-token');
+      expect(request.credentials).toBe('include');
+      expect(request.headers.get('authorization')).toBeNull();
       expect(new URL(request.url).search).toBe('?sort=popular&limit=3');
       return HttpResponse.json({
         items: [
@@ -222,7 +221,6 @@ test('collapses and expands the trends list from its button', async () => {
 });
 
 test('waits for a restored session before loading viewer-specific polls', async () => {
-  sessionStorage.setItem('yaskapp.access-token', 'saved-token');
   const requests: string[] = [];
   const viewerPoll = {
     ...poll,
@@ -231,7 +229,8 @@ test('waits for a restored session before loading viewer-specific polls', async 
   server.use(
     http.get('/auth/me', ({ request }) => {
       requests.push('me');
-      expect(request.headers.get('authorization')).toBe('Bearer saved-token');
+      expect(request.credentials).toBe('include');
+      expect(request.headers.get('authorization')).toBeNull();
       return HttpResponse.json({
         user: {
           id: 'user-1',
@@ -253,7 +252,8 @@ test('waits for a restored session before loading viewer-specific polls', async 
     }),
     http.get('/polls', ({ request }) => {
       requests.push('polls');
-      expect(request.headers.get('authorization')).toBe('Bearer saved-token');
+      expect(request.credentials).toBe('include');
+      expect(request.headers.get('authorization')).toBeNull();
       return HttpResponse.json({ items: [viewerPoll] });
     }),
     http.get('/users', () => HttpResponse.json({ items: [] })),

@@ -10,6 +10,23 @@ import {
   signInUser
 } from './auth.service.js';
 import { authenticate } from './auth.utils.js';
+import { isTrustedOrigin, serializeSessionCookie } from './auth.cookies.js';
+import { env } from '../../config/env.js';
+
+function setSessionCookie(reply: FastifyReply, accessToken: string) {
+  reply.header('set-cookie', serializeSessionCookie(accessToken, env.NODE_ENV === 'production'));
+}
+
+function clearSessionCookie(reply: FastifyReply) {
+  reply.header('set-cookie', serializeSessionCookie(null, env.NODE_ENV === 'production'));
+}
+
+function responseForClient(request: FastifyRequest, result: { user: unknown; accessToken: string; tokenType: string; expiresIn: string }) {
+  if (request.headers['x-auth-mode'] === 'cookie') {
+    return { user: result.user };
+  }
+  return result;
+}
 
 const usernamePattern = /^[a-z0-9_][a-z0-9_.]{2,29}$/i;
 const registerSchema = z.object({
@@ -66,7 +83,8 @@ export function registerAuthRoutes(app: FastifyInstance) {
     try {
       const result = await registerUser(app, parsedBody.data);
 
-      return reply.status(201).send(result);
+      setSessionCookie(reply, result.accessToken);
+      return reply.status(201).send(responseForClient(request, result));
     } catch (error) {
       return authError(reply, error);
     }
@@ -84,10 +102,23 @@ export function registerAuthRoutes(app: FastifyInstance) {
     }
 
     try {
-      return await signInUser(app, parsedBody.data);
+      const result = await signInUser(app, parsedBody.data);
+      setSessionCookie(reply, result.accessToken);
+      return responseForClient(request, result);
     } catch (error) {
       return authError(reply, error);
     }
+  });
+
+  app.post('/auth/logout', async (request, reply) => {
+    if (!isTrustedOrigin(request.headers.origin, env.CORS_ORIGINS)) {
+      return reply.status(403).send({
+        error: 'csrf_origin_rejected',
+        message: 'The request origin is not trusted.'
+      });
+    }
+    clearSessionCookie(reply);
+    return reply.status(204).send();
   });
 
   app.get(

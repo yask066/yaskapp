@@ -25,16 +25,15 @@ const server = setupServer();
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   server.resetHandlers();
-  apiClient.clearAccessToken();
 });
 afterAll(() => server.close());
 
 describe('API client', () => {
-  it('sends its bearer token and decodes a poll returned by a JSON request', async () => {
-    apiClient.setAccessToken('browser-token');
+  it('sends browser credentials and decodes a poll returned by a JSON request', async () => {
     server.use(
       http.post('/polls/poll-1/votes', async ({ request }) => {
-        expect(request.headers.get('authorization')).toBe('Bearer browser-token');
+        expect(request.credentials).toBe('include');
+        expect(request.headers.get('authorization')).toBeNull();
         expect(request.headers.get('content-type')).toContain('application/json');
         await expect(request.json()).resolves.toEqual({ optionId: 'option-1' });
         return HttpResponse.json({ poll });

@@ -2,8 +2,22 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { db } from '../../config/database.js';
 import { findAuthenticatedUserById } from './auth.repository.js';
+import { isTrustedOrigin, sessionCookieName } from './auth.cookies.js';
+import { env } from '../../config/env.js';
+
+function assertTrustedCookieOrigin(request: FastifyRequest, reply: FastifyReply) {
+  const hasCookieSession = Boolean(request.cookies?.[sessionCookieName]);
+  const usesBearer = /^Bearer\s/i.test(request.headers.authorization ?? '');
+  if (hasCookieSession && !usesBearer && !['GET', 'HEAD', 'OPTIONS'].includes(request.method) && !isTrustedOrigin(request.headers.origin, env.CORS_ORIGINS)) {
+    return reply.status(403).send({
+      error: 'csrf_origin_rejected',
+      message: 'The request origin is not trusted.'
+    });
+  }
+}
 
 export async function authenticate(request: FastifyRequest, reply: FastifyReply) {
+  if (assertTrustedCookieOrigin(request, reply)) return;
   try {
     await request.jwtVerify();
   } catch {
@@ -36,7 +50,8 @@ export async function optionalAuthenticate(
   reply: FastifyReply
 ) {
   if (!request.headers.authorization) {
-    return;
+    if (!request.cookies?.[sessionCookieName]) return;
+    if (assertTrustedCookieOrigin(request, reply)) return;
   }
 
   try {

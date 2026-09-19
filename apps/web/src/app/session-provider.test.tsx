@@ -54,11 +54,11 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe('SessionProvider', () => {
-  it('restores a session from session storage and loads the current user', async () => {
-    sessionStorage.setItem('yaskapp.access-token', 'saved-token');
+  it('restores a cookie session and loads the current user', async () => {
     server.use(
       http.get('/auth/me', ({ request }) => {
-        expect(request.headers.get('authorization')).toBe('Bearer saved-token');
+        expect(request.credentials).toBe('include');
+        expect(request.headers.get('authorization')).toBeNull();
         return HttpResponse.json({ user });
       }),
     );
@@ -68,32 +68,28 @@ describe('SessionProvider', () => {
     expect(await screen.findByText('member')).toBeInTheDocument();
   });
 
-  it('removes an invalid token and becomes anonymous after a 401', async () => {
-    sessionStorage.setItem('yaskapp.access-token', 'expired-token');
+  it('becomes anonymous after a 401 cookie session response', async () => {
     server.use(http.get('/auth/me', () => HttpResponse.json({ error: 'unauthorized' }, { status: 401 })));
 
     const { queryClient } = renderSession();
     queryClient.setQueryData(['polls', 'newest'], [{ id: 'cached-poll' }]);
 
     await waitFor(() => expect(screen.getByText('anonymous')).toBeInTheDocument());
-    expect(sessionStorage.getItem('yaskapp.access-token')).toBeNull();
     expect(queryClient.getQueryData(['polls', 'newest'])).toBeUndefined();
   });
 
-  it('keeps a saved token when restoring the user fails without a 401', async () => {
-    sessionStorage.setItem('yaskapp.access-token', 'saved-token');
+  it('becomes anonymous when restoring the cookie session fails without a 401', async () => {
     server.use(http.get('/auth/me', () => HttpResponse.json({ error: 'server_error' }, { status: 500 })));
 
     renderSession();
 
     await waitFor(() => expect(screen.getByText('anonymous')).toBeInTheDocument());
-    expect(sessionStorage.getItem('yaskapp.access-token')).toBe('saved-token');
   });
 
   it('does not restore a completed request after the user signs out', async () => {
-    sessionStorage.setItem('yaskapp.access-token', 'saved-token');
     let resolveResponse: ((response: Response) => void) | undefined;
     server.use(
+      http.post('/auth/logout', () => new HttpResponse(null, { status: 204 })),
       http.get('/auth/me', () => new Promise((resolve) => { resolveResponse = resolve; })),
     );
 
@@ -106,6 +102,5 @@ describe('SessionProvider', () => {
     });
 
     expect(screen.getByText('anonymous')).toBeInTheDocument();
-    expect(sessionStorage.getItem('yaskapp.access-token')).toBeNull();
   });
 });
