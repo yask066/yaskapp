@@ -10,14 +10,14 @@ import {
   type NotificationPreferencesPatch,
 } from './models';
 
-export function listNotifications(input: { limit?: number; cursor?: string; unreadOnly?: boolean } = {}): Promise<NotificationListResponse> {
+export function listNotifications(input: { limit?: number; cursor?: string; unreadOnly?: boolean; signal?: AbortSignal } = {}): Promise<NotificationListResponse> {
   const params = new URLSearchParams({ limit: String(input.limit ?? 25), unreadOnly: String(input.unreadOnly ?? false) });
   if (input.cursor) params.set('cursor', input.cursor);
-  return apiClient.get(`/notifications?${params}`, decodeNotificationListResponse);
+  return apiClient.send(`/notifications?${params}`, { method: 'GET', signal: input.signal }, decodeNotificationListResponse);
 }
 
-export function getUnreadCount(): Promise<{ unreadCount: number }> {
-  return apiClient.get('/notifications/unread-count', decodeUnreadCount);
+export function getUnreadCount(signal?: AbortSignal): Promise<{ unreadCount: number }> {
+  return apiClient.send('/notifications/unread-count', { method: 'GET', signal }, decodeUnreadCount);
 }
 
 export function markNotificationRead(notificationId: string): Promise<{ notificationId: string; readAt: string; unreadCount: number }> {

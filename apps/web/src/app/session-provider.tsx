@@ -9,6 +9,7 @@ type SessionStatus = 'loading' | 'authenticated' | 'anonymous';
 export interface SessionState {
   status: SessionStatus;
   user: AuthUser | null;
+  sessionEpoch: number;
   signIn(input: { login: string; password: string }): Promise<void>;
   register(input: { email: string; username: string; password: string; countryCode: string; displayName?: string }): Promise<void>;
   signOut(): void;
@@ -21,23 +22,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<SessionStatus>('loading');
   const [user, setUser] = useState<AuthUser | null>(null);
-  const sessionEpoch = useRef(0);
+  const [sessionEpoch, setSessionEpoch] = useState(0);
+  const requestEpoch = useRef(0);
 
   const clearSession = useCallback(() => {
+    setSessionEpoch((epoch) => epoch + 1);
     queryClient.clear();
     setUser(null);
     setStatus('anonymous');
   }, [queryClient]);
 
   useEffect(() => {
-    const epoch = sessionEpoch.current;
+    const epoch = requestEpoch.current;
     apiClient.setOnUnauthorized(clearSession);
     void getMe().then((currentUser) => {
-      if (sessionEpoch.current !== epoch) return;
+      if (requestEpoch.current !== epoch) return;
       setUser(currentUser);
       setStatus('authenticated');
     }).catch((error: unknown) => {
-      if (sessionEpoch.current !== epoch) return;
+      if (requestEpoch.current !== epoch) return;
       if (error instanceof ApiError && error.status === 401) {
         clearSession();
         return;
@@ -48,17 +51,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [clearSession]);
 
   const establishSession = useCallback((nextUser: AuthUser) => {
+    setSessionEpoch((epoch) => epoch + 1);
     setUser(nextUser);
     setStatus('authenticated');
   }, []);
 
   const value = useMemo<SessionState>(() => ({
-    status, user,
+    status, user, sessionEpoch,
     signIn: async (input) => establishSession(await login(input)),
     register: async (input) => establishSession(await register(input)),
-    signOut: () => { sessionEpoch.current += 1; clearSession(); void logout().catch(() => undefined); },
+    signOut: () => { requestEpoch.current += 1; clearSession(); void logout().catch(() => undefined); },
     updateUser: setUser,
-  }), [clearSession, establishSession, status, user]);
+  }), [clearSession, establishSession, sessionEpoch, status, user]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

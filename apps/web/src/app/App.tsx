@@ -4,6 +4,7 @@ import { RouterProvider } from 'react-router-dom';
 import { createQueryClient } from './query-client';
 import { router } from './router';
 import { SessionProvider } from './session-provider';
+import { NotificationProvider } from '../features/notifications/notification-store';
 
 export function App(): JSX.Element {
   const [queryClient] = useState(createQueryClient);
@@ -11,7 +12,9 @@ export function App(): JSX.Element {
   return (
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
-        <RouterProvider router={router} />
+        <NotificationProvider>
+          <RouterProvider router={router} />
+        </NotificationProvider>
       </SessionProvider>
     </QueryClientProvider>
   );
