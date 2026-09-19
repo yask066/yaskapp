@@ -1,4 +1,16 @@
 import { ApiError } from './client';
+import type { NotificationItem, NotificationRealtimeEventV1, NotificationType } from '@yaskapp/shared';
+
+export type { NotificationItem, NotificationRealtimeEventV1, NotificationType } from '@yaskapp/shared';
+
+export type NotificationListResponse = {
+  items: NotificationItem[];
+  nextCursor: string | null;
+  unreadCount: number;
+};
+
+export type NotificationPreferences = Record<NotificationType, { inApp: boolean; push: boolean }>;
+export type NotificationPreferencesPatch = Partial<Record<NotificationType, Partial<{ inApp: boolean; push: boolean }>>>;
 
 export interface AuthUserProfile {
   displayName: string;
@@ -123,6 +135,12 @@ function boolean(value: unknown, fallback = false): boolean {
   return value;
 }
 
+function timestamp(value: unknown): string {
+  const parsed = string(value);
+  if (!Number.isFinite(Date.parse(parsed))) invalidResponse('The server returned an invalid timestamp.');
+  return parsed;
+}
+
 function array(value: unknown): unknown[] {
   if (!Array.isArray(value)) invalidResponse();
   return value;
@@ -198,6 +216,91 @@ export function decodeSearchPage(value: unknown): SearchPage {
   const source = object(value);
   return { items: array(source.items).map(decodeSearchResult), nextCursor: nullableString(source.nextCursor) };
 }
+
+export function decodeNotificationItem(value: unknown): NotificationItem {
+  const source = object(value);
+  const type = source.type;
+  if (type !== 'poll_vote' && type !== 'comment' && type !== 'comment_reply' && type !== 'like' && type !== 'follow') invalidResponse();
+  const targetType = source.targetType;
+  if (targetType !== 'poll' && targetType !== 'comment' && targetType !== 'profile') invalidResponse();
+  let actor: NotificationItem['actor'] = null;
+  if (source.actor !== null && source.actor !== undefined) {
+    const actorSource = object(source.actor);
+    actor = {
+      id: string(actorSource.id),
+      username: string(actorSource.username),
+      displayName: string(actorSource.displayName),
+      avatarUrl: nullableString(actorSource.avatarUrl),
+    };
+  }
+  return {
+    id: string(source.id),
+    type,
+    actor,
+    targetType,
+    pollId: nullableString(source.pollId),
+    commentId: nullableString(source.commentId),
+    payload: object(source.payload),
+    readAt: source.readAt === null || source.readAt === undefined ? null : timestamp(source.readAt),
+    createdAt: timestamp(source.createdAt),
+    isTargetAvailable: boolean(source.isTargetAvailable),
+  };
+}
+
+export function decodeNotificationListResponse(value: unknown): NotificationListResponse {
+  const source = object(value);
+  return {
+    items: array(source.items).map(decodeNotificationItem),
+    nextCursor: nullableString(source.nextCursor),
+    unreadCount: number(source.unreadCount),
+  };
+}
+
+export function decodeNotificationPreferences(value: unknown): NotificationPreferences {
+  const source = object(value);
+  const types: NotificationType[] = ['poll_vote', 'comment', 'comment_reply', 'like', 'follow'];
+  return Object.fromEntries(types.map((type) => {
+    const preference = object(source[type]);
+    return [type, { inApp: boolean(preference.inApp), push: boolean(preference.push) }];
+  })) as NotificationPreferences;
+}
+
+export function decodeUnreadCount(value: unknown): { unreadCount: number } {
+  const source = object(value);
+  return { unreadCount: number(source.unreadCount) };
+}
+
+export function decodeNotificationRead(value: unknown): { notificationId: string; readAt: string; unreadCount: number } {
+  const source = object(value);
+  return { notificationId: string(source.notificationId), readAt: timestamp(source.readAt), unreadCount: number(source.unreadCount) };
+}
+
+export function decodeNotificationsReadAll(value: unknown): { readAt: string; updatedCount: number; unreadCount: 0 } {
+  const source = object(value);
+  if (source.unreadCount !== 0) invalidResponse();
+  return { readAt: timestamp(source.readAt), updatedCount: number(source.updatedCount), unreadCount: 0 };
+}
+
+export function decodeNotificationRealtimeEvent(value: unknown): NotificationRealtimeEventV1 {
+  const source = object(value);
+  if (source.version !== 1 || typeof source.type !== 'string') invalidResponse();
+  if (source.type === 'notification.created') {
+    const payload = object(source.payload);
+    return { version: 1, type: source.type, payload: { notification: decodeNotificationItem(payload.notification), unreadCount: number(payload.unreadCount) } };
+  }
+  if (source.type === 'notification.read') {
+    const payload = object(source.payload);
+    return { version: 1, type: source.type, payload: { notificationId: string(payload.notificationId), readAt: timestamp(payload.readAt), unreadCount: number(payload.unreadCount) } };
+  }
+  if (source.type === 'notifications.read_all') {
+    const payload = object(source.payload);
+    if (payload.unreadCount !== 0) invalidResponse();
+    return { version: 1, type: source.type, payload: { readAt: timestamp(payload.readAt), unreadCount: 0 } };
+  }
+  invalidResponse();
+}
+
+export const decodeRealtimeNotificationEvent = decodeNotificationRealtimeEvent;
 
 function decodeSearchResult(value: unknown): SearchResult {
   const source = object(value);
