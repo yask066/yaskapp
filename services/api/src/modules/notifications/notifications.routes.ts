@@ -85,24 +85,28 @@ export function registerNotificationRoutes(app: FastifyInstance) {
     }
   });
 
+  app.get('/notifications/unread-count', { preHandler: [authenticate, notificationListRateLimit] }, async (request, reply) => {
+    return reply.send({ unreadCount: await countUnreadNotifications(request.user.sub) });
+  });
+
   app.post('/notifications/:id/read', { preHandler: [authenticate, notificationReadRateLimit] }, async (request, reply) => {
     const parsed = notificationIdSchema.safeParse(request.params);
     if (!parsed.success) {
       return reply.status(422).send({ error: 'validation_error', message: 'Request input is invalid.' });
     }
 
-    const found = await markNotificationRead(parsed.data.id, request.user.sub);
-    if (!found) {
+    const result = await markNotificationRead(parsed.data.id, request.user.sub);
+    if (!result) {
       return reply.status(404).send({ error: 'not_found', message: 'Notification was not found.' });
     }
 
     sendNotificationRead(request.user.sub, {
-      notificationId: parsed.data.id,
-      unreadCount: await countUnreadNotifications(request.user.sub)
+      notificationId: result.notificationId,
+      unreadCount: result.unreadCount
     });
     incrementNotificationMetric('read');
 
-    return reply.status(204).send();
+    return reply.send(result);
   });
 
   app.post('/notifications/read-all', { preHandler: [authenticate, notificationReadRateLimit] }, async (request, reply) => {

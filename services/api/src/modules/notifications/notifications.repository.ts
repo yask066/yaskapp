@@ -1,4 +1,4 @@
-import type { NotificationType } from '@yaskapp/shared';
+import type { NotificationItem, NotificationType } from '@yaskapp/shared';
 import type { Pool, PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
@@ -7,7 +7,7 @@ import { avatarUrlForUser } from '../profiles/avatar-url.js';
 import { isInAppEnabled, isPushEnabled } from './notification-preferences.repository.js';
 import { incrementNotificationMetric } from './notifications.metrics.js';
 
-type QueryExecutor = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>;
+export type QueryExecutor = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>;
 
 export type CreateNotificationInput = {
   recipientUserId: string;
@@ -19,22 +19,7 @@ export type CreateNotificationInput = {
   deduplicationKey: string;
 };
 
-export type NotificationRecord = {
-  id: string;
-  type: NotificationType;
-  actor: {
-    id: string;
-    username: string;
-    displayName: string;
-    avatarUrl: string | null;
-  } | null;
-  pollId: string | null;
-  commentId: string | null;
-  payload: Record<string, unknown>;
-  readAt: string | null;
-  createdAt: string;
-  isTargetAvailable: boolean;
-};
+export type NotificationRecord = NotificationItem;
 
 type NotificationRow = {
   id: string;
@@ -43,6 +28,7 @@ type NotificationRow = {
   actor_username: string | null;
   actor_display_name: string | null;
   actor_avatar_object_key: string | null;
+  actor_deleted_at: Date | null;
   poll_id: string | null;
   comment_id: string | null;
   payload: Record<string, unknown>;
@@ -51,6 +37,16 @@ type NotificationRow = {
   poll_deleted_at: Date | null;
   comment_deleted_at: Date | null;
 };
+
+const displayPayloadKeys = new Set(['displayName', 'pollQuestion', 'optionLabel', 'commentExcerpt']);
+
+function safeDisplayPayload(payload: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(payload).filter(([key, value]) => displayPayloadKeys.has(key) && (
+      typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null
+    ))
+  );
+}
 
 export function mapNotification(row: NotificationRow): NotificationRecord {
   return {
@@ -66,16 +62,32 @@ export function mapNotification(row: NotificationRow): NotificationRecord {
       : null,
     pollId: row.poll_id,
     commentId: row.comment_id,
-    payload: row.payload,
+    targetType: row.comment_id !== null ? 'comment' : row.poll_id !== null ? 'poll' : 'profile',
+    payload: safeDisplayPayload(row.payload),
     readAt: row.read_at?.toISOString() ?? null,
     createdAt: row.created_at.toISOString(),
     isTargetAvailable: row.poll_id !== null
       ? row.poll_deleted_at === null
       : row.comment_id !== null
-        ? row.comment_deleted_at === null
-        : true
+        ? row.comment_deleted_at === null && row.poll_deleted_at === null
+        : row.actor_id !== null && row.actor_deleted_at === null
   };
 }
+
+const notificationSelect = `
+  n.id, n.type, n.poll_id, n.comment_id, n.payload, n.read_at, n.created_at,
+  actor.id AS actor_id,
+  actor.username AS actor_username,
+  actor_profile.display_name AS actor_display_name,
+  actor_profile.avatar_object_key AS actor_avatar_object_key,
+  actor.deleted_at AS actor_deleted_at,
+  poll.deleted_at AS poll_deleted_at,
+  comment.deleted_at AS comment_deleted_at
+FROM notifications n
+LEFT JOIN users actor ON actor.id = n.actor_user_id
+LEFT JOIN profiles actor_profile ON actor_profile.user_id = actor.id
+LEFT JOIN polls poll ON poll.id = n.poll_id
+LEFT JOIN comments comment ON comment.id = n.comment_id`;
 
 export async function createNotification(
   input: CreateNotificationInput,
@@ -139,18 +151,7 @@ export async function listNotifications(input: {
   const result = await db.query<NotificationRow>(
     `
       SELECT
-        n.id, n.type, n.poll_id, n.comment_id, n.payload, n.read_at, n.created_at,
-        actor.id AS actor_id,
-        actor.username AS actor_username,
-        actor_profile.display_name AS actor_display_name,
-        actor_profile.avatar_object_key AS actor_avatar_object_key,
-        poll.deleted_at AS poll_deleted_at,
-        comment.deleted_at AS comment_deleted_at
-      FROM notifications n
-      LEFT JOIN users actor ON actor.id = n.actor_user_id
-      LEFT JOIN profiles actor_profile ON actor_profile.user_id = actor.id
-      LEFT JOIN polls poll ON poll.id = n.poll_id
-      LEFT JOIN comments comment ON comment.id = n.comment_id
+        ${notificationSelect}
       WHERE ${conditions.join(' AND ')}
       ORDER BY n.created_at DESC, n.id DESC
       LIMIT $${values.length}
@@ -162,31 +163,83 @@ export async function listNotifications(input: {
   return { ...page, unreadCount: await countUnreadNotifications(input.recipientUserId) };
 }
 
-export async function countUnreadNotifications(recipientUserId: string) {
-  const result = await db.query<{ count: string }>(
+export async function countUnreadNotifications(recipientUserId: string, executor: QueryExecutor = db) {
+  const result = await executor.query<{ count: string }>(
     'SELECT COUNT(*)::text AS count FROM notifications WHERE recipient_user_id = $1 AND read_at IS NULL',
     [recipientUserId]
   );
   return Number(result.rows[0]?.count ?? 0);
 }
 
-export async function markNotificationRead(id: string, recipientUserId: string) {
-  const result = await db.query<{ id: string }>(
+export async function getNotificationForRecipient(
+  id: string,
+  recipientUserId: string,
+  executor: QueryExecutor = db
+) {
+  const result = await executor.query<NotificationRow>(
+    `SELECT ${notificationSelect} WHERE n.id = $1 AND n.recipient_user_id = $2`,
+    [id, recipientUserId]
+  );
+  return result.rows[0] ? mapNotification(result.rows[0]) : null;
+}
+
+export async function markNotificationRead(
+  id: string,
+  recipientUserId: string,
+  executor: QueryExecutor = db
+) {
+  const result = await executor.query<{
+    notification_id: string;
+    read_at: Date;
+    unread_count: number;
+  }>(
     `
-      UPDATE notifications
-      SET read_at = COALESCE(read_at, now())
-      WHERE id = $1 AND recipient_user_id = $2
-      RETURNING id
+      WITH updated AS (
+        UPDATE notifications
+        SET read_at = COALESCE(read_at, now())
+        WHERE id = $1 AND recipient_user_id = $2
+        RETURNING id AS notification_id, read_at
+      ), unread AS (
+        SELECT COUNT(*)::int AS unread_count
+        FROM notifications
+        WHERE recipient_user_id = $2 AND read_at IS NULL
+      )
+      SELECT updated.notification_id, updated.read_at, unread.unread_count
+      FROM updated CROSS JOIN unread
     `,
     [id, recipientUserId]
   );
-  return result.rows.length === 1;
+  const row = result.rows[0];
+  return row ? {
+    notificationId: row.notification_id,
+    readAt: row.read_at.toISOString(),
+    unreadCount: row.unread_count
+  } : null;
 }
 
-export async function markAllNotificationsRead(recipientUserId: string) {
-  await db.query(
-    'UPDATE notifications SET read_at = now() WHERE recipient_user_id = $1 AND read_at IS NULL',
+export async function markAllNotificationsRead(recipientUserId: string, executor: QueryExecutor = db) {
+  const result = await executor.query<{ read_at: Date; updated_count: number }>(
+    `
+      WITH marked AS (
+        UPDATE notifications
+        SET read_at = now()
+        WHERE recipient_user_id = $1 AND read_at IS NULL
+        RETURNING read_at
+      ), fallback AS (
+        SELECT MAX(read_at) AS read_at
+        FROM notifications
+        WHERE recipient_user_id = $1
+      )
+      SELECT COALESCE((SELECT MAX(read_at) FROM marked), fallback.read_at, now()) AS read_at,
+             (SELECT COUNT(*)::int FROM marked) AS updated_count
+      FROM fallback
+    `,
     [recipientUserId]
   );
-  return { unreadCount: 0 };
+  const row = result.rows[0];
+  return {
+    readAt: row.read_at.toISOString(),
+    updatedCount: row.updated_count,
+    unreadCount: 0 as const
+  };
 }

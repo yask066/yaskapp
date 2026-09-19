@@ -112,21 +112,83 @@ test('notifications API is authenticated, cursor-based and owner-scoped', async 
   assert.equal(list.statusCode, 200, list.body);
   assert.equal(list.json<{ items: unknown[]; unreadCount: number }>().items.length, 1);
   assert.equal(list.json<{ unreadCount: number }>().unreadCount, 1);
+  assert.deepEqual(list.json<{ items: Array<{ targetType: string; actor: unknown; payload: unknown; isTargetAvailable: boolean }> }>().items[0], {
+    ...list.json<{ items: Array<Record<string, unknown>> }>().items[0],
+    targetType: 'profile',
+    actor: null,
+    payload: {},
+    isTargetAvailable: false
+  });
+
+  const unreadCount = await app.inject({ method: 'GET', url: '/notifications/unread-count', headers: bearer(auth.accessToken) });
+  assert.equal(unreadCount.statusCode, 200, unreadCount.body);
+  assert.deepEqual(unreadCount.json(), { unreadCount: 1 });
 
   const notificationId = list.json<{ items: Array<{ id: string }> }>().items[0].id;
+  const otherRegistration = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: {
+      email: `notification_other_${suffix}@yaskapp.test`,
+      username: `other_ntf_${suffix}`,
+      password: 'password123',
+      displayName: 'Other Notification User',
+      countryCode: 'BY'
+    }
+  });
+  assert.equal(otherRegistration.statusCode, 201, otherRegistration.body);
+  const otherAuth = otherRegistration.json<{ accessToken: string }>();
+  const foreignRead = await app.inject({
+    method: 'POST',
+    url: `/notifications/${notificationId}/read`,
+    headers: bearer(otherAuth.accessToken)
+  });
+  assert.equal(foreignRead.statusCode, 404, foreignRead.body);
+
   const read = await app.inject({
     method: 'POST',
     url: `/notifications/${notificationId}/read`,
     headers: bearer(auth.accessToken)
   });
-  assert.equal(read.statusCode, 204, read.body);
+  assert.equal(read.statusCode, 200, read.body);
+  const readResponse = read.json<{ notificationId: string; readAt: string; unreadCount: number }>();
+  assert.deepEqual(Object.keys(readResponse).sort(), ['notificationId', 'readAt', 'unreadCount']);
+  assert.equal(readResponse.notificationId, notificationId);
+  assert.match(readResponse.readAt, /^\d{4}-\d\d-\d\dT.*Z$/);
+  assert.equal(readResponse.unreadCount, 0);
 
   const repeatedRead = await app.inject({
     method: 'POST',
     url: `/notifications/${notificationId}/read`,
     headers: bearer(auth.accessToken)
   });
-  assert.equal(repeatedRead.statusCode, 204, repeatedRead.body);
+  assert.equal(repeatedRead.statusCode, 200, repeatedRead.body);
+  assert.deepEqual(repeatedRead.json(), readResponse);
+
+  await db.query(
+    `INSERT INTO notifications (recipient_user_id, type, payload, deduplication_key)
+     VALUES ($1, 'follow', '{"email":"private"}'::jsonb, $2)`,
+    [auth.user.id, `test:read-all:${suffix}`]
+  );
+  const readAll = await app.inject({
+    method: 'POST',
+    url: '/notifications/read-all',
+    headers: bearer(auth.accessToken)
+  });
+  assert.equal(readAll.statusCode, 200, readAll.body);
+  const readAllResponse = readAll.json<{ readAt: string; updatedCount: number; unreadCount: 0 }>();
+  assert.deepEqual(Object.keys(readAllResponse).sort(), ['readAt', 'unreadCount', 'updatedCount']);
+  assert.match(readAllResponse.readAt, /^\d{4}-\d\d-\d\dT.*Z$/);
+  assert.equal(readAllResponse.updatedCount, 1);
+  assert.equal(readAllResponse.unreadCount, 0);
+
+  const repeatedReadAll = await app.inject({
+    method: 'POST',
+    url: '/notifications/read-all',
+    headers: bearer(auth.accessToken)
+  });
+  assert.equal(repeatedReadAll.statusCode, 200, repeatedReadAll.body);
+  assert.equal(repeatedReadAll.json<{ updatedCount: number }>().updatedCount, 0);
 
   const invalidCursor = await app.inject({
     method: 'GET',
