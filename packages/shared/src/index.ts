@@ -89,41 +89,11 @@ export type CreatePollVoteResponse = {
   };
 };
 
-export type RealtimeEvent =
-  | {
-      type: 'poll.vote.created';
-      payload: {
-        poll: Omit<Poll, 'viewerVoteOptionId'>;
-        vote: {
-          pollId: string;
-          optionId: string;
-          votesCount: number;
-        };
-      };
-    }
-  | {
-      type: 'poll.vote.updated';
-      payload: {
-        poll: Omit<Poll, 'viewerVoteOptionId'>;
-      };
-    }
-  | {
-      type: 'connection.ready';
-    }
-  | {
-      type: 'poll.admin_deleted';
-      payload: {
-        pollId: string;
-      };
-    }
-  | {
-      type: 'comment.admin_deleted';
-      payload: {
-        commentId: string;
-        pollId: string;
-      };
-    }
-  | {
-      type: 'user.blocked' | 'user.unblocked';
-      payload: { userId: string };
-    };
+export type {
+  NotificationItem,
+  NotificationListResponse,
+  NotificationRealtimeEventV1,
+  NotificationTargetType,
+  NotificationType,
+  RealtimeEvent
+} from './notifications.js';

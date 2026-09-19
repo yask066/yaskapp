@@ -1,3 +1,4 @@
+import type { NotificationType } from '@yaskapp/shared';
 import type { Pool, PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
@@ -7,13 +8,6 @@ import { isInAppEnabled, isPushEnabled } from './notification-preferences.reposi
 import { incrementNotificationMetric } from './notifications.metrics.js';
 
 type QueryExecutor = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>;
-
-export type NotificationType =
-  | 'poll_vote'
-  | 'comment'
-  | 'comment_reply'
-  | 'like'
-  | 'follow';
 
 export type CreateNotificationInput = {
   recipientUserId: string;

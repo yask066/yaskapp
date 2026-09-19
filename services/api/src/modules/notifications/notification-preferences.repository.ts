@@ -1,7 +1,7 @@
+import type { NotificationType } from '@yaskapp/shared';
 import type { Pool, PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
-import type { NotificationType } from './notifications.repository.js';
 
 type QueryExecutor = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>;
 
