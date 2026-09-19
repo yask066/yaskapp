@@ -249,3 +249,10 @@ export function useNotifications(): NotificationStoreContextValue {
   if (!value) throw new Error('useNotifications must be used within a NotificationProvider.');
   return value;
 }
+
+// The shell is also rendered by isolated feature tests without the app provider.
+// It still needs a stable zero badge in that environment.
+// eslint-disable-next-line react-refresh/only-export-components
+export function useOptionalNotificationUnreadCount(): number {
+  return useContext(NotificationContext)?.unreadCount ?? 0;
+}

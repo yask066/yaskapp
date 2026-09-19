@@ -5,6 +5,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { AppLayout } from './AppLayout';
 
 const signOut = vi.fn();
+const notificationState = vi.hoisted(() => ({ unreadCount: 120 }));
 const authenticatedUser = {
   id: 'user-1',
   email: 'member@example.com',
@@ -30,6 +31,10 @@ vi.mock('../app/session-provider', () => ({
     user: sessionUser,
     signOut,
   }),
+}));
+
+vi.mock('../features/notifications/notification-store', () => ({
+  useOptionalNotificationUnreadCount: () => notificationState.unreadCount,
 }));
 
 afterEach(() => {
@@ -90,11 +95,20 @@ test('provides the reference-style Home destination to signed-in members', () =>
   expect(within(primaryNavigation).getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/me');
 });
 
+test('uses a protected notifications destination and caps the unread badge at 99+', () => {
+  renderLayout();
+
+  expect(screen.queryByRole('link', { name: /search.*notifications/i })).not.toBeInTheDocument();
+  expect(screen.getAllByRole('link', { name: 'Notifications, 99+ unread' })[0]).toHaveAttribute('href', '/notifications');
+  expect(within(screen.getByRole('navigation', { name: 'Primary navigation' })).getByRole('link', { name: 'Notifications, 99+ unread' })).toHaveAttribute('href', '/notifications');
+  expect(screen.getAllByText('99+')).toHaveLength(2);
+});
+
 test('keeps the reference sidebar focused on navigation and poll creation', () => {
   renderLayout();
 
   const primaryNavigation = screen.getByRole('navigation', { name: 'Primary navigation' });
-  expect(within(primaryNavigation).getByRole('link', { name: 'Notifications' })).toBeInTheDocument();
+  expect(within(primaryNavigation).getByRole('link', { name: /Notifications/ })).toBeInTheDocument();
   expect(screen.queryByRole('navigation', { name: 'Popular topics' })).not.toBeInTheDocument();
   expect(screen.getAllByRole('link', { name: /Create poll/i })).toHaveLength(1);
   expect(screen.getByRole('link', { name: /Create poll/i })).toHaveAttribute('href', '/polls/new');

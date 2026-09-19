@@ -7,6 +7,7 @@ import { PollDetailPage } from '../features/comments/PollDetailPage';
 import { MyProfilePage } from '../features/profiles/MyProfilePage';
 import { PublicProfilePage } from '../features/profiles/PublicProfilePage';
 import { SearchPage } from '../features/search/SearchPage';
+import { NotificationsPage } from '../features/notifications/NotificationsPage';
 import { useSession } from './session-provider';
 
 function LoadingMain() {
@@ -46,6 +47,7 @@ export const router = createBrowserRouter([
           { path: 'search', element: <SearchPage /> },
           { path: 'polls/new', element: <CreatePollPage /> },
           { path: 'me', element: <MyProfilePage /> },
+          { path: 'notifications', element: <NotificationsPage /> },
         ],
       },
     ],

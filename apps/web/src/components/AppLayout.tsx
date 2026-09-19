@@ -2,10 +2,14 @@ import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useSession } from '../app/session-provider';
 import { Avatar } from './Avatar';
 import { MaterialIcon } from './MaterialIcon';
+import { useOptionalNotificationUnreadCount } from '../features/notifications/notification-store';
 
 export function AppLayout() {
   const { status, user, signOut } = useSession();
   const isAuthenticated = status === 'authenticated' && user;
+  const unreadCount = useOptionalNotificationUnreadCount();
+  const unreadLabel = unreadCount > 99 ? '99+' : String(unreadCount);
+  const notificationLabel = unreadCount > 0 ? `Notifications, ${unreadLabel} unread` : 'Notifications';
   const navigationClassName = ({ isActive }: { isActive: boolean }) =>
     `nav-link sidebar-link${isActive ? ' nav-link--active sidebar-link-active' : ''}`;
 
@@ -20,7 +24,7 @@ export function AppLayout() {
         {status === 'anonymous' ? <nav className="account-navigation" aria-label="Account navigation"><Link to="/login">Login</Link><Link className="create-poll-link" to="/register">Register</Link></nav> : null}
         {isAuthenticated ? (
           <nav className="account-navigation" aria-label="Account navigation">
-            <Link className="notification-link" to="/search?view=notifications" aria-label="Notifications"><MaterialIcon name="notifications_none" /><i /></Link>
+            <Link className="notification-link" to="/notifications" aria-label={notificationLabel}><MaterialIcon name="notifications_none" />{unreadCount > 0 ? <span className="notification-badge">{unreadLabel}</span> : null}</Link>
             <Avatar name={user.profile.displayName} src={user.profile.avatarUrl} size={36} />
             <span className="account-name">{user.profile.displayName}<MaterialIcon name="chevron_down" /></span>
             <Link className="profile-link" to="/me">Profile</Link>
@@ -32,7 +36,7 @@ export function AppLayout() {
         <nav className="app-sidebar-navigation" aria-label="Primary navigation">
           <NavLink end className={navigationClassName} to="/"><MaterialIcon name="home" /> Home</NavLink>
           <NavLink className={navigationClassName} to="/search"><MaterialIcon name="explore" /> Explore</NavLink>
-          <NavLink className={navigationClassName} to="/search?view=notifications"><MaterialIcon name="notifications_none" /> Notifications</NavLink>
+          <NavLink className={navigationClassName} to="/notifications" aria-label={notificationLabel}><MaterialIcon name="notifications_none" /> Notifications{unreadCount > 0 ? <span className="notification-badge">{unreadLabel}</span> : null}</NavLink>
           <NavLink className={navigationClassName} to="/me"><span aria-hidden="true"><Avatar name={user.profile.displayName} src={user.profile.avatarUrl} size={24} /></span> Profile</NavLink>
         </nav>
         <Link className="create-poll-link sidebar-create-poll" to="/polls/new"><MaterialIcon name="add" /> Create poll</Link>
