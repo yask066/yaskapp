@@ -2,7 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { authenticate } from '../auth/auth.utils.js';
-import { sendNotificationRead } from '../../realtime/realtime.hub.js';
+import { realtimeBus } from '../../realtime/realtime.bus.js';
+import { sendToUser } from '../../realtime/realtime.hub.js';
 import { AdminCursorError } from '../admin/pagination.js';
 import {
   countUnreadNotifications,
@@ -100,10 +101,17 @@ export function registerNotificationRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'not_found', message: 'Notification was not found.' });
     }
 
-    sendNotificationRead(request.user.sub, {
-      notificationId: result.notificationId,
-      unreadCount: result.unreadCount
-    });
+    const event = {
+      version: 1 as const,
+      type: 'notification.read' as const,
+      payload: {
+        notificationId: result.notificationId,
+        readAt: result.readAt,
+        unreadCount: result.unreadCount
+      }
+    };
+    sendToUser(request.user.sub, event);
+    void realtimeBus.publish(request.user.sub, event).catch(() => incrementNotificationMetric('publishFailed'));
     incrementNotificationMetric('read');
 
     return reply.send(result);
@@ -111,6 +119,16 @@ export function registerNotificationRoutes(app: FastifyInstance) {
 
   app.post('/notifications/read-all', { preHandler: [authenticate, notificationReadRateLimit] }, async (request, reply) => {
     const result = await markAllNotificationsRead(request.user.sub);
+    const event = {
+      version: 1,
+      type: 'notifications.read_all',
+      payload: {
+        readAt: result.readAt,
+        unreadCount: 0
+      }
+    } as const;
+    sendToUser(request.user.sub, event);
+    void realtimeBus.publish(request.user.sub, event).catch(() => incrementNotificationMetric('publishFailed'));
     return reply.send(result);
   });
 

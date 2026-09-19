@@ -22,6 +22,8 @@ import { registerProfileRoutes } from './modules/profiles/profiles.routes.js';
 import { registerSearchRoutes } from './modules/search/search.routes.js';
 import { registerRealtimeRoutes } from './realtime/realtime.routes.js';
 import { parseCookieHeader } from './modules/auth/auth.cookies.js';
+import { realtimeBus } from './realtime/realtime.bus.js';
+import { sendToUser } from './realtime/realtime.hub.js';
 
 export function buildApp() {
   const app = Fastify({
@@ -175,6 +177,15 @@ export function buildApp() {
   registerProfileRoutes(app);
   registerSearchRoutes(app);
   registerRealtimeRoutes(app);
+
+  app.addHook('onReady', async () => {
+    await realtimeBus.start(({ recipientUserId, event }) => {
+      sendToUser(recipientUserId, event);
+    });
+  });
+  app.addHook('onClose', async () => {
+    await realtimeBus.close();
+  });
 
   return app;
 }

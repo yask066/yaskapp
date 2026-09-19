@@ -1,5 +1,6 @@
 import type { Poll } from '../modules/polls/polls.repository.js';
 import type { NotificationCreatedEvent } from '../modules/notifications/notifications.events.js';
+import type { RealtimeEvent as SharedRealtimeEvent } from '@yaskapp/shared';
 
 type RealtimeSocket = {
   readyState?: number;
@@ -95,6 +96,7 @@ type ModerationAppealResolvedEvent = {
 };
 
 type RealtimeEvent =
+  | SharedRealtimeEvent
   | ConnectionReadyEvent
   | NotificationCreatedEvent
   | LegacyNotificationCreatedEvent
@@ -222,7 +224,7 @@ function broadcast(event: RealtimeEvent) {
   }
 }
 
-function sendToUser(userId: string, event: RealtimeEvent) {
+export function sendToUser(userId: string, event: RealtimeEvent) {
   for (const [client, clientUserId] of clients) {
     if (clientUserId !== userId) continue;
     try {

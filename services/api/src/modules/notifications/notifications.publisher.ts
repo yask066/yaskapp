@@ -1,4 +1,5 @@
-import { sendNotificationCreated } from '../../realtime/realtime.hub.js';
+import { realtimeBus } from '../../realtime/realtime.bus.js';
+import { sendToUser } from '../../realtime/realtime.hub.js';
 import {
   createPostCommitNotificationPublisher,
   type NotificationCreatedEvent,
@@ -11,7 +12,8 @@ import {
 import { incrementNotificationMetric } from './notifications.metrics.js';
 
 export const publishNotificationEvent: NotificationEventPublisher = (recipientUserId, event: NotificationCreatedEvent) => {
-  sendNotificationCreated(recipientUserId, event);
+  sendToUser(recipientUserId, event);
+  return realtimeBus.publish(recipientUserId, event);
 };
 
 const publishCreatedNotification = createPostCommitNotificationPublisher({
