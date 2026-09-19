@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { NotificationItem } from '@yaskapp/shared';
 import { NotificationProvider, useNotifications } from './notification-store';
@@ -100,7 +100,7 @@ describe('notificationReducer', () => {
 
 function ProviderProbe() {
   const notifications = useNotifications();
-  return <output data-testid="unread-count">{notifications.unreadCount}</output>;
+  return <><output data-testid="unread-count">{notifications.unreadCount}</output><button onClick={() => { void notifications.actions.reconcile(); void notifications.actions.reconcile(); }}>reconcile</button></>;
 }
 
 describe('NotificationProvider session lifecycle', () => {
@@ -124,6 +124,18 @@ describe('NotificationProvider session lifecycle', () => {
 
     session.current = { status: 'anonymous', user: null };
     view.rerender(<NotificationProvider><ProviderProbe /></NotificationProvider>);
+    await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('0'));
+  });
+
+  it('coalesces simultaneous realtime reconciliation triggers into one request', async () => {
+    let resolve: ((value: { items: NotificationItem[]; unreadCount: number; nextCursor: null }) => void) | undefined;
+    listNotifications.mockImplementationOnce(() => new Promise((complete) => { resolve = complete; }));
+    render(<NotificationProvider><ProviderProbe /></NotificationProvider>);
+    await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('3'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'reconcile' }));
+    await waitFor(() => expect(listNotifications).toHaveBeenCalledOnce());
+    resolve?.({ items: [], unreadCount: 0, nextCursor: null });
     await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('0'));
   });
 });

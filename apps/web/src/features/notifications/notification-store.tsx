@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import type { NotificationItem, NotificationRealtimeEventV1 } from '@yaskapp/shared';
 import { getUnreadCount, listNotifications, markAllNotificationsRead, markNotificationRead } from '../../api/notifications';
 import { useSession } from '../../app/session-provider';
+import { NotificationRealtimeClient, type RealtimeConnectionStatus, createRealtimeUrl } from './realtime-client';
 
 export interface NotificationStoreState {
   itemsById: Record<string, NotificationItem>;
@@ -128,6 +129,7 @@ export interface NotificationStoreActions {
 
 export interface NotificationStoreContextValue extends NotificationStoreState {
   actions: NotificationStoreActions;
+  realtimeStatus: RealtimeConnectionStatus;
 }
 
 const NotificationContext = createContext<NotificationStoreContextValue | null>(null);
@@ -136,8 +138,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const session = useSession();
   const userId = session.user?.id;
   const [state, dispatch] = useReducer(notificationReducer, initialNotificationState);
+  const [realtimeStatus, setRealtimeStatus] = useState<RealtimeConnectionStatus>('idle');
   const epoch = useRef(0);
   const stateRef = useRef(state);
+  const reconcileFlight = useRef<{ epoch: number; promise: Promise<void> } | null>(null);
   stateRef.current = state;
 
   useEffect(() => {
@@ -156,13 +160,20 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const reconcile = useCallback(async () => {
     const currentEpoch = epoch.current;
+    if (reconcileFlight.current?.epoch === currentEpoch) return reconcileFlight.current.promise;
     dispatch({ type: 'loading', value: true });
-    try {
-      const response = await listNotifications({ limit: 25, unreadOnly: false });
-      if (epoch.current === currentEpoch) dispatch({ type: 'reconcile', ...response });
-    } catch {
-      if (epoch.current === currentEpoch) dispatch({ type: 'error', message: 'Unable to refresh notifications.' });
-    }
+    const request = Promise.resolve().then(async () => {
+      try {
+        const response = await listNotifications({ limit: 25, unreadOnly: false });
+        if (epoch.current === currentEpoch) dispatch({ type: 'reconcile', ...response });
+      } catch {
+        if (epoch.current === currentEpoch) dispatch({ type: 'error', message: 'Unable to refresh notifications.' });
+      } finally {
+        if (reconcileFlight.current?.promise === request) reconcileFlight.current = null;
+      }
+    });
+    reconcileFlight.current = { epoch: currentEpoch, promise: request };
+    return request;
   }, []);
 
   const loadMore = useCallback(async () => {
@@ -212,8 +223,24 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'clearPending' });
   }, []);
 
+  useEffect(() => {
+    if (session.status !== 'authenticated' || !userId) {
+      setRealtimeStatus('idle');
+      return undefined;
+    }
+    const client = new NotificationRealtimeClient({
+      url: createRealtimeUrl(),
+      onEvent: (event) => applyRealtime(event),
+      onConnectionReady: reconcile,
+      reconcile,
+      onStatusChange: setRealtimeStatus,
+    });
+    client.start();
+    return () => client.stop();
+  }, [applyRealtime, reconcile, session.sessionEpoch, session.status, userId]);
+
   const actions = useMemo<NotificationStoreActions>(() => ({ reconcile, loadMore, markRead, markAllRead, applyRealtime, clearPending }), [applyRealtime, clearPending, loadMore, markAllRead, markRead, reconcile]);
-  return <NotificationContext.Provider value={{ ...state, actions }}>{children}</NotificationContext.Provider>;
+  return <NotificationContext.Provider value={{ ...state, actions, realtimeStatus }}>{children}</NotificationContext.Provider>;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
