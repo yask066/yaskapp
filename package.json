@@ -9,7 +9,7 @@
   "scripts": {
     "api:dev": "npm run dev -w @yaskapp/api",
     "api:build": "npm run build -w @yaskapp/api",
-    "api:typecheck": "npm run typecheck -w @yaskapp/api",
+    "api:typecheck": "npm run shared:build && npm run typecheck -w @yaskapp/api",
     "db:bootstrap-superadmin": "npm run db:bootstrap-superadmin -w @yaskapp/api --",
     "db:migrate": "npm run db:migrate -w @yaskapp/api",
     "db:check": "npm run db:check -w @yaskapp/api",
