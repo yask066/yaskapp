@@ -1,4 +1,5 @@
 import type { Poll } from '../modules/polls/polls.repository.js';
+import type { NotificationCreatedEvent } from '../modules/notifications/notifications.events.js';
 
 type RealtimeSocket = {
   readyState?: number;
@@ -28,7 +29,7 @@ type ConnectionReadyEvent = {
   type: 'connection.ready';
 };
 
-type NotificationCreatedEvent = {
+type LegacyNotificationCreatedEvent = {
   type: 'notification.created';
   payload: {
     notification: {
@@ -96,6 +97,7 @@ type ModerationAppealResolvedEvent = {
 type RealtimeEvent =
   | ConnectionReadyEvent
   | NotificationCreatedEvent
+  | LegacyNotificationCreatedEvent
   | NotificationReadEvent
   | PollVoteCreatedEvent
   | PollVoteUpdatedEvent
@@ -190,9 +192,9 @@ export function broadcastModerationAppealResolved(payload: ModerationAppealResol
 
 export function sendNotificationCreated(
   userId: string,
-  payload: NotificationCreatedEvent['payload']
+  event: NotificationCreatedEvent | LegacyNotificationCreatedEvent['payload']
 ) {
-  sendToUser(userId, { type: 'notification.created', payload });
+  sendToUser(userId, 'version' in event ? event : { type: 'notification.created', payload: event });
 }
 
 export function sendNotificationRead(

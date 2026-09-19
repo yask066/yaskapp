@@ -2,8 +2,8 @@ import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
 import { avatarUrlForUser } from '../profiles/avatar-url.js';
-import { countUnreadNotifications, createNotification } from '../notifications/notifications.repository.js';
-import { sendNotificationCreated } from '../../realtime/realtime.hub.js';
+import { createNotification } from '../notifications/notifications.repository.js';
+import { publishNotificationAfterCommit } from '../notifications/notifications.publisher.js';
 
 export type PollVisibility = 'public' | 'followers' | 'private';
 
@@ -799,10 +799,7 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
     await client.query('COMMIT');
 
     if (notificationId) {
-      sendNotificationCreated(pollResult.rows[0].author_id, {
-        notification: { id: notificationId, type: 'comment', actorId: input.authorId, pollId: input.pollId, commentId: comment.id, createdAt: new Date().toISOString() },
-        unreadCount: await countUnreadNotifications(pollResult.rows[0].author_id)
-      });
+      await publishNotificationAfterCommit(pollResult.rows[0].author_id, notificationId);
     }
 
     return {
@@ -849,6 +846,8 @@ export async function likeCommentRecord(input: { pollId: string; commentId: stri
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    let notificationId: string | null = null;
+    let notificationRecipientId: string | null = null;
     const comment = await findCommentForUpdate(client, input.commentId);
     if (!comment || comment.poll_id !== input.pollId) {
       await client.query('ROLLBACK');
@@ -864,6 +863,17 @@ export async function likeCommentRecord(input: { pollId: string; commentId: stri
         'UPDATE comments SET likes_count = likes_count + 1 WHERE id = $1',
         [input.commentId]
       );
+      if (comment.author_id !== input.userId) {
+        notificationRecipientId = comment.author_id;
+        notificationId = (await createNotification({
+          recipientUserId: comment.author_id,
+          actorUserId: input.userId,
+          type: 'like',
+          pollId: input.pollId,
+          commentId: input.commentId,
+          deduplicationKey: `like:comment:${input.commentId}:${input.userId}`
+        }, client)).id;
+      }
     }
 
     const updated = await client.query<PollCommentRow>(
@@ -882,6 +892,9 @@ export async function likeCommentRecord(input: { pollId: string; commentId: stri
       [input.commentId]
     );
     await client.query('COMMIT');
+    if (notificationId && notificationRecipientId) {
+      await publishNotificationAfterCommit(notificationRecipientId, notificationId);
+    }
     return { status: 'liked' as const, comment: mapComment(updated.rows[0]) };
   } catch (error) {
     await client.query('ROLLBACK');
@@ -999,10 +1012,7 @@ export async function likePollRecord(input: {
     await client.query('COMMIT');
 
     if (notificationId) {
-      sendNotificationCreated(pollResult.rows[0].author_id, {
-        notification: { id: notificationId, type: 'like', actorId: input.userId, pollId: input.pollId, commentId: null, createdAt: new Date().toISOString() },
-        unreadCount: await countUnreadNotifications(pollResult.rows[0].author_id)
-      });
+      await publishNotificationAfterCommit(pollResult.rows[0].author_id, notificationId);
     }
 
     return {
@@ -1172,10 +1182,7 @@ export async function createVoteRecord(input: {
     await client.query('COMMIT');
 
     if (notificationId) {
-      sendNotificationCreated(poll.author_id, {
-        notification: { id: notificationId, type: 'poll_vote', actorId: input.voterId, pollId: input.pollId, commentId: null, createdAt: new Date().toISOString() },
-        unreadCount: await countUnreadNotifications(poll.author_id)
-      });
+      await publishNotificationAfterCommit(poll.author_id, notificationId);
     }
 
     return {

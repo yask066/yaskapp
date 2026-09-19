@@ -2,8 +2,7 @@ import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
 import { createNotification } from '../notifications/notifications.repository.js';
-import { countUnreadNotifications } from '../notifications/notifications.repository.js';
-import { sendNotificationCreated } from '../../realtime/realtime.hub.js';
+import { publishNotificationAfterCommit } from '../notifications/notifications.publisher.js';
 
 export type FollowMutation = {
   followerId: string;
@@ -166,10 +165,7 @@ export async function followUserRecord(
       ))
     };
     if (notificationId) {
-      sendNotificationCreated(input.followeeId, {
-        notification: { id: notificationId, type: 'follow', actorId: input.followerId, pollId: null, commentId: null, createdAt: new Date().toISOString() },
-        unreadCount: await countUnreadNotifications(input.followeeId)
-      });
+      await publishNotificationAfterCommit(input.followeeId, notificationId);
     }
     return result;
   });

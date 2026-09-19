@@ -3,7 +3,8 @@ const counters = {
   suppressed: 0,
   read: 0,
   pushSent: 0,
-  pushFailed: 0
+  pushFailed: 0,
+  publishFailed: 0
 };
 
 export function incrementNotificationMetric(name: keyof typeof counters) {

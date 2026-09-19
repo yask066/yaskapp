@@ -2887,3 +2887,70 @@ test('concurrent follow and unfollow requests keep counters consistent', async (
   assert.equal(unfollowedCounts.rows[0]?.followee_followers_count, 0);
   assert.equal(unfollowedCounts.rows[0]?.relationship_count, '0');
 });
+
+test('first comment like creates one complete notification after commit', async () => {
+  const author = await registerTestUser();
+  const liker = await registerTestUser();
+
+  const pollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(author.accessToken),
+    payload: { question: 'Which comment deserves a like?', options: ['This one', 'That one'] }
+  });
+  assert.equal(pollResponse.statusCode, 201, pollResponse.body);
+  const poll = pollResponse.json<PollResponse>().poll;
+
+  const commentResponse = await app.inject({
+    method: 'POST',
+    url: `/polls/${poll.id}/comments`,
+    headers: bearer(author.accessToken),
+    payload: { body: 'A comment to like.' }
+  });
+  assert.equal(commentResponse.statusCode, 201, commentResponse.body);
+  const comment = commentResponse.json<CreateCommentResponse>().comment;
+
+  const likeResponse = await app.inject({
+    method: 'POST',
+    url: `/polls/${poll.id}/comments/${comment.id}/likes`,
+    headers: bearer(liker.accessToken)
+  });
+  assert.equal(likeResponse.statusCode, 201, likeResponse.body);
+
+  const notificationsResponse = await app.inject({
+    method: 'GET',
+    url: '/notifications',
+    headers: bearer(author.accessToken)
+  });
+  assert.equal(notificationsResponse.statusCode, 200, notificationsResponse.body);
+  const notifications = notificationsResponse.json<{
+    items: Array<{ type: string; commentId: string | null; pollId: string | null; actor: { id: string } | null; payload: Record<string, unknown> }>;
+  }>().items;
+  const commentLikes = notifications.filter((item) => item.type === 'like' && item.commentId === comment.id);
+  assert.equal(commentLikes.length, 1);
+  assert.equal(commentLikes[0]?.pollId, poll.id);
+  assert.equal(commentLikes[0]?.actor?.id, liker.user.id);
+  assert.deepEqual(commentLikes[0]?.payload, {});
+
+  const duplicateLikeResponse = await app.inject({
+    method: 'POST',
+    url: `/polls/${poll.id}/comments/${comment.id}/likes`,
+    headers: bearer(liker.accessToken)
+  });
+  assert.equal(duplicateLikeResponse.statusCode, 201, duplicateLikeResponse.body);
+
+  const unlikeResponse = await app.inject({
+    method: 'DELETE',
+    url: `/polls/${poll.id}/comments/${comment.id}/likes`,
+    headers: bearer(liker.accessToken)
+  });
+  assert.equal(unlikeResponse.statusCode, 200, unlikeResponse.body);
+
+  const afterUnlike = await app.inject({
+    method: 'GET',
+    url: '/notifications',
+    headers: bearer(author.accessToken)
+  });
+  assert.equal(afterUnlike.statusCode, 200, afterUnlike.body);
+  assert.equal(afterUnlike.json<{ items: typeof notifications }>().items.filter((item) => item.type === 'like' && item.commentId === comment.id).length, 1);
+});
