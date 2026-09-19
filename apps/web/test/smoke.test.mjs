@@ -13,6 +13,11 @@ test('production image builds the web workspace and serves its compiled output',
   assert.match(dockerfile, /COPY --from=build \/app\/apps\/web\/dist \/usr\/share\/nginx\/html/);
 });
 
+test('production image includes and builds the shared workspace before web', () => {
+  assert.match(dockerfile, /COPY packages\/shared packages\/shared/);
+  assert.match(dockerfile, /RUN npm run build -w @yaskapp\/shared/);
+});
+
 test('nginx falls back to the SPA entry point for deep links', () => {
   assert.match(nginxConfig, /try_files \$uri \$uri\/ \/index\.html;/);
 });
