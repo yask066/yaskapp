@@ -77,7 +77,8 @@ type ExpectedLegacyRealtimeEvent =
       type: 'poll.vote.updated';
       payload: { poll: Omit<Poll, 'viewerVoteOptionId'> };
     }
-  | { type: 'connection.ready' }
+  | { version: 1; type: 'connection.ready' }
+  | { version: 1; type: 'pong' }
   | { type: 'poll.admin_deleted'; payload: { pollId: string } }
   | {
       type: 'comment.admin_deleted';

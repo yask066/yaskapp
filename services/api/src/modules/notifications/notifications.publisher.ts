@@ -9,7 +9,7 @@ import {
   countUnreadNotifications,
   getNotificationForRecipient
 } from './notifications.repository.js';
-import { incrementNotificationMetric } from './notifications.metrics.js';
+import { recordRealtimePublishError } from './notifications.metrics.js';
 
 export const publishNotificationEvent: NotificationEventPublisher = (recipientUserId, event: NotificationCreatedEvent) => {
   sendToUser(recipientUserId, event);
@@ -28,6 +28,6 @@ export async function publishNotificationAfterCommit(recipientUserId: string, no
     await publishCreatedNotification(recipientUserId, notificationId);
   } catch {
     // The database mutation has already committed; realtime delivery is best effort.
-    incrementNotificationMetric('publishFailed');
+    recordRealtimePublishError();
   }
 }

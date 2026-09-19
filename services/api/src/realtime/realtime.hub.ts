@@ -1,10 +1,16 @@
 import type { Poll } from '../modules/polls/polls.repository.js';
 import type { NotificationCreatedEvent } from '../modules/notifications/notifications.events.js';
+import {
+  recordCommitToClient,
+  recordSocketConnected,
+  recordSocketDisconnected
+} from '../modules/notifications/notifications.metrics.js';
 import type { RealtimeEvent as SharedRealtimeEvent } from '@yaskapp/shared';
 
 type RealtimeSocket = {
   readyState?: number;
   send(data: string): void;
+  close?: (code?: number, reason?: string) => void;
 };
 
 type PollVoteCreatedEvent = {
@@ -27,6 +33,7 @@ type PollVoteUpdatedEvent = {
 };
 
 type ConnectionReadyEvent = {
+  version: 1;
   type: 'connection.ready';
 };
 
@@ -113,26 +120,94 @@ type RealtimeEvent =
   | ModerationAppealResolvedEvent;
 
 const openReadyState = 1;
-const clients = new Map<RealtimeSocket, string | undefined>();
+const idleTimeoutMs = 90_000;
+const clients = new Map<RealtimeSocket, { userId: string | undefined; lastSeen: number }>();
+const disconnectMetrics: Record<string, number> = {};
+let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+
+export function createConnectionReadyEvent(): ConnectionReadyEvent {
+  return { version: 1, type: 'connection.ready' };
+}
+
+export function getRealtimeConnectionMetrics() {
+  return {
+    activeSockets: clients.size,
+    disconnectsByReason: { ...disconnectMetrics }
+  };
+}
+
+export function resetRealtimeConnectionMetrics() {
+  // Test helper: socket metrics are process-global and the detailed counters live in notifications.metrics.
+  for (const socket of clients.keys()) socket.close?.(4000, 'test_reset');
+  clients.clear();
+  for (const key of Object.keys(disconnectMetrics)) delete disconnectMetrics[key];
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = undefined;
+}
 
 function send(socket: RealtimeSocket, event: RealtimeEvent) {
   if (socket.readyState !== undefined && socket.readyState !== openReadyState) {
     return;
   }
 
+  if (event.type === 'notification.created') {
+    const createdAt = Date.parse(event.payload.notification.createdAt);
+    if (Number.isFinite(createdAt)) recordCommitToClient(Date.now() - createdAt);
+  }
   socket.send(JSON.stringify(event));
 }
 
 export function addRealtimeClient(socket: RealtimeSocket, userId?: string) {
-  clients.set(socket, userId);
+  clients.set(socket, { userId, lastSeen: Date.now() });
+  recordSocketConnected();
+  ensureHeartbeat();
 
-  send(socket, {
-    type: 'connection.ready'
-  });
+  send(socket, createConnectionReadyEvent());
 
-  return () => {
-    clients.delete(socket);
+  return (reason = 'client_close') => {
+    if (!clients.delete(socket)) return;
+    recordSocketDisconnected(reason);
+    disconnectMetrics[reason] = (disconnectMetrics[reason] ?? 0) + 1;
+    if (clients.size === 0 && heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = undefined;
+    }
   };
+}
+
+export function handleRealtimeMessage(socket: RealtimeSocket, message: Buffer | ArrayBuffer | string) {
+  const state = clients.get(socket);
+  if (state) state.lastSeen = Date.now();
+  const value = message.toString();
+  if (value === 'ping' || value === JSON.stringify({ type: 'ping' })) {
+    send(socket, { version: 1, type: 'pong' } as RealtimeEvent);
+  }
+}
+
+function ensureHeartbeat() {
+  if (heartbeatTimer) return;
+  heartbeatTimer = setInterval(() => {
+    sweepIdleRealtimeClients(Date.now());
+  }, 30_000);
+  heartbeatTimer.unref?.();
+}
+
+export function sweepIdleRealtimeClients(now: number) {
+  for (const [socket, state] of clients) {
+    if (now - state.lastSeen <= idleTimeoutMs) continue;
+    socket.close?.(4001, 'idle_timeout');
+    removeRealtimeClient(socket, 'idle_timeout');
+  }
+}
+
+function removeRealtimeClient(socket: RealtimeSocket, reason: string) {
+  if (!clients.delete(socket)) return;
+  recordSocketDisconnected(reason);
+  disconnectMetrics[reason] = (disconnectMetrics[reason] ?? 0) + 1;
+  if (clients.size === 0 && heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = undefined;
+  }
 }
 
 export function broadcastPollVoteCreated(payload: PollVoteCreatedEvent['payload']) {
@@ -225,8 +300,9 @@ function broadcast(event: RealtimeEvent) {
 }
 
 export function sendToUser(userId: string, event: RealtimeEvent) {
-  for (const [client, clientUserId] of clients) {
-    if (clientUserId !== userId) continue;
+  for (const [client, state] of clients) {
+    if (state.userId !== userId) continue;
+    state.lastSeen = Date.now();
     try {
       send(client, event);
     } catch {

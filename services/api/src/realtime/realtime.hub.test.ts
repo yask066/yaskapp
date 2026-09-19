@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import type { Poll } from '../modules/polls/polls.repository.js';
+import { getNotificationMetrics } from '../modules/notifications/notifications.metrics.js';
 import {
   addRealtimeClient,
   broadcastPollVoteCreated,
@@ -15,8 +16,65 @@ import {
   broadcastModerationAppealCreated,
   broadcastModerationAppealResolved
   , sendNotificationCreated,
-  sendNotificationRead
+  sendNotificationRead,
+  createConnectionReadyEvent,
+  handleRealtimeMessage,
+  getRealtimeConnectionMetrics,
+  resetRealtimeConnectionMetrics,
+  sweepIdleRealtimeClients
 } from './realtime.hub.js';
+
+test('connection ready is versioned and sent only after socket registration', () => {
+  resetRealtimeConnectionMetrics();
+  const messages: string[] = [];
+  const remove = addRealtimeClient({ readyState: 1, send: (message) => messages.push(message) }, 'user-ready');
+
+  assert.deepEqual(JSON.parse(messages[0] ?? ''), createConnectionReadyEvent());
+  assert.deepEqual(JSON.parse(messages[0] ?? ''), {
+    version: 1,
+    type: 'connection.ready'
+  });
+  assert.equal(getRealtimeConnectionMetrics().activeSockets, 1);
+  remove();
+  assert.equal(getRealtimeConnectionMetrics().activeSockets, 0);
+});
+
+test('heartbeat replies with a versioned pong and never includes recipient identity', () => {
+  const messages: string[] = [];
+  const socket = { readyState: 1, send: (message: string) => messages.push(message) };
+  handleRealtimeMessage(socket, 'ping');
+  handleRealtimeMessage(socket, JSON.stringify({ type: 'ping' }));
+
+  assert.deepEqual(messages.map((message) => JSON.parse(message)), [
+    { version: 1, type: 'pong' },
+    { version: 1, type: 'pong' }
+  ]);
+  assert.equal(messages.some((message) => message.includes('user-')), false);
+});
+
+test('disconnect metrics retain a safe reason without payload data', () => {
+  resetRealtimeConnectionMetrics();
+  const remove = addRealtimeClient({ readyState: 1, send: () => undefined }, 'user-disconnect');
+  remove('idle_timeout');
+
+  assert.equal(getRealtimeConnectionMetrics().disconnectsByReason.idle_timeout, 1);
+});
+
+test('heartbeat closes idle sockets with a safe close reason', () => {
+  resetRealtimeConnectionMetrics();
+  const closes: string[] = [];
+  const remove = addRealtimeClient({
+    readyState: 1,
+    send: () => undefined,
+    close: (_code, reason) => closes.push(reason ?? '')
+  }, 'user-idle');
+
+  sweepIdleRealtimeClients(Date.now() + 90_001);
+
+  assert.deepEqual(closes, ['idle_timeout']);
+  assert.equal(getRealtimeConnectionMetrics().activeSockets, 0);
+  remove();
+});
 
 test('realtime vote events omit viewer-specific vote state', () => {
   let message = '';
@@ -221,4 +279,32 @@ test('notification events are delivered only to the matching user', () => {
   assert.equal(JSON.parse(first[1] ?? '').type, 'notification.read');
   removeFirst();
   removeSecond();
+});
+
+test('notification delivery records commit-to-client latency without logging payloads', () => {
+  const before = getNotificationMetrics().commitToClientSamples;
+  const remove = addRealtimeClient({ readyState: 1, send: () => undefined }, 'user-latency');
+
+  sendNotificationCreated('user-latency', {
+    version: 1,
+    type: 'notification.created',
+    payload: {
+      notification: {
+        id: 'notification-latency',
+        type: 'follow',
+        actor: null,
+        targetType: 'profile',
+        pollId: null,
+        commentId: null,
+        payload: {},
+        readAt: null,
+        createdAt: new Date(Date.now() - 10).toISOString(),
+        isTargetAvailable: true
+      },
+      unreadCount: 1
+    }
+  });
+
+  assert.equal(getNotificationMetrics().commitToClientSamples, before + 1);
+  remove();
 });

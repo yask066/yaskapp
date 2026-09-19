@@ -16,6 +16,8 @@ export type RateLimitOptions = {
   windowMs: number;
   errorCode?: string;
   keyBy?: 'ip' | 'user';
+  skipInTest?: boolean;
+  onResponse?: (statusCode: number) => void;
 };
 
 type RateLimitResult = {
@@ -55,7 +57,7 @@ export function rateLimitKey(
 export function rateLimit(options: RateLimitOptions) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     // Integration tests exercise business routes without throttling the test suite.
-    if (process.env.NODE_ENV === 'test') {
+    if (process.env.NODE_ENV === 'test' && options.skipInTest !== false) {
       return;
     }
 
@@ -71,6 +73,7 @@ export function rateLimit(options: RateLimitOptions) {
       reply.header('RateLimit-Reset', result.retryAfterSeconds);
 
       if (!result.allowed) {
+        options.onResponse?.(429);
         reply.header('Retry-After', result.retryAfterSeconds);
 
         return reply.status(429).send({
@@ -78,6 +81,7 @@ export function rateLimit(options: RateLimitOptions) {
           message: 'Too many requests. Try again later.'
         });
       }
+      options.onResponse?.(200);
     } catch (error) {
       // Rate limiting must not make the API unavailable when Redis is restarting.
       request.log.error({ err: error }, 'Rate limit check failed');

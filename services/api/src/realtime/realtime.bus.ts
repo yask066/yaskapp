@@ -1,6 +1,7 @@
 import type { RealtimeEvent } from '@yaskapp/shared';
 
 import { createRedisClient, realtimeChannel, type RedisClientLike } from '../config/redis.js';
+import { recordRealtimeSubscribeError } from '../modules/notifications/notifications.metrics.js';
 
 export { realtimeChannel };
 export type { RedisClientLike } from '../config/redis.js';
@@ -55,7 +56,12 @@ export class RealtimeBus {
       const decoded = decodeMessage(message);
       if (decoded) onMessage(decoded);
     });
-    await this.subscriber.subscribe(realtimeChannel);
+    try {
+      await this.subscriber.subscribe(realtimeChannel);
+    } catch (error) {
+      recordRealtimeSubscribeError();
+      throw error;
+    }
     this.started = true;
   }
 

@@ -14,7 +14,7 @@ import {
 import { getNotificationPreferences, updateNotificationPreferences } from './notification-preferences.repository.js';
 import { registerNotificationDevice, revokeNotificationDevice } from './notification-devices.repository.js';
 import { rateLimit } from '../../config/rate-limit.js';
-import { incrementNotificationMetric } from './notifications.metrics.js';
+import { incrementNotificationMetric, recordReadResult, recordRealtimePublishError } from './notifications.metrics.js';
 
 const notificationReadRateLimit = rateLimit({ keyPrefix: 'notifications-read', limit: 60, windowMs: 60_000, keyBy: 'user' });
 const notificationListRateLimit = rateLimit({ keyPrefix: 'notifications-list', limit: 120, windowMs: 60_000, keyBy: 'user' });
@@ -111,8 +111,9 @@ export function registerNotificationRoutes(app: FastifyInstance) {
       }
     };
     sendToUser(request.user.sub, event);
-    void realtimeBus.publish(request.user.sub, event).catch(() => incrementNotificationMetric('publishFailed'));
+    void realtimeBus.publish(request.user.sub, event).catch(() => recordRealtimePublishError());
     incrementNotificationMetric('read');
+    recordReadResult('read', 'updated');
 
     return reply.send(result);
   });
@@ -128,7 +129,8 @@ export function registerNotificationRoutes(app: FastifyInstance) {
       }
     } as const;
     sendToUser(request.user.sub, event);
-    void realtimeBus.publish(request.user.sub, event).catch(() => incrementNotificationMetric('publishFailed'));
+    void realtimeBus.publish(request.user.sub, event).catch(() => recordRealtimePublishError());
+    recordReadResult('read_all', result.updatedCount > 0 ? 'updated' : 'unchanged');
     return reply.send(result);
   });
 

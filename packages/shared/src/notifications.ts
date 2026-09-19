@@ -70,7 +70,12 @@ export type RealtimeEvent =
       };
     }
   | {
+      version: 1;
       type: 'connection.ready';
+    }
+  | {
+      version: 1;
+      type: 'pong';
     }
   | {
       type: 'poll.admin_deleted';
