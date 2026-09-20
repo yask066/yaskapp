@@ -4,7 +4,7 @@ import { notificationHref } from './notification-target';
 
 interface NotificationCardProps {
   item: NotificationItem;
-  onRead: (id: string) => void;
+  onRead: (id: string) => void | Promise<void>;
 }
 
 function notificationCopy(item: NotificationItem): string {
@@ -36,7 +36,7 @@ export function NotificationCard({ item, onRead }: NotificationCardProps) {
 
   return (
     <article className={`notification-card${item.readAt ? '' : ' notification-card--unread'}`} aria-label={item.readAt ? copy : `${copy}, unread`}>
-      {href ? <Link to={href} onClick={() => onRead(item.id)}>{content}</Link> : <div className="notification-card__unavailable">{content}<span className="notification-card__status">This content is no longer available</span></div>}
+      {href ? <Link to={href} onClick={() => { void onRead(item.id); }}>{content}</Link> : <div className="notification-card__unavailable">{content}<span className="notification-card__status" role="status">This content is no longer available</span></div>}
     </article>
   );
 }

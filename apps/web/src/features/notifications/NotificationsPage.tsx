@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { NotificationCard } from './NotificationCard';
 import { useNotifications } from './notification-store';
 
@@ -48,7 +49,10 @@ export function NotificationsPage() {
     <main id="main-content" className="notifications-page">
       <header className="page-heading">
         <div><p className="eyebrow">Inbox</p><h1>Notifications</h1></div>
-        {notifications.unreadCount > 0 ? <button className="button" type="button" onClick={() => void notifications.actions.markAllRead()}>Mark all as read</button> : null}
+        <div className="notifications-page__actions">
+          <Link className="button button--quiet" to="/settings/notifications">Settings</Link>
+          {notifications.unreadCount > 0 ? <button className="button" type="button" onClick={() => void notifications.actions.markAllRead()}>Mark all as read</button> : null}
+        </div>
       </header>
       <div className="notifications-toolbar">
         <div className="segmented-tabs" role="tablist" aria-label="Notification filters">

@@ -100,7 +100,7 @@ describe('notificationReducer', () => {
 
 function ProviderProbe() {
   const notifications = useNotifications();
-  return <><output data-testid="unread-count">{notifications.unreadCount}</output><button onClick={() => { void notifications.actions.reconcile(); void notifications.actions.reconcile(); }}>reconcile</button></>;
+  return <><output data-testid="unread-count">{notifications.unreadCount}</output><output data-testid="notification-error">{notifications.error}</output><button onClick={() => { void notifications.actions.reconcile(); void notifications.actions.reconcile(); }}>reconcile</button><button onClick={() => { void notifications.actions.markRead('notification-1'); }}>read</button></>;
 }
 
 describe('NotificationProvider session lifecycle', () => {
@@ -137,5 +137,17 @@ describe('NotificationProvider session lifecycle', () => {
     await waitFor(() => expect(listNotifications).toHaveBeenCalledOnce());
     resolve?.({ items: [], unreadCount: 0, nextCursor: null });
     await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('0'));
+  });
+
+  it('reconciles and exposes a contextual error when marking read is ambiguous', async () => {
+    markNotificationRead.mockRejectedValueOnce(new Error('timeout'));
+    listNotifications.mockResolvedValueOnce({ items: [], unreadCount: 0, nextCursor: null });
+    render(<NotificationProvider><ProviderProbe /></NotificationProvider>);
+    await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('3'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'read' }));
+
+    await waitFor(() => expect(screen.getByTestId('notification-error')).toHaveTextContent('Unable to mark notification as read'));
+    expect(listNotifications).toHaveBeenCalledOnce();
   });
 });

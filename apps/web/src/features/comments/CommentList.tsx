@@ -1,18 +1,21 @@
+import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteComment, likeComment, listComments, unlikeComment } from '../../api/polls';
 import type { PollComment } from '../../api/models';
 import { mutationErrorMessage } from '../polls/usePollMutations';
+import { commentScrollBehavior } from './comment-scroll';
 
 interface CommentListProps {
   pollId: string;
   currentUserId?: string | null;
+  focusedCommentId?: string | null;
 }
 
 function replaceComment(queryClient: ReturnType<typeof useQueryClient>, pollId: string, comment: PollComment) {
   queryClient.setQueryData<PollComment[]>(['comments', pollId], (cached = []) => cached.map((item) => item.id === comment.id ? comment : item));
 }
 
-export function CommentList({ pollId, currentUserId }: CommentListProps) {
+export function CommentList({ pollId, currentUserId, focusedCommentId }: CommentListProps) {
   const queryClient = useQueryClient();
   const commentsQuery = useQuery({ queryKey: ['comments', pollId], queryFn: () => listComments(pollId) });
   const likeMutation = useMutation({
@@ -26,6 +29,15 @@ export function CommentList({ pollId, currentUserId }: CommentListProps) {
       return queryClient.invalidateQueries({ queryKey: ['poll', pollId] });
     },
   });
+  const focusedCommentRef = useRef<HTMLLIElement | null>(null);
+  useEffect(() => {
+    if (!focusedCommentId || !commentsQuery.data) return;
+    const target = focusedCommentRef.current;
+    if (!target) return;
+    target.focus();
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    target.scrollIntoView?.({ block: 'center', behavior: commentScrollBehavior(prefersReducedMotion) });
+  }, [commentsQuery.data, focusedCommentId]);
   const writeError = likeMutation.error ?? deleteMutation.error;
 
   if (commentsQuery.isPending) return <p role="status">Loading comments…</p>;
@@ -35,7 +47,7 @@ export function CommentList({ pollId, currentUserId }: CommentListProps) {
     <div className="comment-list">
       {writeError ? <p role="alert">{mutationErrorMessage(writeError)}</p> : null}
       {commentsQuery.data?.length ? <ul>
-        {commentsQuery.data.map((comment) => <li className="comment-card" key={comment.id}>
+        {commentsQuery.data.map((comment) => <li className={`comment-card${comment.id === focusedCommentId ? ' comment-card--focused' : ''}`} key={comment.id} ref={comment.id === focusedCommentId ? focusedCommentRef : undefined} tabIndex={comment.id === focusedCommentId ? -1 : undefined} aria-current={comment.id === focusedCommentId ? 'location' : undefined}>
           <p className="comment-card__author"><strong>{comment.author.displayName || comment.author.username}</strong> <span>@{comment.author.username}</span></p>
           <p className="comment-card__body">{comment.body}</p>
           <div className="comment-card__actions">{currentUserId ? <button className="button" type="button" aria-pressed={comment.viewerHasLiked} onClick={() => likeMutation.mutate(comment)}>Like ({comment.likesCount})</button> : null}{comment.author.id === currentUserId ? <button className="button" type="button" onClick={() => { if (window.confirm('Delete this comment?')) deleteMutation.mutate(comment.id); }}>Delete</button> : null}</div>

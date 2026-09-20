@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { createComment, getPoll } from '../../api/polls';
 import type { PollComment } from '../../api/models';
 import { useSession } from '../../app/session-provider';
@@ -11,6 +11,8 @@ import { CommentList } from './CommentList';
 
 export function PollDetailPage() {
   const { pollId = '' } = useParams();
+  const [searchParams] = useSearchParams();
+  const focusedCommentId = searchParams.get('comment');
   const { user } = useSession();
   const queryClient = useQueryClient();
   const pollMutations = usePollMutations();
@@ -31,7 +33,7 @@ export function PollDetailPage() {
       <section className="comments-section" aria-labelledby="comments-heading">
         <header className="page-heading"><h1 id="comments-heading">Comments</h1></header>
         {user ? <CommentForm onSubmit={async (body) => { await createMutation.mutateAsync(body); }} /> : <Link to={`/login?next=${encodeURIComponent(`/polls/${pollId}`)}`}>Login</Link>}
-        {pollId ? <CommentList pollId={pollId} currentUserId={user?.id} /> : null}
+        {pollId ? <CommentList pollId={pollId} currentUserId={user?.id} focusedCommentId={focusedCommentId} /> : null}
       </section>
     </main>
   );

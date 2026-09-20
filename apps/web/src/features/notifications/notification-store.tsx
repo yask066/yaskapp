@@ -198,6 +198,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     } catch {
       dispatch({ type: 'rollback', snapshot });
       await reconcile();
+      dispatch({ type: 'error', message: 'Unable to mark notification as read. Your inbox was refreshed.' });
     }
   }, [reconcile]);
 
