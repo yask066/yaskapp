@@ -8,6 +8,7 @@ import { MyProfilePage } from '../features/profiles/MyProfilePage';
 import { PublicProfilePage } from '../features/profiles/PublicProfilePage';
 import { SearchPage } from '../features/search/SearchPage';
 import { NotificationsPage } from '../features/notifications/NotificationsPage';
+import { NotificationPreferencesPage } from '../features/notifications/NotificationPreferencesPage';
 import { useSession } from './session-provider';
 
 function LoadingMain() {
@@ -48,6 +49,7 @@ export const router = createBrowserRouter([
           { path: 'polls/new', element: <CreatePollPage /> },
           { path: 'me', element: <MyProfilePage /> },
           { path: 'notifications', element: <NotificationsPage /> },
+          { path: 'settings/notifications', element: <NotificationPreferencesPage /> },
         ],
       },
     ],
