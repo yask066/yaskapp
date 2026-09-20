@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../core/config/api_config.dart';
+import 'notification_model.dart';
 
 class NotificationsApiException implements Exception {
   const NotificationsApiException(this.message);
@@ -11,14 +12,8 @@ class NotificationsApiException implements Exception {
   String toString() => message;
 }
 
-class NotificationActor {
-  const NotificationActor(
-      {required this.username, required this.displayName, this.avatarUrl});
-  final String username;
-  final String displayName;
-  final String? avatarUrl;
-}
-
+/// Backwards-compatible view used by the existing inbox until it is migrated
+/// to the app-wide store. New code should use [NotificationItem].
 class NotificationSummary {
   const NotificationSummary({
     required this.id,
@@ -36,9 +31,10 @@ class NotificationSummary {
     return NotificationSummary(
       id: json['id'] as String,
       type: json['type'] as String,
-      actor: actor == null
+      actor: actor == null || actor['username'] is! String || actor['displayName'] is! String
           ? null
           : NotificationActor(
+              id: actor['id'] as String? ?? actor['username'] as String,
               username: actor['username'] as String,
               displayName: actor['displayName'] as String,
               avatarUrl: actor['avatarUrl'] as String?,
@@ -102,6 +98,42 @@ class NotificationsPage {
   final int unreadCount;
 }
 
+class NotificationItemsPage {
+  const NotificationItemsPage({
+    required this.items,
+    required this.nextCursor,
+    required this.unreadCount,
+  });
+
+  final List<NotificationItem> items;
+  final String? nextCursor;
+  final int unreadCount;
+}
+
+class NotificationReadResponse {
+  const NotificationReadResponse({
+    required this.notificationId,
+    required this.readAt,
+    required this.unreadCount,
+  });
+
+  final String notificationId;
+  final DateTime readAt;
+  final int unreadCount;
+}
+
+class NotificationReadAllResponse {
+  const NotificationReadAllResponse({
+    required this.readAt,
+    required this.updatedCount,
+    required this.unreadCount,
+  });
+
+  final DateTime readAt;
+  final int updatedCount;
+  final int unreadCount;
+}
+
 class NotificationsApiClient {
   NotificationsApiClient(
       {ApiConfig config = const ApiConfig(), http.Client? httpClient})
@@ -131,9 +163,10 @@ class NotificationsApiClient {
         .timeout(const Duration(seconds: 10));
     final body = _decode(response);
     final items = body['items'];
-    if (items is! List<dynamic>)
+    if (items is! List<dynamic>) {
       throw const NotificationsApiException(
           'Notifications response is invalid.');
+    }
     return NotificationsPage(
       items: items
           .map((item) =>
@@ -144,14 +177,86 @@ class NotificationsApiClient {
     );
   }
 
+  Future<NotificationItemsPage> listTyped({
+    required String accessToken,
+    String? cursor,
+    bool unreadOnly = false,
+    int limit = 25,
+  }) async {
+    final query = <String, String>{
+      'limit': '$limit',
+      'unreadOnly': '$unreadOnly',
+      if (cursor != null) 'cursor': cursor,
+    };
+    final response = await _httpClient.get(
+      Uri.parse(_config.baseUrl).replace(
+        path: '/notifications',
+        queryParameters: query,
+      ),
+      headers: {'authorization': 'Bearer $accessToken'},
+    ).timeout(const Duration(seconds: 10));
+    final body = _decode(response);
+    final rawItems = body['items'];
+    if (rawItems is! List) {
+      throw const NotificationsApiException('Notifications response is invalid.');
+    }
+    final items = <NotificationItem>[];
+    for (final raw in rawItems) {
+      if (raw is! Map) continue;
+      final item = NotificationItem.tryParse(Map<String, dynamic>.from(raw));
+      if (item != null) items.add(item);
+    }
+    return NotificationItemsPage(
+      items: items,
+      nextCursor: body['nextCursor'] as String?,
+      unreadCount: body['unreadCount'] as int? ?? 0,
+    );
+  }
+
+  Future<int> unreadCount({required String accessToken}) async {
+    final response = await _httpClient.get(
+      Uri.parse(_config.baseUrl).replace(path: '/notifications/unread-count'),
+      headers: {'authorization': 'Bearer $accessToken'},
+    ).timeout(const Duration(seconds: 10));
+    final body = _decode(response);
+    final count = body['unreadCount'];
+    if (count is! int) {
+      throw const NotificationsApiException('Unread count response is invalid.');
+    }
+    return count;
+  }
+
   Future<void> markRead(
       {required String accessToken, required String id}) async {
     final response = await _httpClient.post(
       Uri.parse(_config.baseUrl).replace(path: '/notifications/$id/read'),
       headers: {'authorization': 'Bearer $accessToken'},
     );
-    if (response.statusCode < 200 || response.statusCode >= 300)
+    if (response.statusCode < 200 || response.statusCode >= 300) {
       _throwResponse(response);
+    }
+  }
+
+  Future<NotificationReadResponse> markReadTyped({
+    required String accessToken,
+    required String id,
+  }) async {
+    final response = await _httpClient.post(
+      Uri.parse(_config.baseUrl).replace(path: '/notifications/$id/read'),
+      headers: {'authorization': 'Bearer $accessToken'},
+    );
+    final body = _decode(response);
+    final notificationId = body['notificationId'];
+    final readAt = DateTime.tryParse(body['readAt'] as String? ?? '');
+    final unreadCount = body['unreadCount'];
+    if (notificationId is! String || readAt == null || unreadCount is! int) {
+      throw const NotificationsApiException('Read response is invalid.');
+    }
+    return NotificationReadResponse(
+      notificationId: notificationId,
+      readAt: readAt,
+      unreadCount: unreadCount,
+    );
   }
 
   Future<int> markAllRead({required String accessToken}) async {
@@ -163,15 +268,38 @@ class NotificationsApiClient {
     return body['unreadCount'] as int? ?? 0;
   }
 
+  Future<NotificationReadAllResponse> markAllReadTyped({
+    required String accessToken,
+  }) async {
+    final response = await _httpClient.post(
+      Uri.parse(_config.baseUrl).replace(path: '/notifications/read-all'),
+      headers: {'authorization': 'Bearer $accessToken'},
+    );
+    final body = _decode(response);
+    final readAt = DateTime.tryParse(body['readAt'] as String? ?? '');
+    final updatedCount = body['updatedCount'];
+    final unreadCount = body['unreadCount'];
+    if (readAt == null || updatedCount is! int || unreadCount is! int) {
+      throw const NotificationsApiException('Read-all response is invalid.');
+    }
+    return NotificationReadAllResponse(
+      readAt: readAt,
+      updatedCount: updatedCount,
+      unreadCount: unreadCount,
+    );
+  }
+
   Map<String, dynamic> _decode(http.Response response) {
     final decoded = response.body.isEmpty
         ? const <String, dynamic>{}
         : jsonDecode(response.body);
-    if (response.statusCode < 200 || response.statusCode >= 300)
+    if (response.statusCode < 200 || response.statusCode >= 300) {
       _throwResponse(response, decoded);
-    if (decoded is! Map<String, dynamic>)
+    }
+    if (decoded is! Map<String, dynamic>) {
       throw const NotificationsApiException(
           'Notifications response is invalid.');
+    }
     return decoded;
   }
 
