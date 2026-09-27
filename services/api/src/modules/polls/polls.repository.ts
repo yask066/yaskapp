@@ -453,6 +453,23 @@ export async function deletePollCommentRecord(input: {
   try {
     await client.query('BEGIN');
 
+    const pollResult = await client.query<{ id: string }>(
+      `
+        SELECT id
+        FROM polls
+        WHERE id = $1
+          AND visibility = 'public'
+          AND deleted_at IS NULL
+        FOR UPDATE
+      `,
+      [input.pollId]
+    );
+
+    if (pollResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
     const result = await client.query<{ id: string; parent_comment_id: string | null }>(
       `
         UPDATE comments c
