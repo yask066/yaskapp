@@ -8,7 +8,7 @@ All API replicas in one environment must point to the same Redis instance with `
 
 ## HTTP contract
 
-All endpoints below require the current user's session or bearer token. A caller can only list or mutate their own notifications.
+Notification endpoints below require the current user's session or bearer token; a caller can only list or mutate their own notifications. Poll comment reads may be anonymous, while comment creation requires authentication as noted in its row.
 
 | Request | Response |
 | --- | --- |
@@ -18,8 +18,15 @@ All endpoints below require the current user's session or bearer token. A caller
 | `POST /notifications/read-all` | `{ readAt: ISO-8601, updatedCount: number, unreadCount: 0 }` |
 | `GET /notification-preferences` | Per-type `{ inApp, push }` settings for `poll_vote`, `comment`, `comment_reply`, `like`, and `follow` |
 | `PATCH /notification-preferences` | Partial per-type `{ inApp?, push? }` updates |
+| `GET /polls/:pollId/comments?limit=50` | Root comments only; each item includes `parentCommentId: null` and `repliesCount` |
+| `GET /polls/:pollId/comments/:commentId/replies?limit=20&cursor=<opaque>` | One root's replies in ascending order, `{ items, nextCursor }`; `limit` is 1–50 and the opaque cursor is passed back unchanged |
+| `POST /polls/:pollId/comments` | Authenticated `{ body, parentCommentId? }`; omission creates a root, while the optional parent must be an active root on this same public poll. Replies to replies are rejected. The returned poll `commentsCount` includes roots and replies. |
+
+Comment and reply listing is available only for an existing public poll; deleted polls, roots, and replies are excluded. The reply endpoint returns not found for a missing, deleted, cross-poll, or non-root parent. Comment creation, the all-comments counter, and any durable notification are committed together. Deleting a root soft-deletes its direct replies and subtracts all removed rows from `commentsCount`; deleting one reply subtracts one.
 
 `NotificationItem` contains `id`, `type`, nullable `actor` (including `id`), `targetType`, nullable `pollId` and `commentId`, safe display `payload`, nullable `readAt`, `createdAt`, and `isTargetAvailable`. Clients use the opaque `nextCursor` unchanged. The supported notification types are `poll_vote`, `comment`, `comment_reply`, `like`, and `follow`.
+
+For `comment_reply`, `commentId` identifies the reply and `pollId` its poll. The sole recipient is the root comment's author when their `comment_reply.inApp` preference is enabled; self-replies and disabled preferences create no notification. The notification payload is empty and never includes reply text. Realtime publication happens after the transaction commits. Opening the notification should resolve the root, expand the thread, and focus the exact reply; a deleted/unavailable target stays in inbox history and uses the client's safe fallback.
 
 Keep existing HTTP response fields available through the compatibility window. This plan does not set an expiry date: remove legacy fields only after the minimum supported web and mobile clients have migrated and product has approved the cutoff.
 
@@ -66,8 +73,8 @@ The current API exports only backend counters. Reconnect attempts, client-visibl
 - The staging web host now proxies `/notifications*`, `/notification-preferences*`, `/notification-devices*`, and `/realtime*` to the API before its SPA fallback. Validate these routes through the actual staging host before using it for smoke evidence.
 - Web read/read-all requests now guard late success and rollback against a session epoch change. Duplicate creation and delayed read-all events preserve newer unread state; provider visibility reconciliation is wired. Focused regression tests cover these session and ordering cases.
 - Flutter now decodes `notification.read` and `notifications.read_all` and applies them to the active notification store while preserving newer notifications. Focused store, client decoder, and session tests cover this behavior.
-- `comment_reply` remains blocked by the product dependency below. The manual two-client smoke and complete release suite also remain required evidence; this runbook does not assert that either has been executed.
-- The API suite still has a logout acceptance failure: `/auth/logout` clears the browser cookie, while previously issued bearer JWTs remain valid. Server-side revocation would invalidate sessions across devices; resolve this security/product decision before claiming the complete API suite passes.
+- One-level replies and the `comment_reply` producer are implemented according to the [poll comment replies plan](superpowers/plans/2026-09-27-poll-comment-replies.md). A real API-created reply must still pass the two-client smoke before the five-type release gate can be marked complete; this runbook does not claim that smoke has run.
+- The previous baseline recorded a logout acceptance failure: `/auth/logout` clears the browser cookie while previously issued bearer JWTs remain valid. This execution could not confirm whether it still reproduces because the full API suite could not start without test `DATABASE_URL`, `REDIS_URL`, S3 settings, or an available Docker Engine. Server-side revocation would invalidate sessions across devices; keep that decision separate from replies.
 
 ## Staging multi-node operation
 
@@ -82,6 +89,6 @@ docker compose -f infra/docker/docker-compose.staging.yml ps
 
 Confirm both API containers are healthy and `/health/ready` reports database, Redis, and storage readiness. To inspect per-process notification counters, query `/health/metrics` on each replica from the private operations network. If one replica cannot subscribe, do not pass the multi-node release gate.
 
-## Product dependency
+## Poll comment replies release gate
 
-The current poll-comments MVP explicitly excludes nested replies and leaves `comments.parent_comment_id` unused. The notifications clients can decode and navigate an existing `comment_reply`, but there is no reply producer in this repository. Do not mark the five-type release smoke complete until a separate replies task closes this dependency or product changes the acceptance gate. Do not add a reply endpoint as part of notification operations.
+The [poll comment replies plan](superpowers/plans/2026-09-27-poll-comment-replies.md) defines the one-level comment thread contract, producer, and client behavior. Do not mark all five notification types passed until a real reply has been created through `POST /polls/:pollId/comments` with `parentCommentId` and the linked notification has been observed and opened in both web and Flutter using the manual smoke procedure. A synthetic event or direct database insert does not satisfy this gate.

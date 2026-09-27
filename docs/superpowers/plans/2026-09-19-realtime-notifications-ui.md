@@ -25,7 +25,7 @@
 
 ## Blocking Product Dependency
 
-`docs/prd-poll-comments.md` требует не использовать `comments.parent_comment_id` в текущем comments MVP, но этот PRD требует пользовательское действие, создающее `comment_reply`, и smoke всех пяти типов. Эта декомпозиция реализует контракт, отображение и deep link уже существующего `comment_reply`, однако настоящий producer для reply должен прийти из отдельной задачи/PRD по ответам на комментарии либо требования smoke/acceptance должны быть скорректированы до старта Task 14. Не расширять comments API скрыто внутри notifications PR.
+Одноуровневые ответы на комментарии реализуются по [плану poll comment replies](2026-09-27-poll-comment-replies.md), который обновляет PRD, API, producer и оба клиента. Task 15 считается прошедшим пяти типов только после реализации replies и успешного двухклиентного smoke с настоящим reply, созданным через API; синтетический `comment_reply` fixture не закрывает gate. Контракт уведомлений остаётся прежним: получатель — автор корневого комментария, self-reply не уведомляет, тело ответа не попадает в payload.
 
 ## File Map
 
