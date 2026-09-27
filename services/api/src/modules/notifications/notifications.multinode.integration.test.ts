@@ -226,3 +226,96 @@ test('two API nodes fan out committed create, read and read-all events only to r
   );
   assert.equal(unread.rows[0]?.count, '0');
 });
+
+test('comment_reply reaches only the root author on both API nodes', async () => {
+  const pollAuthor = await registerUser('reply_poll');
+  const rootAuthor = await registerUser('reply_root');
+  const replier = await registerUser('reply_actor');
+  const unrelated = await registerUser('reply_other');
+  const rootAuthorFirstEvents = firstNode.connect(rootAuthor.user.id);
+  const rootAuthorSecondEvents = secondNode.connect(rootAuthor.user.id);
+  const pollAuthorFirstEvents = firstNode.connect(pollAuthor.user.id);
+  const pollAuthorSecondEvents = secondNode.connect(pollAuthor.user.id);
+  const unrelatedFirstEvents = firstNode.connect(unrelated.user.id);
+  const unrelatedSecondEvents = secondNode.connect(unrelated.user.id);
+  await Promise.all([firstNode.start(), secondNode.start()]);
+
+  const pollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(pollAuthor.accessToken),
+    payload: { question: 'Multi-node reply notification', options: ['One', 'Two'] }
+  });
+  assert.equal(pollResponse.statusCode, 201, pollResponse.body);
+  const poll = pollResponse.json<{ poll: { id: string } }>().poll;
+  const rootResponse = await app.inject({
+    method: 'POST',
+    url: `/polls/${poll.id}/comments`,
+    headers: bearer(rootAuthor.accessToken),
+    payload: { body: 'Reply events belong to this author.' }
+  });
+  assert.equal(rootResponse.statusCode, 201, rootResponse.body);
+  const root = rootResponse.json<{ comment: { id: string } }>().comment;
+  await Promise.all([
+    waitForEvent(pollAuthorFirstEvents, 'notification.created'),
+    waitForEvent(pollAuthorSecondEvents, 'notification.created')
+  ]);
+  for (const events of [
+    rootAuthorFirstEvents,
+    rootAuthorSecondEvents,
+    pollAuthorFirstEvents,
+    pollAuthorSecondEvents,
+    unrelatedFirstEvents,
+    unrelatedSecondEvents
+  ]) events.splice(0);
+
+  const replyBody = 'Do not copy this private reply into an event.';
+  const replyResponse = await app.inject({
+    method: 'POST',
+    url: `/polls/${poll.id}/comments`,
+    headers: bearer(replier.accessToken),
+    payload: { body: replyBody, parentCommentId: root.id }
+  });
+  assert.equal(replyResponse.statusCode, 201, replyResponse.body);
+  const reply = replyResponse.json<{ comment: { id: string } }>().comment;
+  const storedRows = await db.query<{
+    id: string;
+    recipient_user_id: string;
+    type: string;
+    poll_id: string | null;
+    comment_id: string | null;
+    payload: Record<string, unknown>;
+  }>(
+    `SELECT id, recipient_user_id, type, poll_id, comment_id, payload
+     FROM notifications WHERE type = 'comment_reply' AND comment_id = $1`,
+    [reply.id]
+  );
+  assert.equal(storedRows.rows.length, 1);
+  const notification = storedRows.rows[0];
+  assert.equal(notification?.recipient_user_id, rootAuthor.user.id);
+  assert.equal(notification?.type, 'comment_reply');
+  assert.equal(notification?.poll_id, poll.id);
+  assert.equal(notification?.comment_id, reply.id);
+  assert.deepEqual(notification?.payload, {});
+
+  const [rootAuthorFirst, rootAuthorSecond] = await Promise.all([
+    waitForEvent(rootAuthorFirstEvents, 'notification.created'),
+    waitForEvent(rootAuthorSecondEvents, 'notification.created')
+  ]);
+  const firstCreated = rootAuthorFirst as Extract<RealtimeEvent, { type: 'notification.created' }>;
+  const secondCreated = rootAuthorSecond as Extract<RealtimeEvent, { type: 'notification.created' }>;
+  assert.equal(firstCreated.payload.notification.id, notification?.id);
+  assert.equal(firstCreated.payload.notification.type, 'comment_reply');
+  assert.equal(firstCreated.payload.notification.pollId, poll.id);
+  assert.equal(firstCreated.payload.notification.commentId, reply.id);
+  assert.deepEqual(firstCreated.payload.notification.payload, {});
+  assert.deepEqual(secondCreated, firstCreated);
+  assert.equal(JSON.stringify(firstCreated).includes(replyBody), false);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(countEventType(rootAuthorFirstEvents, 'notification.created'), 1);
+  assert.equal(countEventType(rootAuthorSecondEvents, 'notification.created'), 1);
+  assert.equal(countEventType(pollAuthorFirstEvents, 'notification.created'), 0);
+  assert.equal(countEventType(pollAuthorSecondEvents, 'notification.created'), 0);
+  assert.equal(countEventType(unrelatedFirstEvents, 'notification.created'), 0);
+  assert.equal(countEventType(unrelatedSecondEvents, 'notification.created'), 0);
+});

@@ -956,6 +956,8 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
   try {
     await client.query('BEGIN');
     let notificationId: string | null = null;
+    let notificationRecipientId: string | null = null;
+    let parentAuthorId: string | null = null;
 
     const pollResult = await client.query<{ id: string; author_id: string }>(
       `
@@ -975,9 +977,9 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
     }
 
     if (input.parentCommentId) {
-      const parentResult = await client.query<{ id: string }>(
+      const parentResult = await client.query<{ id: string; author_id: string }>(
         `
-          SELECT id
+          SELECT id, author_id
           FROM comments
           WHERE id = $1
             AND poll_id = $2
@@ -992,6 +994,7 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
         await client.query('ROLLBACK');
         return { status: 'not_found' as const };
       }
+      parentAuthorId = parentResult.rows[0]?.author_id ?? null;
     }
 
     const commentResult = await client.query<PollCommentRow>(
@@ -1037,14 +1040,27 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
       throw new Error('Comment insert did not return a row.');
     }
 
-    if (pollResult.rows[0].author_id !== input.authorId) {
+    if (input.parentCommentId) {
+      if (parentAuthorId && parentAuthorId !== input.authorId) {
+        notificationRecipientId = parentAuthorId;
+        notificationId = (await createNotification({
+          recipientUserId: parentAuthorId,
+          actorUserId: input.authorId,
+          type: 'comment_reply',
+          pollId: input.pollId,
+          commentId: comment.id,
+          deduplicationKey: `comment_reply:${comment.id}:${parentAuthorId}`
+        }, client)).id;
+      }
+    } else if (pollResult.rows[0].author_id !== input.authorId) {
+      notificationRecipientId = pollResult.rows[0].author_id;
       notificationId = (await createNotification({
-        recipientUserId: pollResult.rows[0].author_id,
+        recipientUserId: notificationRecipientId,
         actorUserId: input.authorId,
         type: 'comment',
         pollId: input.pollId,
         commentId: comment.id,
-        deduplicationKey: `comment:${comment.id}:${pollResult.rows[0].author_id}`
+        deduplicationKey: `comment:${comment.id}:${notificationRecipientId}`
       }, client)).id;
     }
 
@@ -1066,8 +1082,8 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
 
     await client.query('COMMIT');
 
-    if (notificationId) {
-      await publishNotificationAfterCommit(pollResult.rows[0].author_id, notificationId);
+    if (notificationId && notificationRecipientId) {
+      await publishNotificationAfterCommit(notificationRecipientId, notificationId);
     }
 
     return {

@@ -3342,3 +3342,119 @@ test('poll comment replies reject missing, cross-poll, deleted, and reply-level 
   assert.equal(deletedParentResponse.statusCode, 404, deletedParentResponse.body);
   assert.equal(deletedParentResponse.json<{ error: string }>().error, 'not_found');
 });
+
+test('comment_reply is stored for the root comment author with no comment body payload', async () => {
+  const pollAuthor = await registerTestUser();
+  const rootAuthor = await registerTestUser();
+  const replier = await registerTestUser();
+  const pollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(pollAuthor.accessToken),
+    payload: { question: 'Reply notification recipients', options: ['One', 'Two'] }
+  });
+  assert.equal(pollResponse.statusCode, 201, pollResponse.body);
+  const poll = pollResponse.json<PollResponse>().poll;
+  const rootResponse = await app.inject({
+    method: 'POST',
+    url: `/polls/${poll.id}/comments`,
+    headers: bearer(rootAuthor.accessToken),
+    payload: { body: 'Root author should receive replies.' }
+  });
+  assert.equal(rootResponse.statusCode, 201, rootResponse.body);
+  const root = rootResponse.json<CreateCommentResponse>().comment;
+  const replyBody = 'Sensitive reply text must not enter notification payloads.';
+  const replyResponse = await app.inject({
+    method: 'POST',
+    url: `/polls/${poll.id}/comments`,
+    headers: bearer(replier.accessToken),
+    payload: { body: replyBody, parentCommentId: root.id }
+  });
+  assert.equal(replyResponse.statusCode, 201, replyResponse.body);
+  const reply = replyResponse.json<CreateCommentResponse>().comment;
+  const notificationRows = await db.query<{
+    recipient_user_id: string;
+    actor_user_id: string | null;
+    type: string;
+    poll_id: string | null;
+    comment_id: string | null;
+    payload: Record<string, unknown>;
+  }>(
+    `SELECT recipient_user_id, actor_user_id, type, poll_id, comment_id, payload
+     FROM notifications WHERE comment_id = $1`,
+    [reply.id]
+  );
+  assert.equal(notificationRows.rows.length, 1);
+  assert.deepEqual(notificationRows.rows[0], {
+    recipient_user_id: rootAuthor.user.id,
+    actor_user_id: replier.user.id,
+    type: 'comment_reply',
+    poll_id: poll.id,
+    comment_id: reply.id,
+    payload: {}
+  });
+  assert.equal(JSON.stringify(notificationRows.rows[0]?.payload).includes(replyBody), false);
+});
+
+test('self replies and disabled in-app preferences persist without reply notifications', async () => {
+  const pollAuthor = await registerTestUser();
+  const selfReplyAuthor = await registerTestUser();
+  const disabledReplyAuthor = await registerTestUser();
+  const replyActor = await registerTestUser();
+  const pollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(pollAuthor.accessToken),
+    payload: { question: 'Reply notification suppression', options: ['One', 'Two'] }
+  });
+  assert.equal(pollResponse.statusCode, 201, pollResponse.body);
+  const poll = pollResponse.json<PollResponse>().poll;
+  const createRoot = async (author: AuthResponse, body: string) => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/polls/${poll.id}/comments`,
+      headers: bearer(author.accessToken),
+      payload: { body }
+    });
+    assert.equal(response.statusCode, 201, response.body);
+    return response.json<CreateCommentResponse>().comment;
+  };
+  const selfRoot = await createRoot(selfReplyAuthor, 'A comment I wrote.');
+  const selfReplyResponse = await app.inject({
+    method: 'POST',
+    url: `/polls/${poll.id}/comments`,
+    headers: bearer(selfReplyAuthor.accessToken),
+    payload: { body: 'I am replying to myself.', parentCommentId: selfRoot.id }
+  });
+  assert.equal(selfReplyResponse.statusCode, 201, selfReplyResponse.body);
+  const selfReply = selfReplyResponse.json<CreateCommentResponse>().comment;
+  assert.equal(selfReplyResponse.json<CreateCommentResponse>().poll.commentsCount, 2);
+  const selfNotifications = await db.query<{ count: string }>(
+    'SELECT count(*)::text AS count FROM notifications WHERE comment_id = $1',
+    [selfReply.id]
+  );
+  assert.equal(selfNotifications.rows[0]?.count, '0');
+
+  const disabledRoot = await createRoot(disabledReplyAuthor, 'In-app replies are disabled.');
+  const preferencesResponse = await app.inject({
+    method: 'PATCH',
+    url: '/notification-preferences',
+    headers: bearer(disabledReplyAuthor.accessToken),
+    payload: { comment_reply: { inApp: false } }
+  });
+  assert.equal(preferencesResponse.statusCode, 200, preferencesResponse.body);
+  const disabledReplyResponse = await app.inject({
+    method: 'POST',
+    url: `/polls/${poll.id}/comments`,
+    headers: bearer(replyActor.accessToken),
+    payload: { body: 'This reply should not notify.', parentCommentId: disabledRoot.id }
+  });
+  assert.equal(disabledReplyResponse.statusCode, 201, disabledReplyResponse.body);
+  const disabledReply = disabledReplyResponse.json<CreateCommentResponse>().comment;
+  assert.equal(disabledReplyResponse.json<CreateCommentResponse>().poll.commentsCount, 4);
+  const disabledNotifications = await db.query<{ count: string }>(
+    'SELECT count(*)::text AS count FROM notifications WHERE comment_id = $1',
+    [disabledReply.id]
+  );
+  assert.equal(disabledNotifications.rows[0]?.count, '0');
+});
