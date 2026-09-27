@@ -74,4 +74,39 @@ void main() {
     await tester.tap(find.text('Notifications'));
     expect(opened, isTrue);
   });
+
+  testWidgets('caps large notification badges with an accessible 99 plus label',
+      (tester) async {
+    const user = AuthUser(
+      id: 'user-1',
+      email: 'user@example.com',
+      username: 'user',
+      status: 'active',
+      profile: AuthUserProfile(
+        displayName: 'User',
+        pollsCount: 0,
+        followersCount: 0,
+        followingCount: 0,
+      ),
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: MainBottomNavigation(
+          user: user,
+          selectedIndex: 0,
+          unreadNotifications: 100,
+          onCreate: () {},
+          onSelected: (_) {},
+        ),
+      ),
+    ));
+
+    expect(find.text('99+'), findsOneWidget);
+    final badgeSemantics = tester.widget<Semantics>(
+      find.byKey(const ValueKey('notification-badge-semantics')),
+    );
+    expect(badgeSemantics.properties.label, '99+ unread notifications');
+    expect(find.text('100'), findsNothing);
+  });
 }

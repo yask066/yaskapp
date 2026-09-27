@@ -10,7 +10,8 @@ import '../notifications/notification_store.dart';
 import 'realtime_client.dart';
 
 typedef RealtimeClientFactory = RealtimeClient Function(String accessToken);
-typedef NotificationStoreFactory = NotificationStore Function(String accessToken);
+typedef NotificationStoreFactory = NotificationStore Function(
+    String accessToken);
 typedef ReconnectJitter = Duration Function(Duration maxJitter);
 
 class RealtimeSession with WidgetsBindingObserver {
@@ -21,8 +22,8 @@ class RealtimeSession with WidgetsBindingObserver {
     this.reconnectMaxDelay = const Duration(seconds: 30),
     ReconnectJitter? jitter,
     math.Random? random,
-  })  : _clientFactory = clientFactory ??
-            ((token) => RealtimeClient(accessToken: token)),
+  })  : _clientFactory =
+            clientFactory ?? ((token) => RealtimeClient(accessToken: token)),
         _storeFactory = storeFactory ??
             ((token) => NotificationStore(
                   apiClient: NotificationsApiClient(),
@@ -79,7 +80,7 @@ class RealtimeSession with WidgetsBindingObserver {
     });
     _notificationSubscription = _client!.notifications.listen((event) {
       if (epoch != _epoch) return;
-      _store?.receiveNew(event.notification, unreadCount: event.unreadCount, atTop: true);
+      _store?.receiveNew(event.notification, unreadCount: event.unreadCount);
       _notificationsController.add(
         NotificationItemEvent(
           notification: event.notification,
@@ -147,7 +148,8 @@ class RealtimeSession with WidgetsBindingObserver {
     final jitter = _jitter?.call(maxJitter) ??
         (maxJitter == Duration.zero
             ? Duration.zero
-            : Duration(microseconds: _random.nextInt(maxJitter.inMicroseconds + 1)));
+            : Duration(
+                microseconds: _random.nextInt(maxJitter.inMicroseconds + 1)));
     _reconnectTimer = Timer(delay + jitter, () {
       _reconnectTimer = null;
       if (epoch == _epoch) _client?.connect();
@@ -162,7 +164,8 @@ class RealtimeSession with WidgetsBindingObserver {
 }
 
 class NotificationItemEvent {
-  const NotificationItemEvent({required this.notification, required this.unreadCount});
+  const NotificationItemEvent(
+      {required this.notification, required this.unreadCount});
 
   final NotificationItem notification;
   final int unreadCount;

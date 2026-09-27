@@ -10,7 +10,6 @@ import '../polls/polls_api_client.dart';
 import '../profile/profile_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import '../notifications/notifications_screen.dart';
-import '../notifications/notifications_api_client.dart';
 import '../notifications/notification_store.dart';
 import '../realtime/realtime_session.dart';
 
@@ -23,9 +22,7 @@ class HomeScreen extends StatefulWidget {
     required this.realtimeSession,
     super.key,
     PollsApiClient? pollsApiClient,
-    NotificationsApiClient? notificationsApiClient,
-  })  : _pollsApiClient = pollsApiClient,
-        _notificationsApiClient = notificationsApiClient;
+  }) : _pollsApiClient = pollsApiClient;
 
   final AuthSession session;
   final AuthApiClient authApiClient;
@@ -33,7 +30,6 @@ class HomeScreen extends StatefulWidget {
   final ValueChanged<AuthUser> onUserUpdated;
   final RealtimeSession realtimeSession;
   final PollsApiClient? _pollsApiClient;
-  final NotificationsApiClient? _notificationsApiClient;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -44,8 +40,6 @@ class _HomeScreenState extends State<HomeScreen> {
   var _unreadNotifications = 0;
   late final PollsApiClient _pollsApiClient;
   late final bool _ownsPollsApiClient;
-  late final NotificationsApiClient _notificationsApiClientInstance;
-  late final bool _ownsNotificationsApiClient;
   late final NotificationStore _notificationStore;
   final _feedKey = GlobalKey<FeedScreenState>();
   final _profileKey = GlobalKey<ProfileScreenState>();
@@ -55,9 +49,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _ownsPollsApiClient = widget._pollsApiClient == null;
     _pollsApiClient = widget._pollsApiClient ?? PollsApiClient();
-    _ownsNotificationsApiClient = widget._notificationsApiClient == null;
-    _notificationsApiClientInstance =
-        widget._notificationsApiClient ?? NotificationsApiClient();
     _notificationStore = widget.realtimeSession.notificationStore;
     _unreadNotifications = _notificationStore.state.unreadCount;
     _notificationStore.addListener(_handleNotificationStoreChanged);
@@ -67,9 +58,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     if (_ownsPollsApiClient) {
       _pollsApiClient.close();
-    }
-    if (_ownsNotificationsApiClient) {
-      _notificationsApiClientInstance.close();
     }
     _notificationStore.removeListener(_handleNotificationStoreChanged);
     super.dispose();
@@ -112,10 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
             realtimeClient: widget.realtimeSession.realtimeClient,
           ),
           NotificationsScreen(
-            session: widget.session,
             isActive: _selectedIndex == 2,
-            apiClient: _notificationsApiClientInstance,
-            realtimeClient: widget.realtimeSession.realtimeClient,
             notificationStore: _notificationStore,
           ),
           ProfileScreen(
@@ -151,6 +136,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class MainBottomNavigation extends StatelessWidget {
   const MainBottomNavigation({
+    super.key,
     required this.user,
     required this.selectedIndex,
     required this.onSelected,
@@ -270,19 +256,34 @@ class _NavItem extends StatelessWidget {
                   Positioned(
                     right: -12,
                     top: -8,
-                    child: Container(
-                      constraints:
-                          const BoxConstraints(minWidth: 16, minHeight: 16),
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      decoration: BoxDecoration(
+                    child: Semantics(
+                      key: const ValueKey('notification-badge-semantics'),
+                      container: true,
+                      label:
+                          '${badgeCount > 99 ? '99+' : badgeCount} unread notifications',
+                      liveRegion: true,
+                      child: Container(
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(
                           color: const Color(0xFFD92D20),
-                          borderRadius: BorderRadius.circular(10)),
-                      child: Text(badgeCount > 99 ? '99+' : '$badgeCount',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: ExcludeSemantics(
+                          child: Text(
+                            badgeCount > 99 ? '99+' : '$badgeCount',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 9,
-                              fontWeight: FontWeight.w700)),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
               ],

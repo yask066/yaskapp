@@ -2,180 +2,180 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../auth/auth_session.dart';
 import '../../core/widgets/user_avatar.dart';
-import '../realtime/realtime_client.dart';
+import 'notification_model.dart';
 import 'notification_store.dart';
-import 'notifications_api_client.dart';
 
 class NotificationsScreen extends StatefulWidget {
-  const NotificationsScreen(
-      {required this.session,
-      this.isActive = false,
-      this.apiClient,
-      this.realtimeClient,
-      this.notificationStore,
-      this.onUnreadCountChanged,
-      super.key});
-  final AuthSession session;
+  const NotificationsScreen({
+    required this.notificationStore,
+    this.isActive = false,
+    super.key,
+  });
+
+  final NotificationStore notificationStore;
   final bool isActive;
-  final NotificationsApiClient? apiClient;
-  final RealtimeClient? realtimeClient;
-  final NotificationStore? notificationStore;
-  final ValueChanged<int>? onUnreadCountChanged;
+
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  late final NotificationsApiClient _apiClient;
-  late final RealtimeClient _realtimeClient;
-  late final bool _ownsApiClient;
-  late final bool _ownsRealtimeClient;
-  final _items = <NotificationSummary>[];
-  String? _nextCursor;
-  Object? _error;
-  bool _loading = true;
+  final _scrollController = ScrollController();
+  bool _loading = false;
   bool _loadingMore = false;
-  StreamSubscription<NotificationRealtimeEvent>? _realtimeSubscription;
+  bool _unreadOnly = false;
+  bool _requestedFirstPage = false;
+  bool _retryFirstPage = false;
+  bool _fillingUnreadPages = false;
 
   @override
   void initState() {
     super.initState();
-    _ownsApiClient = widget.apiClient == null;
-    _apiClient = widget.apiClient ?? NotificationsApiClient();
-    _ownsRealtimeClient = widget.realtimeClient == null;
-    _realtimeClient = widget.realtimeClient ??
-        RealtimeClient(accessToken: widget.session.accessToken);
-    if (widget.notificationStore == null) {
-      _realtimeSubscription =
-          _realtimeClient.notifications.listen(_handleRealtimeNotification);
-      _realtimeClient.connect();
-    } else {
-      widget.notificationStore!.addListener(_handleStoreChanged);
-    }
-    if (widget.isActive) {
-      unawaited(_load());
-    }
+    _scrollController.addListener(_handleScroll);
+    widget.notificationStore.addListener(_handleStoreChanged);
+    widget.notificationStore.setInboxAtTop(true);
+    if (widget.isActive) unawaited(_loadFirstPage());
   }
 
   @override
   void didUpdateWidget(covariant NotificationsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.notificationStore != widget.notificationStore) {
+      oldWidget.notificationStore.removeListener(_handleStoreChanged);
+      widget.notificationStore.addListener(_handleStoreChanged);
+      widget.notificationStore.setInboxAtTop(
+        !_scrollController.hasClients || _scrollController.offset <= 1,
+      );
+      _requestedFirstPage = false;
+    }
     if (shouldLoadNotifications(
-        isActive: widget.isActive, wasActive: oldWidget.isActive)) {
-      unawaited(_load());
+      isActive: widget.isActive,
+      wasActive: oldWidget.isActive,
+    )) {
+      unawaited(_loadFirstPage());
     }
   }
 
   @override
   void dispose() {
-    unawaited(_realtimeSubscription?.cancel());
-    widget.notificationStore?.removeListener(_handleStoreChanged);
-    if (_ownsRealtimeClient) unawaited(_realtimeClient.close());
-    if (_ownsApiClient) _apiClient.close();
+    widget.notificationStore.removeListener(_handleStoreChanged);
+    _scrollController.dispose();
     super.dispose();
   }
 
   void _handleStoreChanged() {
-    if (mounted) widget.onUnreadCountChanged?.call(widget.notificationStore!.state.unreadCount);
+    if (!mounted) return;
+    setState(() {});
+    _resumeUnreadFill();
   }
 
-  Future<void> _load({bool append = false}) async {
-    if (append && _loadingMore) return;
+  Future<void> _loadFirstPage({bool refresh = false}) async {
+    if (_loading) return;
+    final store = widget.notificationStore;
+    if (!refresh && _requestedFirstPage) return;
+    if (!refresh && store.state.ids.isNotEmpty) {
+      _requestedFirstPage = true;
+      return;
+    }
+
+    _requestedFirstPage = true;
+    setState(() => _loading = true);
+    await store.loadFirstPage();
+    if (!mounted) return;
     setState(() {
-      if (append)
-        _loadingMore = true;
-      else {
-        _loading = true;
-        _error = null;
-      }
+      _loading = false;
+      _retryFirstPage = refresh && store.state.error != null;
     });
+    _resumeUnreadFill();
+  }
+
+  Future<void> _loadNextPage() async {
+    final store = widget.notificationStore;
+    if (store.state.nextCursor == null) return;
+    if (!_loadingMore) setState(() => _loadingMore = true);
     try {
-      final page = await _apiClient.list(
-          accessToken: widget.session.accessToken,
-          cursor: append ? _nextCursor : null);
-      if (!mounted) return;
-      setState(() {
-        if (!append) _items.clear();
-        final ids = _items.map((item) => item.id).toSet();
-        _items.addAll(page.items.where((item) => ids.add(item.id)));
-        _nextCursor = page.nextCursor;
-        _loading = false;
-        _loadingMore = false;
-      });
-      if (!widget.isActive) return;
-      widget.onUnreadCountChanged?.call(page.unreadCount);
-      if (!append && page.unreadCount > 0) {
-        await _markAllRead();
+      await store.loadNextPage();
+    } finally {
+      if (mounted && _loadingMore) {
+        setState(() {
+          _loadingMore = false;
+          _retryFirstPage = false;
+        });
       }
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _loadingMore = false;
-        _error = error;
-      });
+      _resumeUnreadFill();
     }
   }
 
-  void _handleRealtimeNotification(NotificationRealtimeEvent event) {
-    final item = NotificationSummary.fromJson(event.payload);
-    if (_items.every((existing) => existing.id != item.id))
-      setState(() => _items.insert(0, item));
-    widget.onUnreadCountChanged?.call(event.unreadCount);
+  void _setUnreadFilter(bool unreadOnly) {
+    setState(() => _unreadOnly = unreadOnly);
+    _resumeUnreadFill();
   }
 
-  Future<void> _markRead(NotificationSummary item) async {
-    if (!item.isUnread) return;
+  void _resumeUnreadFill() {
+    final store = widget.notificationStore;
+    if (_unreadOnly &&
+        !_loading &&
+        !_loadingMore &&
+        _visibleItems(store.state).isEmpty &&
+        store.state.unreadCount > 0 &&
+        store.state.nextCursor != null &&
+        store.state.error == null) {
+      unawaited(_loadUnreadUntilFound());
+    }
+  }
+
+  Future<void> _loadUnreadUntilFound() async {
+    if (_fillingUnreadPages) return;
+    final store = widget.notificationStore;
+    _fillingUnreadPages = true;
     try {
-      await _apiClient.markRead(
-          accessToken: widget.session.accessToken, id: item.id);
-      if (!mounted) return;
-      setState(() {
-        final index = _items.indexWhere((candidate) => candidate.id == item.id);
-        if (index >= 0)
-          _items[index] = NotificationSummary(
-              id: item.id,
-              type: item.type,
-              actor: item.actor,
-              pollId: item.pollId,
-              commentId: item.commentId,
-              readAt: DateTime.now(),
-              createdAt: item.createdAt,
-              isTargetAvailable: item.isTargetAvailable);
-      });
-      widget.onUnreadCountChanged
-          ?.call(_items.where((candidate) => candidate.isUnread).length);
-    } catch (_) {}
+      while (mounted &&
+          _unreadOnly &&
+          _visibleItems(store.state).isEmpty &&
+          store.state.unreadCount > 0 &&
+          store.state.nextCursor != null &&
+          store.state.error == null) {
+        await _loadNextPage();
+      }
+    } finally {
+      _fillingUnreadPages = false;
+      if (mounted) setState(() {});
+    }
   }
 
-  Future<void> _markAllRead() async {
-    try {
-      final count =
-          await _apiClient.markAllRead(accessToken: widget.session.accessToken);
-      if (!mounted) return;
-      setState(() {
-        for (var i = 0; i < _items.length; i++) {
-          final item = _items[i];
-          _items[i] = NotificationSummary(
-              id: item.id,
-              type: item.type,
-              actor: item.actor,
-              pollId: item.pollId,
-              commentId: item.commentId,
-              readAt: item.readAt ?? DateTime.now(),
-              createdAt: item.createdAt,
-              isTargetAvailable: item.isTargetAvailable);
-        }
-      });
-      widget.onUnreadCountChanged?.call(count);
-    } catch (_) {}
+  void _handleScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    widget.notificationStore.setInboxAtTop(position.pixels <= 1);
+    if (position.extentAfter < 240 &&
+        widget.notificationStore.state.nextCursor != null &&
+        !_loadingMore) {
+      unawaited(_loadNextPage());
+    }
   }
 
-  Future<void> _openDetails(NotificationSummary item) async {
-    await _markRead(item);
-    if (!mounted) return;
+  Future<void> _materializePendingAtTop() async {
+    if (_scrollController.hasClients) {
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _scrollController.jumpTo(0);
+      } else {
+        await _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOut,
+        );
+      }
+    }
+    widget.notificationStore.materializePending();
+  }
+
+  void _markAllRead() {
+    unawaited(widget.notificationStore.markAllRead());
+  }
+
+  Future<void> _openDetails(NotificationItem item) async {
+    if (item.isUnread) unawaited(widget.notificationStore.markRead(item.id));
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -205,7 +205,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             const SizedBox(height: 12),
             _DetailRow(label: 'Type', value: _typeLabel(item.type)),
             _DetailRow(label: 'Related to', value: item.targetLabel),
-            _DetailRow(label: 'Created', value: _dateTime(item.createdAt)),
+            _DetailRow(
+                label: 'Created', value: _dateTime(item.createdAt.toLocal())),
             if (!item.isTargetAvailable)
               const Padding(
                 padding: EdgeInsets.only(top: 12),
@@ -217,67 +218,133 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
+  List<NotificationItem> _visibleItems(NotificationStoreState state) =>
+      state.ids
+          .map((id) => state.itemsById[id])
+          .whereType<NotificationItem>()
+          .where((item) => !_unreadOnly || item.isUnread)
+          .toList(growable: false);
+
   @override
   Widget build(BuildContext context) {
+    final state = widget.notificationStore.state;
+    final visibleItems = _visibleItems(state);
+    final sections = _groupedSections(visibleItems);
+    final isInitialLoading = _loading && state.ids.isEmpty;
+    final isInitialError =
+        state.error != null && state.ids.isEmpty && !_loading;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FC),
       body: SafeArea(
         bottom: false,
-        child: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? _ErrorState(onRetry: _load)
-              : _items.isEmpty
-                  ? const _EmptyState()
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      child: NotificationListener<ScrollNotification>(
-                        onNotification: (notification) {
-                          if (notification.metrics.extentAfter < 240 &&
-                              _nextCursor != null &&
-                              !_loadingMore) {
-                            unawaited(_load(append: true));
-                          }
-                          return false;
-                        },
-                        child: ListView(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                          children: [
-                            _NotificationsHeader(onMarkAllRead: _markAllRead),
-                            const SizedBox(height: 28),
-                            for (final section in _groupedSections()) ...[
-                              _NotificationSection(
-                                title: section.$1,
-                                items: section.$2,
-                                onTap: _openDetails,
-                              ),
-                              const SizedBox(height: 24),
-                            ],
-                            if (_loadingMore)
-                              const Padding(
-                                padding: EdgeInsets.all(24),
-                                child:
-                                    Center(child: CircularProgressIndicator()),
-                              ),
-                          ],
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: _NotificationsHeader(
+                onMarkAllRead: _markAllRead,
+                canMarkAllRead: state.unreadCount > 0,
+                isMarkAllPending: state.isMarkAllPending,
+              ),
+            ),
+            if (state.isMarkAllPending)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: LinearProgressIndicator(
+                  key: ValueKey('read-all-pending'),
+                  minHeight: 3,
+                  semanticsLabel: 'Marking all notifications read',
+                ),
+              ),
+            if (state.readAllError != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: _ReadAllError(onRetry: _markAllRead),
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: _NotificationFilters(
+                unreadOnly: _unreadOnly,
+                onChanged: _setUnreadFilter,
+              ),
+            ),
+            if (_loadingMore)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: LinearProgressIndicator(
+                  key: ValueKey('notifications-loading-more'),
+                  minHeight: 3,
+                  semanticsLabel: 'Loading more notifications',
+                ),
+              ),
+            if (state.pendingIds.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: _PendingNotificationsBanner(
+                  count: state.pendingIds.length,
+                  onTap: _materializePendingAtTop,
+                ),
+              ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () => _loadFirstPage(refresh: true),
+                child: ListView(
+                  controller: _scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
+                  children: [
+                    if (isInitialLoading)
+                      const _NotificationsLoading()
+                    else if (isInitialError)
+                      _ErrorState(onRetry: () => _loadFirstPage(refresh: true))
+                    else if (state.ids.isEmpty)
+                      const _EmptyState()
+                    else if (visibleItems.isEmpty &&
+                        _unreadOnly &&
+                        state.unreadCount > 0 &&
+                        state.nextCursor != null)
+                      _UnreadSearchState(isError: state.error != null)
+                    else if (visibleItems.isEmpty)
+                      const _FilteredEmptyState()
+                    else
+                      for (final section in sections) ...[
+                        _NotificationSection(
+                          title: section.$1,
+                          items: section.$2,
+                          onTap: _openDetails,
                         ),
-                      ),
-                    ),
+                        const SizedBox(height: 24),
+                      ],
+                    if (state.error != null && state.ids.isNotEmpty)
+                      _PageError(onRetry: _retryData),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  List<(String, List<NotificationSummary>)> _groupedSections() {
+  Future<void> _retryData() {
+    return _retryFirstPage || widget.notificationStore.state.nextCursor == null
+        ? _loadFirstPage(refresh: true)
+        : _loadNextPage();
+  }
+
+  List<(String, List<NotificationItem>)> _groupedSections(
+      List<NotificationItem> items) {
     final now = DateTime.now();
-    final today = <NotificationSummary>[];
-    final yesterday = <NotificationSummary>[];
-    final earlier = <NotificationSummary>[];
-    for (final item in _items) {
-      final date = item.createdAt;
-      final difference = DateTime(now.year, now.month, now.day)
-          .difference(DateTime(date.year, date.month, date.day))
-          .inDays;
-      if (difference == 0) {
+    final today = <NotificationItem>[];
+    final yesterday = <NotificationItem>[];
+    final earlier = <NotificationItem>[];
+    for (final item in items) {
+      final date = item.createdAt.toLocal();
+      final difference =
+          DateUtils.dateOnly(now).difference(DateUtils.dateOnly(date)).inDays;
+      if (difference <= 0) {
         today.add(item);
       } else if (difference == 1) {
         yesterday.add(item);
@@ -301,33 +368,15 @@ String notificationAgeLabel(DateTime value, {DateTime? now}) {
   final seconds = (now ?? DateTime.now()).difference(value).inSeconds;
   final ageInSeconds = seconds < 0 ? 0 : seconds;
 
-  if (ageInSeconds < 60) {
-    return _ageLabel(ageInSeconds, 'second');
-  }
-
+  if (ageInSeconds < 60) return _ageLabel(ageInSeconds, 'second');
   final minutes = ageInSeconds ~/ 60;
-  if (minutes < 60) {
-    return _ageLabel(minutes, 'minute');
-  }
-
+  if (minutes < 60) return _ageLabel(minutes, 'minute');
   final hours = minutes ~/ 60;
-  if (hours < 24) {
-    return _ageLabel(hours, 'hour');
-  }
-
+  if (hours < 24) return _ageLabel(hours, 'hour');
   final days = hours ~/ 24;
-  if (days < 7) {
-    return _ageLabel(days, 'day');
-  }
-
-  if (days < 30) {
-    return _ageLabel(days ~/ 7, 'week');
-  }
-
-  if (days < 365) {
-    return _ageLabel(days ~/ 30, 'month');
-  }
-
+  if (days < 7) return _ageLabel(days, 'day');
+  if (days < 30) return _ageLabel(days ~/ 7, 'week');
+  if (days < 365) return _ageLabel(days ~/ 30, 'month');
   return _ageLabel(days ~/ 365, 'year');
 }
 
@@ -342,8 +391,8 @@ class _NotificationSection extends StatelessWidget {
   });
 
   final String title;
-  final List<NotificationSummary> items;
-  final ValueChanged<NotificationSummary> onTap;
+  final List<NotificationItem> items;
+  final ValueChanged<NotificationItem> onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -369,7 +418,10 @@ class _NotificationSection extends StatelessWidget {
           child: Column(
             children: [
               for (var index = 0; index < items.length; index++) ...[
-                _NotificationTile(item: items[index], onTap: () => onTap(items[index])),
+                _NotificationTile(
+                  item: items[index],
+                  onTap: () => onTap(items[index]),
+                ),
                 if (index < items.length - 1)
                   const Divider(height: 1, indent: 84, endIndent: 16),
               ],
@@ -383,81 +435,116 @@ class _NotificationSection extends StatelessWidget {
 
 class _NotificationTile extends StatelessWidget {
   const _NotificationTile({required this.item, required this.onTap});
-  final NotificationSummary item;
+
+  final NotificationItem item;
   final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) {
     final actor = item.actor?.displayName ?? 'Someone';
-    final accent = _notificationAccent(item.type);
-    return InkWell(
-      key: ValueKey('notification-card-${item.id}'),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                UserAvatar(
-                  displayName: actor,
-                  username: item.actor?.username ?? 'unknown',
-                  imageUrl: item.actor?.avatarUrl,
-                  key: ValueKey('notification-avatar-${item.id}'),
-                  radius: 26,
-                ),
-                Positioned(
-                  right: -7,
-                  bottom: -5,
-                  child: Container(
-                    key: ValueKey('notification-event-${item.type}'),
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: accent,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: Icon(_notificationIcon(item.type), color: Colors.white, size: 16),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(width: 22),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    final accent = _notificationAccent(item.type.wireName);
+    final background = item.isUnread ? const Color(0xFFEEF4FF) : Colors.white;
+    return Semantics(
+      key: ValueKey('notification-card-semantics-${item.id}'),
+      container: true,
+      button: true,
+      label: '${item.title}${item.isUnread ? ', unread notification' : ''}',
+      child: InkWell(
+        key: ValueKey('notification-card-${item.id}'),
+        onTap: onTap,
+        child: Container(
+          key: ValueKey('notification-card-background-${item.id}'),
+          decoration: BoxDecoration(color: background),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  _NotificationTitle(item: item),
-                  const SizedBox(height: 7),
-                  Text(item.detail,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Color(0xFF667085), fontSize: 14, height: 1.25)),
-                  const SizedBox(height: 8),
-                  Text(notificationAgeLabel(item.createdAt),
-                      style: const TextStyle(color: Color(0xFF667085), fontSize: 13)),
+                  UserAvatar(
+                    displayName: actor,
+                    username: item.actor?.username ?? 'unknown',
+                    imageUrl: item.actor?.avatarUrl,
+                    key: ValueKey('notification-avatar-${item.id}'),
+                    radius: 26,
+                  ),
+                  Positioned(
+                    right: -7,
+                    bottom: -5,
+                    child: Container(
+                      key: ValueKey('notification-event-${item.type.wireName}'),
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: accent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: Icon(
+                        _notificationIcon(item.type.wireName),
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
                 ],
               ),
-            ),
-            const SizedBox(width: 10),
-            if (item.isUnread) ...[
-              const SizedBox(width: 9),
-              const Icon(Icons.circle, size: 10, color: Color(0xFF2F6FED)),
+              const SizedBox(width: 22),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _NotificationTitle(item: item),
+                    const SizedBox(height: 7),
+                    Text(
+                      item.detail,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF475467),
+                        fontSize: 14,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Tooltip(
+                      message: _dateTime(item.createdAt.toLocal()),
+                      child: Text(
+                        notificationAgeLabel(item.createdAt.toLocal()),
+                        key: ValueKey('notification-age-${item.id}'),
+                        style: const TextStyle(
+                          color: Color(0xFF475467),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              if (item.isUnread)
+                Semantics(
+                  label: 'Unread notification',
+                  child: const Icon(
+                    Icons.circle,
+                    key: ValueKey('notification-unread-marker'),
+                    size: 10,
+                    color: Color(0xFF2F6FED),
+                  ),
+                ),
             ],
-          ],
+          ),
         ),
       ),
     );
   }
-
 }
 
 class _NotificationTitle extends StatelessWidget {
   const _NotificationTitle({required this.item});
 
-  final NotificationSummary item;
+  final NotificationItem item;
 
   @override
   Widget build(BuildContext context) {
@@ -470,13 +557,19 @@ class _NotificationTitle extends StatelessWidget {
     );
     final actorIndex = item.title.indexOf(actorName);
     if (actorIndex < 0) {
-      return Text(item.title,
-          maxLines: 2, overflow: TextOverflow.ellipsis, style: titleStyle);
+      return Text(
+        item.title,
+        key: ValueKey('notification-title-${item.id}'),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: titleStyle,
+      );
     }
 
     final actorEnd = actorIndex + actorName.length;
-    final accent = _notificationAccent(item.type);
+    final accent = _notificationAccent(item.type.wireName);
     return RichText(
+      key: ValueKey('notification-title-${item.id}'),
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
       text: TextSpan(
@@ -496,7 +589,7 @@ class _NotificationTitle extends StatelessWidget {
                 actorName,
                 key: ValueKey('notification-actor-${item.id}'),
                 style: titleStyle.copyWith(
-                  color: accent,
+                  color: const Color(0xFF101828),
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -510,8 +603,15 @@ class _NotificationTitle extends StatelessWidget {
 }
 
 class _NotificationsHeader extends StatelessWidget {
-  const _NotificationsHeader({required this.onMarkAllRead});
+  const _NotificationsHeader({
+    required this.onMarkAllRead,
+    required this.canMarkAllRead,
+    required this.isMarkAllPending,
+  });
+
   final VoidCallback onMarkAllRead;
+  final bool canMarkAllRead;
+  final bool isMarkAllPending;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -525,21 +625,248 @@ class _NotificationsHeader extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Expanded(child: Text('Notifications', style: TextStyle(color: Color(0xFF101828), fontSize: 20, fontWeight: FontWeight.w700))),
+            const Expanded(
+              child: Text(
+                'Notifications',
+                style: TextStyle(
+                  color: Color(0xFF101828),
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
             PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, size: 28, color: Color(0xFF101828)),
+              enabled: canMarkAllRead && !isMarkAllPending,
+              icon: const Icon(Icons.more_vert,
+                  size: 28, color: Color(0xFF101828)),
               onSelected: (_) => onMarkAllRead(),
-              itemBuilder: (_) => const [PopupMenuItem(value: 'read', child: Text('Mark all as read'))],
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'read', child: Text('Mark all as read')),
+              ],
             ),
           ],
         ),
       );
 }
 
+class _NotificationFilters extends StatelessWidget {
+  const _NotificationFilters({
+    required this.unreadOnly,
+    required this.onChanged,
+  });
+
+  final bool unreadOnly;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+        spacing: 8,
+        children: [
+          ChoiceChip(
+            label: const Text('All'),
+            selected: !unreadOnly,
+            onSelected: (_) => onChanged(false),
+          ),
+          ChoiceChip(
+            label: const Text('Unread'),
+            selected: unreadOnly,
+            onSelected: (_) => onChanged(true),
+          ),
+        ],
+      );
+}
+
+class _PendingNotificationsBanner extends StatelessWidget {
+  const _PendingNotificationsBanner({
+    required this.count,
+    required this.onTap,
+  });
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: const Color(0xFFEAF1FF),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.arrow_upward, size: 18),
+                  const SizedBox(width: 8),
+                  Text('New notifications ($count)'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+class _NotificationsLoading extends StatelessWidget {
+  const _NotificationsLoading();
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        key: const ValueKey('notifications-loading-semantics'),
+        container: true,
+        label: 'Loading notifications',
+        liveRegion: true,
+        child: const Column(
+          children: [
+            _NotificationSkeleton(),
+            SizedBox(height: 12),
+            _NotificationSkeleton(),
+          ],
+        ),
+      );
+}
+
+class _NotificationSkeleton extends StatelessWidget {
+  const _NotificationSkeleton();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        height: 104,
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE4E7EC),
+          borderRadius: BorderRadius.circular(14),
+        ),
+      );
+}
+
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
+
   @override
-  Widget build(BuildContext context) => const Center(child: Text('No notifications yet', style: TextStyle(color: Color(0xFF667085))));
+  Widget build(BuildContext context) => const SizedBox(
+        height: 240,
+        child: Center(
+          child: Text(
+            'No notifications yet',
+            style: TextStyle(color: Color(0xFF475467)),
+          ),
+        ),
+      );
+}
+
+class _FilteredEmptyState extends StatelessWidget {
+  const _FilteredEmptyState();
+
+  @override
+  Widget build(BuildContext context) => const SizedBox(
+        height: 200,
+        child: Center(
+          child: Text(
+            'No unread notifications',
+            style: TextStyle(color: Color(0xFF475467)),
+          ),
+        ),
+      );
+}
+
+class _UnreadSearchState extends StatelessWidget {
+  const _UnreadSearchState({required this.isError});
+
+  final bool isError;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: 180,
+        child: Center(
+          child: isError
+              ? const Text('Could not load unread notifications')
+              : Semantics(
+                  label: 'Loading unread notifications',
+                  liveRegion: true,
+                  child: const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 12),
+                      Text('Looking for unread notifications'),
+                    ],
+                  ),
+                ),
+        ),
+      );
+}
+
+class _ReadAllError extends StatelessWidget {
+  const _ReadAllError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => MaterialBanner(
+        content: const Text('Could not mark all as read'),
+        actions: [TextButton(onPressed: onRetry, child: const Text('Retry'))],
+      );
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: 240,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Could not load notifications'),
+              const SizedBox(height: 12),
+              FilledButton(onPressed: onRetry, child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+}
+
+class _PageError extends StatelessWidget {
+  const _PageError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            const Expanded(child: Text('Could not load notifications')),
+            TextButton(onPressed: onRetry, child: const Text('Retry')),
+          ],
+        ),
+      );
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(width: 92, child: Text(label)),
+            Expanded(child: Text(value)),
+          ],
+        ),
+      );
 }
 
 Color _notificationAccent(String type) => switch (type) {
@@ -557,45 +884,14 @@ IconData _notificationIcon(String type) => switch (type) {
       _ => Icons.notifications,
     };
 
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.label, required this.value});
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(width: 92, child: Text(label)),
-            Expanded(child: Text(value)),
-          ],
-        ),
-      );
-}
-
-String _typeLabel(String type) => switch (type) {
-      'poll_vote' => 'Poll vote',
-      'comment' => 'Comment',
-      'comment_reply' => 'Comment reply',
-      'follow' => 'New follower',
-      'like' => 'Like',
-      _ => 'Activity',
+String _typeLabel(NotificationType type) => switch (type) {
+      NotificationType.pollVote => 'Poll vote',
+      NotificationType.comment => 'Comment',
+      NotificationType.commentReply => 'Comment reply',
+      NotificationType.follow => 'New follower',
+      NotificationType.like => 'Like',
     };
 
 String _dateTime(DateTime value) =>
     '${value.day.toString().padLeft(2, '0')}.${value.month.toString().padLeft(2, '0')}.${value.year} '
     '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.onRetry});
-  final VoidCallback onRetry;
-  @override
-  Widget build(BuildContext context) => Center(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Text('Could not load notifications'),
-        const SizedBox(height: 12),
-        FilledButton(onPressed: onRetry, child: const Text('Retry'))
-      ]));
-}
