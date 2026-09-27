@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/widgets/user_avatar.dart';
 import 'notification_model.dart';
+import 'notification_navigator.dart';
 import 'notification_store.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -174,48 +175,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     unawaited(widget.notificationStore.markAllRead());
   }
 
-  Future<void> _openDetails(NotificationItem item) async {
-    if (item.isUnread) unawaited(widget.notificationStore.markRead(item.id));
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                UserAvatar(
-                  displayName: item.actor?.displayName ?? 'Someone',
-                  username: item.actor?.username ?? 'unknown',
-                  imageUrl: item.actor?.avatarUrl,
-                  radius: 24,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(item.title,
-                      style: Theme.of(context).textTheme.titleMedium),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Text(item.detail),
-            const SizedBox(height: 12),
-            _DetailRow(label: 'Type', value: _typeLabel(item.type)),
-            _DetailRow(label: 'Related to', value: item.targetLabel),
-            _DetailRow(
-                label: 'Created', value: _dateTime(item.createdAt.toLocal())),
-            if (!item.isTargetAvailable)
-              const Padding(
-                padding: EdgeInsets.only(top: 12),
-                child: Text('The related content is no longer available.'),
-              ),
-          ],
-        ),
-      ),
-    );
+  Future<void> _openNotification(NotificationItem item) async {
+    if (item.isUnread) {
+      unawaited(widget.notificationStore.markRead(item.id));
+    }
+    await openNotificationTarget(context, item);
   }
 
   List<NotificationItem> _visibleItems(NotificationStoreState state) =>
@@ -312,7 +276,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         _NotificationSection(
                           title: section.$1,
                           items: section.$2,
-                          onTap: _openDetails,
+                          onTap: _openNotification,
                         ),
                         const SizedBox(height: 24),
                       ],
@@ -850,25 +814,6 @@ class _PageError extends StatelessWidget {
       );
 }
 
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(width: 92, child: Text(label)),
-            Expanded(child: Text(value)),
-          ],
-        ),
-      );
-}
-
 Color _notificationAccent(String type) => switch (type) {
       'comment' || 'comment_reply' => const Color(0xFF2F6FED),
       'like' => const Color(0xFFF45B69),
@@ -882,14 +827,6 @@ IconData _notificationIcon(String type) => switch (type) {
       'poll_vote' => Icons.check,
       'follow' => Icons.person_add,
       _ => Icons.notifications,
-    };
-
-String _typeLabel(NotificationType type) => switch (type) {
-      NotificationType.pollVote => 'Poll vote',
-      NotificationType.comment => 'Comment',
-      NotificationType.commentReply => 'Comment reply',
-      NotificationType.follow => 'New follower',
-      NotificationType.like => 'Like',
     };
 
 String _dateTime(DateTime value) =>

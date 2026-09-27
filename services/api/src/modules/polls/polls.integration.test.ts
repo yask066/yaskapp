@@ -2954,3 +2954,57 @@ test('first comment like creates one complete notification after commit', async 
   assert.equal(afterUnlike.statusCode, 200, afterUnlike.body);
   assert.equal(afterUnlike.json<{ items: typeof notifications }>().items.filter((item) => item.type === 'like' && item.commentId === comment.id).length, 1);
 });
+
+test('polls can be loaded by id only when the viewer can see them', async () => {
+  const author = await registerTestUser();
+  const viewer = await registerTestUser();
+  const publicPollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(author.accessToken),
+    payload: {
+      question: 'A public notification target',
+      options: ['One', 'Two']
+    }
+  });
+  assert.equal(publicPollResponse.statusCode, 201, publicPollResponse.body);
+  const publicPollId = publicPollResponse.json<PollResponse>().poll.id;
+
+  const publicResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${publicPollId}`,
+    headers: bearer(viewer.accessToken)
+  });
+  assert.equal(publicResponse.statusCode, 200, publicResponse.body);
+  assert.equal(
+    publicResponse.json<PollResponse>().poll.question,
+    'A public notification target'
+  );
+
+  const privatePollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(author.accessToken),
+    payload: {
+      question: 'A private notification target',
+      options: ['One', 'Two'],
+      visibility: 'private'
+    }
+  });
+  assert.equal(privatePollResponse.statusCode, 201, privatePollResponse.body);
+  const privatePollId = privatePollResponse.json<PollResponse>().poll.id;
+
+  const hiddenResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${privatePollId}`,
+    headers: bearer(viewer.accessToken)
+  });
+  assert.equal(hiddenResponse.statusCode, 404, hiddenResponse.body);
+
+  const ownerResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${privatePollId}`,
+    headers: bearer(author.accessToken)
+  });
+  assert.equal(ownerResponse.statusCode, 200, ownerResponse.body);
+});

@@ -10,6 +10,7 @@ import {
   listPollCommentRecords,
   listPublicPollRecords,
   listSubscriptionPollRecords,
+  findViewablePollRecordById,
   unlikePollRecord,
   unlikeCommentRecord
 } from './polls.repository.js';
@@ -108,6 +109,12 @@ export async function listPublicPolls(
   sort: 'newest' | 'popular' = 'newest'
 ) {
   return listPublicPollRecords(limit, viewerId, sort);
+}
+
+export async function getViewablePoll(pollId: string, viewerId?: string) {
+  const poll = await findViewablePollRecordById(pollId, viewerId);
+  if (!poll) throw new PollNotFoundError('Poll was not found.');
+  return poll;
 }
 
 export async function deletePoll(input: { pollId: string; authorId: string }) {

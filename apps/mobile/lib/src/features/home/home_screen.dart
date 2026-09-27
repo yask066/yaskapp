@@ -10,6 +10,7 @@ import '../polls/polls_api_client.dart';
 import '../profile/profile_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import '../notifications/notifications_screen.dart';
+import '../notifications/notification_navigator.dart';
 import '../notifications/notification_store.dart';
 import '../realtime/realtime_session.dart';
 
@@ -99,9 +100,14 @@ class _HomeScreenState extends State<HomeScreen> {
             pollsApiClient: _pollsApiClient,
             realtimeClient: widget.realtimeSession.realtimeClient,
           ),
-          NotificationsScreen(
-            isActive: _selectedIndex == 2,
-            notificationStore: _notificationStore,
+          NotificationNavigationScope(
+            accessToken: widget.session.accessToken,
+            currentUserId: widget.session.user.id,
+            pollsApiClient: _pollsApiClient,
+            child: NotificationsScreen(
+              isActive: _selectedIndex == 2,
+              notificationStore: _notificationStore,
+            ),
           ),
           ProfileScreen(
             key: _profileKey,

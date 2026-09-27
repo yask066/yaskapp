@@ -47,7 +47,7 @@ class _NotificationPreferencesScreenState
     }
   }
 
-  Future<void> _setPreference(String type, {bool? inApp, bool? push}) async {
+  Future<void> _setPreference(String type, {required bool inApp}) async {
     final old = _preferences;
     if (old == null) return;
     try {
@@ -55,7 +55,6 @@ class _NotificationPreferencesScreenState
         accessToken: widget.accessToken,
         type: type,
         inApp: inApp,
-        push: push,
       );
       if (mounted) setState(() => _preferences = updated);
     } on Object catch (error) {
@@ -113,20 +112,10 @@ class _NotificationPreferencesScreenState
 
   Widget _setting(
           String type, String title, NotificationPreference preference) =>
-      Column(
-        children: [
-          SwitchListTile(
-            title: Text(title),
-            subtitle: const Text('In-app'),
-            value: preference.inApp,
-            onChanged: (next) => _setPreference(type, inApp: next),
-          ),
-          SwitchListTile(
-            title: const Text('Push'),
-            subtitle: const Text('Delivery will be available in Phase 6'),
-            value: preference.push,
-            onChanged: (next) => _setPreference(type, push: next),
-          ),
-        ],
+      SwitchListTile(
+        title: Text(title),
+        subtitle: const Text('In-app'),
+        value: preference.inApp,
+        onChanged: (next) => _setPreference(type, inApp: next),
       );
 }

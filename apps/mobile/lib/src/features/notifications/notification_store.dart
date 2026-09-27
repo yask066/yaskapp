@@ -228,6 +228,7 @@ class NotificationStore {
       rollbackRead(id);
       _error = error;
       _notify();
+      await loadFirstPage();
     }
   }
 

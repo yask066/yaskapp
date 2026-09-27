@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/user_avatar.dart';
@@ -19,6 +21,7 @@ class PollCommentsScreen extends StatefulWidget {
     required this.pollsApiClient,
     this.currentUserId,
     this.reportsApiClient,
+    this.initialCommentId,
     super.key,
   });
 
@@ -27,6 +30,7 @@ class PollCommentsScreen extends StatefulWidget {
   final PollsApiClient pollsApiClient;
   final String? currentUserId;
   final ReportsApiClient? reportsApiClient;
+  final String? initialCommentId;
 
   @override
   State<PollCommentsScreen> createState() => _PollCommentsScreenState();
@@ -34,12 +38,14 @@ class PollCommentsScreen extends StatefulWidget {
 
 class _PollCommentsScreenState extends State<PollCommentsScreen> {
   final _commentController = TextEditingController();
+  final _targetCommentKey = GlobalKey();
   late Future<List<PollCommentSummary>> _commentsFuture;
   late PollSummary _poll;
   List<PollCommentSummary>? _comments;
   bool _isSubmittingComment = false;
   bool _isDeletingComment = false;
   bool _isLikingPoll = false;
+  bool _targetCommentFocusScheduled = false;
   late final ReportsApiClient _reportsApiClient;
   late final bool _ownsReportsApiClient;
 
@@ -85,7 +91,33 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
   void _retryComments() {
     setState(() {
       _comments = null;
+      _targetCommentFocusScheduled = false;
       _commentsFuture = _loadComments();
+    });
+  }
+
+  void _scheduleTargetCommentFocus(List<PollCommentSummary> comments) {
+    final targetId = widget.initialCommentId;
+    if (targetId == null || _targetCommentFocusScheduled) return;
+    _targetCommentFocusScheduled = true;
+    if (!comments.any((comment) => comment.id == targetId)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showSnackBar('This comment is no longer available.');
+      });
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final targetContext = _targetCommentKey.currentContext;
+      if (!mounted || targetContext == null) return;
+      unawaited(Scrollable.ensureVisible(
+        targetContext,
+        alignment: 0.25,
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 280),
+        curve: Curves.easeOut,
+      ));
     });
   }
 
@@ -368,10 +400,13 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                       }
 
                       final comments = _comments ?? snapshot.data ?? [];
+                      _scheduleTargetCommentFocus(comments);
 
-                      return ListView(
+                      return SingleChildScrollView(
                         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                        children: [
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                           PollCard(
                             poll: _poll,
                             accessToken: widget.accessToken,
@@ -413,16 +448,27 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                             const _CommentsEmptyState()
                           else
                             for (final comment in comments) ...[
-                              _CommentTile(
-                                comment: comment,
-                                onDelete: widget.currentUserId == comment.author.id
-                                    ? () => _deleteComment(comment)
+                              KeyedSubtree(
+                                key: comment.id == widget.initialCommentId
+                                    ? ValueKey(
+                                        'notification-target-comment-${comment.id}')
                                     : null,
-                                onReport: widget.currentUserId != null &&
-                                        widget.currentUserId != comment.author.id
-                                    ? () => _reportComment(comment)
-                                    : null,
-                                onToggleLike: _toggleCommentLike,
+                                child: _CommentTile(
+                                  key: comment.id == widget.initialCommentId
+                                      ? _targetCommentKey
+                                      : null,
+                                  comment: comment,
+                                  isNotificationTarget:
+                                      comment.id == widget.initialCommentId,
+                                  onDelete: widget.currentUserId == comment.author.id
+                                      ? () => _deleteComment(comment)
+                                      : null,
+                                  onReport: widget.currentUserId != null &&
+                                          widget.currentUserId != comment.author.id
+                                      ? () => _reportComment(comment)
+                                      : null,
+                                  onToggleLike: _toggleCommentLike,
+                                ),
                               ),
                               const Divider(
                                 height: 1,
@@ -430,7 +476,8 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                                 color: _commentsDivider,
                               ),
                             ],
-                        ],
+                          ],
+                        ),
                       );
                     },
                   ),
@@ -615,13 +662,16 @@ class _CommentsErrorState extends StatelessWidget {
 
 class _CommentTile extends StatefulWidget {
   const _CommentTile({
+    super.key,
     required this.comment,
+    this.isNotificationTarget = false,
     this.onDelete,
     this.onReport,
     this.onToggleLike,
   });
 
   final PollCommentSummary comment;
+  final bool isNotificationTarget;
   final VoidCallback? onDelete;
   final VoidCallback? onReport;
   final Future<PollCommentSummary?> Function(PollCommentSummary comment)?
@@ -676,8 +726,14 @@ class _CommentTileState extends State<_CommentTile> {
   Widget build(BuildContext context) {
     final comment = _comment;
 
-    return Padding(
+    return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: widget.isNotificationTarget
+            ? const Color(0xFFE6EEFF)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

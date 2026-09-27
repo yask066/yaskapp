@@ -26,6 +26,7 @@ import {
   createPollComment,
   deletePollComment,
   deletePoll,
+  getViewablePoll,
   likePoll,
   likeComment,
   listPollComments,
@@ -197,6 +198,29 @@ async function parseMultipartCreatePoll(request: FastifyRequest) {
 }
 
 export function registerPollRoutes(app: FastifyInstance) {
+  app.get(
+    '/polls/:pollId',
+    {
+      preHandler: optionalAuthenticate
+    },
+    async (request, reply) => {
+      const parsedParams = voteParamsSchema.safeParse(request.params);
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      try {
+        const poll = await getViewablePoll(
+          parsedParams.data.pollId,
+          request.user?.sub
+        );
+        return { poll };
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
+
   app.get(
     '/polls',
     {

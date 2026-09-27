@@ -93,6 +93,20 @@ class PollsApiClient {
         .toList();
   }
 
+  Future<PollSummary> getPoll({
+    required String pollId,
+    String? accessToken,
+  }) async {
+    final uri = Uri.parse(_config.baseUrl).replace(path: '/polls/$pollId');
+    final response = await _httpClient.get(
+      uri,
+      headers: {
+        if (accessToken != null) 'authorization': 'Bearer $accessToken',
+      },
+    );
+    return _decodePollResponse(response, 'Poll response is invalid.');
+  }
+
   Future<List<PollSummary>> listMyPolls({
     required String accessToken,
     int limit = 20,

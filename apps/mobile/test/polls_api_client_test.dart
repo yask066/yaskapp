@@ -10,6 +10,30 @@ import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
 void main() {
   const config = ApiConfig(baseUrl: 'http://api.test');
 
+  test('loads a poll by ID for an authenticated viewer', () async {
+    late http.Request sentRequest;
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((request) async {
+        sentRequest = request;
+        return http.Response(
+          jsonEncode({'poll': _pollJson(commentsCount: 0)}),
+          200,
+        );
+      }),
+    );
+
+    final poll = await client.getPoll(
+      pollId: 'poll-1',
+      accessToken: 'access-token',
+    );
+
+    expect(sentRequest.method, 'GET');
+    expect(sentRequest.url.path, '/polls/poll-1');
+    expect(sentRequest.headers['authorization'], 'Bearer access-token');
+    expect(poll.id, 'poll-1');
+    client.close();
+  });
   test('maps closed vote errors to a clear user message', () async {
     final client = PollsApiClient(
       config: config,

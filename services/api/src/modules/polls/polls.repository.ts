@@ -613,6 +613,46 @@ export async function findPollRecordById(pollId: string) {
   }
 }
 
+export async function findViewablePollRecordById(
+  pollId: string,
+  viewerId?: string
+) {
+  const client = await db.connect();
+
+  try {
+    const result = await client.query<{ id: string }>(
+      `
+        SELECT p.id
+        FROM polls p
+        JOIN users u ON u.id = p.author_id
+        WHERE p.id = $1
+          AND p.deleted_at IS NULL
+          AND u.status = 'active'
+          AND (
+            p.visibility = 'public'
+            OR p.author_id = $2
+            OR (
+              p.visibility = 'followers'
+              AND EXISTS (
+                SELECT 1
+                FROM follows f
+                WHERE f.follower_id = $2
+                  AND f.followee_id = p.author_id
+              )
+            )
+          )
+      `,
+      [pollId, viewerId ?? null]
+    );
+
+    if (result.rowCount === 0) return null;
+    const [poll] = await hydratePolls(client, [pollId], viewerId);
+    return poll ?? null;
+  } finally {
+    client.release();
+  }
+}
+
 export async function findViewablePollImageRecord(
   pollId: string,
   viewerId?: string

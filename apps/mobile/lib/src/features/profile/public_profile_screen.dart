@@ -18,6 +18,7 @@ class PublicProfileScreen extends StatefulWidget {
     required this.profilesApiClient,
     this.pollsApiClient,
     this.reportsApiClient,
+    this.initialProfile,
     super.key,
   });
 
@@ -27,6 +28,7 @@ class PublicProfileScreen extends StatefulWidget {
   final ProfilesApiClient profilesApiClient;
   final PollsApiClient? pollsApiClient;
   final ReportsApiClient? reportsApiClient;
+  final PublicProfile? initialProfile;
 
   @override
   State<PublicProfileScreen> createState() => _PublicProfileScreenState();
@@ -46,7 +48,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _profileFuture = _loadProfile();
+    _profile = widget.initialProfile;
+    _isFollowing = _profile?.viewerIsFollowing ?? false;
+    _profileFuture = _profile == null
+        ? _loadProfile()
+        : Future<PublicProfile>.value(_profile!);
     _ownsReportsApiClient = widget.reportsApiClient == null;
     _reportsApiClient = widget.reportsApiClient ?? ReportsApiClient();
     if (widget.pollsApiClient != null) {
