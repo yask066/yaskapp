@@ -84,6 +84,26 @@ class NotificationItem {
   String? get commentId => target.commentId;
   bool get isUnread => readAt == null;
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'type': type.wireName,
+        'actor': actor == null
+            ? null
+            : {
+                'id': actor!.id,
+                'username': actor!.username,
+                'displayName': actor!.displayName,
+                'avatarUrl': actor!.avatarUrl,
+              },
+        'targetType': target.type.wireName,
+        'pollId': pollId,
+        'commentId': commentId,
+        'payload': payload,
+        'readAt': readAt?.toUtc().toIso8601String(),
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'isTargetAvailable': isTargetAvailable,
+      };
+
   static NotificationItem? tryParse(Map<String, dynamic> json) {
     try {
       final id = json['id'];

@@ -11,6 +11,8 @@ import '../profile/profile_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../notifications/notifications_api_client.dart';
+import '../notifications/notification_store.dart';
+import '../realtime/realtime_session.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -18,6 +20,7 @@ class HomeScreen extends StatefulWidget {
     required this.authApiClient,
     required this.onLogout,
     required this.onUserUpdated,
+    required this.realtimeSession,
     super.key,
     PollsApiClient? pollsApiClient,
     NotificationsApiClient? notificationsApiClient,
@@ -28,6 +31,7 @@ class HomeScreen extends StatefulWidget {
   final AuthApiClient authApiClient;
   final VoidCallback onLogout;
   final ValueChanged<AuthUser> onUserUpdated;
+  final RealtimeSession realtimeSession;
   final PollsApiClient? _pollsApiClient;
   final NotificationsApiClient? _notificationsApiClient;
 
@@ -38,11 +42,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   var _selectedIndex = 0;
   var _unreadNotifications = 0;
-  var _notificationsViewed = false;
   late final PollsApiClient _pollsApiClient;
   late final bool _ownsPollsApiClient;
   late final NotificationsApiClient _notificationsApiClientInstance;
   late final bool _ownsNotificationsApiClient;
+  late final NotificationStore _notificationStore;
   final _feedKey = GlobalKey<FeedScreenState>();
   final _profileKey = GlobalKey<ProfileScreenState>();
 
@@ -54,7 +58,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _ownsNotificationsApiClient = widget._notificationsApiClient == null;
     _notificationsApiClientInstance =
         widget._notificationsApiClient ?? NotificationsApiClient();
-    unawaited(_loadUnreadNotificationCount());
+    _notificationStore = widget.realtimeSession.notificationStore;
+    _unreadNotifications = _notificationStore.state.unreadCount;
+    _notificationStore.addListener(_handleNotificationStoreChanged);
   }
 
   @override
@@ -65,19 +71,15 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_ownsNotificationsApiClient) {
       _notificationsApiClientInstance.close();
     }
+    _notificationStore.removeListener(_handleNotificationStoreChanged);
     super.dispose();
   }
 
-  Future<void> _loadUnreadNotificationCount() async {
-    try {
-      final page = await _notificationsApiClientInstance.list(
-        accessToken: widget.session.accessToken,
-        limit: 1,
-      );
-      if (!mounted || _notificationsViewed) return;
-      setState(() => _unreadNotifications = page.unreadCount);
-    } catch (_) {
-      // The notification tab can retry the full request when opened.
+  void _handleNotificationStoreChanged() {
+    if (!mounted) return;
+    final count = _notificationStore.state.unreadCount;
+    if (count != _unreadNotifications) {
+      setState(() => _unreadNotifications = count);
     }
   }
 
@@ -99,6 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
             key: _feedKey,
             session: widget.session,
             pollsApiClient: _pollsApiClient,
+            realtimeClient: widget.realtimeSession.realtimeClient,
             onPollCreated: (_) {
               unawaited(_profileKey.currentState?.refreshMyPolls());
             },
@@ -106,13 +109,14 @@ class _HomeScreenState extends State<HomeScreen> {
           SubscriptionsScreen(
             session: widget.session,
             pollsApiClient: _pollsApiClient,
+            realtimeClient: widget.realtimeSession.realtimeClient,
           ),
           NotificationsScreen(
             session: widget.session,
             isActive: _selectedIndex == 2,
             apiClient: _notificationsApiClientInstance,
-            onUnreadCountChanged: (count) =>
-                setState(() => _unreadNotifications = count),
+            realtimeClient: widget.realtimeSession.realtimeClient,
+            notificationStore: _notificationStore,
           ),
           ProfileScreen(
             key: _profileKey,
@@ -120,6 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
             accessToken: widget.session.accessToken,
             authApiClient: widget.authApiClient,
             pollsApiClient: _pollsApiClient,
+            realtimeClient: widget.realtimeSession.realtimeClient,
             onLogout: widget.onLogout,
             onUserUpdated: widget.onUserUpdated,
           ),
@@ -130,12 +135,6 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedIndex: _selectedIndex,
         onCreate: _openCreatePoll,
         unreadNotifications: _unreadNotifications,
-        onNotificationsOpened: () {
-          setState(() {
-            _notificationsViewed = true;
-            _unreadNotifications = 0;
-          });
-        },
         onSelected: (index) {
           setState(() {
             _selectedIndex = index;

@@ -4,7 +4,10 @@ import 'dart:convert';
 import 'package:web_socket_channel/io.dart';
 
 import '../../core/config/api_config.dart';
+import '../notifications/notification_model.dart';
 import '../polls/poll_summary.dart';
+
+enum RealtimeConnectionEvent { ready, disconnected }
 
 class PollVoteRealtimeEvent {
   const PollVoteRealtimeEvent({required this.poll});
@@ -32,19 +35,30 @@ class CommentDeletedRealtimeEvent {
 
 class NotificationRealtimeEvent {
   const NotificationRealtimeEvent(
-      {required this.payload, required this.unreadCount});
-  final Map<String, dynamic> payload;
+      {required this.notification, required this.unreadCount});
+  final NotificationItem notification;
   final int unreadCount;
+
+  Map<String, dynamic> get payload => notification.toJson();
 }
 
 class RealtimeClient {
-  RealtimeClient({ApiConfig config = const ApiConfig(), this.accessToken})
-      : _config = config;
+  RealtimeClient({
+    ApiConfig config = const ApiConfig(),
+    this.accessToken,
+    this.heartbeatInterval = const Duration(seconds: 20),
+    this.heartbeatTimeout = const Duration(seconds: 45),
+  }) : _config = config;
 
   final ApiConfig _config;
   final String? accessToken;
+  final Duration heartbeatInterval;
+  final Duration heartbeatTimeout;
   IOWebSocketChannel? _channel;
   StreamSubscription<dynamic>? _subscription;
+  Timer? _heartbeatTimer;
+  DateTime _lastPong = DateTime.now().toUtc();
+  bool _closing = false;
   final _pollVoteController =
       StreamController<PollVoteRealtimeEvent>.broadcast();
   final _pollDeletedController =
@@ -57,6 +71,8 @@ class RealtimeClient {
       StreamController<CommentDeletedRealtimeEvent>.broadcast();
   final _notificationController =
       StreamController<NotificationRealtimeEvent>.broadcast();
+  final _connectionController =
+      StreamController<RealtimeConnectionEvent>.broadcast();
 
   Stream<PollVoteRealtimeEvent> get pollVotes => _pollVoteController.stream;
   Stream<PollDeletedRealtimeEvent> get pollDeletions =>
@@ -69,11 +85,15 @@ class RealtimeClient {
       _commentDeletedController.stream;
   Stream<NotificationRealtimeEvent> get notifications =>
       _notificationController.stream;
+  Stream<RealtimeConnectionEvent> get connectionEvents =>
+      _connectionController.stream;
 
   void connect() {
     if (_channel != null) {
       return;
     }
+
+    _closing = false;
 
     final channel = IOWebSocketChannel.connect(
       Uri.parse(_config.websocketUrl),
@@ -82,6 +102,8 @@ class RealtimeClient {
           : {'Authorization': 'Bearer $accessToken'},
     );
     _channel = channel;
+    _lastPong = DateTime.now().toUtc();
+    _startHeartbeat();
     _subscription = channel.stream.listen(
       _handleMessage,
       onError: (_) => disconnect(),
@@ -100,11 +122,17 @@ class RealtimeClient {
 
     final channel = _channel;
     _channel = null;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
 
     await channel?.sink.close();
+    if (channel != null && !_closing) {
+      _emitConnectionEvent(RealtimeConnectionEvent.disconnected);
+    }
   }
 
   Future<void> close() async {
+    _closing = true;
     await disconnect();
     await _pollVoteController.close();
     await _pollDeletedController.close();
@@ -112,6 +140,30 @@ class RealtimeClient {
     await _userUnblockedController.close();
     await _commentDeletedController.close();
     await _notificationController.close();
+    await _connectionController.close();
+  }
+
+  void emitConnectionEvent(RealtimeConnectionEvent event) {
+    if (!_connectionController.isClosed) {
+      _connectionController.add(event);
+    }
+  }
+
+  void _emitConnectionEvent(RealtimeConnectionEvent event) {
+    emitConnectionEvent(event);
+  }
+
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(heartbeatInterval, (_) {
+      final channel = _channel;
+      if (channel == null) return;
+      if (DateTime.now().toUtc().difference(_lastPong) > heartbeatTimeout) {
+        unawaited(disconnect());
+        return;
+      }
+      channel.sink.add(jsonEncode({'type': 'ping'}));
+    });
   }
 
   void _handleMessage(dynamic message) {
@@ -124,6 +176,21 @@ class RealtimeClient {
     }
 
     if (decoded is! Map<String, dynamic>) {
+      return;
+    }
+
+    if (decoded['type'] == 'connection.ready') {
+      if (decoded['version'] == 1) {
+        _lastPong = DateTime.now().toUtc();
+        _emitConnectionEvent(RealtimeConnectionEvent.ready);
+      }
+      return;
+    }
+
+    if (decoded['type'] == 'pong') {
+      if (decoded['version'] == 1) {
+        _lastPong = DateTime.now().toUtc();
+      }
       return;
     }
 
@@ -141,9 +208,14 @@ class RealtimeClient {
       final payload = decoded['payload'];
       if (payload is Map<String, dynamic> &&
           payload['notification'] is Map<String, dynamic> &&
-          payload['unreadCount'] is int) {
+          payload['unreadCount'] is int &&
+          decoded['version'] == 1) {
+        final notification = NotificationItem.tryParse(
+          payload['notification'] as Map<String, dynamic>,
+        );
+        if (notification == null) return;
         _notificationController.add(NotificationRealtimeEvent(
-          payload: payload['notification'] as Map<String, dynamic>,
+          notification: notification,
           unreadCount: payload['unreadCount'] as int,
         ));
       }

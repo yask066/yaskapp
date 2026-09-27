@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../auth/auth_session.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../realtime/realtime_client.dart';
+import 'notification_store.dart';
 import 'notifications_api_client.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -13,12 +14,14 @@ class NotificationsScreen extends StatefulWidget {
       this.isActive = false,
       this.apiClient,
       this.realtimeClient,
+      this.notificationStore,
       this.onUnreadCountChanged,
       super.key});
   final AuthSession session;
   final bool isActive;
   final NotificationsApiClient? apiClient;
   final RealtimeClient? realtimeClient;
+  final NotificationStore? notificationStore;
   final ValueChanged<int>? onUnreadCountChanged;
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -44,9 +47,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     _ownsRealtimeClient = widget.realtimeClient == null;
     _realtimeClient = widget.realtimeClient ??
         RealtimeClient(accessToken: widget.session.accessToken);
-    _realtimeSubscription =
-        _realtimeClient.notifications.listen(_handleRealtimeNotification);
-    _realtimeClient.connect();
+    if (widget.notificationStore == null) {
+      _realtimeSubscription =
+          _realtimeClient.notifications.listen(_handleRealtimeNotification);
+      _realtimeClient.connect();
+    } else {
+      widget.notificationStore!.addListener(_handleStoreChanged);
+    }
     if (widget.isActive) {
       unawaited(_load());
     }
@@ -64,9 +71,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void dispose() {
     unawaited(_realtimeSubscription?.cancel());
+    widget.notificationStore?.removeListener(_handleStoreChanged);
     if (_ownsRealtimeClient) unawaited(_realtimeClient.close());
     if (_ownsApiClient) _apiClient.close();
     super.dispose();
+  }
+
+  void _handleStoreChanged() {
+    if (mounted) widget.onUnreadCountChanged?.call(widget.notificationStore!.state.unreadCount);
   }
 
   Future<void> _load({bool append = false}) async {

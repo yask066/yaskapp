@@ -11,6 +11,7 @@ import 'features/home/home_screen.dart';
 import 'features/notifications/firebase_push_service.dart';
 import 'features/notifications/notification_devices_api_client.dart';
 import 'features/polls/polls_api_client.dart';
+import 'features/realtime/realtime_session.dart';
 
 class YaskappApp extends StatefulWidget {
   const YaskappApp({
@@ -37,6 +38,7 @@ class _YaskappAppState extends State<YaskappApp> {
   String? _latestPushToken;
   late final bool _ownsAuthApiClient;
   AuthSession? _session;
+  late final RealtimeSession _realtimeSession;
   var _isBootstrapping = true;
 
   @override
@@ -48,6 +50,7 @@ class _YaskappAppState extends State<YaskappApp> {
         widget.authSessionStore ?? const SecureAuthSessionStore();
     _notificationDevicesApiClient = NotificationDevicesApiClient();
     _firebasePushService = FirebasePushService();
+    _realtimeSession = RealtimeSession();
     _initializePushRegistration();
     _bootstrapSession();
   }
@@ -59,6 +62,7 @@ class _YaskappAppState extends State<YaskappApp> {
     }
     _pushTokenSubscription?.cancel();
     _notificationDevicesApiClient.close();
+    unawaited(_realtimeSession.close());
 
     super.dispose();
   }
@@ -89,6 +93,7 @@ class _YaskappAppState extends State<YaskappApp> {
           expiresIn: 'persisted',
         );
       });
+      unawaited(_realtimeSession.start(_session!));
       unawaited(_registerPushToken(accessToken));
     } catch (_) {
       await _authSessionStore.clear();
@@ -111,6 +116,7 @@ class _YaskappAppState extends State<YaskappApp> {
     setState(() {
       _session = session;
     });
+    unawaited(_realtimeSession.start(session));
     unawaited(_registerPushToken(session.accessToken));
   }
 
@@ -127,6 +133,7 @@ class _YaskappAppState extends State<YaskappApp> {
       }
     }
     await _authSessionStore.clear();
+    await _realtimeSession.stop();
 
     if (!mounted) {
       return;
@@ -235,6 +242,7 @@ class _YaskappAppState extends State<YaskappApp> {
                   onLogout: _clearSession,
                   onUserUpdated: _updateUser,
                   pollsApiClient: widget.pollsApiClient,
+                  realtimeSession: _realtimeSession,
                 ),
     );
   }

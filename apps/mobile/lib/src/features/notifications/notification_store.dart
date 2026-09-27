@@ -41,6 +41,11 @@ class NotificationStore {
   int _sessionEpoch = 0;
   final List<void Function()> _listeners = [];
 
+  void close() {
+    apiClient?.close();
+    _listeners.clear();
+  }
+
   NotificationStoreState get state => NotificationStoreState(
         itemsById: UnmodifiableMapView(Map.of(_itemsById)),
         ids: List.unmodifiable(_ids),
@@ -103,7 +108,7 @@ class NotificationStore {
     );
   }
 
-  void receiveNew(NotificationItem item, {bool atTop = false}) {
+  void receiveNew(NotificationItem item, {bool atTop = false, int? unreadCount}) {
     if (_itemsById.containsKey(item.id)) return;
     _itemsById[item.id] = item;
     if (atTop) {
@@ -111,7 +116,11 @@ class NotificationStore {
     } else {
       _pendingIds.add(item.id);
     }
-    if (item.isUnread) _unreadCount++;
+    if (unreadCount != null) {
+      _unreadCount = unreadCount;
+    } else if (item.isUnread) {
+      _unreadCount++;
+    }
     _notify();
   }
 
