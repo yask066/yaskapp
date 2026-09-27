@@ -235,6 +235,151 @@ void main() {
     expect(find.byTooltip('Post comment'), findsOneWidget);
   });
 
+  testWidgets('shows, retries, paginates and collapses a reply thread', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    var firstPageAttempts = 0;
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([_rootComment(repliesCount: 2)]),
+      replyPageLoader: ({required rootCommentId, cursor, limit = 20}) async {
+        if (cursor == null) {
+          firstPageAttempts++;
+          if (firstPageAttempts == 1) {
+            throw const PollsApiException('Could not load replies.');
+          }
+          return PollCommentRepliesPage(
+            items: [_reply],
+            nextCursor: 'reply-cursor',
+          );
+        }
+        return PollCommentRepliesPage(
+          items: [_secondReply],
+          nextCursor: null,
+        );
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          currentUserId: 'viewer-1',
+          pollsApiClient: pollsApiClient,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Show replies (2)'), findsOneWidget);
+    await tester.tap(find.text('Show replies (2)'));
+    await tester.pumpAndSettle();
+    expect(find.text('Could not load replies.'), findsOneWidget);
+
+    await tester.tap(find.text('Retry replies'));
+    await tester.pumpAndSettle();
+    expect(find.text('First reply.'), findsOneWidget);
+    expect(find.text('Load more replies'), findsOneWidget);
+
+    await tester.tap(find.text('Load more replies'));
+    await tester.pumpAndSettle();
+    expect(find.text('Second reply.'), findsOneWidget);
+
+    await tester.tap(find.text('Hide replies (2)'));
+    await tester.pumpAndSettle();
+    expect(find.text('First reply.'), findsNothing);
+  });
+
+  testWidgets('cancels and submits a reply to the root, updating both counts', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([_rootComment()]),
+      createCommentFuture: Future.value(_createReplyResult),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _pollWithComment,
+          accessToken: 'access-token',
+          currentUserId: 'viewer-1',
+          pollsApiClient: pollsApiClient,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('reply-comment-root-1')));
+    await tester.pumpAndSettle();
+    expect(find.text('Replying to Author'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('reply-composer-root-1')),
+        'discard this reply');
+    await tester.tap(find.text('Cancel reply'));
+    await tester.pumpAndSettle();
+    expect(find.text('Replying to Author'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('reply-comment-root-1')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('reply-composer-root-1')),
+        'A reply to the root.');
+    await tester.tap(find.byTooltip('Post reply'));
+    await tester.pumpAndSettle();
+
+    expect(pollsApiClient.createCommentCalls, 1);
+    expect(pollsApiClient.createdParentCommentIds, ['root-1']);
+    expect(pollsApiClient.createdCommentBodies, ['A reply to the root.']);
+    expect(find.text('A reply to the root.'), findsOneWidget);
+    expect(find.text('2 comments'), findsOneWidget);
+    expect(find.text('Hide replies (1)'), findsOneWidget);
+  });
+
+  testWidgets('allows anonymous visitors to read replies but not compose one', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([_rootComment(repliesCount: 1)]),
+      replyPageLoader: ({required rootCommentId, cursor, limit = 20}) async =>
+          PollCommentRepliesPage(items: [_reply], nextCursor: null),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          pollsApiClient: pollsApiClient,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Show replies (1)'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('First reply.'), findsOneWidget);
+    expect(
+        tester
+            .widget<TextButton>(find.byKey(
+              const ValueKey('reply-comment-root-1'),
+            ))
+            .onPressed,
+        isNull);
+    expect(find.text('Replying to Author'), findsNothing);
+  });
+
   testWidgets('shows comments error state', (tester) async {
     final commentsCompleter = Completer<List<PollCommentSummary>>();
 
@@ -439,7 +584,8 @@ void main() {
     expect(replyRect.left, closeTo(bodyRect.left + 45, 0.5));
   });
 
-  testWidgets('shows delete in the poll-style menu for the current user comment',
+  testWidgets(
+      'shows delete in the poll-style menu for the current user comment',
       (tester) async {
     tester.view.physicalSize = const Size(400, 1000);
     tester.view.devicePixelRatio = 1;
@@ -550,7 +696,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Delete comment?'), findsOneWidget);
-    expect(find.text('This comment will be removed permanently.'), findsOneWidget);
+    expect(
+        find.text('This comment will be removed permanently.'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
     await tester.pumpAndSettle();
@@ -639,6 +786,66 @@ final _comment = PollCommentSummary(
   updatedAt: DateTime(2026, 7, 17, 12, 1),
 );
 
+PollCommentSummary _rootComment({int repliesCount = 0}) => PollCommentSummary(
+      id: 'root-1',
+      pollId: 'poll-1',
+      author: const PollAuthorSummary(
+        id: 'author-1',
+        username: 'author',
+        displayName: 'Author',
+      ),
+      body: 'Root comment.',
+      likesCount: 0,
+      repliesCount: repliesCount,
+      createdAt: DateTime(2026, 7, 17, 12),
+      updatedAt: DateTime(2026, 7, 17, 12),
+    );
+
+final _reply = PollCommentSummary(
+  id: 'reply-1',
+  pollId: 'poll-1',
+  author: const PollAuthorSummary(
+    id: 'viewer-1',
+    username: 'viewer',
+    displayName: 'Viewer',
+  ),
+  body: 'First reply.',
+  likesCount: 0,
+  parentCommentId: 'root-1',
+  createdAt: DateTime(2026, 7, 17, 12, 2),
+  updatedAt: DateTime(2026, 7, 17, 12, 2),
+);
+
+final _secondReply = PollCommentSummary(
+  id: 'reply-2',
+  pollId: 'poll-1',
+  author: const PollAuthorSummary(
+    id: 'viewer-2',
+    username: 'viewer2',
+    displayName: 'Second Viewer',
+  ),
+  body: 'Second reply.',
+  likesCount: 0,
+  parentCommentId: 'root-1',
+  createdAt: DateTime(2026, 7, 17, 12, 3),
+  updatedAt: DateTime(2026, 7, 17, 12, 3),
+);
+
+final _createdReply = PollCommentSummary(
+  id: 'reply-3',
+  pollId: 'poll-1',
+  author: const PollAuthorSummary(
+    id: 'viewer-1',
+    username: 'viewer',
+    displayName: 'Viewer',
+  ),
+  body: 'A reply to the root.',
+  likesCount: 0,
+  parentCommentId: 'root-1',
+  createdAt: DateTime(2026, 7, 17, 12, 4),
+  updatedAt: DateTime(2026, 7, 17, 12, 4),
+);
+
 final _likedComment = PollCommentSummary(
   id: 'comment-1',
   pollId: 'poll-1',
@@ -659,6 +866,11 @@ final _createCommentResult = CreatePollCommentResult(
   poll: _pollWithComment,
 );
 
+final _createReplyResult = CreatePollCommentResult(
+  comment: _createdReply,
+  poll: _poll.copyWith(commentsCount: 2),
+);
+
 class _FakePollsApiClient extends PollsApiClient {
   _FakePollsApiClient({
     required this.commentsFuture,
@@ -666,18 +878,29 @@ class _FakePollsApiClient extends PollsApiClient {
     Future<PollCommentSummary>? likeCommentFuture,
     Future<PollSummary>? likePollFuture,
     Future<void>? deleteCommentFuture,
-  }) : createCommentFuture =
+    this.replyPageLoader,
+    this.commentLoader,
+  })  : createCommentFuture =
             createCommentFuture ?? Future.value(_createCommentResult),
-       likeCommentFuture = likeCommentFuture ?? Future.value(_likedComment),
-       likePollFuture = likePollFuture ?? Future.value(_likedPoll),
-       deleteCommentFuture = deleteCommentFuture ?? Future.value();
+        likeCommentFuture = likeCommentFuture ?? Future.value(_likedComment),
+        likePollFuture = likePollFuture ?? Future.value(_likedPoll),
+        deleteCommentFuture = deleteCommentFuture ?? Future.value();
 
   final Future<List<PollCommentSummary>> commentsFuture;
   final Future<CreatePollCommentResult> createCommentFuture;
   final Future<PollCommentSummary> likeCommentFuture;
   final Future<PollSummary> likePollFuture;
   final Future<void> deleteCommentFuture;
+  final Future<PollCommentRepliesPage> Function({
+    required String rootCommentId,
+    required int limit,
+    String? cursor,
+  })? replyPageLoader;
+  final Future<PollCommentSummary> Function(String commentId)? commentLoader;
   int createCommentCalls = 0;
+  final List<String> createdCommentBodies = [];
+  final List<String?> createdParentCommentIds = [];
+  int replyPageCalls = 0;
   int likeCommentCalls = 0;
   int likePollCalls = 0;
   int deleteCommentCalls = 0;
@@ -692,12 +915,43 @@ class _FakePollsApiClient extends PollsApiClient {
   }
 
   @override
+  Future<PollCommentRepliesPage> listCommentReplies({
+    required String pollId,
+    required String rootCommentId,
+    int limit = 20,
+    String? cursor,
+    String? accessToken,
+  }) {
+    replyPageCalls++;
+    return replyPageLoader?.call(
+          rootCommentId: rootCommentId,
+          limit: limit,
+          cursor: cursor,
+        ) ??
+        Future.value(const PollCommentRepliesPage(items: [], nextCursor: null));
+  }
+
+  @override
+  Future<PollCommentSummary> getComment({
+    required String pollId,
+    required String commentId,
+    required String accessToken,
+  }) {
+    return commentLoader?.call(commentId) ??
+        Future.error(
+            const PollsApiException('Comment was not found.', statusCode: 404));
+  }
+
+  @override
   Future<CreatePollCommentResult> createComment({
     required String pollId,
     required String body,
     required String accessToken,
+    String? parentCommentId,
   }) {
     createCommentCalls++;
+    createdCommentBodies.add(body);
+    createdParentCommentIds.add(parentCommentId);
 
     return createCommentFuture;
   }

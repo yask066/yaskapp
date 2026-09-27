@@ -400,6 +400,49 @@ class PollsApiClient {
         .toList();
   }
 
+  Future<PollCommentRepliesPage> listCommentReplies({
+    required String pollId,
+    required String rootCommentId,
+    int limit = 20,
+    String? cursor,
+    String? accessToken,
+  }) async {
+    final uri = Uri.parse(_config.baseUrl).replace(
+      path: '/polls/$pollId/comments/$rootCommentId/replies',
+      queryParameters: {
+        'limit': limit.toString(),
+        if (cursor != null) 'cursor': cursor,
+      },
+    );
+    final response = await _httpClient.get(
+      uri,
+      headers: {
+        if (accessToken != null) 'authorization': 'Bearer $accessToken',
+      },
+    );
+    final body = _decodeObject(response);
+    final items = body['items'];
+
+    if (items is! List<dynamic>) {
+      throw const PollsApiException(
+          'Poll comment replies response is invalid.');
+    }
+    final nextCursor = body['nextCursor'];
+    if (nextCursor != null && nextCursor is! String) {
+      throw const PollsApiException(
+          'Poll comment replies response is invalid.');
+    }
+
+    return PollCommentRepliesPage(
+      items: items
+          .map(
+            (item) => PollCommentSummary.fromJson(item as Map<String, dynamic>),
+          )
+          .toList(),
+      nextCursor: nextCursor as String?,
+    );
+  }
+
   Future<PollCommentSummary> getComment({
     required String pollId,
     required String commentId,
@@ -432,7 +475,8 @@ class PollsApiClient {
       headers: {'authorization': 'Bearer $accessToken'},
     );
 
-    return _decodeCommentResponse(response, 'Like comment response is invalid.');
+    return _decodeCommentResponse(
+        response, 'Like comment response is invalid.');
   }
 
   Future<PollCommentSummary> unlikeComment({
@@ -448,7 +492,8 @@ class PollsApiClient {
       headers: {'authorization': 'Bearer $accessToken'},
     );
 
-    return _decodeCommentResponse(response, 'Unlike comment response is invalid.');
+    return _decodeCommentResponse(
+        response, 'Unlike comment response is invalid.');
   }
 
   Future<void> deleteComment({
@@ -473,6 +518,7 @@ class PollsApiClient {
     required String pollId,
     required String body,
     required String accessToken,
+    String? parentCommentId,
   }) async {
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls/$pollId/comments',
@@ -485,6 +531,7 @@ class PollsApiClient {
       },
       body: jsonEncode({
         'body': body,
+        if (parentCommentId != null) 'parentCommentId': parentCommentId,
       }),
     );
     final decoded = _decodeObject(response);

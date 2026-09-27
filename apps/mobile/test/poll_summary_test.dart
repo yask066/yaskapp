@@ -81,7 +81,30 @@ void main() {
     expect(comment.author.displayName, 'Ada Lovelace');
     expect(comment.body, 'I would choose the second option.');
     expect(comment.likesCount, 0);
+    expect(comment.parentCommentId, isNull);
+    expect(comment.repliesCount, 0);
     expect(comment.createdAt.isUtc, false);
     expect(comment.updatedAt.isUtc, false);
+  });
+
+  test('parses reply relationship and root reply count', () {
+    final reply = PollCommentSummary.fromJson({
+      'id': 'reply-1',
+      'pollId': 'poll-1',
+      'author': {
+        'id': 'user-2',
+        'username': 'grace',
+        'displayName': 'Grace Hopper',
+      },
+      'body': 'A reply.',
+      'likesCount': 0,
+      'parentCommentId': 'root-1',
+      'repliesCount': 2,
+      'createdAt': '2026-07-21T10:02:00.000Z',
+      'updatedAt': '2026-07-21T10:02:00.000Z',
+    });
+
+    expect(reply.parentCommentId, 'root-1');
+    expect(reply.repliesCount, 2);
   });
 }

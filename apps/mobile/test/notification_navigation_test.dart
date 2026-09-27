@@ -169,6 +169,112 @@ void main() {
         lessThan(tester.view.physicalSize.height));
   });
 
+  testWidgets('resolves a reply notification to its root and focuses the reply',
+      (tester) async {
+    final requestedPaths = <String>[];
+    final root = {
+      ..._commentJson('root-1', body: 'The root comment.'),
+      'repliesCount': 1,
+    };
+    final reply = _commentJson(
+      'reply-1',
+      body: 'The exact reply notification target.',
+      parentCommentId: 'root-1',
+    );
+    final earlierReply = _commentJson(
+      'reply-0',
+      body: 'An earlier reply on the first page.',
+      parentCommentId: 'root-1',
+    );
+    final pollsApiClient = _pollsClient((request) async {
+      requestedPaths.add(request.url.path);
+      if (request.url.path == '/polls/poll-1') {
+        return http.Response(jsonEncode({'poll': _pollJson}), 200);
+      }
+      if (request.url.path == '/polls/poll-1/comments') {
+        return http.Response('{"items":[]}', 200);
+      }
+      if (request.url.path == '/polls/poll-1/comments/reply-1') {
+        return http.Response(jsonEncode({'comment': reply}), 200);
+      }
+      if (request.url.path == '/polls/poll-1/comments/root-1') {
+        return http.Response(jsonEncode({'comment': root}), 200);
+      }
+      if (request.url.path == '/polls/poll-1/comments/root-1/replies') {
+        final cursor = request.url.queryParameters['cursor'];
+        return http.Response(
+          jsonEncode(cursor == null
+              ? {
+                  'items': [earlierReply],
+                  'nextCursor': 'reply-page-2',
+                }
+              : {
+                  'items': [reply],
+                  'nextCursor': null,
+                }),
+          200,
+        );
+      }
+      return http.Response('{"message":"not found"}', 404);
+    });
+    final profilesApiClient = _profilesClient();
+    addTearDown(pollsApiClient.close);
+    addTearDown(profilesApiClient.close);
+
+    await tester.pumpWidget(MaterialApp(
+      home: NotificationNavigationScope(
+        accessToken: 'access-token',
+        currentUserId: 'recipient-1',
+        pollsApiClient: pollsApiClient,
+        profilesApiClient: profilesApiClient,
+        child: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () => unawaited(openNotificationTarget(
+                  context,
+                  _item(NotificationType.commentReply, commentId: 'reply-1'),
+                )),
+                child: const Text('Open reply notification'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('Open reply notification'));
+    await tester.pumpAndSettle();
+
+    final target = find.byKey(
+      const ValueKey('notification-target-comment-reply-1'),
+    );
+    expect(find.byType(PollCommentsScreen), findsOneWidget);
+    expect(find.text('The root comment.'), findsOneWidget);
+    expect(find.text('The exact reply notification target.'), findsOneWidget);
+    expect(target, findsOneWidget);
+    expect(requestedPaths, contains('/polls/poll-1/comments/reply-1'));
+    expect(requestedPaths, contains('/polls/poll-1/comments/root-1'));
+    expect(
+      requestedPaths,
+      contains('/polls/poll-1/comments/root-1/replies'),
+    );
+    expect(
+      requestedPaths
+          .where((path) => path == '/polls/poll-1/comments/root-1/replies')
+          .length,
+      2,
+    );
+    expect(tester.getTopLeft(target).dy, greaterThanOrEqualTo(0));
+    final targetFocus = find.descendant(
+      of: target,
+      matching: find.byType(Focus),
+    );
+    expect(
+      tester.widget<Focus>(targetFocus).focusNode?.hasFocus,
+      isTrue,
+    );
+  });
+
   testWidgets('unavailable targets show a safe fallback without navigation',
       (tester) async {
     final store = NotificationStore();
@@ -440,7 +546,13 @@ final _longCommentsJson = List.generate(
   ),
 );
 
-Map<String, dynamic> _commentJson(String id, {String? body}) => {
+Map<String, dynamic> _commentJson(
+  String id, {
+  String? body,
+  String? parentCommentId,
+  int repliesCount = 0,
+}) =>
+    {
       'id': id,
       'pollId': 'poll-1',
       'author': {
@@ -452,6 +564,8 @@ Map<String, dynamic> _commentJson(String id, {String? body}) => {
       'body': body ?? 'Body for $id',
       'likesCount': 0,
       'viewerHasLiked': false,
+      'parentCommentId': parentCommentId,
+      'repliesCount': repliesCount,
       'createdAt': '2026-09-20T12:00:00.000Z',
       'updatedAt': '2026-09-20T12:00:00.000Z',
     };

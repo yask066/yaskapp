@@ -55,6 +55,8 @@ class PollCommentSummary {
     required this.body,
     required this.likesCount,
     this.viewerHasLiked = false,
+    this.parentCommentId,
+    this.repliesCount = 0,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -68,6 +70,8 @@ class PollCommentSummary {
       body: json['body'] as String,
       likesCount: json['likesCount'] as int,
       viewerHasLiked: json['viewerHasLiked'] as bool? ?? false,
+      parentCommentId: json['parentCommentId'] as String?,
+      repliesCount: json['repliesCount'] as int? ?? 0,
       createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
       updatedAt: DateTime.parse(json['updatedAt'] as String).toLocal(),
     );
@@ -79,8 +83,29 @@ class PollCommentSummary {
   final String body;
   final int likesCount;
   final bool viewerHasLiked;
+  final String? parentCommentId;
+  final int repliesCount;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  PollCommentSummary copyWith({
+    int? likesCount,
+    bool? viewerHasLiked,
+    int? repliesCount,
+  }) {
+    return PollCommentSummary(
+      id: id,
+      pollId: pollId,
+      author: author,
+      body: body,
+      likesCount: likesCount ?? this.likesCount,
+      viewerHasLiked: viewerHasLiked ?? this.viewerHasLiked,
+      parentCommentId: parentCommentId,
+      repliesCount: repliesCount ?? this.repliesCount,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+  }
 
   String get createdLabel {
     final elapsed = DateTime.now().difference(createdAt);
@@ -99,6 +124,16 @@ class PollCommentSummary {
 
     return '${elapsed.inDays} d';
   }
+}
+
+class PollCommentRepliesPage {
+  const PollCommentRepliesPage({
+    required this.items,
+    required this.nextCursor,
+  });
+
+  final List<PollCommentSummary> items;
+  final String? nextCursor;
 }
 
 class PollSummary {

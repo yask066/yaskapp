@@ -39,6 +39,7 @@ class PollCommentsScreen extends StatefulWidget {
 class _PollCommentsScreenState extends State<PollCommentsScreen> {
   final _commentController = TextEditingController();
   final _targetCommentKey = GlobalKey();
+  final _targetReplyKey = GlobalKey();
   late Future<List<PollCommentSummary>> _commentsFuture;
   late PollSummary _poll;
   List<PollCommentSummary>? _comments;
@@ -46,6 +47,8 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
   bool _isDeletingComment = false;
   bool _isLikingPoll = false;
   bool _targetCommentFocusScheduled = false;
+  String? _targetRootCommentId;
+  String? _targetReplyId;
   String? _targetCommentLoadMessage;
   late final ReportsApiClient _reportsApiClient;
   late final bool _ownsReportsApiClient;
@@ -82,27 +85,65 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
       accessToken: widget.accessToken,
     );
     _targetCommentLoadMessage = null;
+    _targetRootCommentId = null;
+    _targetReplyId = null;
     final targetId = widget.initialCommentId;
-    if (targetId != null &&
-        !comments.any((comment) => comment.id == targetId)) {
-      try {
-        final target = await widget.pollsApiClient.getComment(
-          pollId: _poll.id,
-          commentId: targetId,
-          accessToken: widget.accessToken,
-        );
-        if (target.pollId == _poll.id) {
-          comments.add(target);
-        } else {
-          _targetCommentLoadMessage = 'This comment is no longer available.';
+    if (targetId != null) {
+      var target = _findComment(comments, targetId);
+      if (target == null) {
+        try {
+          target = await widget.pollsApiClient.getComment(
+            pollId: _poll.id,
+            commentId: targetId,
+            accessToken: widget.accessToken,
+          );
+        } on PollsApiException catch (error) {
+          _targetCommentLoadMessage = error.statusCode == 404
+              ? 'This comment is no longer available.'
+              : 'Could not open this comment. Please try again.';
+        } on Object {
+          _targetCommentLoadMessage =
+              'Could not open this comment. Please try again.';
         }
-      } on PollsApiException catch (error) {
-        _targetCommentLoadMessage = error.statusCode == 404
-            ? 'This comment is no longer available.'
-            : 'Could not open this comment. Please try again.';
-      } on Object {
-        _targetCommentLoadMessage =
-            'Could not open this comment. Please try again.';
+      }
+
+      if (target != null && target.pollId == _poll.id) {
+        final parentCommentId = target.parentCommentId;
+        if (parentCommentId == null) {
+          _targetRootCommentId = target.id;
+          if (_findComment(comments, target.id) == null) comments.add(target);
+        } else {
+          _targetReplyId = target.id;
+          _targetRootCommentId = parentCommentId;
+          var root = _findComment(comments, parentCommentId);
+          if (root == null) {
+            try {
+              root = await widget.pollsApiClient.getComment(
+                pollId: _poll.id,
+                commentId: parentCommentId,
+                accessToken: widget.accessToken,
+              );
+            } on PollsApiException catch (error) {
+              _targetCommentLoadMessage = error.statusCode == 404
+                  ? 'This comment is no longer available.'
+                  : 'Could not open this comment. Please try again.';
+            } on Object {
+              _targetCommentLoadMessage =
+                  'Could not open this comment. Please try again.';
+            }
+          }
+          if (root != null &&
+              root.pollId == _poll.id &&
+              root.parentCommentId == null) {
+            if (_findComment(comments, root.id) == null) comments.add(root);
+          } else {
+            _targetReplyId = null;
+            _targetCommentLoadMessage ??=
+                'This comment is no longer available.';
+          }
+        }
+      } else if (target != null) {
+        _targetCommentLoadMessage = 'This comment is no longer available.';
       }
     }
 
@@ -123,13 +164,21 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
     final targetId = widget.initialCommentId;
     if (targetId == null || _targetCommentFocusScheduled) return;
     _targetCommentFocusScheduled = true;
-    if (!comments.any((comment) => comment.id == targetId)) {
+    if (_targetCommentLoadMessage != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _showSnackBar(
             _targetCommentLoadMessage ?? 'This comment is no longer available.',
           );
         }
+      });
+      return;
+    }
+    if (_targetReplyId != null) return;
+    final rootId = _targetRootCommentId ?? targetId;
+    if (!comments.any((comment) => comment.id == rootId)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showSnackBar('This comment is no longer available.');
       });
       return;
     }
@@ -145,6 +194,32 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
             : const Duration(milliseconds: 280),
         curve: Curves.easeOut,
       ));
+    });
+  }
+
+  PollCommentSummary? _findComment(
+    List<PollCommentSummary> comments,
+    String id,
+  ) {
+    for (final comment in comments) {
+      if (comment.id == id) return comment;
+    }
+    return null;
+  }
+
+  void _onReplyCreated(
+    String rootCommentId,
+    PollSummary updatedPoll,
+  ) {
+    if (!mounted) return;
+    final updatedComments = (_comments ?? []).map((comment) {
+      return comment.id == rootCommentId
+          ? comment.copyWith(repliesCount: comment.repliesCount + 1)
+          : comment;
+    }).toList();
+    setState(() {
+      _poll = updatedPoll;
+      _comments = updatedComments;
     });
   }
 
@@ -301,11 +376,11 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
         return;
       }
 
-      final updatedComments = (_comments ?? [])
-          .where((item) => item.id != comment.id)
-          .toList();
+      final updatedComments =
+          (_comments ?? []).where((item) => item.id != comment.id).toList();
       final updatedPoll = _poll.copyWith(
-        commentsCount: _poll.commentsCount > 0 ? _poll.commentsCount - 1 : 0,
+        commentsCount: (_poll.commentsCount - comment.repliesCount - 1)
+            .clamp(0, _poll.commentsCount),
       );
 
       setState(() {
@@ -434,75 +509,98 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                          PollCard(
-                            poll: _poll,
-                            accessToken: widget.accessToken,
-                            onToggleLike:
-                                _isLikingPoll ? null : _togglePollLike,
-                            isLiking: _isLikingPoll,
-                          ),
-                          const SizedBox(height: 26),
-                          Row(
-                            children: [
-                              Text(
-                                '${_poll.commentsCount} comments',
-                                style: const TextStyle(
+                            PollCard(
+                              poll: _poll,
+                              accessToken: widget.accessToken,
+                              onToggleLike:
+                                  _isLikingPoll ? null : _togglePollLike,
+                              isLiking: _isLikingPoll,
+                            ),
+                            const SizedBox(height: 26),
+                            Row(
+                              children: [
+                                Text(
+                                  '${_poll.commentsCount} comments',
+                                  style: const TextStyle(
+                                    color: _commentsSecondaryText,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const Spacer(),
+                                const Text(
+                                  'Newest',
+                                  style: TextStyle(
+                                    color: _commentsSecondaryText,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.keyboard_arrow_down,
                                   color: _commentsSecondaryText,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500,
+                                  size: 18,
                                 ),
-                              ),
-                              const Spacer(),
-                              const Text(
-                                'Newest',
-                                style: TextStyle(
-                                  color: _commentsSecondaryText,
-                                  fontSize: 15,
-                                ),
-                              ),
-                              const Icon(
-                                Icons.keyboard_arrow_down,
-                                color: _commentsSecondaryText,
-                                size: 18,
-                              ),
-                            ],
-                          ),
-                          const Divider(
-                            height: 32,
-                            color: _commentsDivider,
-                          ),
-                          if (comments.isEmpty)
-                            const _CommentsEmptyState()
-                          else
-                            for (final comment in comments) ...[
-                              KeyedSubtree(
-                                key: comment.id == widget.initialCommentId
-                                    ? ValueKey(
-                                        'notification-target-comment-${comment.id}')
-                                    : null,
-                                child: _CommentTile(
-                                  key: comment.id == widget.initialCommentId
-                                      ? _targetCommentKey
-                                      : null,
-                                  comment: comment,
-                                  isNotificationTarget:
-                                      comment.id == widget.initialCommentId,
-                                  onDelete: widget.currentUserId == comment.author.id
-                                      ? () => _deleteComment(comment)
-                                      : null,
-                                  onReport: widget.currentUserId != null &&
-                                          widget.currentUserId != comment.author.id
-                                      ? () => _reportComment(comment)
-                                      : null,
-                                  onToggleLike: _toggleCommentLike,
-                                ),
-                              ),
-                              const Divider(
-                                height: 1,
-                                indent: 76,
-                                color: _commentsDivider,
-                              ),
-                            ],
+                              ],
+                            ),
+                            const Divider(
+                              height: 32,
+                              color: _commentsDivider,
+                            ),
+                            if (comments.isEmpty)
+                              const _CommentsEmptyState()
+                            else
+                              ...comments.expand((comment) {
+                                final isReplyTargetRoot =
+                                    comment.id == _targetRootCommentId &&
+                                        _targetReplyId != null;
+                                final isRootTarget =
+                                    comment.id == _targetRootCommentId &&
+                                        _targetReplyId == null;
+                                return <Widget>[
+                                  KeyedSubtree(
+                                    key: isRootTarget
+                                        ? ValueKey(
+                                            'notification-target-comment-${comment.id}')
+                                        : null,
+                                    child: _CommentTile(
+                                      key: isRootTarget
+                                          ? _targetCommentKey
+                                          : ValueKey(
+                                              'comment-tile-${comment.id}'),
+                                      comment: comment,
+                                      isNotificationTarget: isRootTarget,
+                                      pollId: _poll.id,
+                                      accessToken: widget.accessToken,
+                                      pollsApiClient: widget.pollsApiClient,
+                                      canReply: widget.currentUserId != null,
+                                      focusedReplyId: isReplyTargetRoot
+                                          ? _targetReplyId
+                                          : null,
+                                      targetReplyKey: isReplyTargetRoot
+                                          ? _targetReplyKey
+                                          : null,
+                                      onReplyCreated: (updatedPoll) =>
+                                          _onReplyCreated(
+                                              comment.id, updatedPoll),
+                                      onDelete: widget.currentUserId ==
+                                              comment.author.id
+                                          ? () => _deleteComment(comment)
+                                          : null,
+                                      onReport: widget.currentUserId != null &&
+                                              widget.currentUserId !=
+                                                  comment.author.id
+                                          ? () => _reportComment(comment)
+                                          : null,
+                                      onToggleLike: _toggleCommentLike,
+                                    ),
+                                  ),
+                                  const Divider(
+                                    height: 1,
+                                    indent: 76,
+                                    color: _commentsDivider,
+                                  ),
+                                ];
+                              }),
                           ],
                         ),
                       );
@@ -687,10 +785,427 @@ class _CommentsErrorState extends StatelessWidget {
   }
 }
 
+class _CommentThread extends StatefulWidget {
+  const _CommentThread({
+    super.key,
+    required this.rootComment,
+    required this.pollId,
+    required this.accessToken,
+    required this.pollsApiClient,
+    required this.canReply,
+    required this.onReplyCreated,
+    this.focusedReplyId,
+    this.targetReplyKey,
+  });
+
+  final PollCommentSummary rootComment;
+  final String pollId;
+  final String accessToken;
+  final PollsApiClient pollsApiClient;
+  final bool canReply;
+  final ValueChanged<PollSummary> onReplyCreated;
+  final String? focusedReplyId;
+  final GlobalKey? targetReplyKey;
+
+  @override
+  State<_CommentThread> createState() => _CommentThreadState();
+}
+
+class _CommentThreadState extends State<_CommentThread> {
+  final _replyController = TextEditingController();
+  final _targetReplyFocusNode = FocusNode(debugLabel: 'notification reply');
+  List<PollCommentSummary> _replies = [];
+  String? _nextCursor;
+  String? _failedCursor;
+  String? _loadError;
+  String? _submissionError;
+  bool _isExpanded = false;
+  bool _isComposing = false;
+  bool _isLoading = false;
+  bool _isLoadingMore = false;
+  bool _isSubmitting = false;
+  bool _hasLoaded = false;
+  bool _targetFocusScheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.focusedReplyId != null) {
+      _isExpanded = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_loadReplies());
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _CommentThread oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusedReplyId != widget.focusedReplyId) {
+      _targetFocusScheduled = false;
+      if (widget.focusedReplyId != null) {
+        _isExpanded = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !_hasLoaded) unawaited(_loadReplies());
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _replyController.dispose();
+    _targetReplyFocusNode.dispose();
+    super.dispose();
+  }
+
+  void openComposer() {
+    if (!widget.canReply || _isSubmitting) return;
+    setState(() {
+      _isComposing = true;
+      _submissionError = null;
+    });
+  }
+
+  void _toggleExpanded() {
+    final expand = !_isExpanded;
+    setState(() => _isExpanded = expand);
+    if (expand && !_hasLoaded && !_isLoading) unawaited(_loadReplies());
+  }
+
+  Future<void> _loadReplies({String? cursor}) async {
+    if (_isLoading || _isLoadingMore) return;
+    final isFirstPage = cursor == null;
+    setState(() {
+      _loadError = null;
+      _failedCursor = cursor;
+      if (isFirstPage) {
+        _isLoading = true;
+      } else {
+        _isLoadingMore = true;
+      }
+    });
+
+    try {
+      final page = await widget.pollsApiClient.listCommentReplies(
+        pollId: widget.pollId,
+        rootCommentId: widget.rootComment.id,
+        limit: 20,
+        cursor: cursor,
+        accessToken: widget.accessToken,
+      );
+      if (!mounted) return;
+      final mergedReplies = _mergeReplies(_replies, page.items);
+      setState(() {
+        _replies = mergedReplies;
+        _nextCursor = page.nextCursor;
+        _hasLoaded = true;
+        _isLoading = false;
+        _isLoadingMore = false;
+        _loadError = null;
+        _failedCursor = null;
+      });
+      _scheduleTargetReplyFocus();
+
+      final targetFound = widget.focusedReplyId == null ||
+          mergedReplies.any((reply) => reply.id == widget.focusedReplyId);
+      if (!targetFound && page.nextCursor != null) {
+        unawaited(_loadReplies(cursor: page.nextCursor));
+      }
+    } on PollsApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _isLoadingMore = false;
+        _loadError = error.userMessage;
+        _failedCursor = cursor;
+      });
+    } on Object {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _isLoadingMore = false;
+        _loadError = 'Could not load replies. Please try again.';
+        _failedCursor = cursor;
+      });
+    }
+  }
+
+  List<PollCommentSummary> _mergeReplies(
+    List<PollCommentSummary> current,
+    List<PollCommentSummary> incoming,
+  ) {
+    final merged = [...current];
+    for (final reply in incoming) {
+      if (!merged.any((item) => item.id == reply.id)) merged.add(reply);
+    }
+    return merged;
+  }
+
+  void _scheduleTargetReplyFocus() {
+    final targetId = widget.focusedReplyId;
+    if (targetId == null ||
+        _targetFocusScheduled ||
+        !_replies.any((reply) => reply.id == targetId)) {
+      return;
+    }
+    _targetFocusScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final targetContext = widget.targetReplyKey?.currentContext;
+      if (!mounted || targetContext == null) return;
+      _targetReplyFocusNode.requestFocus();
+      unawaited(Scrollable.ensureVisible(
+        targetContext,
+        alignment: 0.25,
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 280),
+        curve: Curves.easeOut,
+      ));
+    });
+  }
+
+  Future<void> _submitReply() async {
+    final body = _replyController.text.trim();
+    if (body.isEmpty || _isSubmitting) return;
+    setState(() {
+      _isSubmitting = true;
+      _submissionError = null;
+    });
+
+    try {
+      final result = await widget.pollsApiClient.createComment(
+        pollId: widget.pollId,
+        body: body,
+        accessToken: widget.accessToken,
+        parentCommentId: widget.rootComment.id,
+      );
+      if (!mounted) return;
+      widget.onReplyCreated(result.poll);
+      _replyController.clear();
+      setState(() {
+        _replies = _mergeReplies(_replies, [result.comment]);
+        _isExpanded = true;
+        _isComposing = false;
+      });
+      if (!_hasLoaded) unawaited(_loadReplies());
+    } on PollsApiException catch (error) {
+      if (!mounted) return;
+      setState(() => _submissionError = error.userMessage);
+    } on Object {
+      if (!mounted) return;
+      setState(() => _submissionError = 'Could not post reply.');
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authorLabel = widget.rootComment.author.displayName.isNotEmpty
+        ? widget.rootComment.author.displayName
+        : widget.rootComment.author.username;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.rootComment.repliesCount > 0 || _isExpanded)
+          TextButton(
+            key: ValueKey('toggle-replies-${widget.rootComment.id}'),
+            onPressed: _toggleExpanded,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              visualDensity: VisualDensity.compact,
+            ),
+            child: Text(
+              '${_isExpanded ? 'Hide' : 'Show'} replies (${widget.rootComment.repliesCount})',
+            ),
+          ),
+        if (_isComposing && widget.canReply)
+          _ReplyComposer(
+            controller: _replyController,
+            isSubmitting: _isSubmitting,
+            error: _submissionError,
+            rootCommentId: widget.rootComment.id,
+            authorLabel: authorLabel,
+            onCancel: () {
+              if (_isSubmitting) return;
+              _replyController.clear();
+              setState(() {
+                _isComposing = false;
+                _submissionError = null;
+              });
+            },
+            onSubmit: _submitReply,
+          ),
+        if (_isExpanded) ...[
+          if (_isLoading && _replies.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          if (_loadError != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_loadError!,
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.error)),
+                  TextButton(
+                    onPressed: _isLoading || _isLoadingMore
+                        ? null
+                        : () => unawaited(_loadReplies(cursor: _failedCursor)),
+                    child: const Text('Retry replies'),
+                  ),
+                ],
+              ),
+            ),
+          if (_hasLoaded && _replies.isEmpty && _loadError == null)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('No replies yet.'),
+            ),
+          for (final reply in _replies) _buildReply(reply),
+          if (_nextCursor != null && _loadError == null)
+            TextButton(
+              onPressed: _isLoadingMore
+                  ? null
+                  : () => unawaited(_loadReplies(cursor: _nextCursor)),
+              child: Text(
+                  _isLoadingMore ? 'Loading replies…' : 'Load more replies'),
+            ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildReply(PollCommentSummary reply) {
+    final isTarget = reply.id == widget.focusedReplyId;
+    final card = Focus(
+      key: isTarget ? widget.targetReplyKey : null,
+      focusNode: isTarget ? _targetReplyFocusNode : null,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isTarget ? const Color(0xFFE6EEFF) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              reply.author.displayName.isNotEmpty
+                  ? reply.author.displayName
+                  : reply.author.username,
+              style: const TextStyle(
+                color: _commentsPrimaryText,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(reply.body, style: const TextStyle(height: 1.3)),
+          ],
+        ),
+      ),
+    );
+    return isTarget
+        ? KeyedSubtree(
+            key: ValueKey('notification-target-comment-${reply.id}'),
+            child: card,
+          )
+        : card;
+  }
+}
+
+class _ReplyComposer extends StatelessWidget {
+  const _ReplyComposer({
+    required this.controller,
+    required this.isSubmitting,
+    required this.error,
+    required this.rootCommentId,
+    required this.authorLabel,
+    required this.onCancel,
+    required this.onSubmit,
+  });
+
+  final TextEditingController controller;
+  final bool isSubmitting;
+  final String? error;
+  final String rootCommentId;
+  final String authorLabel;
+  final VoidCallback onCancel;
+  final VoidCallback onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _commentsDivider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Replying to $authorLabel'),
+          const SizedBox(height: 8),
+          TextField(
+            key: ValueKey('reply-composer-$rootCommentId'),
+            controller: controller,
+            enabled: !isSubmitting,
+            minLines: 1,
+            maxLines: 4,
+            maxLength: 1000,
+            decoration: const InputDecoration(
+              hintText: 'Write a reply...',
+              border: OutlineInputBorder(),
+              counterText: '',
+            ),
+          ),
+          if (error != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            ),
+          Wrap(
+            spacing: 8,
+            children: [
+              TextButton(
+                onPressed: isSubmitting ? null : onCancel,
+                child: const Text('Cancel reply'),
+              ),
+              Tooltip(
+                message: 'Post reply',
+                child: FilledButton(
+                  onPressed: isSubmitting ? null : onSubmit,
+                  child: const Text('Post reply'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CommentTile extends StatefulWidget {
   const _CommentTile({
     super.key,
     required this.comment,
+    required this.pollId,
+    required this.accessToken,
+    required this.pollsApiClient,
+    required this.canReply,
+    required this.onReplyCreated,
+    this.focusedReplyId,
+    this.targetReplyKey,
     this.isNotificationTarget = false,
     this.onDelete,
     this.onReport,
@@ -698,6 +1213,13 @@ class _CommentTile extends StatefulWidget {
   });
 
   final PollCommentSummary comment;
+  final String pollId;
+  final String accessToken;
+  final PollsApiClient pollsApiClient;
+  final bool canReply;
+  final ValueChanged<PollSummary> onReplyCreated;
+  final String? focusedReplyId;
+  final GlobalKey? targetReplyKey;
   final bool isNotificationTarget;
   final VoidCallback? onDelete;
   final VoidCallback? onReport;
@@ -709,6 +1231,7 @@ class _CommentTile extends StatefulWidget {
 }
 
 class _CommentTileState extends State<_CommentTile> {
+  final _replyThreadKey = GlobalKey<_CommentThreadState>();
   late PollCommentSummary _comment;
   bool _isLiking = false;
 
@@ -761,140 +1284,180 @@ class _CommentTileState extends State<_CommentTile> {
             : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          UserAvatar(
-            displayName: comment.author.displayName,
-            username: comment.author.username,
-            imageUrl: comment.author.avatarUrl,
-            radius: 22,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              UserAvatar(
+                displayName: comment.author.displayName,
+                username: comment.author.username,
+                imageUrl: comment.author.avatarUrl,
+                radius: 22,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        comment.author.displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: _commentsPrimaryText,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      comment.createdLabel,
-                      style: const TextStyle(
-                        color: _commentsSecondaryText,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  comment.body,
-                  style: const TextStyle(
-                    color: _commentsPrimaryText,
-                    fontSize: 16,
-                    height: 21 / 16,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    IconButton(
-                      key: ValueKey('like-comment-${comment.id}'),
-                      tooltip: comment.viewerHasLiked
-                          ? 'Unlike comment'
-                          : 'Like comment',
-                      onPressed: _isLiking ? null : _toggleLike,
-                      padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints.tightFor(width: 18, height: 24),
-                      style: IconButton.styleFrom(
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      alignment: Alignment.centerLeft,
-                      icon: Icon(
-                        comment.viewerHasLiked
-                            ? Icons.favorite
-                            : Icons.favorite_border,
-                        size: 18,
-                        color: comment.viewerHasLiked
-                            ? Colors.redAccent
-                            : _commentsSecondaryText,
-                      ),
-                    ),
-                    const SizedBox(width: 1),
-                    Text(
-                      '${comment.likesCount}',
-                      style: const TextStyle(
-                          color: _commentsSecondaryText, fontSize: 14),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Reply',
-                      style: TextStyle(
-                          color: _commentsSecondaryText, fontSize: 14),
-                    ),
-                    const Spacer(),
-                    if (widget.onDelete != null || widget.onReport != null)
-                      SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: PopupMenuButton<_CommentAction>(
-                          tooltip: 'More',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 220),
-                          menuPadding: const EdgeInsets.symmetric(vertical: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            comment.author.displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: _commentsPrimaryText,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                          elevation: 6,
-                          icon: const Icon(Icons.more_vert, size: 22),
-                          onSelected: (action) {
-                            if (action == _CommentAction.deleteComment) {
-                              widget.onDelete?.call();
-                            } else if (action == _CommentAction.report) {
-                              widget.onReport?.call();
-                            }
-                          },
-                          itemBuilder: (context) => [
-                            if (widget.onDelete != null)
-                              const PopupMenuItem<_CommentAction>(
-                                value: _CommentAction.deleteComment,
-                                height: 52,
-                                child: _CommentMenuRow(
-                                  icon: Icons.delete_outline,
-                                  label: 'Delete comment',
-                                  destructive: true,
-                                ),
-                              ),
-                            if (widget.onReport != null)
-                              const PopupMenuItem<_CommentAction>(
-                                value: _CommentAction.report,
-                                height: 52,
-                                child: _CommentMenuRow(
-                                  icon: Icons.flag_outlined,
-                                  label: 'Report',
-                                ),
-                              ),
-                          ],
                         ),
+                        const SizedBox(width: 6),
+                        Text(
+                          comment.createdLabel,
+                          style: const TextStyle(
+                            color: _commentsSecondaryText,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      comment.body,
+                      style: const TextStyle(
+                        color: _commentsPrimaryText,
+                        fontSize: 16,
+                        height: 21 / 16,
                       ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        IconButton(
+                          key: ValueKey('like-comment-${comment.id}'),
+                          tooltip: comment.viewerHasLiked
+                              ? 'Unlike comment'
+                              : 'Like comment',
+                          onPressed: _isLiking ? null : _toggleLike,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints.tightFor(
+                              width: 18, height: 24),
+                          style: IconButton.styleFrom(
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          alignment: Alignment.centerLeft,
+                          icon: Icon(
+                            comment.viewerHasLiked
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            size: 18,
+                            color: comment.viewerHasLiked
+                                ? Colors.redAccent
+                                : _commentsSecondaryText,
+                          ),
+                        ),
+                        const SizedBox(width: 1),
+                        Text(
+                          '${comment.likesCount}',
+                          style: const TextStyle(
+                              color: _commentsSecondaryText, fontSize: 14),
+                        ),
+                        const SizedBox(width: 12),
+                        Tooltip(
+                          message: widget.canReply
+                              ? 'Reply to ${comment.author.displayName}'
+                              : 'Sign in to reply',
+                          child: TextButton(
+                            key: ValueKey('reply-comment-${comment.id}'),
+                            onPressed: widget.canReply
+                                ? () =>
+                                    _replyThreadKey.currentState?.openComposer()
+                                : null,
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            child: const Text(
+                              'Reply',
+                              style: TextStyle(
+                                color: _commentsSecondaryText,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        if (widget.onDelete != null || widget.onReport != null)
+                          SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: PopupMenuButton<_CommentAction>(
+                              tooltip: 'More',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 220),
+                              menuPadding:
+                                  const EdgeInsets.symmetric(vertical: 8),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 6,
+                              icon: const Icon(Icons.more_vert, size: 22),
+                              onSelected: (action) {
+                                if (action == _CommentAction.deleteComment) {
+                                  widget.onDelete?.call();
+                                } else if (action == _CommentAction.report) {
+                                  widget.onReport?.call();
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                if (widget.onDelete != null)
+                                  const PopupMenuItem<_CommentAction>(
+                                    value: _CommentAction.deleteComment,
+                                    height: 52,
+                                    child: _CommentMenuRow(
+                                      icon: Icons.delete_outline,
+                                      label: 'Delete comment',
+                                      destructive: true,
+                                    ),
+                                  ),
+                                if (widget.onReport != null)
+                                  const PopupMenuItem<_CommentAction>(
+                                    value: _CommentAction.report,
+                                    height: 52,
+                                    child: _CommentMenuRow(
+                                      icon: Icons.flag_outlined,
+                                      label: 'Report',
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
-              ],
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 34),
+            child: _CommentThread(
+              key: _replyThreadKey,
+              rootComment: comment,
+              pollId: widget.pollId,
+              accessToken: widget.accessToken,
+              pollsApiClient: widget.pollsApiClient,
+              canReply: widget.canReply,
+              focusedReplyId: widget.focusedReplyId,
+              targetReplyKey: widget.targetReplyKey,
+              onReplyCreated: widget.onReplyCreated,
             ),
           ),
         ],

@@ -246,6 +246,48 @@ void main() {
     expect(comments.first.author.username, 'ada');
   });
 
+  test('lists cursor-paginated replies for a root comment', () async {
+    late http.Request sentRequest;
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((request) async {
+        sentRequest = request;
+        return http.Response(
+          jsonEncode({
+            'items': [
+              {
+                ..._commentJson(),
+                'id': 'reply-1',
+                'parentCommentId': 'root-1',
+              },
+            ],
+            'nextCursor': 'next-page',
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+
+    final page = await client.listCommentReplies(
+      pollId: 'poll-1',
+      rootCommentId: 'root-1',
+      limit: 3,
+      cursor: 'opaque cursor',
+      accessToken: 'access-token',
+    );
+
+    expect(sentRequest.method, 'GET');
+    expect(sentRequest.url.path, '/polls/poll-1/comments/root-1/replies');
+    expect(sentRequest.url.queryParameters, {
+      'limit': '3',
+      'cursor': 'opaque cursor',
+    });
+    expect(sentRequest.headers['authorization'], 'Bearer access-token');
+    expect(page.items.single.parentCommentId, 'root-1');
+    expect(page.nextCursor, 'next-page');
+  });
+
   test('creates poll comment', () async {
     late http.Request sentRequest;
     final client = PollsApiClient(
@@ -278,6 +320,44 @@ void main() {
     expect(result.comment.id, 'comment-1');
     expect(result.poll.id, 'poll-1');
     expect(result.poll.commentsCount, 1);
+  });
+
+  test('creates a reply with its root comment ID', () async {
+    late http.Request sentRequest;
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((request) async {
+        sentRequest = request;
+        return http.Response(
+          jsonEncode({
+            'comment': {
+              ..._commentJson(),
+              'id': 'reply-1',
+              'parentCommentId': 'root-1',
+            },
+            'poll': _pollJson(commentsCount: 2),
+          }),
+          201,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+
+    final result = await client.createComment(
+      pollId: 'poll-1',
+      body: 'A useful reply.',
+      accessToken: 'access-token',
+      parentCommentId: 'root-1',
+    );
+
+    expect(sentRequest.method, 'POST');
+    expect(sentRequest.url.path, '/polls/poll-1/comments');
+    expect(jsonDecode(sentRequest.body), {
+      'body': 'A useful reply.',
+      'parentCommentId': 'root-1',
+    });
+    expect(result.comment.parentCommentId, 'root-1');
+    expect(result.poll.commentsCount, 2);
   });
 
   test('deletes a poll comment through the comment route', () async {
