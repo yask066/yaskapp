@@ -484,6 +484,7 @@ class _FakePollsApiClient extends PollsApiClient {
     required String pollId,
     required String body,
     required String accessToken,
+    String? parentCommentId,
   }) async {
     return createCommentResult!;
   }

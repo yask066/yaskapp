@@ -879,7 +879,6 @@ class _FakePollsApiClient extends PollsApiClient {
     Future<PollSummary>? likePollFuture,
     Future<void>? deleteCommentFuture,
     this.replyPageLoader,
-    this.commentLoader,
   })  : createCommentFuture =
             createCommentFuture ?? Future.value(_createCommentResult),
         likeCommentFuture = likeCommentFuture ?? Future.value(_likedComment),
@@ -896,7 +895,6 @@ class _FakePollsApiClient extends PollsApiClient {
     required int limit,
     String? cursor,
   })? replyPageLoader;
-  final Future<PollCommentSummary> Function(String commentId)? commentLoader;
   int createCommentCalls = 0;
   final List<String> createdCommentBodies = [];
   final List<String?> createdParentCommentIds = [];
@@ -937,9 +935,9 @@ class _FakePollsApiClient extends PollsApiClient {
     required String commentId,
     required String accessToken,
   }) {
-    return commentLoader?.call(commentId) ??
-        Future.error(
-            const PollsApiException('Comment was not found.', statusCode: 404));
+    return Future.error(
+      const PollsApiException('Comment was not found.', statusCode: 404),
+    );
   }
 
   @override
