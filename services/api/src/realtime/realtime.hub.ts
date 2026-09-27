@@ -121,28 +121,9 @@ type RealtimeEvent =
 
 const openReadyState = 1;
 const idleTimeoutMs = 90_000;
-const clients = new Map<RealtimeSocket, { userId: string | undefined; lastSeen: number }>();
-const disconnectMetrics: Record<string, number> = {};
-let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
 
 export function createConnectionReadyEvent(): ConnectionReadyEvent {
   return { version: 1, type: 'connection.ready' };
-}
-
-export function getRealtimeConnectionMetrics() {
-  return {
-    activeSockets: clients.size,
-    disconnectsByReason: { ...disconnectMetrics }
-  };
-}
-
-export function resetRealtimeConnectionMetrics() {
-  // Test helper: socket metrics are process-global and the detailed counters live in notifications.metrics.
-  for (const socket of clients.keys()) socket.close?.(4000, 'test_reset');
-  clients.clear();
-  for (const key of Object.keys(disconnectMetrics)) delete disconnectMetrics[key];
-  if (heartbeatTimer) clearInterval(heartbeatTimer);
-  heartbeatTimer = undefined;
 }
 
 function send(socket: RealtimeSocket, event: RealtimeEvent) {
@@ -157,57 +138,119 @@ function send(socket: RealtimeSocket, event: RealtimeEvent) {
   socket.send(JSON.stringify(event));
 }
 
-export function addRealtimeClient(socket: RealtimeSocket, userId?: string) {
-  clients.set(socket, { userId, lastSeen: Date.now() });
-  recordSocketConnected();
-  ensureHeartbeat();
+type RealtimeHubOptions = { recordMetrics?: boolean };
 
-  send(socket, createConnectionReadyEvent());
+/** A process-local socket registry. Each API process owns one hub instance. */
+export class RealtimeHub {
+  private readonly clients = new Map<RealtimeSocket, { userId: string | undefined; lastSeen: number }>();
+  private readonly disconnectMetrics: Record<string, number> = {};
+  private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
 
-  return (reason = 'client_close') => {
-    if (!clients.delete(socket)) return;
-    recordSocketDisconnected(reason);
-    disconnectMetrics[reason] = (disconnectMetrics[reason] ?? 0) + 1;
-    if (clients.size === 0 && heartbeatTimer) {
-      clearInterval(heartbeatTimer);
-      heartbeatTimer = undefined;
+  constructor(private readonly options: RealtimeHubOptions = {}) {}
+
+  getConnectionMetrics() {
+    return {
+      activeSockets: this.clients.size,
+      disconnectsByReason: { ...this.disconnectMetrics }
+    };
+  }
+
+  reset() {
+    for (const socket of this.clients.keys()) socket.close?.(4000, 'test_reset');
+    this.clients.clear();
+    for (const key of Object.keys(this.disconnectMetrics)) delete this.disconnectMetrics[key];
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = undefined;
+  }
+
+  addRealtimeClient(socket: RealtimeSocket, userId?: string) {
+    this.clients.set(socket, { userId, lastSeen: Date.now() });
+    if (this.options.recordMetrics) recordSocketConnected();
+    this.ensureHeartbeat();
+    send(socket, createConnectionReadyEvent());
+
+    return (reason = 'client_close') => this.removeRealtimeClient(socket, reason);
+  }
+
+  handleRealtimeMessage(socket: RealtimeSocket, message: Buffer | ArrayBuffer | string) {
+    const state = this.clients.get(socket);
+    if (state) state.lastSeen = Date.now();
+    const value = message.toString();
+    if (value === 'ping' || value === JSON.stringify({ type: 'ping' })) {
+      send(socket, { version: 1, type: 'pong' } as RealtimeEvent);
     }
-  };
+  }
+
+  sweepIdleRealtimeClients(now: number) {
+    for (const [socket, state] of this.clients) {
+      if (now - state.lastSeen <= idleTimeoutMs) continue;
+      socket.close?.(4001, 'idle_timeout');
+      this.removeRealtimeClient(socket, 'idle_timeout');
+    }
+  }
+
+  broadcast(event: RealtimeEvent) {
+    for (const client of this.clients.keys()) {
+      try {
+        send(client, event);
+      } catch {
+        this.clients.delete(client);
+      }
+    }
+  }
+
+  sendToUser(userId: string, event: RealtimeEvent) {
+    for (const [client, state] of this.clients) {
+      if (state.userId !== userId) continue;
+      state.lastSeen = Date.now();
+      try {
+        send(client, event);
+      } catch {
+        this.clients.delete(client);
+      }
+    }
+  }
+
+  private ensureHeartbeat() {
+    if (this.heartbeatTimer) return;
+    this.heartbeatTimer = setInterval(() => {
+      this.sweepIdleRealtimeClients(Date.now());
+    }, 30_000);
+    this.heartbeatTimer.unref?.();
+  }
+
+  private removeRealtimeClient(socket: RealtimeSocket, reason: string) {
+    if (!this.clients.delete(socket)) return;
+    if (this.options.recordMetrics) recordSocketDisconnected(reason);
+    this.disconnectMetrics[reason] = (this.disconnectMetrics[reason] ?? 0) + 1;
+    if (this.clients.size === 0 && this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = undefined;
+    }
+  }
+}
+
+const processRealtimeHub = new RealtimeHub({ recordMetrics: true });
+
+export function getRealtimeConnectionMetrics() {
+  return processRealtimeHub.getConnectionMetrics();
+}
+
+export function resetRealtimeConnectionMetrics() {
+  // Test helper: socket metrics are process-global and the detailed counters live in notifications.metrics.
+  processRealtimeHub.reset();
+}
+
+export function addRealtimeClient(socket: RealtimeSocket, userId?: string) {
+  return processRealtimeHub.addRealtimeClient(socket, userId);
 }
 
 export function handleRealtimeMessage(socket: RealtimeSocket, message: Buffer | ArrayBuffer | string) {
-  const state = clients.get(socket);
-  if (state) state.lastSeen = Date.now();
-  const value = message.toString();
-  if (value === 'ping' || value === JSON.stringify({ type: 'ping' })) {
-    send(socket, { version: 1, type: 'pong' } as RealtimeEvent);
-  }
-}
-
-function ensureHeartbeat() {
-  if (heartbeatTimer) return;
-  heartbeatTimer = setInterval(() => {
-    sweepIdleRealtimeClients(Date.now());
-  }, 30_000);
-  heartbeatTimer.unref?.();
+  processRealtimeHub.handleRealtimeMessage(socket, message);
 }
 
 export function sweepIdleRealtimeClients(now: number) {
-  for (const [socket, state] of clients) {
-    if (now - state.lastSeen <= idleTimeoutMs) continue;
-    socket.close?.(4001, 'idle_timeout');
-    removeRealtimeClient(socket, 'idle_timeout');
-  }
-}
-
-function removeRealtimeClient(socket: RealtimeSocket, reason: string) {
-  if (!clients.delete(socket)) return;
-  recordSocketDisconnected(reason);
-  disconnectMetrics[reason] = (disconnectMetrics[reason] ?? 0) + 1;
-  if (clients.size === 0 && heartbeatTimer) {
-    clearInterval(heartbeatTimer);
-    heartbeatTimer = undefined;
-  }
+  processRealtimeHub.sweepIdleRealtimeClients(now);
 }
 
 export function broadcastPollVoteCreated(payload: PollVoteCreatedEvent['payload']) {
@@ -290,23 +333,9 @@ function sanitizePoll(
 }
 
 function broadcast(event: RealtimeEvent) {
-  for (const client of clients.keys()) {
-    try {
-      send(client, event);
-    } catch {
-      clients.delete(client);
-    }
-  }
+  processRealtimeHub.broadcast(event);
 }
 
 export function sendToUser(userId: string, event: RealtimeEvent) {
-  for (const [client, state] of clients) {
-    if (state.userId !== userId) continue;
-    state.lastSeen = Date.now();
-    try {
-      send(client, event);
-    } catch {
-      clients.delete(client);
-    }
-  }
+  processRealtimeHub.sendToUser(userId, event);
 }

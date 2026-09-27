@@ -184,6 +184,78 @@ class NotificationStore {
     _notify();
   }
 
+  void applyRemoteRead({
+    required String notificationId,
+    required DateTime readAt,
+    required int unreadCount,
+  }) {
+    final item = _itemsById[notificationId];
+    var changedUnreadItem = false;
+    if (item != null) {
+      final isPendingMutation = _pendingReadIds.contains(notificationId);
+      if (item.createdAt.isAfter(readAt) ||
+          (item.readAt != null &&
+              !isPendingMutation &&
+              readAt.isBefore(item.readAt!))) {
+        return;
+      }
+      changedUnreadItem = item.isUnread;
+      _itemsById[notificationId] = item.copyWith(readAt: readAt);
+      _pendingReadIds.remove(notificationId);
+      _readAllPendingIds.remove(notificationId);
+    }
+
+    final hasNewerUnreadItem = _itemsById.values.any(
+      (candidate) => candidate.isUnread && candidate.createdAt.isAfter(readAt),
+    );
+    if (_isMarkAllPending) _readAllHasAuthoritativeCountUpdate = true;
+    if (hasNewerUnreadItem) {
+      if (changedUnreadItem && _unreadCount > 0) _unreadCount--;
+    } else {
+      _unreadCount = unreadCount;
+    }
+    _notify();
+  }
+
+  void applyRemoteReadAll({
+    required DateTime readAt,
+    required int unreadCount,
+  }) {
+    var hasNewerUnreadItem = false;
+    var changedUnreadItems = 0;
+    for (final entry in _itemsById.entries) {
+      final item = entry.value;
+      if (item.createdAt.isAfter(readAt)) {
+        if (item.isUnread) hasNewerUnreadItem = true;
+        continue;
+      }
+      final isPendingMutation = _pendingReadIds.contains(entry.key);
+      if (item.isUnread) changedUnreadItems++;
+      if (item.readAt == null ||
+          (isPendingMutation || !item.readAt!.isAfter(readAt))) {
+        _itemsById[entry.key] = item.copyWith(readAt: readAt);
+        _pendingReadIds.remove(entry.key);
+      }
+    }
+
+    _readAllPendingIds.clear();
+    _readAllRollback = {};
+    _hasReadAllRollback = false;
+    _isMarkAllPending = false;
+    _readAllOptimisticReadAt = null;
+    _readAllHasAuthoritativeCountUpdate = false;
+    _readAllConcurrentUnreadDelta = 0;
+    _readAllError = null;
+    if (hasNewerUnreadItem) {
+      _unreadCount = _unreadCount > changedUnreadItems
+          ? _unreadCount - changedUnreadItems
+          : 0;
+    } else {
+      _unreadCount = unreadCount;
+    }
+    _notify();
+  }
+
   void markAllReadOptimistic({DateTime? readAt}) {
     _readAllRollback = {};
     _hasReadAllRollback = true;

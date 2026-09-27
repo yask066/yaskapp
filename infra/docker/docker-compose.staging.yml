@@ -102,6 +102,9 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 3000
+      REDIS_URL: redis://redis:6379
+    deploy:
+      replicas: 2
     restart: unless-stopped
     expose:
       - "3000"

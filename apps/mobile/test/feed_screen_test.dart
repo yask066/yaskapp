@@ -474,6 +474,7 @@ class _FakePollsApiClient extends PollsApiClient {
   Future<List<PollCommentSummary>> listComments({
     required String pollId,
     int limit = 50,
+    String? accessToken,
   }) async {
     return comments;
   }

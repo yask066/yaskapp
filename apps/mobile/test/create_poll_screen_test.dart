@@ -37,8 +37,11 @@ void main() {
       ),
     );
 
-    final field = tester.widget<TextFormField>(find.byType(TextFormField).first);
-    final border = field.decoration.enabledBorder as OutlineInputBorder;
+    final field = find.byType(TextFormField).first;
+    final inputDecorator = tester.widget<InputDecorator>(
+      find.descendant(of: field, matching: find.byType(InputDecorator)).first,
+    );
+    final border = inputDecorator.decoration.enabledBorder as OutlineInputBorder;
 
     expect(border.borderSide.width, 1);
     expect(border.borderRadius, BorderRadius.circular(16));

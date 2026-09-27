@@ -42,6 +42,72 @@ class NotificationRealtimeEvent {
   Map<String, dynamic> get payload => notification.toJson();
 }
 
+class NotificationReadRealtimeEvent {
+  const NotificationReadRealtimeEvent({
+    required this.notificationId,
+    required this.readAt,
+    required this.unreadCount,
+  });
+
+  final String notificationId;
+  final DateTime readAt;
+  final int unreadCount;
+}
+
+class NotificationsReadAllRealtimeEvent {
+  const NotificationsReadAllRealtimeEvent({
+    required this.readAt,
+    required this.unreadCount,
+  });
+
+  final DateTime readAt;
+  final int unreadCount;
+}
+
+NotificationReadRealtimeEvent? decodeNotificationReadRealtimeEvent(
+    Object? envelope) {
+  if (envelope is! Map<String, dynamic> ||
+      envelope['version'] != 1 ||
+      envelope['type'] != 'notification.read') {
+    return null;
+  }
+  final payload = envelope['payload'];
+  if (payload is! Map<String, dynamic> ||
+      payload['notificationId'] is! String ||
+      payload['readAt'] is! String ||
+      payload['unreadCount'] is! int) {
+    return null;
+  }
+  final readAt = DateTime.tryParse(payload['readAt'] as String);
+  if (readAt == null) return null;
+  return NotificationReadRealtimeEvent(
+    notificationId: payload['notificationId'] as String,
+    readAt: readAt,
+    unreadCount: payload['unreadCount'] as int,
+  );
+}
+
+NotificationsReadAllRealtimeEvent? decodeNotificationsReadAllRealtimeEvent(
+    Object? envelope) {
+  if (envelope is! Map<String, dynamic> ||
+      envelope['version'] != 1 ||
+      envelope['type'] != 'notifications.read_all') {
+    return null;
+  }
+  final payload = envelope['payload'];
+  if (payload is! Map<String, dynamic> ||
+      payload['readAt'] is! String ||
+      payload['unreadCount'] is! int) {
+    return null;
+  }
+  final readAt = DateTime.tryParse(payload['readAt'] as String);
+  if (readAt == null) return null;
+  return NotificationsReadAllRealtimeEvent(
+    readAt: readAt,
+    unreadCount: payload['unreadCount'] as int,
+  );
+}
+
 class RealtimeClient {
   RealtimeClient({
     ApiConfig config = const ApiConfig(),
@@ -71,6 +137,10 @@ class RealtimeClient {
       StreamController<CommentDeletedRealtimeEvent>.broadcast();
   final _notificationController =
       StreamController<NotificationRealtimeEvent>.broadcast();
+  final _notificationReadController =
+      StreamController<NotificationReadRealtimeEvent>.broadcast();
+  final _notificationsReadAllController =
+      StreamController<NotificationsReadAllRealtimeEvent>.broadcast();
   final _connectionController =
       StreamController<RealtimeConnectionEvent>.broadcast();
 
@@ -85,6 +155,10 @@ class RealtimeClient {
       _commentDeletedController.stream;
   Stream<NotificationRealtimeEvent> get notifications =>
       _notificationController.stream;
+  Stream<NotificationReadRealtimeEvent> get notificationReads =>
+      _notificationReadController.stream;
+  Stream<NotificationsReadAllRealtimeEvent> get notificationsReadAll =>
+      _notificationsReadAllController.stream;
   Stream<RealtimeConnectionEvent> get connectionEvents =>
       _connectionController.stream;
 
@@ -140,12 +214,27 @@ class RealtimeClient {
     await _userUnblockedController.close();
     await _commentDeletedController.close();
     await _notificationController.close();
+    await _notificationReadController.close();
+    await _notificationsReadAllController.close();
     await _connectionController.close();
   }
 
   void emitConnectionEvent(RealtimeConnectionEvent event) {
     if (!_connectionController.isClosed) {
       _connectionController.add(event);
+    }
+  }
+
+  void emitNotificationReadEvent(NotificationReadRealtimeEvent event) {
+    if (!_notificationReadController.isClosed) {
+      _notificationReadController.add(event);
+    }
+  }
+
+  void emitNotificationsReadAllEvent(
+      NotificationsReadAllRealtimeEvent event) {
+    if (!_notificationsReadAllController.isClosed) {
+      _notificationsReadAllController.add(event);
     }
   }
 
@@ -219,6 +308,18 @@ class RealtimeClient {
           unreadCount: payload['unreadCount'] as int,
         ));
       }
+      return;
+    }
+
+    if (decoded['type'] == 'notification.read') {
+      final event = decodeNotificationReadRealtimeEvent(decoded);
+      if (event != null) _notificationReadController.add(event);
+      return;
+    }
+
+    if (decoded['type'] == 'notifications.read_all') {
+      final event = decodeNotificationsReadAllRealtimeEvent(decoded);
+      if (event != null) _notificationsReadAllController.add(event);
       return;
     }
 

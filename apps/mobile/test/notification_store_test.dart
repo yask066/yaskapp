@@ -196,4 +196,37 @@ void main() {
     expect(store.state.nextCursor, 'next');
     expect(store.state.unreadCount, 0);
   });
+
+  test('applies remote read events without overwriting newer unread notifications', () {
+    final store = NotificationStore();
+    final older = _item('older', '2026-09-19T12:00:00Z');
+    final newer = _item('newer', '2026-09-19T12:20:00Z');
+    store.mergePage(items: [older, newer], unreadCount: 2);
+
+    store.applyRemoteRead(
+      notificationId: older.id,
+      readAt: DateTime.parse('2026-09-19T12:10:00Z'),
+      unreadCount: 0,
+    );
+
+    expect(store.state.itemsById[older.id]!.isUnread, isFalse);
+    expect(store.state.itemsById[newer.id]!.isUnread, isTrue);
+    expect(store.state.unreadCount, 1);
+  });
+
+  test('applies remote read-all only to notifications created by that mutation time', () {
+    final store = NotificationStore();
+    final older = _item('older', '2026-09-19T12:00:00Z');
+    final newer = _item('newer', '2026-09-19T12:20:00Z');
+    store.mergePage(items: [older, newer], unreadCount: 2);
+
+    store.applyRemoteReadAll(
+      readAt: DateTime.parse('2026-09-19T12:10:00Z'),
+      unreadCount: 0,
+    );
+
+    expect(store.state.itemsById[older.id]!.isUnread, isFalse);
+    expect(store.state.itemsById[newer.id]!.isUnread, isTrue);
+    expect(store.state.unreadCount, 1);
+  });
 }

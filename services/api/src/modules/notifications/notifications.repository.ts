@@ -191,30 +191,23 @@ export async function markNotificationRead(
   const result = await executor.query<{
     notification_id: string;
     read_at: Date;
-    unread_count: number;
   }>(
     `
-      WITH updated AS (
-        UPDATE notifications
-        SET read_at = COALESCE(read_at, now())
-        WHERE id = $1 AND recipient_user_id = $2
-        RETURNING id AS notification_id, read_at
-      ), unread AS (
-        SELECT COUNT(*)::int AS unread_count
-        FROM notifications
-        WHERE recipient_user_id = $2 AND read_at IS NULL
-      )
-      SELECT updated.notification_id, updated.read_at, unread.unread_count
-      FROM updated CROSS JOIN unread
+      UPDATE notifications
+      SET read_at = COALESCE(read_at, now())
+      WHERE id = $1 AND recipient_user_id = $2
+      RETURNING id AS notification_id, read_at
     `,
     [id, recipientUserId]
   );
   const row = result.rows[0];
-  return row ? {
+  if (!row) return null;
+
+  return {
     notificationId: row.notification_id,
     readAt: row.read_at.toISOString(),
-    unreadCount: row.unread_count
-  } : null;
+    unreadCount: await countUnreadNotifications(recipientUserId, executor)
+  };
 }
 
 export async function markAllNotificationsRead(recipientUserId: string, executor: QueryExecutor = db) {

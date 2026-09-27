@@ -43,6 +43,8 @@ class RealtimeSession with WidgetsBindingObserver {
   NotificationStore? _store;
   StreamSubscription<RealtimeConnectionEvent>? _connectionSubscription;
   StreamSubscription<NotificationRealtimeEvent>? _notificationSubscription;
+  StreamSubscription<NotificationReadRealtimeEvent>? _notificationReadSubscription;
+  StreamSubscription<NotificationsReadAllRealtimeEvent>? _notificationsReadAllSubscription;
   Timer? _reconnectTimer;
   Future<void>? _reconcileFuture;
   int _reconnectAttempt = 0;
@@ -88,6 +90,22 @@ class RealtimeSession with WidgetsBindingObserver {
         ),
       );
     });
+    _notificationReadSubscription = _client!.notificationReads.listen((event) {
+      if (epoch != _epoch) return;
+      _store?.applyRemoteRead(
+        notificationId: event.notificationId,
+        readAt: event.readAt,
+        unreadCount: event.unreadCount,
+      );
+    });
+    _notificationsReadAllSubscription =
+        _client!.notificationsReadAll.listen((event) {
+      if (epoch != _epoch) return;
+      _store?.applyRemoteReadAll(
+        readAt: event.readAt,
+        unreadCount: event.unreadCount,
+      );
+    });
     _client!.connect();
   }
 
@@ -100,8 +118,12 @@ class RealtimeSession with WidgetsBindingObserver {
     _reconcileFuture = null;
     await _connectionSubscription?.cancel();
     await _notificationSubscription?.cancel();
+    await _notificationReadSubscription?.cancel();
+    await _notificationsReadAllSubscription?.cancel();
     _connectionSubscription = null;
     _notificationSubscription = null;
+    _notificationReadSubscription = null;
+    _notificationsReadAllSubscription = null;
     final client = _client;
     _client = null;
     _store?.resetSession();

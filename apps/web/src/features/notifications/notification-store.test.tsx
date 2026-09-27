@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { NotificationItem } from '@yaskapp/shared';
 import { NotificationProvider, useNotifications } from './notification-store';
@@ -13,7 +13,7 @@ const { getUnreadCount, listNotifications, markNotificationRead, markAllNotifica
   listNotifications: vi.fn(),
   markNotificationRead: vi.fn(),
   markAllNotificationsRead: vi.fn(),
-  session: { current: { status: 'authenticated' as 'authenticated' | 'anonymous', user: { id: 'user-1' } as { id: string } | null } },
+  session: { current: { status: 'authenticated' as 'authenticated' | 'anonymous', user: { id: 'user-1' } as { id: string } | null, sessionEpoch: 1 } },
 }));
 vi.mock('../../api/notifications', () => ({ getUnreadCount, listNotifications, markNotificationRead, markAllNotificationsRead }));
 
@@ -55,6 +55,32 @@ describe('notificationReducer', () => {
 
     expect(result.itemsById[current.id].readAt).toBe(current.readAt);
     expect(result.unreadCount).toBe(0);
+  });
+
+  it('does not let a duplicate creation event restore an unread count after an authoritative read', () => {
+    const current = item({ readAt: '2026-09-19T12:05:00.000Z' });
+    const state = stateWith([current], { unreadCount: 0 });
+    const result = notificationReducer(state, {
+      type: 'createdEvent',
+      item: { ...current, readAt: null },
+      unreadCount: 1,
+      atTop: true,
+    });
+
+    expect(result.itemsById[current.id].readAt).toBe(current.readAt);
+    expect(result.unreadCount).toBe(0);
+  });
+
+  it('does not apply a delayed read-all event to notifications created afterward', () => {
+    const later = item({ id: 'later', createdAt: '2026-09-19T12:20:00.000Z' });
+    const state = stateWith([later], { unreadCount: 1 });
+    const result = notificationReducer(state, {
+      type: 'readAllEvent',
+      readAt: '2026-09-19T12:10:00.000Z',
+    });
+
+    expect(result.itemsById.later.readAt).toBeNull();
+    expect(result.unreadCount).toBe(1);
   });
 
   it('optimistically reads one item and can roll back the exact snapshot', () => {
@@ -100,14 +126,16 @@ describe('notificationReducer', () => {
 
 function ProviderProbe() {
   const notifications = useNotifications();
-  return <><output data-testid="unread-count">{notifications.unreadCount}</output><output data-testid="notification-error">{notifications.error}</output><button onClick={() => { void notifications.actions.reconcile(); void notifications.actions.reconcile(); }}>reconcile</button><button onClick={() => { void notifications.actions.markRead('notification-1'); }}>read</button></>;
+  return <><output data-testid="unread-count">{notifications.unreadCount}</output><output data-testid="notification-error">{notifications.error}</output><output data-testid="notification-ids">{notifications.ids.join(',')}</output><button onClick={() => { void notifications.actions.reconcile(); void notifications.actions.reconcile(); }}>reconcile</button><button onClick={() => { void notifications.actions.markRead('notification-1'); }}>read</button><button onClick={() => { void notifications.actions.markAllRead(); }}>read all</button></>;
 }
 
 describe('NotificationProvider session lifecycle', () => {
   afterEach(() => {
-    session.current = { status: 'authenticated', user: { id: 'user-1' } };
+    session.current = { status: 'authenticated', user: { id: 'user-1' }, sessionEpoch: 1 };
     getUnreadCount.mockClear();
     listNotifications.mockClear();
+    markNotificationRead.mockClear();
+    markAllNotificationsRead.mockClear();
   });
 
   it('loads only the unread count for an authenticated session', async () => {
@@ -118,11 +146,21 @@ describe('NotificationProvider session lifecycle', () => {
     expect(listNotifications).not.toHaveBeenCalled();
   });
 
+  it('registers browser visibility reconciliation for the active notification session', async () => {
+    const addEventListener = vi.spyOn(document, 'addEventListener');
+    const view = render(<NotificationProvider><ProviderProbe /></NotificationProvider>);
+
+    await waitFor(() => expect(addEventListener).toHaveBeenCalledWith('visibilitychange', expect.any(Function)));
+
+    view.unmount();
+    addEventListener.mockRestore();
+  });
+
   it('resets state when the authenticated user changes', async () => {
     const view = render(<NotificationProvider><ProviderProbe /></NotificationProvider>);
     await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('3'));
 
-    session.current = { status: 'anonymous', user: null };
+    session.current = { status: 'anonymous', user: null, sessionEpoch: 2 };
     view.rerender(<NotificationProvider><ProviderProbe /></NotificationProvider>);
     await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('0'));
   });
@@ -149,5 +187,54 @@ describe('NotificationProvider session lifecycle', () => {
 
     await waitFor(() => expect(screen.getByTestId('notification-error')).toHaveTextContent('Unable to mark notification as read'));
     expect(listNotifications).toHaveBeenCalledOnce();
+  });
+
+  it('does not roll back a previous user snapshot after their read request fails', async () => {
+    let rejectRead: ((reason?: unknown) => void) | undefined;
+    listNotifications
+      .mockResolvedValueOnce({ items: [item()], unreadCount: 1, nextCursor: null })
+      .mockResolvedValueOnce({ items: [], unreadCount: 0, nextCursor: null });
+    markNotificationRead.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectRead = reject; }));
+    const view = render(<NotificationProvider><ProviderProbe /></NotificationProvider>);
+    await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('3'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'reconcile' }));
+    await waitFor(() => expect(screen.getByTestId('notification-ids')).toHaveTextContent('notification-1'));
+    fireEvent.click(screen.getByRole('button', { name: 'read' }));
+
+    session.current = { status: 'authenticated', user: { id: 'user-2' }, sessionEpoch: 2 };
+    view.rerender(<NotificationProvider><ProviderProbe /></NotificationProvider>);
+    await waitFor(() => expect(screen.getByTestId('notification-ids')).toBeEmptyDOMElement());
+    await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('3'));
+
+    await act(async () => {
+      rejectRead?.(new Error('late timeout'));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(markNotificationRead).toHaveBeenCalledOnce();
+    expect(screen.getByTestId('notification-ids')).toBeEmptyDOMElement();
+    expect(screen.getByTestId('unread-count')).toHaveTextContent('3');
+    expect(listNotifications).toHaveBeenCalledOnce();
+  });
+
+  it('ignores a successful read-all response from a previous user session', async () => {
+    let resolveReadAll: ((value: { readAt: string; updatedCount: number; unreadCount: number }) => void) | undefined;
+    markAllNotificationsRead.mockImplementationOnce(() => new Promise((resolve) => { resolveReadAll = resolve; }));
+    const view = render(<NotificationProvider><ProviderProbe /></NotificationProvider>);
+    await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('3'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'read all' }));
+    session.current = { status: 'authenticated', user: { id: 'user-2' }, sessionEpoch: 2 };
+    view.rerender(<NotificationProvider><ProviderProbe /></NotificationProvider>);
+    await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('3'));
+
+    await act(async () => {
+      resolveReadAll?.({ readAt: '2026-09-19T12:30:00.000Z', updatedCount: 3, unreadCount: 0 });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(screen.getByTestId('notification-ids')).toBeEmptyDOMElement();
+    expect(screen.getByTestId('unread-count')).toHaveTextContent('3');
   });
 });

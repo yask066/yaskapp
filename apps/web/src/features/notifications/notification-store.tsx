@@ -84,11 +84,20 @@ export function notificationReducer(state: NotificationStoreState, action: Notif
     case 'reconcile': return { ...mergeItems(state, action.items, true), unreadCount: action.unreadCount, nextCursor: action.nextCursor, loading: false, error: null };
     case 'createdEvent': {
       const existed = Boolean(state.itemsById[action.item.id]);
+      const latestLoaded = state.ids[0] ? state.itemsById[state.ids[0]] : undefined;
+      const olderThanLoadedPage = Boolean(
+        state.hasLoaded && latestLoaded &&
+        timestamp(action.item.createdAt) < timestamp(latestLoaded.createdAt)
+      );
       const merged = mergeItems(state, [action.item], false);
       const pendingIds = action.atTop
         ? merged.pendingIds.filter((id) => id !== action.item.id)
         : [...new Set([...state.pendingIds, action.item.id])];
-      return { ...merged, pendingIds, unreadCount: existed ? Math.max(state.unreadCount, action.unreadCount) : action.unreadCount };
+      return {
+        ...merged,
+        pendingIds,
+        unreadCount: existed || olderThanLoadedPage ? state.unreadCount : action.unreadCount,
+      };
     }
     case 'readEvent': {
       const current = state.itemsById[action.notificationId];
@@ -101,10 +110,15 @@ export function notificationReducer(state: NotificationStoreState, action: Notif
       };
     }
     case 'readAllEvent': {
-      const itemsById = Object.fromEntries(Object.entries(state.itemsById).map(([id, item]) => [
-        id, timestamp(action.readAt) >= timestamp(item.readAt) ? { ...item, readAt: action.readAt } : item,
-      ]));
-      return { ...state, itemsById, unreadCount: 0 };
+      let hasNewerUnreadItem = false;
+      const itemsById = Object.fromEntries(Object.entries(state.itemsById).map(([id, item]) => {
+        if (timestamp(item.createdAt) > timestamp(action.readAt)) {
+          if (!item.readAt) hasNewerUnreadItem = true;
+          return [id, item];
+        }
+        return [id, timestamp(action.readAt) >= timestamp(item.readAt) ? { ...item, readAt: action.readAt } : item];
+      }));
+      return { ...state, itemsById, unreadCount: hasNewerUnreadItem ? state.unreadCount : 0 };
     }
     case 'optimisticRead': {
       const item = state.itemsById[action.notificationId];
@@ -140,34 +154,47 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(notificationReducer, initialNotificationState);
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeConnectionStatus>('idle');
   const epoch = useRef(0);
+  const sessionIdentity = `${session.status}:${userId ?? ''}:${session.sessionEpoch}`;
+  const sessionIdentityRef = useRef(sessionIdentity);
+  sessionIdentityRef.current = sessionIdentity;
   const stateRef = useRef(state);
   const reconcileFlight = useRef<{ epoch: number; promise: Promise<void> } | null>(null);
   stateRef.current = state;
 
   useEffect(() => {
     const currentEpoch = ++epoch.current;
+    const currentSessionIdentity = sessionIdentity;
     const controller = new AbortController();
     dispatch({ type: 'reset' });
     if (session.status !== 'authenticated' || !userId) return () => controller.abort();
     dispatch({ type: 'loading', value: true });
     void getUnreadCount(controller.signal).then(({ unreadCount }) => {
-      if (epoch.current === currentEpoch) dispatch({ type: 'unreadCount', unreadCount });
+      if (epoch.current === currentEpoch && sessionIdentityRef.current === currentSessionIdentity) {
+        dispatch({ type: 'unreadCount', unreadCount });
+      }
     }).catch(() => {
-      if (epoch.current === currentEpoch && !controller.signal.aborted) dispatch({ type: 'error', message: 'Unable to load notifications.' });
+      if (epoch.current === currentEpoch && sessionIdentityRef.current === currentSessionIdentity && !controller.signal.aborted) {
+        dispatch({ type: 'error', message: 'Unable to load notifications.' });
+      }
     });
     return () => controller.abort();
   }, [session.sessionEpoch, session.status, userId]);
 
   const reconcile = useCallback(async () => {
     const currentEpoch = epoch.current;
+    const currentSessionIdentity = sessionIdentityRef.current;
     if (reconcileFlight.current?.epoch === currentEpoch) return reconcileFlight.current.promise;
     dispatch({ type: 'loading', value: true });
     const request = Promise.resolve().then(async () => {
       try {
         const response = await listNotifications({ limit: 25, unreadOnly: false });
-        if (epoch.current === currentEpoch) dispatch({ type: 'reconcile', ...response });
+        if (epoch.current === currentEpoch && sessionIdentityRef.current === currentSessionIdentity) {
+          dispatch({ type: 'reconcile', ...response });
+        }
       } catch {
-        if (epoch.current === currentEpoch) dispatch({ type: 'error', message: 'Unable to refresh notifications.' });
+        if (epoch.current === currentEpoch && sessionIdentityRef.current === currentSessionIdentity) {
+          dispatch({ type: 'error', message: 'Unable to refresh notifications.' });
+        }
       } finally {
         if (reconcileFlight.current?.promise === request) reconcileFlight.current = null;
       }
@@ -180,22 +207,31 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     const cursor = stateRef.current.nextCursor;
     if (!cursor || stateRef.current.loading) return;
     const currentEpoch = epoch.current;
+    const currentSessionIdentity = sessionIdentityRef.current;
     dispatch({ type: 'loading', value: true });
     try {
       const response = await listNotifications({ limit: 25, cursor, unreadOnly: false });
-      if (epoch.current === currentEpoch) dispatch({ type: 'merge', ...response });
+      if (epoch.current === currentEpoch && sessionIdentityRef.current === currentSessionIdentity) {
+        dispatch({ type: 'merge', ...response });
+      }
     } catch {
-      if (epoch.current === currentEpoch) dispatch({ type: 'error', message: 'Unable to load more notifications.' });
+      if (epoch.current === currentEpoch && sessionIdentityRef.current === currentSessionIdentity) {
+        dispatch({ type: 'error', message: 'Unable to load more notifications.' });
+      }
     }
   }, []);
 
   const markRead = useCallback(async (notificationId: string) => {
+    const currentEpoch = epoch.current;
+    const currentSessionIdentity = sessionIdentityRef.current;
     const snapshot = stateRef.current;
     dispatch({ type: 'optimisticRead', notificationId, readAt: new Date().toISOString() });
     try {
       const response = await markNotificationRead(notificationId);
+      if (epoch.current !== currentEpoch || sessionIdentityRef.current !== currentSessionIdentity) return;
       dispatch({ type: 'readEvent', ...response });
     } catch {
+      if (epoch.current !== currentEpoch || sessionIdentityRef.current !== currentSessionIdentity) return;
       dispatch({ type: 'rollback', snapshot });
       await reconcile();
       dispatch({ type: 'error', message: 'Unable to mark notification as read. Your inbox was refreshed.' });
@@ -203,12 +239,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [reconcile]);
 
   const markAllRead = useCallback(async () => {
+    const currentEpoch = epoch.current;
+    const currentSessionIdentity = sessionIdentityRef.current;
     const snapshot = stateRef.current;
     dispatch({ type: 'optimisticReadAll', readAt: new Date().toISOString() });
     try {
       const response = await markAllNotificationsRead();
+      if (epoch.current !== currentEpoch || sessionIdentityRef.current !== currentSessionIdentity) return;
       dispatch({ type: 'readAllEvent', readAt: response.readAt });
     } catch {
+      if (epoch.current !== currentEpoch || sessionIdentityRef.current !== currentSessionIdentity) return;
       dispatch({ type: 'rollback', snapshot });
       await reconcile();
     }
@@ -229,16 +269,20 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       setRealtimeStatus('idle');
       return undefined;
     }
+    const currentSessionIdentity = sessionIdentity;
     const client = new NotificationRealtimeClient({
       url: createRealtimeUrl(),
-      onEvent: (event) => applyRealtime(event),
-      onConnectionReady: reconcile,
+      onEvent: (event) => {
+        if (sessionIdentityRef.current === currentSessionIdentity) applyRealtime(event);
+      },
+      onConnectionReady: () => sessionIdentityRef.current === currentSessionIdentity ? reconcile() : undefined,
       reconcile,
+      documentRef: typeof document === 'undefined' ? undefined : document,
       onStatusChange: setRealtimeStatus,
     });
     client.start();
     return () => client.stop();
-  }, [applyRealtime, reconcile, session.sessionEpoch, session.status, userId]);
+  }, [applyRealtime, reconcile, session.sessionEpoch, session.status, sessionIdentity, userId]);
 
   const actions = useMemo<NotificationStoreActions>(() => ({ reconcile, loadMore, markRead, markAllRead, applyRealtime, clearPending }), [applyRealtime, clearPending, loadMore, markAllRead, markRead, reconcile]);
   return <NotificationContext.Provider value={{ ...state, actions, realtimeStatus }}>{children}</NotificationContext.Provider>;

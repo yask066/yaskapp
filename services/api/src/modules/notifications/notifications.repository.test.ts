@@ -94,11 +94,14 @@ test('read mutations return exact idempotent responses and stay recipient-scoped
   const executor = {
     async query<T>(sql: string, values?: unknown[]) {
       calls.push({ sql, values });
-      if (sql.includes('WITH updated')) {
-        return { rows: [{ notification_id: 'notification-4', read_at: new Date('2026-09-19T12:00:00.000Z'), unread_count: 2 }] } as { rows: T[] };
-      }
       if (sql.includes('WITH marked')) {
         return { rows: [{ read_at: new Date('2026-09-19T12:01:00.000Z'), updated_count: 2 }] } as { rows: T[] };
+      }
+      if (sql.includes('UPDATE notifications')) {
+        return { rows: [{ notification_id: 'notification-4', read_at: new Date('2026-09-19T12:00:00.000Z') }] } as { rows: T[] };
+      }
+      if (sql.includes('COUNT(*)::text AS count')) {
+        return { rows: [{ count: '2' }] } as { rows: T[] };
       }
       return { rows: [] } as { rows: T[] };
     }
@@ -116,4 +119,6 @@ test('read mutations return exact idempotent responses and stay recipient-scoped
   });
   assert.equal(await getNotificationForRecipient('notification-4', 'recipient-4', executor as never), null);
   assert.match(calls[0]?.values?.join('|') ?? '', /notification-4\|recipient-4/);
+  assert.match(calls[1]?.sql ?? '', /COUNT\(\*\)::text AS count/);
+  assert.deepEqual(calls[1]?.values, ['recipient-4']);
 });
