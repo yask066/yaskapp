@@ -39,9 +39,9 @@ In addition to the creation/deep-link scenario above, verify the real reply noti
 | Web browser/version | Not run |
 | Flutter device/OS/build | Not run |
 | Tester and UTC time | Not run |
-| Scenarios passed / failed, including cross-recipient isolation | No manual scenarios run; automated feature-focused tests are recorded in the implementation plan ledger |
+| Scenarios passed / failed, including cross-recipient isolation | No manual scenarios run; automated results are recorded below |
 | `comment_reply` implementation dependency closed | Yes — one-level API, producer, web and Flutter are implemented |
-| Real API-created `comment_reply` smoke | Not run / Passed / Failed |
+| Real API-created `comment_reply` smoke | Not run — staging and connected test clients were unavailable |
 | Notes / issue links | |
 
 ## Automated verification record
