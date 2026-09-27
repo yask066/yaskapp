@@ -8,6 +8,7 @@ import {
   likePollRecord,
   likeCommentRecord,
   listPollCommentRecords,
+  listPollCommentReplyRecords,
   findViewablePollCommentRecordById,
   listPublicPollRecords,
   listSubscriptionPollRecords,
@@ -76,6 +77,15 @@ export type CreatePollCommentInput = {
   pollId: string;
   authorId: string;
   body: string;
+  parentCommentId?: string;
+};
+
+export type ListPollCommentRepliesInput = {
+  pollId: string;
+  commentId: string;
+  limit: number;
+  cursor?: string;
+  viewerId?: string;
 };
 
 export type DeletePollCommentInput = {
@@ -150,6 +160,19 @@ export async function listPollComments(input: ListPollCommentsInput & { viewerId
   };
 }
 
+export async function listPollCommentReplies(input: ListPollCommentRepliesInput) {
+  const result = await listPollCommentReplyRecords(input);
+
+  if (result.status === 'not_found') {
+    throw new PollNotFoundError('Comment was not found.');
+  }
+
+  return {
+    items: result.items,
+    nextCursor: result.nextCursor
+  };
+}
+
 export async function getPollComment(input: {
   pollId: string;
   commentId: string;
@@ -165,7 +188,8 @@ export async function createPollComment(input: CreatePollCommentInput) {
   const result = await createPollCommentRecord({
     pollId: input.pollId,
     authorId: input.authorId,
-    body: input.body.trim()
+    body: input.body.trim(),
+    parentCommentId: input.parentCommentId
   });
 
   if (result.status === 'not_found') {

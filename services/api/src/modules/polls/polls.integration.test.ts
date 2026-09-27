@@ -92,6 +92,8 @@ type ListCommentsResponse = {
     };
     body: string;
     likesCount: number;
+    parentCommentId: string | null;
+    repliesCount: number;
   }>;
 };
 
@@ -3134,4 +3136,209 @@ test('poll notification comment targets can be loaded by id', async () => {
     headers: bearer(author.accessToken)
   });
   assert.equal(mismatchedCommentResponse.statusCode, 404, mismatchedCommentResponse.body);
+});
+
+test('poll comment replies can be created, listed in cursor pages, and deleted with their thread', async () => {
+  const pollAuthor = await registerTestUser();
+  const rootAuthor = await registerTestUser();
+  const replier = await registerTestUser();
+  const pollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(pollAuthor.accessToken),
+    payload: { question: 'A poll with a reply thread', options: ['One', 'Two'] }
+  });
+  assert.equal(pollResponse.statusCode, 201, pollResponse.body);
+  const poll = pollResponse.json<PollResponse>().poll;
+
+  const rootResponse = await app.inject({
+    method: 'POST',
+    url: `/polls/${poll.id}/comments`,
+    headers: bearer(rootAuthor.accessToken),
+    payload: { body: 'Root comment.' }
+  });
+  assert.equal(rootResponse.statusCode, 201, rootResponse.body);
+  const root = rootResponse.json<CreateCommentResponse>().comment;
+
+  const replies = [] as Array<{ id: string; body: string; parentCommentId: string | null }>;
+  const replyTimes = [
+    '2026-09-27 10:00:00.000100+00',
+    '2026-09-27 10:00:00.000200+00',
+    '2026-09-27 10:00:00.000300+00'
+  ];
+  for (const [index, body] of ['First reply.', 'Second reply.', 'Third reply.'].entries()) {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/polls/${poll.id}/comments`,
+      headers: bearer(replier.accessToken),
+      payload: { body, parentCommentId: root.id }
+    });
+    assert.equal(response.statusCode, 201, response.body);
+    const created = response.json<CreateCommentResponse>();
+    assert.equal(created.comment.parentCommentId, root.id);
+    assert.equal(created.poll.commentsCount, index + 2);
+    replies.push(created.comment);
+    await db.query('UPDATE comments SET created_at = $2::timestamptz WHERE id = $1', [
+      created.comment.id,
+      replyTimes[index]
+    ]);
+  }
+
+  const rootListResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${poll.id}/comments`
+  });
+  assert.equal(rootListResponse.statusCode, 200, rootListResponse.body);
+  const rootItems = rootListResponse.json<ListCommentsResponse>().items;
+  assert.equal(rootItems.length, 1);
+  assert.equal(rootItems[0]?.id, root.id);
+  assert.equal(rootItems[0]?.parentCommentId, null);
+  assert.equal(rootItems[0]?.repliesCount, 3);
+
+  const firstPageResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${poll.id}/comments/${root.id}/replies?limit=2`
+  });
+  assert.equal(firstPageResponse.statusCode, 200, firstPageResponse.body);
+  const firstPage = firstPageResponse.json<{
+    items: Array<{ id: string; body: string; parentCommentId: string | null }>;
+    nextCursor: string | null;
+  }>();
+  assert.deepEqual(firstPage.items.map((item) => item.body), ['First reply.', 'Second reply.']);
+  assert.ok(firstPage.items.every((item) => item.parentCommentId === root.id));
+  assert.equal(typeof firstPage.nextCursor, 'string');
+
+  const secondPageResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${poll.id}/comments/${root.id}/replies?limit=2&cursor=${encodeURIComponent(firstPage.nextCursor ?? '')}`
+  });
+  assert.equal(secondPageResponse.statusCode, 200, secondPageResponse.body);
+  const secondPage = secondPageResponse.json<{
+    items: Array<{ id: string; body: string }>;
+    nextCursor: string | null;
+  }>();
+  assert.deepEqual(secondPage.items.map((item) => item.body), ['Third reply.']);
+  assert.equal(secondPage.nextCursor, null);
+  const targetReplyResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${poll.id}/comments/${replies[2]?.id}`,
+    headers: bearer(pollAuthor.accessToken)
+  });
+  assert.equal(targetReplyResponse.statusCode, 200, targetReplyResponse.body);
+  assert.equal(
+    targetReplyResponse.json<{ comment: { parentCommentId: string | null } }>().comment.parentCommentId,
+    root.id
+  );
+
+  const deleteReplyResponse = await app.inject({
+    method: 'DELETE',
+    url: `/polls/${poll.id}/comments/${replies[1]?.id}`,
+    headers: bearer(replier.accessToken)
+  });
+  assert.equal(deleteReplyResponse.statusCode, 204, deleteReplyResponse.body);
+  const afterReplyDelete = await app.inject({
+    method: 'GET',
+    url: `/polls/${poll.id}`,
+    headers: bearer(pollAuthor.accessToken)
+  });
+  assert.equal(afterReplyDelete.json<PollResponse>().poll.commentsCount, 3);
+
+  const deleteRootResponse = await app.inject({
+    method: 'DELETE',
+    url: `/polls/${poll.id}/comments/${root.id}`,
+    headers: bearer(rootAuthor.accessToken)
+  });
+  assert.equal(deleteRootResponse.statusCode, 204, deleteRootResponse.body);
+  const afterRootDelete = await app.inject({
+    method: 'GET',
+    url: `/polls/${poll.id}`,
+    headers: bearer(pollAuthor.accessToken)
+  });
+  assert.equal(afterRootDelete.json<PollResponse>().poll.commentsCount, 0);
+  const activeThreadRows = await db.query<{ count: string }>(
+    'SELECT count(*)::text AS count FROM comments WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL',
+    [[root.id, ...replies.map((reply) => reply.id)]]
+  );
+  assert.equal(activeThreadRows.rows[0]?.count, '0');
+  const unavailableReplyTarget = await app.inject({
+    method: 'GET',
+    url: `/polls/${poll.id}/comments/${replies[2]?.id}`,
+    headers: bearer(pollAuthor.accessToken)
+  });
+  assert.equal(unavailableReplyTarget.statusCode, 404, unavailableReplyTarget.body);
+  const unavailableThreadResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${poll.id}/comments/${root.id}/replies`
+  });
+  assert.equal(unavailableThreadResponse.statusCode, 404, unavailableThreadResponse.body);
+});
+
+test('poll comment replies reject missing, cross-poll, deleted, and reply-level parents', async () => {
+  const pollAuthor = await registerTestUser();
+  const commenter = await registerTestUser();
+  const createPoll = async (question: string) => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/polls',
+      headers: bearer(pollAuthor.accessToken),
+      payload: { question, options: ['One', 'Two'] }
+    });
+    assert.equal(response.statusCode, 201, response.body);
+    return response.json<PollResponse>().poll;
+  };
+  const poll = await createPoll('Reply validation poll');
+  const otherPoll = await createPoll('Other reply validation poll');
+  const createRoot = async (pollId: string, body: string) => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/polls/${pollId}/comments`,
+      headers: bearer(commenter.accessToken),
+      payload: { body }
+    });
+    assert.equal(response.statusCode, 201, response.body);
+    return response.json<CreateCommentResponse>().comment;
+  };
+  const root = await createRoot(poll.id, 'Root for validation.');
+  const otherRoot = await createRoot(otherPoll.id, 'Root in another poll.');
+  const nestedReplyResponse = await app.inject({
+    method: 'POST',
+    url: `/polls/${poll.id}/comments`,
+    headers: bearer(commenter.accessToken),
+    payload: { body: 'First-level reply.', parentCommentId: root.id }
+  });
+  assert.equal(nestedReplyResponse.statusCode, 201, nestedReplyResponse.body);
+  const nestedReply = nestedReplyResponse.json<CreateCommentResponse>().comment;
+  const invalidParents = [
+    { pollId: poll.id, parentCommentId: '00000000-0000-0000-0000-000000000000' },
+    { pollId: poll.id, parentCommentId: otherRoot.id },
+    { pollId: poll.id, parentCommentId: nestedReply.id }
+  ];
+  for (const invalidParent of invalidParents) {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/polls/${invalidParent.pollId}/comments`,
+      headers: bearer(commenter.accessToken),
+      payload: {
+        body: 'This reply must not be created.',
+        parentCommentId: invalidParent.parentCommentId
+      }
+    });
+    assert.equal(response.statusCode, 404, response.body);
+    assert.equal(response.json<{ error: string }>().error, 'not_found');
+  }
+
+  const deleteParentResponse = await app.inject({
+    method: 'DELETE',
+    url: `/polls/${poll.id}/comments/${root.id}`,
+    headers: bearer(commenter.accessToken)
+  });
+  assert.equal(deleteParentResponse.statusCode, 204, deleteParentResponse.body);
+  const deletedParentResponse = await app.inject({
+    method: 'POST',
+    url: `/polls/${poll.id}/comments`,
+    headers: bearer(commenter.accessToken),
+    payload: { body: 'This reply must not be created.', parentCommentId: root.id }
+  });
+  assert.equal(deletedParentResponse.statusCode, 404, deletedParentResponse.body);
+  assert.equal(deletedParentResponse.json<{ error: string }>().error, 'not_found');
 });

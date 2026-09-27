@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
+import { AdminCursorError, encodeAdminCursor } from '../admin/pagination.js';
 import { avatarUrlForUser } from '../profiles/avatar-url.js';
 import { createNotification } from '../notifications/notifications.repository.js';
 import { publishNotificationAfterCommit } from '../notifications/notifications.publisher.js';
@@ -29,6 +30,8 @@ export type PollComment = {
   body: string;
   likesCount: number;
   viewerHasLiked: boolean;
+  parentCommentId: string | null;
+  repliesCount: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -69,6 +72,15 @@ export type CreatePollCommentRecordInput = {
   pollId: string;
   authorId: string;
   body: string;
+  parentCommentId?: string;
+};
+
+export type ListPollCommentRepliesRecordInput = {
+  pollId: string;
+  commentId: string;
+  limit: number;
+  cursor?: string;
+  viewerId?: string;
 };
 
 type PollRow = {
@@ -99,6 +111,10 @@ type PollOptionRow = {
   votes_count: number;
 };
 
+type PollCommentReplyRow = PollCommentRow & {
+  cursor_created_at: string;
+};
+
 type PollCommentRow = {
   id: string;
   poll_id: string;
@@ -109,6 +125,8 @@ type PollCommentRow = {
   body: string;
   likes_count: number;
   viewer_has_liked: boolean;
+  parent_comment_id: string | null;
+  replies_count: number;
   created_at: Date;
   updated_at: Date;
 };
@@ -170,6 +188,8 @@ function mapComment(row: PollCommentRow): PollComment {
     body: row.body,
     likesCount: row.likes_count,
     viewerHasLiked: row.viewer_has_liked,
+    parentCommentId: row.parent_comment_id ?? null,
+    repliesCount: row.replies_count ?? 0,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString()
   };
@@ -433,7 +453,7 @@ export async function deletePollCommentRecord(input: {
   try {
     await client.query('BEGIN');
 
-    const result = await client.query(
+    const result = await client.query<{ id: string; parent_comment_id: string | null }>(
       `
         UPDATE comments c
         SET deleted_at = now(), updated_at = now()
@@ -445,7 +465,7 @@ export async function deletePollCommentRecord(input: {
           AND p.id = c.poll_id
           AND p.visibility = 'public'
           AND p.deleted_at IS NULL
-        RETURNING c.id
+        RETURNING c.id, c.parent_comment_id
       `,
       [input.commentId, input.pollId, input.authorId]
     );
@@ -455,13 +475,29 @@ export async function deletePollCommentRecord(input: {
       return { status: 'not_found' as const };
     }
 
+    let deletedCount = 1;
+    if (result.rows[0]?.parent_comment_id === null) {
+      const repliesResult = await client.query(
+        `
+          UPDATE comments
+          SET deleted_at = now(), updated_at = now()
+          WHERE poll_id = $1
+            AND parent_comment_id = $2
+            AND deleted_at IS NULL
+          RETURNING id
+        `,
+        [input.pollId, input.commentId]
+      );
+      deletedCount += repliesResult.rowCount ?? 0;
+    }
+
     await client.query(
       `
         UPDATE polls
-        SET comments_count = GREATEST(comments_count - 1, 0), updated_at = now()
+        SET comments_count = GREATEST(comments_count - $2, 0), updated_at = now()
         WHERE id = $1
       `,
-      [input.pollId]
+      [input.pollId, deletedCount]
     );
 
     await client.query('COMMIT');
@@ -722,6 +758,13 @@ export async function listPollCommentRecords(input: { pollId: string; limit: num
             SELECT 1 FROM likes l
             WHERE l.comment_id = c.id AND l.user_id = $3
           ) AS viewer_has_liked,
+          c.parent_comment_id,
+          (
+            SELECT count(*)::int
+            FROM comments r
+            WHERE r.parent_comment_id = c.id
+              AND r.deleted_at IS NULL
+          ) AS replies_count,
           c.created_at,
           c.updated_at
         FROM comments c
@@ -730,7 +773,7 @@ export async function listPollCommentRecords(input: { pollId: string; limit: num
         WHERE c.poll_id = $1
           AND c.parent_comment_id IS NULL
           AND c.deleted_at IS NULL
-        ORDER BY c.created_at ASC
+        ORDER BY c.created_at ASC, c.id ASC
         LIMIT $2
       `,
       [input.pollId, input.limit, input.viewerId ?? null]
@@ -742,6 +785,103 @@ export async function listPollCommentRecords(input: { pollId: string; limit: num
     };
   } finally {
     client.release();
+  }
+}
+
+export async function listPollCommentReplyRecords(input: ListPollCommentRepliesRecordInput) {
+  const cursor = input.cursor === undefined ? undefined : decodeCommentCursor(input.cursor);
+  const client = await db.connect();
+
+  try {
+    const rootResult = await client.query<{ id: string }>(
+      `
+        SELECT c.id
+        FROM comments c
+        JOIN polls p ON p.id = c.poll_id
+        WHERE c.id = $1
+          AND c.poll_id = $2
+          AND c.parent_comment_id IS NULL
+          AND c.deleted_at IS NULL
+          AND p.visibility = 'public'
+          AND p.deleted_at IS NULL
+      `,
+      [input.commentId, input.pollId]
+    );
+
+    if (rootResult.rowCount === 0) {
+      return { status: 'not_found' as const };
+    }
+
+    const repliesResult = await client.query<PollCommentReplyRow>(
+      `
+        SELECT
+          c.id,
+          c.poll_id,
+          c.author_id,
+          u.username::text AS author_username,
+          pr.display_name AS author_display_name,
+          pr.avatar_object_key AS author_avatar_object_key,
+          c.body,
+          c.likes_count,
+          EXISTS (
+            SELECT 1 FROM likes l
+            WHERE l.comment_id = c.id AND l.user_id = $6
+          ) AS viewer_has_liked,
+          c.parent_comment_id,
+          0::int AS replies_count,
+          c.created_at,
+          c.updated_at,
+          to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
+        FROM comments c
+        JOIN users u ON u.id = c.author_id
+        JOIN profiles pr ON pr.user_id = c.author_id
+        WHERE c.poll_id = $1
+          AND c.parent_comment_id = $2
+          AND c.deleted_at IS NULL
+          AND (
+            $3::timestamptz IS NULL
+            OR (c.created_at, c.id) > ($3::timestamptz, $4::uuid)
+          )
+        ORDER BY c.created_at ASC, c.id ASC
+        LIMIT $5
+      `,
+      [input.pollId, input.commentId, cursor?.createdAt ?? null, cursor?.id ?? null, input.limit + 1, input.viewerId ?? null]
+    );
+
+    const hasNextPage = repliesResult.rows.length > input.limit;
+    const pageRows = hasNextPage ? repliesResult.rows.slice(0, input.limit) : repliesResult.rows;
+    const items = pageRows.map(mapComment);
+    const lastRow = pageRows.at(-1);
+
+    return {
+      status: 'found' as const,
+      items,
+      nextCursor: hasNextPage && lastRow
+        ? encodeAdminCursor({ createdAt: lastRow.cursor_created_at, id: lastRow.id })
+        : null
+    };
+  } finally {
+    client.release();
+  }
+}
+
+function decodeCommentCursor(value: string) {
+  try {
+    const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as {
+      createdAt?: unknown;
+      id?: unknown;
+    };
+    if (
+      typeof parsed.createdAt !== 'string' ||
+      Number.isNaN(Date.parse(parsed.createdAt)) ||
+      typeof parsed.id !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parsed.id)
+    ) {
+      throw new Error('Invalid comment cursor.');
+    }
+    return { createdAt: parsed.createdAt, id: parsed.id };
+  } catch {
+    throw new AdminCursorError('The pagination cursor is invalid.');
   }
 }
 
@@ -768,6 +908,13 @@ export async function findViewablePollCommentRecordById(input: {
             SELECT 1 FROM likes l
             WHERE l.comment_id = c.id AND l.user_id = $3
           ) AS viewer_has_liked,
+          c.parent_comment_id,
+          (
+            SELECT count(*)::int
+            FROM comments r
+            WHERE r.parent_comment_id = c.id
+              AND r.deleted_at IS NULL
+          ) AS replies_count,
           c.created_at,
           c.updated_at
         FROM comments c
@@ -778,6 +925,17 @@ export async function findViewablePollCommentRecordById(input: {
         WHERE c.id = $1
           AND c.poll_id = $2
           AND c.deleted_at IS NULL
+          AND (
+            c.parent_comment_id IS NULL
+            OR EXISTS (
+              SELECT 1
+              FROM comments parent
+              WHERE parent.id = c.parent_comment_id
+                AND parent.poll_id = c.poll_id
+                AND parent.parent_comment_id IS NULL
+                AND parent.deleted_at IS NULL
+            )
+          )
           AND p.deleted_at IS NULL
           AND p.visibility = 'public'
           AND poll_author.status = 'active'
@@ -816,17 +974,38 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
       return { status: 'not_found' as const };
     }
 
+    if (input.parentCommentId) {
+      const parentResult = await client.query<{ id: string }>(
+        `
+          SELECT id
+          FROM comments
+          WHERE id = $1
+            AND poll_id = $2
+            AND parent_comment_id IS NULL
+            AND deleted_at IS NULL
+          FOR UPDATE
+        `,
+        [input.parentCommentId, input.pollId]
+      );
+
+      if (parentResult.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return { status: 'not_found' as const };
+      }
+    }
+
     const commentResult = await client.query<PollCommentRow>(
       `
         WITH inserted_comment AS (
-          INSERT INTO comments (poll_id, author_id, body)
-          VALUES ($1, $2, $3)
+          INSERT INTO comments (poll_id, author_id, body, parent_comment_id)
+          VALUES ($1, $2, $3, $4)
           RETURNING
             id,
             poll_id,
             author_id,
             body,
             likes_count,
+            parent_comment_id,
             created_at,
             updated_at
         )
@@ -840,13 +1019,15 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
           c.body,
           c.likes_count,
           false AS viewer_has_liked,
+          c.parent_comment_id,
+          0::int AS replies_count,
           c.created_at,
           c.updated_at
         FROM inserted_comment c
         JOIN users u ON u.id = c.author_id
         JOIN profiles pr ON pr.user_id = c.author_id
       `,
-      [input.pollId, input.authorId, input.body]
+      [input.pollId, input.authorId, input.body, input.parentCommentId ?? null]
     );
 
     const comment = commentResult.rows[0];
@@ -912,6 +1093,13 @@ async function findCommentForUpdate(client: PoolClient, commentId: string) {
         pr.avatar_object_key AS author_avatar_object_key,
         c.body, c.likes_count,
         false AS viewer_has_liked,
+        c.parent_comment_id,
+        (
+          SELECT count(*)::int
+          FROM comments r
+          WHERE r.parent_comment_id = c.id
+            AND r.deleted_at IS NULL
+        ) AS replies_count,
         c.created_at, c.updated_at
       FROM comments c
       JOIN polls p ON p.id = c.poll_id
@@ -970,6 +1158,13 @@ export async function likeCommentRecord(input: { pollId: string; commentId: stri
           pr.display_name AS author_display_name,
           pr.avatar_object_key AS author_avatar_object_key,
           c.body, c.likes_count, true AS viewer_has_liked,
+          c.parent_comment_id,
+          (
+            SELECT count(*)::int
+            FROM comments r
+            WHERE r.parent_comment_id = c.id
+              AND r.deleted_at IS NULL
+          ) AS replies_count,
           c.created_at, c.updated_at
         FROM comments c
         JOIN users u ON u.id = c.author_id
@@ -1019,6 +1214,13 @@ export async function unlikeCommentRecord(input: { pollId: string; commentId: st
           pr.display_name AS author_display_name,
           pr.avatar_object_key AS author_avatar_object_key,
           c.body, c.likes_count, false AS viewer_has_liked,
+          c.parent_comment_id,
+          (
+            SELECT count(*)::int
+            FROM comments r
+            WHERE r.parent_comment_id = c.id
+              AND r.deleted_at IS NULL
+          ) AS replies_count,
           c.created_at, c.updated_at
         FROM comments c
         JOIN users u ON u.id = c.author_id

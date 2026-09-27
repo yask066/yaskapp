@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
+import { AdminCursorError } from '../admin/pagination.js';
 import {
   broadcastPollVoteCreated,
   broadcastPollVoteUpdated,
@@ -31,6 +32,7 @@ import {
   likePoll,
   likeComment,
   listPollComments,
+  listPollCommentReplies,
   listPublicPolls,
   listSubscriptionPolls,
   unlikePoll,
@@ -87,8 +89,14 @@ const commentsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(50)
 }).strict();
 
+const commentRepliesQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  cursor: z.string().max(512).optional()
+}).strict();
+
 const createCommentSchema = z.object({
-  body: z.string().trim().min(1).max(1000)
+  body: z.string().trim().min(1).max(1000),
+  parentCommentId: uuidSchema.optional()
 }).strict();
 
 const voteBodySchema = z.object({
@@ -104,6 +112,14 @@ function validationError(reply: FastifyReply, error: z.ZodError) {
 }
 
 function pollError(reply: FastifyReply, error: unknown) {
+  if (error instanceof AdminCursorError) {
+    return reply.status(400).send({
+      error: 'validation_error',
+      message: 'Request input is invalid.',
+      details: { formErrors: ['The comment pagination cursor is invalid.'], fieldErrors: {} }
+    });
+  }
+
   if (error instanceof PollNotFoundError) {
     return reply.status(404).send({
       error: 'not_found',
@@ -383,6 +399,30 @@ export function registerPollRoutes(app: FastifyInstance) {
     }
   });
 
+  app.get(
+    '/polls/:pollId/comments/:commentId/replies',
+    { preHandler: optionalAuthenticate },
+    async (request, reply) => {
+      const parsedParams = commentLikeParamsSchema.safeParse(request.params);
+      if (!parsedParams.success) return validationError(reply, parsedParams.error);
+
+      const parsedQuery = commentRepliesQuerySchema.safeParse(request.query);
+      if (!parsedQuery.success) return validationError(reply, parsedQuery.error);
+
+      try {
+        return await listPollCommentReplies({
+          pollId: parsedParams.data.pollId,
+          commentId: parsedParams.data.commentId,
+          limit: parsedQuery.data.limit,
+          cursor: parsedQuery.data.cursor,
+          viewerId: request.user?.sub
+        });
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
+
   app.post('/polls/:pollId/comments/:commentId/likes', { preHandler: authenticate }, async (request, reply) => {
     const parsedParams = commentLikeParamsSchema.safeParse(request.params);
     if (!parsedParams.success) return validationError(reply, parsedParams.error);
@@ -475,7 +515,8 @@ export function registerPollRoutes(app: FastifyInstance) {
         const result = await createPollComment({
           pollId: parsedParams.data.pollId,
           authorId: request.user.sub,
-          body: parsedBody.data.body
+          body: parsedBody.data.body,
+          parentCommentId: parsedBody.data.parentCommentId
         });
 
         return reply.status(201).send({
