@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { decodePoll, decodePollComment, responseField, responseItems, type Poll, type PollComment } from './models';
+import { decodePoll, decodePollComment, decodePollCommentRepliesPage, responseField, responseItems, type Poll, type PollComment, type PollCommentRepliesPage } from './models';
 
 export function listPolls(input: { sort?: 'newest' | 'popular'; limit?: number } = {}): Promise<Poll[]> {
   const params = new URLSearchParams({ limit: String(input.limit ?? 20) });
@@ -49,11 +49,43 @@ export function listComments(pollId: string): Promise<PollComment[]> {
   return apiClient.get(`/polls/${pollId}/comments?limit=50`, (body) => responseItems(body, decodePollComment));
 }
 
-export function createComment(pollId: string, body: string): Promise<{ comment: PollComment; poll: Poll }> {
-  return apiClient.send(`/polls/${pollId}/comments`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ body }) }, (value) => ({
-    comment: responseField(value, 'comment', decodePollComment),
-    poll: responseField(value, 'poll', decodePoll),
-  }));
+export function listCommentReplies(
+  pollId: string,
+  rootCommentId: string,
+  input: { limit?: number; cursor?: string } = {},
+): Promise<PollCommentRepliesPage> {
+  const params = new URLSearchParams({ limit: String(input.limit ?? 20) });
+  if (input.cursor !== undefined) params.set('cursor', input.cursor);
+  return apiClient.get(
+    `/polls/${pollId}/comments/${rootCommentId}/replies?${params}`,
+    decodePollCommentRepliesPage,
+  );
+}
+
+export function getComment(pollId: string, commentId: string): Promise<PollComment> {
+  return apiClient.get(
+    `/polls/${pollId}/comments/${commentId}`,
+    (value) => responseField(value, 'comment', decodePollComment),
+  );
+}
+
+export function createComment(
+  pollId: string,
+  body: string,
+  parentCommentId?: string,
+): Promise<{ comment: PollComment; poll: Poll }> {
+  return apiClient.send(
+    `/polls/${pollId}/comments`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ body, ...(parentCommentId === undefined ? {} : { parentCommentId }) }),
+    },
+    (value) => ({
+      comment: responseField(value, 'comment', decodePollComment),
+      poll: responseField(value, 'poll', decodePoll),
+    }),
+  );
 }
 
 export function likeComment(pollId: string, commentId: string): Promise<PollComment> {

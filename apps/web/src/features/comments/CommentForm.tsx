@@ -1,11 +1,24 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { mutationErrorMessage } from '../polls/usePollMutations';
 
 interface CommentFormProps {
   onSubmit(body: string): Promise<void>;
+  label?: string;
+  submitLabel?: string;
+  replyToLabel?: string;
+  onCancel?: () => void;
+  cancelLabel?: string;
 }
 
-export function CommentForm({ onSubmit }: CommentFormProps) {
+export function CommentForm({
+  onSubmit,
+  label = 'Add a comment',
+  submitLabel = 'Post comment',
+  replyToLabel,
+  onCancel,
+  cancelLabel = 'Cancel reply',
+}: CommentFormProps) {
+  const textareaId = useId();
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,11 +45,15 @@ export function CommentForm({ onSubmit }: CommentFormProps) {
 
   return (
     <form className="comment-form" onSubmit={(event) => void submit(event)}>
-      <label className="field" htmlFor="comment-body">Add a comment
-        <textarea id="comment-body" value={body} onChange={(event) => setBody(event.target.value)} maxLength={1000} required />
+      {replyToLabel ? <p className="comment-form__reply-to">Replying to {replyToLabel}</p> : null}
+      <label className="field" htmlFor={textareaId}>{label}
+        <textarea id={textareaId} value={body} onChange={(event) => setBody(event.target.value)} maxLength={1000} required />
       </label>
       {error ? <p role="alert">{error}</p> : null}
-      <button className="button button--primary" type="submit" disabled={isSubmitting}>Post comment</button>
+      <div className="comment-form__actions">
+        <button className="button button--primary" type="submit" disabled={isSubmitting}>{submitLabel}</button>
+        {onCancel ? <button className="button comment-form__cancel" type="button" onClick={onCancel} disabled={isSubmitting}>{cancelLabel}</button> : null}
+      </div>
     </form>
   );
 }

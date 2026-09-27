@@ -76,8 +76,15 @@ export interface PollComment {
   body: string;
   likesCount: number;
   viewerHasLiked: boolean;
+  parentCommentId: string | null;
+  repliesCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PollCommentRepliesPage {
+  items: PollComment[];
+  nextCursor: string | null;
 }
 
 export interface PublicProfile {
@@ -199,7 +206,26 @@ function decodePollOption(value: unknown): PollOption {
 
 export function decodePollComment(value: unknown): PollComment {
   const source = object(value);
-  return { id: string(source.id), pollId: string(source.pollId), author: decodePollAuthor(source.author), body: string(source.body), likesCount: number(source.likesCount), viewerHasLiked: boolean(source.viewerHasLiked), createdAt: string(source.createdAt), updatedAt: string(source.updatedAt) };
+  return {
+    id: string(source.id),
+    pollId: string(source.pollId),
+    author: decodePollAuthor(source.author),
+    body: string(source.body),
+    likesCount: number(source.likesCount),
+    viewerHasLiked: boolean(source.viewerHasLiked),
+    parentCommentId: nullableString(source.parentCommentId),
+    repliesCount: source.repliesCount === undefined ? 0 : number(source.repliesCount),
+    createdAt: string(source.createdAt),
+    updatedAt: string(source.updatedAt),
+  };
+}
+
+export function decodePollCommentRepliesPage(value: unknown): PollCommentRepliesPage {
+  const source = object(value);
+  return {
+    items: array(source.items).map(decodePollComment),
+    nextCursor: nullableString(source.nextCursor),
+  };
 }
 
 export function decodePublicProfile(value: unknown): PublicProfile {

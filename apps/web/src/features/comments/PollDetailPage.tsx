@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { createComment, getPoll } from '../../api/polls';
+import { createComment, getComment, getPoll } from '../../api/polls';
 import type { PollComment } from '../../api/models';
 import { useSession } from '../../app/session-provider';
 import { AsyncState } from '../../components/AsyncState';
@@ -17,6 +17,19 @@ export function PollDetailPage() {
   const queryClient = useQueryClient();
   const pollMutations = usePollMutations();
   const pollQuery = useQuery({ queryKey: ['poll', pollId], queryFn: () => getPoll(pollId), enabled: Boolean(pollId) });
+  const commentTargetQuery = useQuery({
+    queryKey: ['comment-target', pollId, focusedCommentId],
+    queryFn: () => getComment(pollId, focusedCommentId ?? ''),
+    enabled: Boolean(pollId && focusedCommentId),
+  });
+  const targetRootId = commentTargetQuery.data?.parentCommentId ?? null;
+  const rootTargetQuery = useQuery({
+    queryKey: ['comment-target', pollId, targetRootId],
+    queryFn: () => getComment(pollId, targetRootId ?? ''),
+    enabled: Boolean(pollId && focusedCommentId && targetRootId),
+  });
+  const focusedReplyId = targetRootId ? focusedCommentId : null;
+  const resolvedRootComment = targetRootId ? rootTargetQuery.data : commentTargetQuery.data;
   const createMutation = useMutation({
     mutationFn: (body: string) => createComment(pollId, body),
     onSuccess: ({ comment, poll }) => {
@@ -33,7 +46,15 @@ export function PollDetailPage() {
       <section className="comments-section" aria-labelledby="comments-heading">
         <header className="page-heading"><h1 id="comments-heading">Comments</h1></header>
         {user ? <CommentForm onSubmit={async (body) => { await createMutation.mutateAsync(body); }} /> : <Link to={`/login?next=${encodeURIComponent(`/polls/${pollId}`)}`}>Login</Link>}
-        {pollId ? <CommentList pollId={pollId} currentUserId={user?.id} focusedCommentId={focusedCommentId} /> : null}
+        {pollId ? <CommentList
+          pollId={pollId}
+          currentUserId={user?.id}
+          focusedCommentId={focusedReplyId ? null : focusedCommentId}
+          focusedReplyId={focusedReplyId}
+          forcedExpandedRootId={targetRootId}
+          resolvedRootComment={resolvedRootComment}
+          onReplyCreated={(poll) => replaceCachedPoll(queryClient, poll)}
+        /> : null}
       </section>
     </main>
   );
