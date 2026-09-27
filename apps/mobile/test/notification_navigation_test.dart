@@ -31,6 +31,13 @@ void main() {
         if (request.url.path == '/polls/poll-1/comments') {
           return http.Response(jsonEncode({'items': _commentsJson}), 200);
         }
+        if (request.url.path.startsWith('/polls/poll-1/comments/')) {
+          final commentId = request.url.pathSegments.last;
+          return http.Response(
+            jsonEncode({'comment': _commentJson(commentId)}),
+            200,
+          );
+        }
         if (request.url.path == '/users/actor-1/polls') {
           return http.Response('{"items":[]}', 200);
         }
@@ -104,9 +111,22 @@ void main() {
 
   testWidgets('scrolls the target comment into view and highlights it',
       (tester) async {
+    final requestedPaths = <String>[];
     final pollsApiClient = _pollsClient((request) async {
+      requestedPaths.add(request.url.path);
       if (request.url.path == '/polls/poll-1') {
         return http.Response(jsonEncode({'poll': _pollJson}), 200);
+      }
+      if (request.url.path == '/polls/poll-1/comments/comment-80') {
+        return http.Response(
+          jsonEncode({
+            'comment': _commentJson(
+              'comment-80',
+              body: 'Comment outside the first page',
+            ),
+          }),
+          200,
+        );
       }
       return http.Response(jsonEncode({'items': _longCommentsJson}), 200);
     });
@@ -126,7 +146,7 @@ void main() {
               child: ElevatedButton(
                 onPressed: () => unawaited(openNotificationTarget(
                   context,
-                  _item(NotificationType.comment, commentId: 'comment-15'),
+                  _item(NotificationType.comment, commentId: 'comment-80'),
                 )),
                 child: const Text('Open target'),
               ),
@@ -139,9 +159,11 @@ void main() {
     await tester.pumpAndSettle();
 
     final target = find.byKey(
-      const ValueKey('notification-target-comment-comment-15'),
+      const ValueKey('notification-target-comment-comment-80'),
     );
     expect(target, findsOneWidget);
+    expect(find.text('Comment outside the first page'), findsOneWidget);
+    expect(requestedPaths, contains('/polls/poll-1/comments/comment-80'));
     expect(tester.getTopLeft(target).dy, greaterThanOrEqualTo(0));
     expect(tester.getBottomRight(target).dy,
         lessThan(tester.view.physicalSize.height));
@@ -177,6 +199,52 @@ void main() {
     expect(find.byType(NotificationsScreen), findsOneWidget);
     expect(find.text('This content is no longer available.'), findsOneWidget);
     expect(store.state.itemsById, contains('item-1'));
+  });
+
+  testWidgets('missing comment targets keep the poll open and show a fallback',
+      (tester) async {
+    final pollsApiClient = _pollsClient((request) async {
+      if (request.url.path == '/polls/poll-1') {
+        return http.Response(jsonEncode({'poll': _pollJson}), 200);
+      }
+      if (request.url.path == '/polls/poll-1/comments') {
+        return http.Response('{"items":[]}', 200);
+      }
+      return http.Response('{"message":"Comment was not found."}', 404);
+    });
+    final profilesApiClient = _profilesClient();
+    addTearDown(pollsApiClient.close);
+    addTearDown(profilesApiClient.close);
+
+    await tester.pumpWidget(MaterialApp(
+      home: NotificationNavigationScope(
+        accessToken: 'access-token',
+        currentUserId: 'recipient-1',
+        pollsApiClient: pollsApiClient,
+        profilesApiClient: profilesApiClient,
+        child: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () => unawaited(openNotificationTarget(
+                  context,
+                  _item(
+                    NotificationType.comment,
+                    commentId: 'comment-missing',
+                  ),
+                )),
+                child: const Text('Open target'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('Open target'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PollCommentsScreen), findsOneWidget);
+    expect(find.text('This comment is no longer available.'), findsOneWidget);
   });
 
   testWidgets('failed read mutation reconciles without removing the card',
@@ -361,7 +429,6 @@ final _profileJson = <String, dynamic>{
 
 final _commentsJson = [
   _commentJson('comment-1'),
-  _commentJson('reply-1'),
   _commentJson('comment-2'),
 ];
 

@@ -8,6 +8,7 @@ import {
   likePollRecord,
   likeCommentRecord,
   listPollCommentRecords,
+  findViewablePollCommentRecordById,
   listPublicPollRecords,
   listSubscriptionPollRecords,
   findViewablePollRecordById,
@@ -147,6 +148,16 @@ export async function listPollComments(input: ListPollCommentsInput & { viewerId
   return {
     items: result.items
   };
+}
+
+export async function getPollComment(input: {
+  pollId: string;
+  commentId: string;
+  viewerId: string;
+}) {
+  const comment = await findViewablePollCommentRecordById(input);
+  if (!comment) throw new PollNotFoundError('Comment was not found.');
+  return comment;
 }
 
 export async function createPollComment(input: CreatePollCommentInput) {

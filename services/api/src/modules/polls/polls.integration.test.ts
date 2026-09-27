@@ -2981,6 +2981,12 @@ test('polls can be loaded by id only when the viewer can see them', async () => 
     'A public notification target'
   );
 
+  const anonymousPublicResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${publicPollId}`
+  });
+  assert.equal(anonymousPublicResponse.statusCode, 401, anonymousPublicResponse.body);
+
   const privatePollResponse = await app.inject({
     method: 'POST',
     url: '/polls',
@@ -3007,4 +3013,125 @@ test('polls can be loaded by id only when the viewer can see them', async () => 
     headers: bearer(author.accessToken)
   });
   assert.equal(ownerResponse.statusCode, 200, ownerResponse.body);
+
+  const followersPollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(author.accessToken),
+    payload: {
+      question: 'A followers notification target',
+      options: ['One', 'Two'],
+      visibility: 'followers'
+    }
+  });
+  assert.equal(followersPollResponse.statusCode, 201, followersPollResponse.body);
+  const followersPollId = followersPollResponse.json<PollResponse>().poll.id;
+
+  const unfollowedResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${followersPollId}`,
+    headers: bearer(viewer.accessToken)
+  });
+  assert.equal(unfollowedResponse.statusCode, 404, unfollowedResponse.body);
+
+  const followResponse = await app.inject({
+    method: 'POST',
+    url: `/users/${author.user.id}/follow`,
+    headers: bearer(viewer.accessToken)
+  });
+  assert.equal(followResponse.statusCode, 201, followResponse.body);
+
+  const followedResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${followersPollId}`,
+    headers: bearer(viewer.accessToken)
+  });
+  assert.equal(followedResponse.statusCode, 200, followedResponse.body);
+
+  await db.query(
+    'UPDATE users SET session_version = session_version + 1 WHERE id = $1',
+    [viewer.user.id]
+  );
+  const revokedSessionResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${publicPollId}`,
+    headers: bearer(viewer.accessToken)
+  });
+  assert.equal(revokedSessionResponse.statusCode, 401, revokedSessionResponse.body);
+});
+
+test('poll notification comment targets can be loaded by id', async () => {
+  const author = await registerTestUser();
+  const commenter = await registerTestUser();
+  const pollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(author.accessToken),
+    payload: {
+      question: 'A comment notification target',
+      options: ['One', 'Two']
+    }
+  });
+  assert.equal(pollResponse.statusCode, 201, pollResponse.body);
+  const pollId = pollResponse.json<PollResponse>().poll.id;
+
+  await db.query(
+    `
+      INSERT INTO comments (poll_id, author_id, body)
+      SELECT $1, $2, 'Earlier comment ' || comment_number
+      FROM generate_series(1, 50) AS comment_number
+    `,
+    [pollId, commenter.user.id]
+  );
+
+  const createCommentResponse = await app.inject({
+    method: 'POST',
+    url: `/polls/${pollId}/comments`,
+    headers: bearer(commenter.accessToken),
+    payload: { body: 'A target comment outside the first page.' }
+  });
+  assert.equal(createCommentResponse.statusCode, 201, createCommentResponse.body);
+  const commentId = createCommentResponse.json<CreateCommentResponse>().comment.id;
+
+  const firstPageResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${pollId}/comments?limit=50`,
+    headers: bearer(author.accessToken)
+  });
+  assert.equal(firstPageResponse.statusCode, 200, firstPageResponse.body);
+  assert.equal(firstPageResponse.json<ListCommentsResponse>().items.length, 50);
+  assert.equal(
+    firstPageResponse.json<ListCommentsResponse>().items.some(
+      (comment) => comment.id === commentId
+    ),
+    false
+  );
+
+  const commentResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${pollId}/comments/${commentId}`,
+    headers: bearer(author.accessToken)
+  });
+  assert.equal(commentResponse.statusCode, 200, commentResponse.body);
+  assert.equal(
+    commentResponse.json<{ comment: { id: string; body: string } }>().comment.body,
+    'A target comment outside the first page.'
+  );
+
+  const otherPollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(author.accessToken),
+    payload: {
+      question: 'A different public poll',
+      options: ['One', 'Two']
+    }
+  });
+  const otherPollId = otherPollResponse.json<PollResponse>().poll.id;
+  const mismatchedCommentResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${otherPollId}/comments/${commentId}`,
+    headers: bearer(author.accessToken)
+  });
+  assert.equal(mismatchedCommentResponse.statusCode, 404, mismatchedCommentResponse.body);
 });

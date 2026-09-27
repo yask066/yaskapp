@@ -34,6 +34,29 @@ void main() {
     expect(poll.id, 'poll-1');
     client.close();
   });
+
+  test('loads a comment by ID for notification deep links', () async {
+    late http.Request sentRequest;
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((request) async {
+        sentRequest = request;
+        return http.Response(jsonEncode({'comment': _commentJson()}), 200);
+      }),
+    );
+
+    final comment = await client.getComment(
+      pollId: 'poll-1',
+      commentId: 'comment-1',
+      accessToken: 'access-token',
+    );
+
+    expect(sentRequest.method, 'GET');
+    expect(sentRequest.url.path, '/polls/poll-1/comments/comment-1');
+    expect(sentRequest.headers['authorization'], 'Bearer access-token');
+    expect(comment.id, 'comment-1');
+    client.close();
+  });
   test('maps closed vote errors to a clear user message', () async {
     final client = PollsApiClient(
       config: config,

@@ -27,6 +27,7 @@ import {
   deletePollComment,
   deletePoll,
   getViewablePoll,
+  getPollComment,
   likePoll,
   likeComment,
   listPollComments,
@@ -201,7 +202,7 @@ export function registerPollRoutes(app: FastifyInstance) {
   app.get(
     '/polls/:pollId',
     {
-      preHandler: optionalAuthenticate
+      preHandler: authenticate
     },
     async (request, reply) => {
       const parsedParams = voteParamsSchema.safeParse(request.params);
@@ -429,6 +430,28 @@ export function registerPollRoutes(app: FastifyInstance) {
       return pollError(reply, error);
     }
   });
+
+  app.get(
+    '/polls/:pollId/comments/:commentId',
+    { preHandler: authenticate },
+    async (request, reply) => {
+      const parsedParams = commentLikeParamsSchema.safeParse(request.params);
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      try {
+        const comment = await getPollComment({
+          pollId: parsedParams.data.pollId,
+          commentId: parsedParams.data.commentId,
+          viewerId: request.user.sub
+        });
+        return { comment };
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
 
   app.post(
     '/polls/:pollId/comments',

@@ -46,6 +46,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
   bool _isDeletingComment = false;
   bool _isLikingPoll = false;
   bool _targetCommentFocusScheduled = false;
+  String? _targetCommentLoadMessage;
   late final ReportsApiClient _reportsApiClient;
   late final bool _ownsReportsApiClient;
 
@@ -75,23 +76,45 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
     );
   }
 
-  Future<List<PollCommentSummary>> _loadComments() {
-    return widget.pollsApiClient.listComments(
+  Future<List<PollCommentSummary>> _loadComments() async {
+    final comments = await widget.pollsApiClient.listComments(
       pollId: _poll.id,
       accessToken: widget.accessToken,
-    ).then((
-      comments,
-    ) {
-      _comments = comments;
+    );
+    _targetCommentLoadMessage = null;
+    final targetId = widget.initialCommentId;
+    if (targetId != null &&
+        !comments.any((comment) => comment.id == targetId)) {
+      try {
+        final target = await widget.pollsApiClient.getComment(
+          pollId: _poll.id,
+          commentId: targetId,
+          accessToken: widget.accessToken,
+        );
+        if (target.pollId == _poll.id) {
+          comments.add(target);
+        } else {
+          _targetCommentLoadMessage = 'This comment is no longer available.';
+        }
+      } on PollsApiException catch (error) {
+        _targetCommentLoadMessage = error.statusCode == 404
+            ? 'This comment is no longer available.'
+            : 'Could not open this comment. Please try again.';
+      } on Object {
+        _targetCommentLoadMessage =
+            'Could not open this comment. Please try again.';
+      }
+    }
 
-      return comments;
-    });
+    _comments = comments;
+    return comments;
   }
 
   void _retryComments() {
     setState(() {
       _comments = null;
       _targetCommentFocusScheduled = false;
+      _targetCommentLoadMessage = null;
       _commentsFuture = _loadComments();
     });
   }
@@ -102,7 +125,11 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
     _targetCommentFocusScheduled = true;
     if (!comments.any((comment) => comment.id == targetId)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _showSnackBar('This comment is no longer available.');
+        if (mounted) {
+          _showSnackBar(
+            _targetCommentLoadMessage ?? 'This comment is no longer available.',
+          );
+        }
       });
       return;
     }
@@ -418,7 +445,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                           Row(
                             children: [
                               Text(
-                                '${comments.length} comments',
+                                '${_poll.commentsCount} comments',
                                 style: const TextStyle(
                                   color: _commentsSecondaryText,
                                   fontSize: 15,

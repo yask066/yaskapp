@@ -400,6 +400,25 @@ class PollsApiClient {
         .toList();
   }
 
+  Future<PollCommentSummary> getComment({
+    required String pollId,
+    required String commentId,
+    required String accessToken,
+  }) async {
+    final uri = Uri.parse(_config.baseUrl).replace(
+      path: '/polls/$pollId/comments/$commentId',
+    );
+    final response = await _httpClient.get(
+      uri,
+      headers: {'authorization': 'Bearer $accessToken'},
+    );
+
+    return _decodeCommentResponse(
+      response,
+      'Poll comment response is invalid.',
+    );
+  }
+
   Future<PollCommentSummary> likeComment({
     required String pollId,
     required String commentId,

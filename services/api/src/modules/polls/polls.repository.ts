@@ -745,6 +745,53 @@ export async function listPollCommentRecords(input: { pollId: string; limit: num
   }
 }
 
+export async function findViewablePollCommentRecordById(input: {
+  pollId: string;
+  commentId: string;
+  viewerId: string;
+}) {
+  const client = await db.connect();
+
+  try {
+    const result = await client.query<PollCommentRow>(
+      `
+        SELECT
+          c.id,
+          c.poll_id,
+          c.author_id,
+          u.username::text AS author_username,
+          pr.display_name AS author_display_name,
+          pr.avatar_object_key AS author_avatar_object_key,
+          c.body,
+          c.likes_count,
+          EXISTS (
+            SELECT 1 FROM likes l
+            WHERE l.comment_id = c.id AND l.user_id = $3
+          ) AS viewer_has_liked,
+          c.created_at,
+          c.updated_at
+        FROM comments c
+        JOIN polls p ON p.id = c.poll_id
+        JOIN users poll_author ON poll_author.id = p.author_id
+        JOIN users u ON u.id = c.author_id
+        JOIN profiles pr ON pr.user_id = c.author_id
+        WHERE c.id = $1
+          AND c.poll_id = $2
+          AND c.deleted_at IS NULL
+          AND p.deleted_at IS NULL
+          AND p.visibility = 'public'
+          AND poll_author.status = 'active'
+          AND u.status = 'active'
+      `,
+      [input.commentId, input.pollId, input.viewerId]
+    );
+
+    return result.rows[0] ? mapComment(result.rows[0]) : null;
+  } finally {
+    client.release();
+  }
+}
+
 export async function createPollCommentRecord(input: CreatePollCommentRecordInput) {
   const client = await db.connect();
 
