@@ -14,11 +14,22 @@ import {
 import { getNotificationPreferences, updateNotificationPreferences } from './notification-preferences.repository.js';
 import { registerNotificationDevice, revokeNotificationDevice } from './notification-devices.repository.js';
 import { rateLimit } from '../../config/rate-limit.js';
-import { incrementNotificationMetric, recordReadResult, recordRealtimePublishError } from './notifications.metrics.js';
+import {
+  incrementNotificationMetric,
+  recordRateLimitResponse,
+  recordReadResult,
+  recordRealtimePublishError
+} from './notifications.metrics.js';
 
-const notificationReadRateLimit = rateLimit({ keyPrefix: 'notifications-read', limit: 60, windowMs: 60_000, keyBy: 'user' });
-const notificationListRateLimit = rateLimit({ keyPrefix: 'notifications-list', limit: 120, windowMs: 60_000, keyBy: 'user' });
-const notificationDeviceRateLimit = rateLimit({ keyPrefix: 'notification-devices', limit: 20, windowMs: 60_000, keyBy: 'user' });
+const notificationReadRateLimit = rateLimit({
+  keyPrefix: 'notifications-read', limit: 60, windowMs: 60_000, keyBy: 'user', onResponse: recordRateLimitResponse
+});
+const notificationListRateLimit = rateLimit({
+  keyPrefix: 'notifications-list', limit: 120, windowMs: 60_000, keyBy: 'user', onResponse: recordRateLimitResponse
+});
+const notificationDeviceRateLimit = rateLimit({
+  keyPrefix: 'notification-devices', limit: 20, windowMs: 60_000, keyBy: 'user', onResponse: recordRateLimitResponse
+});
 
 const preferenceSchema = z.object({
   inApp: z.boolean().optional(),

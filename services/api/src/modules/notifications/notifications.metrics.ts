@@ -53,6 +53,6 @@ export function recordReadResult(operation: 'read' | 'read_all', result: 'update
   readResults[key] = (readResults[key] ?? 0) + 1;
 }
 
-export function recordRateLimitResponse() {
-  counters.rateLimitResponses += 1;
+export function recordRateLimitResponse(statusCode: number) {
+  if (statusCode === 429) counters.rateLimitResponses += 1;
 }

@@ -18,8 +18,8 @@ import {
   , sendNotificationCreated,
   sendNotificationRead,
   createConnectionReadyEvent,
-  handleRealtimeMessage,
   getRealtimeConnectionMetrics,
+  handleRealtimeMessage,
   resetRealtimeConnectionMetrics,
   sweepIdleRealtimeClients
 } from './realtime.hub.js';
@@ -73,6 +73,29 @@ test('heartbeat closes idle sockets with a safe close reason', () => {
 
   assert.deepEqual(closes, ['idle_timeout']);
   assert.equal(getRealtimeConnectionMetrics().activeSockets, 0);
+  remove();
+});
+
+test('send failures decrement active sockets and record a socket error disconnect', () => {
+  resetRealtimeConnectionMetrics();
+  const activeSocketsBefore = getNotificationMetrics().activeSockets;
+  let sends = 0;
+  const remove = addRealtimeClient({
+    readyState: 1,
+    send: () => {
+      sends += 1;
+      if (sends > 1) throw new Error('socket is closed');
+    }
+  }, 'user-send-failure');
+
+  sendNotificationCreated('user-send-failure', {
+    notification: { id: 'notification-failure', type: 'follow', actorId: 'actor-1', pollId: null, commentId: null, createdAt: new Date().toISOString() },
+    unreadCount: 1
+  });
+
+  assert.equal(getRealtimeConnectionMetrics().activeSockets, 0);
+  assert.equal(getRealtimeConnectionMetrics().disconnectsByReason.socket_error, 1);
+  assert.equal(getNotificationMetrics().activeSockets, activeSocketsBefore);
   remove();
 });
 

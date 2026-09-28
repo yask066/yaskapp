@@ -194,7 +194,7 @@ export class RealtimeHub {
       try {
         send(client, event);
       } catch {
-        this.clients.delete(client);
+        this.removeRealtimeClient(client, 'socket_error');
       }
     }
   }
@@ -206,7 +206,7 @@ export class RealtimeHub {
       try {
         send(client, event);
       } catch {
-        this.clients.delete(client);
+        this.removeRealtimeClient(client, 'socket_error');
       }
     }
   }

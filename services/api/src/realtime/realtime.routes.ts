@@ -9,7 +9,7 @@ import { rateLimit, type RateLimitOptions } from '../config/rate-limit.js';
 import { recordRateLimitResponse } from '../modules/notifications/notifications.metrics.js';
 
 export function isAllowedRealtimeOrigin(origin: string | undefined, configuredOrigins: string) {
-  return isTrustedOrigin(origin, configuredOrigins);
+  return Boolean(origin && isTrustedOrigin(origin, configuredOrigins));
 }
 
 export function isRealtimeTokenInQuery(url: string) {
@@ -23,7 +23,13 @@ export function getRealtimeAuthMode(request: { headers?: { authorization?: strin
 }
 
 export function createRealtimeHandshakeRateLimit(): RateLimitOptions {
-  return { keyPrefix: 'realtime-handshake', limit: 20, windowMs: 60_000, keyBy: 'ip' };
+  return {
+    keyPrefix: 'realtime-handshake',
+    limit: 20,
+    windowMs: 60_000,
+    keyBy: 'ip',
+    onResponse: recordRateLimitResponse
+  };
 }
 
 export function redactRealtimeLogFields(fields: Record<string, unknown>) {
@@ -42,19 +48,28 @@ async function validateRealtimeHandshake(request: Parameters<typeof authenticate
 
 const realtimeHandshakeRateLimit = rateLimit({
   ...createRealtimeHandshakeRateLimit(),
-  skipInTest: false,
-  onResponse: () => recordRateLimitResponse()
+  skipInTest: false
 });
 
-export function registerRealtimeRoutes(app: FastifyInstance) {
-  app.get('/realtime', { websocket: true, preHandler: [validateRealtimeHandshake, authenticate, realtimeHandshakeRateLimit] }, (connection, request) => {
-    const removeClient = addRealtimeClient(connection.socket, request.user.sub);
+export function createRealtimeHandshakePreHandlers(
+  handshakeRateLimit = realtimeHandshakeRateLimit,
+  authenticator = authenticate
+) {
+  return [handshakeRateLimit, validateRealtimeHandshake, authenticator];
+}
 
-    connection.socket.on('message', (message: Buffer | ArrayBuffer | string) => {
-      handleRealtimeMessage(connection.socket, message);
+export function registerRealtimeRoutes(
+  app: FastifyInstance,
+  preHandlers = createRealtimeHandshakePreHandlers()
+) {
+  app.get('/realtime', { websocket: true, preHandler: preHandlers }, (socket, request) => {
+    const removeClient = addRealtimeClient(socket, request.user.sub);
+
+    socket.on('message', (message: Buffer | ArrayBuffer | Buffer[] | string) => {
+      handleRealtimeMessage(socket, Array.isArray(message) ? Buffer.concat(message) : message);
     });
 
-    connection.socket.on('close', () => removeClient('client_close'));
-    connection.socket.on('error', () => removeClient('socket_error'));
+    socket.on('close', () => removeClient('client_close'));
+    socket.on('error', () => removeClient('socket_error'));
   });
 }
