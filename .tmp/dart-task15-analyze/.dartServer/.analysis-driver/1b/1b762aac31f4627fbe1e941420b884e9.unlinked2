@@ -1,602 +1,0 @@
-{_stateonUserTapAlwaysCalled	onUserTapmagnifierConfigurationgroupId
-controller	focusNode
-decorationkeyboardTypetextInputActiontextCapitalizationstyle
-strutStyle	textAligntextAlignVerticaltextDirection	autofocusstatesControllerobscuringCharacterobscureTextautocorrectsmartDashesTypesmartQuotesTypeenableSuggestionsmaxLinesminLinesexpandsreadOnlytoolbarOptions
-showCursornoMaxLength	maxLengthmaxLengthEnforcement	onChangedonEditingCompleteonSubmittedonAppPrivateCommandinputFormattersenabledignorePointerscursorWidthcursorHeightcursorRadiuscursorOpacityAnimatescursorColorcursorErrorColorselectionHeightStyleselectionWidthStylekeyboardAppearancescrollPaddingenableInteractiveSelectionselectAllOnFocusselectionControlsdragStartBehaviorselectionEnabledonTaponTapAlwaysCalledonTapOutsideonTapUpOutsidemouseCursorbuildCounterscrollPhysicsscrollControllerautofillHintsclipBehaviorrestorationIdscribbleEnabledstylusHandwritingEnabledenableIMEPersonalizedLearningenableInlinePredictioncontentInsertionConfigurationcontextMenuBuildercanRequestFocusundoControllerhintLocales_defaultContextMenuBuilderspellCheckConfigurationmaterialMisspelledTextStyle*defaultSpellCheckSuggestionsToolbarBuilder#inferAndroidSpellCheckConfigurationcreateStatedebugFillProperties_controller_effectiveController
-_focusNode_effectiveFocusNode_effectiveMaxLengthEnforcement_isHoveringneedsCounter_showSelectionHandles _selectionGestureDetectorBuilderforcePressEnablededitableTextKey
-_isEnabled_currentLength_hasIntrinsicError	_hasError_errorColor_getEffectiveDecoration	initState_canRequestFocusdidChangeDependenciesdidUpdateWidgetrestoreState_registerController_createLocalControllerdispose_editableText_requestKeyboard_shouldShowSelectionHandles_handleFocusChanged_handleSelectionChanged_handleSelectionHandleTapped_handleHover_internalStatesController_handleStatesControllerChange_statesController_initStatesController
-autofillIdautofilltextInputConfiguration_getInputStyleForStatebuild	InputCounterWidgetBuilder)_TextFieldSelectionGestureDetectorBuilder	TextField_TextFieldState_m2StateInputStyle_m2CounterErrorStyle_m3StateInputStyle_m3InputStyle_m3CounterErrorStyle’BoxHeightStyleBoxWidthStyleiOSHorizontalOffsetSmartDashesTypeSmartQuotesTypeTextCapitalizationTextInputActionTextInputTypebuildCounterWidgetBuildContextint
-liveRegion	Semanticsbool#TextSelectionGestureDetectorBuilderstatedelegateoverridewidgetonTapAlwaysCalledvoidonTapcallMaterialForm	FormFieldTextFormFieldEditableTextAutomaticKeepAliveClientMixinwantKeepAliveTextEditingControllerdisposeListViewCustomScrollViewInputDecorationOutlineInputBordertextScaffold
-ScrollableScrollNotificationObserverTextSelectionOverlay	ShortcutsActionsInputDecoratorStatefulWidgetnoMaxLengthMaxLengthEnforcementnone LengthLimitingTextInputFormatterdefaultSelectionHeightStyle	TextAlignstart
-Deprecated
-EdgeInsetsallDragStartBehaviorStringCliphardEdgedefaultStylusHandwritingEnabledlengthdisabledenabled	identicalnewline	multilineCupertinoTextMagnifierTextMagnifierTextMagnifierConfigurationObject	FocusNode
-FocusScopedone	TextTheme	bodyLarge	ThemeDatauseMaterial3titleMediumdisabledColor	TextStyle
-StrutStyleTextAlignVerticalTextDirectionWidgetStatehoverederrorfocusedWidgetStatesControllervalueStatesetStateWidgetStatePropertyupdateMaterialStatesControllerToolbarOptionscounterText
-errorStyleValueChangedVoidCallbacknextpreviousAppPrivateCommandCallbackListTextInputFormatter
-suffixIcondoubleRadiusDefaultSelectionStylecursorColorplatformTargetPlatformiOSmacOSCupertinoThemeDataprimaryColorColorSchemeprimarycolorSchemeColorcolor
-brightness
-BrightnessTextSelectionControlsGestureDetectorListenerGestureTapCallback	TapRegionTapRegionCallbackTapRegionUpCallbackWidgetStateMouseCursorresolvetextableMouseCursorcounterTextsemanticsLabelScrollPhysicsScrollControllerIterableRestorableTextEditingControllerRestorationBucketRestorationScopeRestorationManagerContentInsertionConfigurationAdaptiveTextSelectionToolbarBrowserContextMenuEditableTextContextMenuBuilderUndoHistoryControllerLocaleEditableTextStateSystemContextMenuisSupportedByFieldeditableTexteditableTextStateSpellCheckConfigurationmisspelledTextStyleCupertinoTextFieldcupertinoMisspelledTextStyle
-decorationTextDecoration	underlinedecorationColorColorsreddecorationStyleTextDecorationStylewavy#spellCheckSuggestionsToolbarBuilder*defaultSpellCheckSuggestionsToolbarBuildervisibleForTestingdefaultTargetPlatform%CupertinoSpellCheckSuggestionsToolbarandroidfuchsialinuxwindowsSpellCheckSuggestionsToolbarcopyWithmaterialMisspelledTextStyleDiagnosticPropertiesBuilderdebugFillPropertiesaddDiagnosticsPropertydefaultValueEnumPropertyIntPropertyDoublePropertyColorPropertyEdgeInsetsGeometryFlagPropertyifFalseallowedMimeTypes!kDefaultContentInsertionMimeTypesRestorationMixin+TextSelectionGestureDetectorBuilderDelegateAutofillClient
-controller	focusNodemaxLengthEnforcementgetDefaultMaxLengthEnforcementThemeofcontext	maxLength	GlobalKeyselectionEnabled
-charactersrestorePending	errorTextcursorErrorColorMaterialLocalizationsInputDecorationThemeDataInputDecorationThemeapplyDefaultshintMaxLinesmaxLineshasFocuscurrentLength	isFocused	containerchildclamp remainingTextFieldCharacterCountcounterStylesemanticCounterText	initStatecanRequestFocusaddListenerNavigationMode
-MediaQuerymaybeNavigationModeOftraditionaldirectionaldidChangeDependenciesdidUpdateWidgetunregisterFromRestorationremoveListenerreadOnly	selectionisCollapsedstatesControllerregisterForRestorationTextEditingValue	fromValuerestorationIdcurrentStaterequestKeyboardSelectionChangedCauseshouldShowSelectionToolbarshouldShowSelectionHandleskeyboard	longPressstylusHandwriting
-isNotEmptyTextSelectionbringIntoViewextentdraghideToolbartoggleToolbar
-autofillIdautofillTextInputConfigurationautofillHintstoListgrowableAutofillConfigurationuniqueIdentifiercurrentEditingValuehintTexttextInputConfigurationautofillConfiguration	resolveAsmergedebugCheckHasMaterial"debugCheckHasMaterialLocalizationsdebugCheckHasDirectionalitystyleinheritfontSizetextBaseline	textThemekeyboardAppearanceinputFormattersinferIOSSpellCheckConfigurationspellCheckConfiguration#inferAndroidSpellCheckConfigurationselectionControlscursorOpacityAnimatesOffsetcursorRadiusCupertinoTheme$cupertinoTextSelectionHandleControlscupertinoThemeselectionColorwithOpacitycirculardevicePixelRatioOf+cupertinoDesktopTextSelectionHandleControlsrequestFocusunfocus#materialTextSelectionHandleControls"desktopTextSelectionHandleControlsRepaintBoundaryUnmanagedRestorationScopebucketkeytoolbarOptions
-showCursorshowSelectionHandlesundoControllerkeyboardTypetextInputActiontextCapitalization
-strutStyle	textAligntextDirection	autofocusobscuringCharacterobscureTextautocorrectsmartDashesTypesmartQuotesTypeenableSuggestionsminLinesexpands	onChangedonSelectionChangedonEditingCompleteonSubmittedonAppPrivateCommandgroupIdonSelectionHandleTappedonTapOutsideonTapUpOutsiderendererIgnoresPointermouseCursordefercursorWidthcursorHeightselectionHeightStyleselectionWidthStylecursorOffsetpaintCursorAboveTextbackgroundCursorColorCupertinoColorsinactiveGrayscrollPaddingenableInteractiveSelectionselectAllOnFocusdragStartBehaviorscrollControllerscrollPhysicsautofillClientautocorrectionTextRectColorclipBehaviorscribbleEnabledstylusHandwritingEnabledenableIMEPersonalizedLearningenableInlinePredictioncontentInsertionConfigurationcontextMenuBuildermagnifierConfigurationadaptiveMagnifierConfigurationhintLocalesAnimatedBuilder	animation
-Listenablebuilder	baseStyletextAlignVertical
-isHoveringisEmptyMouseRegioncursoronEnterPointerEnterEventonExitPointerExitEventTextFieldTapRegionIgnorePointerignoringignorePointersmaxValueLengthcurrentValueLengthisValid	collapsedoffsetonDidGainAccessibilityFocusonDidLoseAccessibilityFocusonFocusbuildGestureDetectorbehaviorHitTestBehaviortranslucentWidgetStateTextStyleresolveWithSetstatescontains	bodySmall#TextSelectionGestureDetectorBuilderStatefulWidgetStateRestorationMixin+TextSelectionGestureDetectorBuilderDelegateAutofillClient«L/Ë"³±ğ™B¥¶Fîw„e„¾SmartDashesTypeSmartQuotesTypeTextCapitalizationTextInputActionTextInputType „9package:flutter/services.dart ~ BoxHeightStyleBoxWidthStyle h   x{ui{dart:ui  ¦   package:flutter/cupertino.dart  Ğ   package:flutter/foundation.dart  û   package:flutter/gestures.dart  ‚$   package:flutter/rendering.dart  ‚N   package:flutter/services.dart  ‚y   $adaptive_text_selection_toolbar.dart  ‚©   color_scheme.dart  ‚Æ   colors.dart  ‚İ   
-debug.dart  ‚ó   desktop_text_selection.dart  ƒ   input_decorator.dart  ƒ:   magnifier.dart  ƒT   material_localizations.dart  ƒ{   material_state.dartƒ·ƒÏiOSHorizontalOffset ƒš   selectable_text.dart  ƒÓ   $spell_check_suggestions_toolbar.dart  „   text_selection.dart  „"   
-theme.dartÀ ” À)p‡l =€ˆ€§€©€Î€ï8[eg£¥Ïú‚#‚M‚v‚x‚¨‚Å‚Ü‚òƒƒ9ƒSƒzƒ™ƒÒ„„!„7„9„a„Á„Ã„Ü„û………W…|…“…Ã…â…ä† †C†E†’†²†´‡‡Y‡y‡‚‡„‡ãˆ2ˆIˆhˆjˆ‹ˆˆšˆàˆâˆï‰‰'‰,‰/‰1‰T‰Y‰«‰Æ‰ËŠŠkŠ¸ŠßŠä‹*‹z‹ÉŒŒEŒJŒšŒì7…ÓØ)^c³Øİe·+0…Öêï‘>‘Œ‘×’’’-’2’G’˜’ê“““T“e“j““†“Õ”$”D”I”^”¯”¾”Ã••"•'•\•a•®•Ë•Ğ– –l–¾————p—±—¶—ë˜ ˜%˜k˜¼™™™!™^™c™œ™¡™¶šš(š-š{šŒš‘š²š·››K›œ›êœœœ1œ€œÑœèœí;LQ`e§÷(xÆŸŸ%ŸfŸÌ ; ª¡¡-¡Z¡a¡´¡ë¡ò¢C¢“¢ ¢§¢ö£G£w£~£É¤¤_¤«¤õ¥7¥¥ˆ¥Î¦	¦-¦‚¦Ê§§§j§·¨¨¨¨k¨ ¨§¨ô©F©©À©Ç©Ø©ßª(ªpª…ª•ª·ªÍªâªü«,«N«i«¡«²«È«ï¬¬%¬A¬S¬¬»¬Â¬Ü¬ò­­+­O­n­…­¬­Ó­÷®®#®>®S®s®ˆ®¥®¼®Û®ö¯	¯#¯@¯X¯p¯‘¯¨¯Ä¯ä°°!°W°°µ°Ñ°î°ÿ±$±<±V±m±…±¡±º±æ²²7²P²b²”²Ñ²Ø²ú³M³}³Ÿ³Ú³ü´´A´X´ˆ´¢µµµ‚µ´µæµö¶D¶y¶„¶”¶Ò··#·z·Ô¸Y¸i¸«¸Ê¹¹y¹„¹›¹÷ºWºYº˜ºŸºï»=»‡»»¾»Å»Ü¼6¼=¼”¼§¼ä¼æ½½4½6½]½d½­½Ù½Û¾¾¾a¾§¾®¾ÿ¿9¿@¿O¿ˆ¿“¿š¿×¿ŞÀ @-À @HÀ @OÀ @^À @£À @®À @µÀ @òÀ @ùÀ AÀ AÀ A]À AÀ AˆÀ AÙÀ B(À BpÀ B¸À BõÀ C8À C‚À C‰À CÚÀ D-À DLÀ DNÀ DƒÀ DŠÀ DÕÀ EÀ E!À EfÀ E·À EİÀ EßÀ FÀ F>À F@À F}À F·À F¾À G À GGÀ G]À GˆÀ GŠÀ GÊÀ GúÀ GüÀ H/À H6À H‚À H‰À HŞÀ I)À I0À IƒÀ IÑÀ JÀ J#À J%À J]À J~À J€À J·À JÕÀ J×À KÀ KHÀ KJÀ K…À K¬À K®À KåÀ KşÀ L À LNÀ LÀ LÕÀ LÜÀ MÀ MUÀ M¡À MŞÀ NÀ NÀ NeÀ N¶À O
-À ONÀ OœÀ OöÀ PEÀ PœÀ PÇÀ PüÀ PşÀ Q>À QbÀ QdÀ QÀ Q¸À QºÀ QóÀ RÀ RÀ RYÀ RƒÀ R…À RÍÀ R÷À RùÀ SCÀ SdÀ SfÀ SœÀ SîÀ TÀ TÀ TÀ TTÀ T¦À T¼À TÔÀ TÖÀ UÀ U"À U$À UZÀ UrÀ UtÀ UÀ U¤À UõÀ V>À VpÀ V€À VªÀ VäÀ VéÀ WÀ WÀ WLÀ WgÀ WiÀ WµÀ WäÀ X
-À XÀ X\À XsÀ XzÀ X¹À YÀ YWÀ Y­À ZÀ Z>À ZEÀ Z‹À ZÆÀ ZêÀ ZñÀ [FÀ [À [•À [èÀ \8À \ŠÀ \ÜÀ \ãÀ ]/À ]GÀ ]NÀ ]À ]îÀ ^=À ^WÀ ^^À ^ªÀ ^ÃÀ ^ÅÀ _À _À _YÀ _`À _¤À _ÙÀ _ÛÀ `À `À `*À `1À `rÀ `¹À `çÀ a(À aRÀ aTÀ a“À a½À a¿À aøÀ aÿÀ bÀ bÀ b^À b¯À bÓÀ bÿÀ cÀ cBÀ c{À c}À cºÀ cîÀ cğÀ d6À d_À dfÀ d¤À dÏÀ dÖÀ e!À erÀ eÄÀ f À fÀ fÀ f(À f@À fYÀ f…À f«À fÎÀ fëÀ g-À g=À gqÀ gÀ g‹À g”À gŸÀ g·À g¹À g÷À gşÀ h4À hSÀ hUÀ hÀ h«À h­À hçÀ iÀ iÀ iBÀ iaÀ icÀ i¦À iÌÀ iÎÀ iîÀ iõÀ jAÀ jSÀ jZÀ jÀ jÕÀ k#À koÀ kµÀ kÒÀ kÔÀ l"À l)À lhÀ lªÀ láÀ mÀ mÀ mPÀ mWÀ m—À mÉÀ mËÀ nÀ nÀ n\À nŒÀ nÀ nµÀ n¼À nğÀ n÷À o,À oUÀ oWÀ o’À oµÀ o·À oÿÀ p)À p+À piÀ pŠÀ pŒÀ pËÀ pşÀ q À q=À qkÀ qmÀ q«À qçÀ qéÀ rÀ rRÀ rYÀ r«À rûÀ sLÀ ssÀ szÀ sËÀ tÀ tÀ tVÀ tiÀ tpÀ t¾À tíÀ tôÀ u<À u}À u“À ušÀ uíÀ uúÀ vÀ v À vWÀ v^À v®À vúÀ wÀ wÀ wWÀ w^À wuÀ wÂÀ xÀ xQÀ xXÀ x©À xÕÀ xÜÀ y6À yIÀ yPÀ yaÀ yhÀ y¦À yĞÀ yÒÀ zÀ z<À z>À z‹À zšÀ z¡À zØÀ {'À {.À {MÀ {nÀ {À {±À {¸À |	À |À |_À |°À |ÿÀ }À }?À }AÀ }‹À }’À }İÀ ~-À ~~À ~…À ~ÌÀ À eÀ lÀ ƒÀ ’À ©À ÈÀ ÓÀ úÀ €À €BÀ €MÀ €XÀ €nÀ €¤À €ÒÀ €ŞÀ €çÀ €òÀ À À ^À xÀ ªÀ ¬À çÀ ‚À ‚À ‚NÀ ‚{À ‚}À ‚¸À ‚ıÀ ƒ'À ƒ)À ƒ`À ƒgÀ ƒ‹À ƒ§À ƒ©À ƒåÀ „,À „3À „‚À „ĞÀ …!À …qÀ …À …¤À …òÀ †DÀ †KÀ †\À †cÀ †±À †ÄÀ †ÚÀ †úÀ †üÀ ‡9À ‡IÀ ‡yÀ ‡´À ‡¹À ‡ØÀ ‡ÚÀ ˆ À ˆHÀ ˆJÀ ˆ À ˆÍÀ ˆÏÀ ‰À ‰EÀ ‰GÀ ‰’À ‰ÙÀ ‰ÛÀ ŠÀ Š"À ŠkÀ ŠrÀ ŠƒÀ ŠŠÀ ŠÏÀ ‹!À ‹eÀ ‹¢À ‹¤À ‹ìÀ ‹óÀ Œ<À ŒŒÀ ŒÑÀ ŒğÀ ŒòÀ )À YÀ [À ŸÀ ÃÀ ÅÀ òÀ À 7À >À ‚À ÖÀ İÀ :À ?À AÀ †À À ŞÀ +À fÀ hÀ ¸À ¿À ĞÀ ‘!À ‘GÀ ‘™À ‘ÙÀ ’À ’GÀ ’iÀ ’™À ’ŸÀ ’¡À ’ëÀ ’òÀ “BÀ “cÀ “jÀ “{À “ÆÀ “İÀ ”*À ”sÀ ”ÄÀ •À •%À •bÀ •}À •§À •®À •ÔÀ •ôÀ –À –ZÀ –‹À –—À –»À –ßÀ —À —%À —†À —À —’À —”À —åÀ ˜0À ˜AÀ ˜ˆÀ ˜µÀ ˜¼À ™À ™SÀ ™ZÀ ™~À ™šÀ ™ñÀ šÀ š]À šÀ š¦À š«À š­À šºÀ šòÀ šôÀ ›À ›GÀ ›sÀ ›ˆÀ ›éÀ ›ñÀ œRÀ œgÀ œšÀ œµÀ œÎÀ œëÀ œõÀ œıÀ UÀ jÀ —À ®À ÃÀ óÀ ıÀ À À EÀ ^À uÀ  À ªÀ ²À ŸÀ ŸhÀ Ÿ}À ŸŞÀ ŸæÀ  GÀ  §À  ¼À  âÀ  şÀ ¡À ¡qÀ ¡{À ¡ƒÀ ¡˜À ¡¾À ¡ÚÀ ¡ôÀ ¢MÀ ¢WÀ ¢_À ¢tÀ ¢ÒÀ ¢ÚÀ £#À £oÀ £ÈÀ ¤À ¤+À ¤VÀ ¤wÀ ¤–À ¤³À ¤½À ¤ÅÀ ¤ÚÀ ¥8À ¥@À ¥UÀ ¥~À ¥À ¥ºÀ ¥êÀ ¥ôÀ ¥üÀ ¦aÀ ¦vÀ ¦¥À ¦ÃÀ ¦ßÀ ¦üÀ §À §À §tÀ §ÈÀ ¨À ¨ƒÀ ¨˜À ¨şÀ ©À ©ZÀ ©¸À ©ÍÀ ª3À ª;À ªPÀ ª€À ªšÀ ª²À ªåÀ ªïÀ ª÷À «À «!À «>À «`À «}À «¥À «¯À «·À «ÌÀ «ÿÀ ¬À ¬9À ¬VÀ ¬`À ¬hÀ ¬}À ¬«À ¬ÈÀ ¬ãÀ ­ À ­
-À ­À ­'À ­†À ­À ­£À ® À ®À ®À ®wÀ ®À ®”À ®¶À ®ÛÀ ®şÀ ¯CÀ ¯MÀ ¯UÀ ¯jÀ ¯ŒÀ ¯¶À ¯ŞÀ ¯ûÀ °À °À °"À °EÀ °hÀ °‰À °¦À °°À °¸À °ÍÀ ±À ±&À ±HÀ ±eÀ ±oÀ ±wÀ ±ŒÀ ±¶À ±ÙÀ ²'À ²dÀ ²„À ²¶À ²ÀÀ ²ÈÀ ²İÀ ³8À ³@À ³EÀ ³HÀ ³JÀ ³zÀ ³•À ³ãÀ ´À ´rÀ ´tÀ ´À ´èÀ ´êÀ µ(À µNÀ µ²À µ´À µÑÀ µÓÀ µïÀ ¶À ¶6À ¶eÀ ¶gÀ ¶À ¶À ¶äÀ ¶æÀ ·!À ·.À ·NÀ ·PÀ ·]À ·µÀ ··À ·ÄÀ ¸À ¸MÀ ¸OÀ ¸ŸÀ ¸¡À ¸ñÀ ¸óÀ ¹À ¹8À ¹XÀ ¹zÀ ¹àÀ º5À º7À ºPÀ ºÀ ºªÀ ºÅÀ ºÇÀ ºãÀ »À »;À »gÀ »iÀ »˜À »ìÀ ¼ À ¼xÀ ¼ØÀ ½À ½À ½5À ½NÀ ½±À ½½À ½¿À ¾À ¾kÀ ¾À ¾•À ¾—À ¾âÀ ¾øÀ ¿'À ¿WÀ ¿‹À ¿³À ¿ïÀ À)À À;À ÀbÀ ÀˆÀ À§À À±À ÁÀ Á%À Á€À Á‰À ÁÇÀ ÁÎÀ ÁĞÀ ÁõÀ ÂÀ Â4À Â6À Â_À Â‚À Â„À Â¶À ÂØÀ ÃÀ Ã2À ÃÀ ÃèÀ ÃïÀ ÃñÀ ÄÀ Ä<À ÄuÀ ÄŒÀ Ä»À ÄàÀ ÅÀ ÅDÀ ÅgÀ ÅšÀ Å¤À Å«À Å­À Å×À ÅøÀ Æ)À Æ1À Æ6À Æ8À ÆEÀ Æ[À ÆsÀ ÆÓÀ ÆùÀ ÇÀ Ç!À ÇrÀ Ç­À ÇËÀ ÇĞÀ ÇÒÀ ÇñÀ ÈÀ ÈdÀ È€À ÈËÀ ÈöÀ ÈşÀ ÉÀ ÉÀ ÉÀ É4À ÉXÀ É•À ÉšÀ ÉœÀ É©À ÉØÀ ÉÿÀ ÊEÀ ÊÀ ÊÎÀ ÊşÀ ËÀ Ë8À Ë?À ËAÀ ËuÀ ËÆÀ ÌÀ ÌÀ ÌÀ ÌWÀ ÌYÀ Ì¹À ÌòÀ Í%À Í.À Í5À Í7À ÍyÀ Í½À Î À ÎTÀ Î“À Î¡À ÎóÀ Ï!À ÏPÀ Ï{À Ï„À Ï¤À Ï«À Ï°À Ï²À Ï¿À Ğ	À Ğ)À ĞGÀ ĞNÀ ĞSÀ ĞUÀ ĞuÀ Ğ—À ĞĞÀ ĞÕÀ Ğ×À ÑÀ Ñ5À ÑVÀ ÑƒÀ ÑÀÀ ÑÜÀ ÑúÀ ÒÀ ÒÀ ÒÀ ÒÀ ÒKÀ ÒMÀ ÒZÀ ÒnÀ Ò¬À ÒÈÀ ÒåÀ Ó+À ÓVÀ ÓlÀ ÓqÀ ÓsÀ Ó¼À Ó¾À ÓÛÀ ÔÀ ÔÀ Ô	À ÔMÀ ÔœÀ ÔİÀ Õ&À ÕoÀ Õ„À Õ‹À ÕÀ ÕÁÀ ÕÖÀ ÕİÀ ÕßÀ Ö)À Ö>À ÖEÀ ÖGÀ Ö_À ÖtÀ Ö{À Ö}À Ö²À ÖïÀ ×À ×
-À ×À ×=À ×QÀ ×XÀ ×ZÀ ×mÀ ×rÀ ×tÀ ×”À ×§À ×ôÀ Ø	À ØÀ ØdÀ ØiÀ ØkÀ ØÄÀ ÙÀ ÙQÀ ÙfÀ Ù¡À Ù¬À Ù³À ÙµÀ ÙàÀ Ú À Ú"À ÚDÀ ÚhÀ ÚŒÀ Ú°À ÚéÀ Û$À Û/À Û6À Û8À ÛcÀ ÛƒÀ Û§À ÛËÀ ÛÛÀ ÛıÀ ÜÀ ÜCÀ ÜwÀ Ü À Ü«À Ü²À Ü·À Ü¹À ÜöÀ İÀ İVÀ İ}À İ„À İ‰À İ‹À İ±À İÕÀ İêÀ ŞÀ ŞÀ ŞYÀ Ş`À ŞeÀ ŞgÀ Ş‰À ŞÁÀ ŞÃÀ ŞíÀ ß0À ßFÀ ßKÀ ßMÀ ß‚À ßÀÀ ßÂÀ ßäÀ àÀ àOÀ àVÀ à˜À àÙÀ á+À áhÀ á«À á°À á²À áİÀ áêÀ â!À â#À â0À âÀ â’À âŸÀ âÖÀ ã.À ã}À ãŸÀ ãÊÀ ãõÀ ä3À äƒÀ äÀ ä»À ä½À äùÀ å.À å6À å;À ådÀ åfÀ åÀ åÍÀ æÀ ægÀ æ‡À æÀ æóÀ ç À ç%À ç'À ç4À ç\À ç‰À çÃÀ çöÀ èÀ è$À èIÀ èÀ èáÀ èéÀ èëÀ éÀ épÀ éµÀ éÊÀ éêÀ éòÀ ê'À êzÀ ê—À êñÀ ë5À ëkÀ ë™À ë¼À ëáÀ ìÀ ì)À ìjÀ ìvÀ ì~À ì€À ìĞÀ í"À ídÀ í À íÆÀ íæÀ îÀ î_À îŠÀ î–À îºÀ îŞÀ ï À ï$À ïvÀ ï¡À ï­À ï´À ï¶À ğÀ ğ*À ğkÀ ğ†À ğ¤À ğÅÀ ğîÀ ñÀ ñSÀ ñ‡À ñ‰À ñ¨À ñÈÀ òÀ ò:À òƒÀ ò©À òÒÀ òóÀ óÀ ónÀ óˆÀ óåÀ ôÀ ô|À ô³À ôµÀ ô×À õ&À õJÀ õšÀ õÀÀ õêÀ öÀ ö&À ö†À ö À öıÀ ÷3À ÷”À ÷ÄÀ øÀ øtÀ ø¥À ø²À ø¾À øîÀ ùÀ ù$À ù&À ùJÀ ùnÀ ù’À ùÚÀ úÀ ú+À úLÀ úgÀ úÅÀ úßÀ û:À û<À û^À û‚À ûÉÀ ûğÀ üÀ ü;À üVÀ ü´À üÎÀ ı)À ıYÀ ı²À ş	À ş:À şGÀ şSÀ şƒÀ ş­À ş¹À ş»À şßÀ ÿÀ ÿJÀ ÿqÀ ÿ›À ÿ¼À ÿ×À 5À OÀ ªÀ ÚÀ3ÀŠÀ»ÀÈÀÔÀÀ.À:ÀAÀCÀhÀ‘ÀªÀÈÀéÀÀPÀzÀ²ÀÕÀöÀ(ÀVÀŠÀÄÀİÀÀ/À_À‡ÀÁÀíÀÀMÀÀ¹ÀßÀÀ)ÀyÀÀÀÀ>ÀvÀ®ÀÚÀ	À	:À	|À	ªÀ	ÜÀ
-À
--À
-|À
-¨À
-ÖÀ
-ıÀ"À`ÀœÀÕÀüÀ3ÀsÀ£ÀÖÀ ÀVÀÀÄÀôÀ$ÀEÀŠÀ¸ÀŞÀÀXÀ¨ÀêÀ:ÀtÀ±ÀÔÀ2À^ÀjÀtÀ|À~À¤ÀÄÀÀIÀkÀŸÀÅÀïÀ)ÀOÀ{À°ÀÖÀñÀÿÀÀ"À,À3ÀÀËÀëÀóÀõÀÀfÀ‹À­ÀàÀîÀÀÀÀ7À\ÀÀİÀÿÀÀYÀ|À¾ÀüÀÀCÀ}À²ÀÚÀöÀÀZÀ¯ÀöÀÀ/À\ÀvÀÅÀÀ9ÀUÀvÀ¶ÀÀ|À×À8À•À±À³ÀÀWÀÀíÀJÀ¨À À bÀ ¢À ÀÀ!À!qÀ!ÍÀ!ıÀ",À"GÀ"`À"}À"œÀ"®À"¾À#	À#?À#\À#lÀ#zÀ#†À#À#˜À#À# À#¢À#ÚÀ$À$NÀ$‚À$¹À$ÂÀ%À%À%À%JÀ%¬À%®À%ßÀ%áÀ&%À&jÀ&“À&ÇÀ&ÉÀ&İÀ'RÀ'‚À'áÀ'æÀ(0À(5À(7À(‘À(“À(ÌÀ),À)?À)AÀ)p   €¬/// @docImport 'input_border.dart';
-/// @docImport 'material.dart';
-/// @docImport 'scaffold.dart';
-/// @docImport 'text_form_field.dart';
-/// @docImport 'text_theme.dart';g{~ ¥  Ï  ú  ‚#  ‚M  ‚x  ‚¨  ‚Å  ‚Ü  ‚ò  ƒ  ƒ9  ƒS  ƒz  ƒ™ ƒ·ƒÏƒÒ  „  „!  „9„e„¾   ‡å ˆ    ˆˆˆ) 	ˆ?ˆ8ˆAˆOˆTˆdˆ]ˆUˆ_‡å‡å€    ˆ‚ˆlˆ‚   ˆˆˆˆOˆ¥    ˆäˆåˆäˆäFˆö  ‡„‡„©‡Š   ªx ª  H  ª‰ª‰	ª   ª™ª™ª   ª»ª»ªÀ   ªÑªÑªÖ   ªæªæªë   « « )«   «0«0«?   «R«R«W   «m«m1«r   «¥«¥
-«ª   «¶«¶«»   «Ì«Ì «Ñ   «ó«ó«ø   ¬¬¬   ¬)¬)¬.   ¬E¬E€”¬Ë   ¬à¬à¬å   ¬ö¬ö¬û   ­­­   ­/­/­4   ­S­S­X   ­r­r­w   ­‰­‰ ­š   ­°­° ­Á   ­×­×­Ü   ­û­û®    ®®®   ®'®'®,   ®B®B®G   ®W®W®\   ®w®w®|   ®Œ®Œ®‘   ®©®©®®   ®À®À®Å   ®ß®ß®ä   ®ú®ú®ÿ   ¯¯¯   ¯'¯'¯,   ¯D¯D¯I   ¯\¯\¯a   ¯t¯t¯y   ¯•¯•¯š   ¯¬¯¬¯±   ¯È¯È¯Í   ¯è¯è¯í   °°°   °%°%/°*   °[°[0°`   °’°’ °˜   °¹°¹°¾   °Õ°Õ°Ú   °ò°ò
-°÷   ±±±   ±(±(±-   ±@±@±E   ±Z±Z±_   ±q±q±v   ±‰±‰±   ±¥±¥±ª   ±¾±¾%±Ã   ±ê±ê"±ï   ²²!²   ²;²;²@   ²T²T€£²á   ²ş²şL³   ³Q³Q)³V   ³³³†   ³£³£4³¨   ³Ş³Ş³ã   ´ ´ ´   ´#´#´(   ´E´E´J €ìª¨«««'«(«‡«™«š«İ«æ«ç¬9¬E¬F¬P¬¿¬Y¬…­­I­f­ğ®®6¯:°:°@°J°K°N°S°O°t°…°†±±Ó±á±â±Ù±à±Ú²'²+²,²T²U²_²Õ²h²š²ó³³*³+³v³½³õ´_´e´„´€´f´x´y´ƒ´Ÿ´´½´­´Àµ´Í´è´Á´Ï´Ş´ß´ê´ù´úµµµ:µ*µ=µ~µJµeµ>µLµ[µ\µgµvµwµ‰µµ°µ¡µ™µµœµ­µ¤µ¯µ»µÁµâµÓµËµÂµÎµßµÖµáµíµó¶A¶€¶(¶µÿ¶¶	¶ ¶¶¶&¶¶¶"¶+¶@¶5¶,¶8¶M¶‹¶‘¶Ï·¶¦¶¶¶©¶Î¶»¶³¶ª¶¶¶Ç¶¾¶Ê¶Û·*·0·N·v·>·1·2·J·A·M·P··‡·Ğ·À·š·’·ˆ·•·§··ª·³·´·Í·Ã·Ï¸`¸f¹¹€¸Æ¸§¸r¸s¸|¸¥¸}¸¸¸¸Á¸¸¸Ä¸×¸Ø¸á¹¸â¸ğ¸ı¸ş¹¹˜¹‹¹³¹¦¹¶¹ó¹Å¹Ú¹À¹·¹Ã¹Ç¹Ô¹Õ¹Ü¹é¹êº¹şº6ºº9ºSºDº:º;ºGºH¡/¡/™& ˆ»/// Creates a Material Design text field.
-///
-/// If [decoration] is non-null (which is the default), the text field requires
-/// one of its ancestors to be a [Material] widget.
-///
-/// To remove the decoration entirely (including the extra padding introduced
-/// by the decoration to save space for the labels), set the [decoration] to
-/// null.
-///
-/// The [maxLines] property can be set to null to remove the restriction on
-/// the number of lines. By default, it is one, meaning this is a single-line
-/// text field. [maxLines] must not be zero.
-///
-/// The [maxLength] property is set to null by default, which means the
-/// number of characters allowed in the text field is not restricted. If
-/// [maxLength] is set a character counter will be displayed below the
-/// field showing how many characters have been entered. If the value is
-/// set to a positive integer it will also display the maximum allowed
-/// number of characters to be entered. If the value is set to
-/// [TextField.noMaxLength] then only the current length is displayed.
-///
-/// After [maxLength] characters have been input, additional input
-/// is ignored, unless [maxLengthEnforcement] is set to
-/// [MaxLengthEnforcement.none].
-/// The text field enforces the length with a [LengthLimitingTextInputFormatter],
-/// which is evaluated after the supplied [inputFormatters], if any.
-/// The [maxLength] value must be either null or greater than zero.
-///
-/// If [maxLengthEnforcement] is set to [MaxLengthEnforcement.none], then more
-/// than [maxLength] characters may be entered, and the error counter and
-/// divider will switch to the [decoration].errorStyle when the limit is
-/// exceeded.
-///
-/// The text cursor is not shown if [showCursor] is false or if [showCursor]
-/// is null (the default) and [readOnly] is true.
-///
-/// The [selectionHeightStyle] and [selectionWidthStyle] properties allow
-/// changing the shape of the selection highlighting. These properties default
-/// to [EditableText.defaultSelectionHeightStyle] and
-/// [EditableText.defaultSelectionHeightStyle], respectively.
-///
-/// See also:
-///
-///  * [maxLength], which discusses the precise meaning of "number of
-///    characters" and how it may differ from the intuitive meaning. I ¼Ëº[‚†¼Ë‚&/// The configuration for the magnifier of this text field.
-///
-/// By default, builds a [CupertinoTextMagnifier] on iOS and [TextMagnifier]
-/// on Android, and builds nothing on all other platforms. To suppress the
-/// magnifier, consider passing [TextMagnifierConfiguration.disabled].
-///
-/// {@macro flutter.widgets.magnifier.intro}
-///
-/// {@tool dartpad}
-/// This sample demonstrates how to customize the magnifier that this text field uses.
-///
-/// ** See code in examples/api/lib/widgets/text_magnifier/text_magnifier.0.dart **
-/// {@end-tool} ½*¼èI½*1/// {@macro flutter.widgets.editableText.groupId} ½Ì½8€½Ìm/// Controls the text being edited.
-///
-/// If null, this widget will create its own [TextEditingController]. À D@½İ†lÀ D@…ß/// Defines the keyboard focus for this widget.
-///
-/// The [focusNode] is a long-lived object that's typically managed by a
-/// [StatefulWidget] parent. See [FocusNode] for more information.
-///
-/// To give the keyboard focus to this widget, provide a [focusNode] and then
-/// use the current [FocusScope] to request the focus:
-///
-/// ```dart
-/// FocusScope.of(context).requestFocus(myFocusNode);
-/// ```
-///
-/// This happens automatically when the widget is tapped.
-///
-/// To be notified when the widget gains or loses the focus, add a listener
-/// to the [focusNode]:
-///
-/// ```dart
-/// myFocusNode.addListener(() { print(myFocusNode.hasFocus); });
-/// ```
-///
-/// If null, this widget will create its own [FocusNode].
-///
-/// ## Keyboard
-///
-/// Requesting the focus will typically cause the keyboard to be shown
-/// if it's not showing already.
-///
-/// On Android, the user can hide the keyboard - without changing the focus -
-/// with the system back button. They can restore the keyboard's visibility
-/// by tapping on a text field. The user might hide the keyboard and
-/// switch to a physical keyboard, or they might just need to get it
-/// out of the way for a moment, to expose something it's
-/// obscuring. In this case requesting the focus again will not
-/// cause the focus to change, and will not make the keyboard visible.
-///
-/// This widget builds an [EditableText] and will ensure that the keyboard is
-/// showing when it is tapped by calling [EditableTextState.requestKeyboard()]. À EĞÀ DPŠÀ EĞS/// The decoration to show around the text field.
-///
-/// By default, draws a horizontal line under the text field but can be
-/// configured to show an icon, label, hint text, and error text.
-///
-/// Specify null to remove the decoration entirely (including the
-/// extra padding introduced by the decoration to save space for the labels). À F/À EáZÀ F/6/// {@macro flutter.widgets.editableText.keyboardType} À GvÀ FBCÀ Gv
-/// {@template flutter.widgets.TextField.textInputAction}
-/// The type of action button to use for the keyboard.
-///
-/// Defaults to [TextInputAction.newline] if [keyboardType] is
-/// [TextInputType.multiline] and [TextInputAction.done] otherwise.
-/// {@endtemplate} À GåÀ GŒkÀ Gå</// {@macro flutter.widgets.editableText.textCapitalization} À JÀ Gş‚"À Jí/// The style to use for the text being edited.
-///
-/// This text style is also used as the base style for the [decoration].
-///
-/// If null, [TextTheme.bodyLarge] will be used. When the text field is disabled,
-/// [TextTheme.bodyLarge] with an opacity of 0.38 will be used instead.
-///
-/// If null and [ThemeData.useMaterial3] is false, [TextTheme.titleMedium] will
-/// be used. When the text field is disabled, [TextTheme.titleMedium] with
-/// [ThemeData.disabledColor] will be used instead. À JqÀ J'TÀ Jq4/// {@macro flutter.widgets.editableText.strutStyle} À JÉÀ J‚PÀ JÉ3/// {@macro flutter.widgets.editableText.textAlign} À K4À JÙlÀ K4>/// {@macro flutter.material.InputDecorator.textAlignVertical} À KœÀ KL]À Kœ7/// {@macro flutter.widgets.editableText.textDirection} À KòÀ K°KÀ Kò3/// {@macro flutter.widgets.editableText.autofocus} À PéÀ L„÷À Pé„/// Represents the interactive "state" of this widget in terms of a set of
-/// [WidgetState]s, including [WidgetState.disabled], [WidgetState.hovered],
-/// [WidgetState.error], and [WidgetState.focused].
-///
-/// Classes based on this one can provide their own
-/// [WidgetStatesController] to which they've added listeners.
-/// They can also update the controller's [WidgetStatesController.value]
-/// however, this may only be done when it's safe to call
-/// [State.setState], like in an event handler.
-///
-/// The controller's [WidgetStatesController.value] represents the set of
-/// states that a widget's visual properties, typically [WidgetStateProperty]
-/// values, are resolved against. It is _not_ the intrinsic state of the widget.
-/// The widget is responsible for ensuring that the controller's
-/// [WidgetStatesController.value] tracks its intrinsic state. For example
-/// one cannot request the keyboard focus for a widget by adding [WidgetState.focused]
-/// to its controller. When the widget gains the or loses the focus it will
-/// [WidgetStatesController.update] its controller's [WidgetStatesController.value]
-/// and notify listeners of the change. À QMÀ Q _À QM</// {@macro flutter.widgets.editableText.obscuringCharacter} À QªÀ QfOÀ Qª5/// {@macro flutter.widgets.editableText.obscureText} À RÀ Q¼PÀ R5/// {@macro flutter.widgets.editableText.autocorrect} À RqÀ RmÀ RqD/// {@macro flutter.services.TextInputConfiguration.smartDashesType} À RåÀ R‡mÀ RåD/// {@macro flutter.services.TextInputConfiguration.smartQuotesType} À SPÀ RûfÀ SPF/// {@macro flutter.services.TextInputConfiguration.enableSuggestions} À TÀ Sh€±À T€”/// {@macro flutter.widgets.editableText.maxLines}
-///  * [expands], which determines whether the field should fill the height of
-///    its parent. À TÉÀ T €±À TÉ€”/// {@macro flutter.widgets.editableText.minLines}
-///  * [expands], which determines whether the field should fill the height of
-///    its parent. À UÀ TØGÀ U1/// {@macro flutter.widgets.editableText.expands} À UgÀ U&IÀ Ug2/// {@macro flutter.widgets.editableText.readOnly}À VrÀ VsÀ V}À VæÀ V„À V®À WÀ Uv™À W€ì/// Configuration of toolbar options.
-///
-/// If not set, select all and paste will default to be enabled. Copy and cut
-/// will be disabled if [obscureText] is true. If [readOnly] is true,
-/// paste and cut will be disabled regardless. À WZÀ WNÀ WZ4/// {@macro flutter.widgets.editableText.showCursor}À XÀ XÀ W÷À Wk€œÀ W÷t/// If [maxLength] is set to this value, only the "current input length"
-/// part of the character counter is shown. À ^·À X†²À ^·†@/// The maximum number of characters (Unicode grapheme clusters) to allow in
-/// the text field.
-///
-/// If set, a character counter will be displayed below the
-/// field showing how many characters have been entered. If set to a number
-/// greater than 0, it will also display the maximum number allowed. If set
-/// to [TextField.noMaxLength] then only the current character count is displayed.
-/// To remove the counter, set [InputDecoration.counterText] to an empty string or
-/// return null from [TextField.buildCounter] callback.
-///
-/// After [maxLength] characters have been input, additional input
-/// is ignored, unless [maxLengthEnforcement] is set to
-/// [MaxLengthEnforcement.none].
-///
-/// The text field enforces the length with a [LengthLimitingTextInputFormatter],
-/// which is evaluated after the supplied [inputFormatters], if any.
-///
-/// This value must be either null, [TextField.noMaxLength], or greater than 0.
-/// If null (the default) then there is no limit to the number of characters
-/// that can be entered. If set to [TextField.noMaxLength], then no limit will
-/// be enforced, but the number of characters entered will still be displayed.
-///
-/// Whitespace characters (e.g. newline, space, tab) are included in the
-/// character count.
-///
-/// If [maxLengthEnforcement] is [MaxLengthEnforcement.none], then more than
-/// [maxLength] characters may be entered, but the error counter and divider
-/// will switch to the [decoration]'s [InputDecoration.errorStyle] when the
-/// limit is exceeded.
-///
-/// {@macro flutter.services.lengthLimitingTextInputFormatter.maxLength} À _ÂÀ ^ÇÀ _Â€Ï/// Determines how the [maxLength] limit should be enforced.
-///
-/// {@macro flutter.services.textFormatter.effectiveMaxLengthEnforcement}
-///
-/// {@macro flutter.services.textFormatter.maxLengthEnforcement} À aFÀ _İrÀ aF4/// {@macro flutter.widgets.editableText.onChanged}
-///
-/// See also:
-///
-///  * [inputFormatters], which are called before [onChanged]
-///    runs and can validate and change ("format") the input value.
-///  * [onEditingComplete], [onSubmitted]:
-///    which are more specialized input change notifications. À a©À aVdÀ a©;/// {@macro flutter.widgets.editableText.onEditingComplete} À bñÀ aÁ;À bñ€ş/// {@macro flutter.widgets.editableText.onSubmitted}
-///
-/// See also:
-///
-///  * [TextInputAction.next] and [TextInputAction.previous], which
-///    automatically shift the focus to the next/previous focusable item when
-///    the user is done editing. À ceÀ cuÀ ce=/// {@macro flutter.widgets.editableText.onAppPrivateCommand} À cÜÀ clÀ cÜ9/// {@macro flutter.widgets.editableText.inputFormatters} À g­À còƒÂÀ g­ƒ`/// If false the text field is "disabled": it ignores taps and its
-/// [decoration] is rendered in grey.
-///
-/// If non-null this property overrides the [decoration]'s
-/// [InputDecoration.enabled] property.
-///
-/// When a text field is disabled, all of its children widgets are also
-/// disabled, including the [InputDecoration.suffixIcon]. If you need to keep
-/// the suffix icon interactive while disabling the text field, consider using
-/// [readOnly] and [enableInteractiveSelection] instead:
-///
-/// ```dart
-/// TextField(
-///   enabled: true,
-///   readOnly: true,
-///   enableInteractiveSelection: false,
-///   decoration: InputDecoration(
-///     suffixIcon: IconButton(
-///       onPressed: () {
-///         // This will work because the TextField is enabled
-///       },
-///       icon: const Icon(Icons.edit_outlined),
-///     ),
-///   ),
-/// )
-/// ``` À hBÀ g»€•À hBq/// Determines whether this widget ignores pointer events.
-///
-/// Defaults to null, and when null, does nothing. À hÀ hWQÀ h5/// {@macro flutter.widgets.editableText.cursorWidth} À h÷À h¯TÀ h÷6/// {@macro flutter.widgets.editableText.cursorHeight} À iRÀ i
-TÀ iR6/// {@macro flutter.widgets.editableText.cursorRadius} À i´À iedÀ i´?/// {@macro flutter.widgets.editableText.cursorOpacityAnimates} À kÄÀ iĞÿÀ kÄÈ/// The color of the cursor.
-///
-/// The cursor indicates the current location of text insertion point in
-/// the field.
-///
-/// If this is null it will default to the ambient
-/// [DefaultSelectionStyle.cursorColor]. If that is null, and the
-/// [ThemeData.platform] is [TargetPlatform.iOS] or [TargetPlatform.macOS]
-/// it will use [CupertinoThemeData.primaryColor]. Otherwise it will use
-/// the value of [ColorScheme.primary] of [ThemeData.colorScheme]. À lğÀ kÖ*À lğ€ı/// The color of the cursor when the [InputDecorator] is showing an error.
-///
-/// If this is null it will default to [TextStyle.color] of
-/// [InputDecoration.errorStyle]. If that is null, it will use
-/// [ColorScheme.error] of [ThemeData.colorScheme]. À m²À m€¿À m²€ˆ/// Controls how tall the selection highlight boxes are computed to be.
-///
-/// See [ui.BoxHeightStyle] for details on available styles. À nvÀ mÍ€¼À nv€‡/// Controls how wide the selection highlight boxes are computed to be.
-///
-/// See [ui.BoxWidthStyle] for details on available styles. À o@À n€ÂÀ o@€/// The appearance of the keyboard.
-///
-/// This setting is only honored on iOS devices.
-///
-/// If unset, defaults to [ThemeData.brightness]. À o¥À oYYÀ o¥7/// {@macro flutter.widgets.editableText.scrollPadding} À pÀ o¹mÀ pD/// {@macro flutter.widgets.editableText.enableInteractiveSelection} À pwÀ p-ZÀ pw:/// {@macro flutter.widgets.editableText.selectAllOnFocus} À pêÀ pmÀ pê;/// {@macro flutter.widgets.editableText.selectionControls} À qWÀ qfÀ qW9/// {@macro flutter.widgets.scrollable.dragStartBehavior} À vÀ që„0À vƒË/// {@template flutter.material.textfield.onTap}
-/// Called for the first tap in a series of taps.
-///
-/// The text field builds a [GestureDetector] to handle input events like tap,
-/// to trigger focus requests, to move the caret, adjust the selection, etc.
-/// Handling some of those events by wrapping the text field with a competing
-/// GestureDetector is problematic.
-///
-/// To unconditionally handle taps, without interfering with the text field's
-/// internal gesture detector, provide this callback.
-///
-/// If the text field is created with [enabled] false, taps will not be
-/// recognized.
-///
-/// To be notified when the text field gains or loses the focus, provide a
-/// [focusNode] and add a listener to that.
-///
-/// To listen to arbitrary pointer events without competing with the
-/// text field's internal gesture detector, use a [Listener].
-/// {@endtemplate}
-///
-/// If [onTapAlwaysCalled] is enabled, this will also be called for consecutive
-/// taps. À wÀ v"€öÀ w€Í/// Whether [onTap] should be called for every tap.
-///
-/// Defaults to false, so [onTap] is only called for each distinct tap. When
-/// enabled, [onTap] is called for every tap including consecutive taps. À yÁÀ w‚®À yÁ‚X/// {@macro flutter.widgets.editableText.onTapOutside}
-///
-/// {@tool dartpad}
-/// This example shows how to use a `TextFieldTapRegion` to wrap a set of
-/// "spinner" buttons that increment and decrement a value in the [TextField]
-/// without causing the text field to lose keyboard focus.
-///
-/// This example includes a generic `SpinnerField<T>` class that you can copy
-/// into your own project and customize.
-///
-/// ** See code in examples/api/lib/widgets/tap_region/text_field_tap_region.0.dart **
-/// {@end-tool}
-///
-/// See also:
-///
-///  * [TapRegion] for how the region group is determined. À z+À yÔeÀ z+8/// {@macro flutter.widgets.editableText.onTapUpOutside} À }1À z@‚üÀ }1‚ª/// The cursor for a mouse pointer when it enters or is hovering over the
-/// widget.
-///
-/// If [mouseCursor] is a [WidgetStateMouseCursor],
-/// [WidgetStateProperty.resolve] is used for the following [WidgetState]s:
-///
-///  * [WidgetState.error].
-///  * [WidgetState.hovered].
-///  * [WidgetState.focused].
-///  * [WidgetState.disabled].
-///
-/// If this property is null, [WidgetStateMouseCursor.textable] will be used.
-///
-/// The [mouseCursor] is the only property of [TextField] that controls the
-/// appearance of the mouse pointer. All other properties related to "cursor"
-/// stand for the text cursor, which is usually a blinking vertical line at
-/// the editing position. À ›À }C„dÀ ›ƒÜ/// Callback that generates a custom [InputDecoration.counter] widget.
-///
-/// See [InputCounterWidgetBuilder] for an explanation of the passed in
-/// arguments. The returned widget will be placed below the line in place of
-/// the default widget built when [InputDecoration.counterText] is specified.
-///
-/// The returned widget will be wrapped in a [Semantics] widget for
-/// accessibility, but it also needs to be accessible itself. For example,
-/// if returning a Text widget, set the [Text.semanticsLabel] property.
-///
-/// {@tool snippet}
-/// ```dart
-/// Widget counter(
-///   BuildContext context,
-///   {
-///     required int currentLength,
-///     required int? maxLength,
-///     required bool isFocused,
-///   }
-/// ) {
-///   return Text(
-///     '$currentLength of $maxLength characters',
-///     semanticsLabel: 'character count',
-///   );
-/// }
-/// ```
-/// {@end-tool}
-///
-/// If buildCounter returns null, then no counter and no Semantics widget will
-/// be created at all. À şÀ ®]À ş7/// {@macro flutter.widgets.editableText.scrollPhysics} À ‚hÀ ‚fÀ ‚h:/// {@macro flutter.widgets.editableText.scrollController} À ƒÀ ‚€¥À ƒy/// {@macro flutter.widgets.editableText.autofillHints}
-/// {@macro flutter.services.AutofillConfiguration.autofillHints} À ƒ˜À ƒ+yÀ ƒ˜X/// {@macro flutter.material.Material.clipBehavior}
-///
-/// Defaults to [Clip.hardEdge]. À †êÀ ƒ«ƒLÀ †ê‚ı/// {@template flutter.material.textfield.restorationId}
-/// Restoration ID to save and restore the state of the text field.
-///
-/// If non-null, the text field will persist and restore its current scroll
-/// offset and - if no [controller] has been provided - the content of the
-/// text field. If a [controller] has been provided, it is the responsibility
-/// of the owner of that controller to persist and restore it, e.g. by using
-/// a [RestorableTextEditingController].
-///
-/// The state of this widget is persisted in a [RestorationBucket] claimed
-/// from the surrounding [RestorationScope] using the provided restoration ID.
-///
-/// See also:
-///
-///  * [RestorationManager], which explains how state restoration works in
-///    Flutter.
-/// {@endtemplate}À ‡;À ‡<À ‡FÀ ‡¶À ‡MÀ ‡}À ‡ÆÀ †ş€×À ‡Æ9/// {@macro flutter.widgets.editableText.scribbleEnabled} À ˆ-À ‡ÜiÀ ˆ-B/// {@macro flutter.widgets.editableText.stylusHandwritingEnabled} À ˆ­À ˆL~À ˆ­R/// {@macro flutter.services.TextInputConfiguration.enableIMEPersonalizedLearning} À ‰,À ˆÑqÀ ‰,K/// {@macro flutter.services.TextInputConfiguration.enableInlinePrediction} À ‰¹À ‰I€À ‰¹G/// {@macro flutter.widgets.editableText.contentInsertionConfiguration} À ‹À ‰İÂÀ ‹n/// {@macro flutter.widgets.EditableText.contextMenuBuilder}
-///
-/// If not provided, will build a default menu based on the platform.
-///
-/// See also:
-///
-///  * [AdaptiveTextSelectionToolbar], which is built by default.
-///  * [BrowserContextMenu], which allows the browser's context menu on web to
-///    be disabled and Flutter-rendered context menus to appear. À ŒŞÀ ‹¦GÀ ŒŞ/// Determine whether this text field can request the primary focus.
-///
-/// Defaults to true. If false, the text field will not request focus
-/// when tapped, or when its context menu is displayed. If false it will not
-/// be possible to move the focus to the text field with tab key. À HÀ ŒôbÀ H3/// {@macro flutter.widgets.undoHistory.controller} À µÀ ]cÀ µ@/// {@macro flutter.services.TextInputConfiguration.hintLocales} À LÀ C À L€İ/// {@macro flutter.widgets.EditableText.spellCheckConfiguration}
-///
-/// If [SpellCheckConfiguration.misspelledTextStyle] is not specified in this
-/// configuration, then [materialMisspelledTextStyle] is used by default.À ’À ’À ’›À ’*À ’ À ’,À ’:À ’;À ’ZÀ ’KÀ ’\À ’bÀ ’cÀ ’|À ’mÀ ’~À ’‘À ’’À ‘òÀ j‚2À ‘ò[/// The [TextStyle] used to indicate misspelled words in the Material style.
-///
-/// See also:
-///  * [SpellCheckConfiguration.misspelledTextStyle], the style configured to
-///    mark misspelled words with.
-///  * [CupertinoTextField.cupertinoMisspelledTextStyle], the style configured
-///    to mark misspelled words with in the Cupertino style.   À qoÀ qovÀ q¶:/// {@macro flutter.widgets.editableText.selectionEnabled}    À öÀ öÀ    À À #À #  À ÇÀ ÇvÀ Õ    À •fÀ •fÀ •s   À •À •#À •“ À •À •À ’£À ’£„íÀ •5‚I/// Default builder for [TextField]'s spell check suggestions toolbar.
-///
-/// On Apple platforms, builds an iOS-style toolbar. Everywhere else, builds
-/// an Android-style toolbar.
-///
-/// See also:
-///  * [spellCheckConfiguration], where this is typically specified for
-///    [TextField].
-///  * [SpellCheckConfiguration.spellCheckSuggestionsToolbarBuilder], the
-///    parameter for which this is the default value for [TextField].
-///  * [CupertinoTextField.defaultSpellCheckSuggestionsToolbarBuilder], which
-///    is like this but specifies the default for [CupertinoTextField].   À ˜ŒÀ ˜Œ&À ˜¥  À —–À —–ƒÀ ˜b€£/// Returns a new [SpellCheckConfiguration] where the given configuration has
-/// had any missing values replaced with their defaults for the Android
-/// platform.  À š¯À š°À š¯À š¯AÀ šÍ    À ›À ›&À ›8 À šöÀ š÷À šöÀ šö˜MÀ ›  ‰1‰1À ª¡	—Y/// A Material Design text field.
-///
-/// A text field lets the user enter text, either with hardware keyboard or with
-/// an onscreen keyboard.
-///
-/// The text field calls the [onChanged] callback whenever the user changes the
-/// text in the field. If the user indicates that they are done typing in the
-/// field (e.g., by pressing a button on the soft keyboard), the text field
-/// calls the [onSubmitted] callback.
-///
-/// To control the text that is displayed in the text field, use the
-/// [controller]. For example, to set the initial value of the text field, use
-/// a [controller] that already contains some text. The [controller] can also
-/// control the selection and composing region (and to observe changes to the
-/// text, selection, and composing region).
-///
-/// By default, a text field has a [decoration] that draws a divider below the
-/// text field. You can use the [decoration] property to control the decoration,
-/// for example by adding a label or an icon. If you set the [decoration]
-/// property to null, the decoration will be removed entirely, including the
-/// extra padding introduced by the decoration to save space for the labels.
-///
-/// If [decoration] is non-null (which is the default), the text field requires
-/// one of its ancestors to be a [Material] widget.
-///
-/// To integrate the [TextField] into a [Form] with other [FormField] widgets,
-/// consider using [TextFormField].
-///
-/// {@template flutter.material.textfield.wantKeepAlive}
-/// When the widget has focus, it will prevent itself from disposing via its
-/// underlying [EditableText]'s [AutomaticKeepAliveClientMixin.wantKeepAlive] in
-/// order to avoid losing the selection. Removing the focus will allow it to be
-/// disposed.
-/// {@endtemplate}
-///
-/// Remember to call [TextEditingController.dispose] on the [TextEditingController]
-/// when it is no longer needed. This will ensure we discard any resources used
-/// by the object.
-///
-/// If this field is part of a scrolling container that lazily constructs its
-/// children, like a [ListView] or a [CustomScrollView], then a [controller]
-/// should be specified. The controller's lifetime should be managed by a
-/// stateful widget ancestor of the scrolling container.
-///
-/// ## Obscured Input
-///
-/// {@tool dartpad}
-/// This example shows how to create a [TextField] that will obscure input. The
-/// [InputDecoration] surrounds the field in a border using [OutlineInputBorder]
-/// and adds a label.
-///
-/// ** See code in examples/api/lib/material/text_field/text_field.0.dart **
-/// {@end-tool}
-///
-/// ## Reading values
-///
-/// A common way to read a value from a TextField is to use the [onSubmitted]
-/// callback. This callback is applied to the text field's current value when
-/// the user finishes editing.
-///
-/// {@tool dartpad}
-/// This sample shows how to get a value from a TextField via the [onSubmitted]
-/// callback.
-///
-/// ** See code in examples/api/lib/material/text_field/text_field.1.dart **
-/// {@end-tool}
-///
-/// {@macro flutter.widgets.EditableText.lifeCycle}
-///
-/// For most applications the [onSubmitted] callback will be sufficient for
-/// reacting to user input.
-///
-/// The [onEditingComplete] callback also runs when the user finishes editing.
-/// It's different from [onSubmitted] because it has a default value which
-/// updates the text controller and yields the keyboard focus. Applications that
-/// require different behavior can override the default [onEditingComplete]
-/// callback.
-///
-/// Keep in mind you can also always read the current string from a TextField's
-/// [TextEditingController] using [TextEditingController.text].
-///
-/// ## Handling emojis and other complex characters
-/// {@macro flutter.widgets.EditableText.onChanged}
-///
-/// In the live Dartpad example above, try typing the emoji ğŸ‘¨â€ğŸ‘©â€ğŸ‘¦
-/// into the field and submitting. Because the example code measures the length
-/// with `value.characters.length`, the emoji is correctly counted as a single
-/// character.
-///
-/// {@macro flutter.widgets.editableText.showCaretOnScreen}
-///
-/// {@macro flutter.widgets.editableText.accessibility}
-///
-/// {@tool dartpad}
-/// This sample shows how to style a text field to match a filled or outlined
-/// Material Design 3 text field.
-///
-/// ** See code in examples/api/lib/material/text_field/text_field.2.dart **
-/// {@end-tool}
-///
-/// ## Scrolling Considerations
-///
-/// If this [TextField] is not a descendant of [Scaffold] and is being used
-/// within a [Scrollable] or nested [Scrollable]s, consider placing a
-/// [ScrollNotificationObserver] above the root [Scrollable] that contains this
-/// [TextField] to ensure proper scroll coordination for [TextField] and its
-/// components like [TextSelectionOverlay].
-///
-/// {@tool dartpad}
-/// This sample demonstrates how to use the [Shortcuts] and [Actions] widgets
-/// to create a custom `Shift+Enter` keyboard shortcut for inserting a new line
-/// in a [TextField].
-///
-/// ** See code in examples/api/lib/material/text_field/text_field.3.dart **
-/// {@end-tool}
-///
-/// See also:
-///
-///  * [TextFormField], which integrates with the [Form] widget.
-///  * [InputDecorator], which shows the labels and other visual elements that
-///    surround the actual text editing widget.
-///  * [EditableText], which is the raw text editing control at the heart of a
-///    [TextField]. The [EditableText] widget is rarely used directly unless
-///    you are implementing an entirely different design language, such as
-///    Cupertino.
-///  * <https://material.io/design/components/text-fields.html>
-///  * Cookbook: [Create and style a text field](https://docs.flutter.dev/cookbook/forms/text-input)
-///  * Cookbook: [Handle changes to a text field](https://docs.flutter.dev/cookbook/forms/text-field-changes)
-///  * Cookbook: [Retrieve the value of a text field](https://docs.flutter.dev/cookbook/forms/retrieve-input)
-///  * Cookbook: [Focus and text fields](https://docs.flutter.dev/cookbook/forms/focus)   À ´À ³å,À ´  À ´À ´vÀ ´ À µÉÀ µ»À µ¶À µ» À ¶†À ¶nÀ ¶i"À ¶n  À ¶ÁÀ ¶’OÀ ¶Á À ·#À ·$À ·:À ·#(À ·: À ·RÀ ·SÀ ·”À ·À ·¯À ·À ·°À ·±À ·‚À ·R`À ·‚  À Ş¥À Ş‹3À Ş¥    À ´À ´ZÀ ´0    À ´À ´VÀ ´    À ´ìÀ ´ì€ÄÀ µ    À µÕÀ µÕ€À µŞ   À ·¹À ·ºÀ ·¹À ·¹PÀ ·Ï    À ¸QÀ ¸QLÀ ¸Z    À ¸£À ¸£LÀ ¸«    À ¸õÀ ¸õ>À ¸ş    À º9À º9€ŠÀ ºB    À ºÉÀ ºÉ€œÀ ºÓ    À ÇÔÀ ÇÔ-À Çİ   À Ò
-À ÒÀ Ò
-À Ò
-?À Ò#    À ÓuÀ ÓuEÀ ÓŒ    À ßOÀ ßOoÀ ßl   À áßÀ áàÀ áßÀ áß@À á÷   À â”À â•À â”À â”‚¥À â¼     À »kÀ »kŠÉÀ »{   À Æ:À Æ;À Æ:À Æ:”À ÆL   À ÉÀ ÉÀ ÉÀ É€‘À É    À ÉÀÀ ÉÀÀ ÉÊ À ÉÀ ÉŸÀ ÉÀ É†À É°    À ÏÓÀ ÏÓÀ Ïæ   À ÏñÀ ÏñÀ Ïö À Ï´À ÏµÀ Ï´À Ï´€À ÏÆ    À ĞWÀ ĞW|À Ğ\    À ĞöÀ ĞöÀ Ñ  À ĞÙÀ ĞÙ+À ĞŞ   À ÒOÀ ÒPÀ ÒOÀ ÒO À Òa    À ÓÀÀ ÓÀEÀ ÓÅ    À Ô,À Ô,À ÔC  À ÔÀ ÔƒeÀ Ô    À ×vÀ ×v€ñÀ ×{    À ØŠÀ ØŠÀ Ø˜   À Ø£À Ø£À Øº  À ØmÀ Øm„HÀ Ør    À Ü»À Ü»€ÌÀ Üı9/// Toggle the toolbar when a selection handle is tapped.   À İŸÀ İŸÀ İ¤  À İÀ İ€ÖÀ İ’    À ŞÅÀ ŞÅ€„À ŞÊ    À ßÄÀ ßÄêÀ ßÉ    À â@À â@ À âQ À â%À â&À â%À â%iÀ â7    À å‰À å‰À å“  À åhÀ åh»À år    À çCÀ çCÀ çP À ç)À ç*À ç)À ç)¼rÀ ç=  À ³JÀ ³JÀ pTÀ ³P         À#ÀÀ#ÀÀ#Í  À#¢À#¢kÀ#­    À%0À%0À%=  À%À%€™À%    À&ûÀ&ûÀ'  À&İÀ&İVÀ&è    À(OÀ(OÀ(\  À(7À(7XÀ(A    À(²À(²À(¿  À(“À(“€—À(      ……‚c…_8/// Signature for the [TextField.buildCounter] callback.   €²  input_border.dart  €×  material.dart  €ø  scaffold.dart    text_form_field.dart  A  text_theme.dart ‡l =€ˆ€§€©€Î€ï8[eg£¥Ïú‚#‚M‚v‚x‚¨‚Å‚Ü‚òƒƒ9ƒSƒzƒ™ƒÒ„„!„7„9„a„Á„Ã„Ü„û………W…|…“…Ã…â…ä† †C†E†’†²†´‡‡Y‡y‡‚‡„‡ãˆ2ˆIˆhˆjˆ‹ˆˆšˆàˆâˆï‰‰'‰,‰/‰1‰T‰Y‰«‰Æ‰ËŠŠkŠ¸ŠßŠä‹*‹z‹ÉŒŒEŒJŒšŒì7…ÓØ)^c³Øİe·+0…Öêï‘>‘Œ‘×’’’-’2’G’˜’ê“““T“e“j““†“Õ”$”D”I”^”¯”¾”Ã••"•'•\•a•®•Ë•Ğ– –l–¾————p—±—¶—ë˜ ˜%˜k˜¼™™™!™^™c™œ™¡™¶šš(š-š{šŒš‘š²š·››K›œ›êœœœ1œ€œÑœèœí;LQ`e§÷(xÆŸŸ%ŸfŸÌ ; ª¡¡-¡Z¡a¡´¡ë¡ò¢C¢“¢ ¢§¢ö£G£w£~£É¤¤_¤«¤õ¥7¥¥ˆ¥Î¦	¦-¦‚¦Ê§§§j§·¨¨¨¨k¨ ¨§¨ô©F©©À©Ç©Ø©ßª(ªpª…ª•ª·ªÍªâªü«,«N«i«¡«²«È«ï¬¬%¬A¬S¬¬»¬Â¬Ü¬ò­­+­O­n­…­¬­Ó­÷®®#®>®S®s®ˆ®¥®¼®Û®ö¯	¯#¯@¯X¯p¯‘¯¨¯Ä¯ä°°!°W°°µ°Ñ°î°ÿ±$±<±V±m±…±¡±º±æ²²7²P²b²”²Ñ²Ø²ú³M³}³Ÿ³Ú³ü´´A´X´ˆ´¢µµµ‚µ´µæµö¶D¶y¶„¶”¶Ò··#·z·Ô¸Y¸i¸«¸Ê¹¹y¹„¹›¹÷ºWºYº˜ºŸºï»=»‡»»¾»Å»Ü¼6¼=¼”¼§¼ä¼æ½½4½6½]½d½­½Ù½Û¾¾¾a¾§¾®¾ÿ¿9¿@¿O¿ˆ¿“¿š¿×¿ŞÀ @-À @HÀ @OÀ @^À @£À @®À @µÀ @òÀ @ùÀ AÀ AÀ A]À AÀ AˆÀ AÙÀ B(À BpÀ B¸À BõÀ C8À C‚À C‰À CÚÀ D-À DLÀ DNÀ DƒÀ DŠÀ DÕÀ EÀ E!À EfÀ E·À EİÀ EßÀ FÀ F>À F@À F}À F·À F¾À G À GGÀ G]À GˆÀ GŠÀ GÊÀ GúÀ GüÀ H/À H6À H‚À H‰À HŞÀ I)À I0À IƒÀ IÑÀ JÀ J#À J%À J]À J~À J€À J·À JÕÀ J×À KÀ KHÀ KJÀ K…À K¬À K®À KåÀ KşÀ L À LNÀ LÀ LÕÀ LÜÀ MÀ MUÀ M¡À MŞÀ NÀ NÀ NeÀ N¶À O
-À ONÀ OœÀ OöÀ PEÀ PœÀ PÇÀ PüÀ PşÀ Q>À QbÀ QdÀ QÀ Q¸À QºÀ QóÀ RÀ RÀ RYÀ RƒÀ R…À RÍÀ R÷À RùÀ SCÀ SdÀ SfÀ SœÀ SîÀ TÀ TÀ TÀ TTÀ T¦À T¼À TÔÀ TÖÀ UÀ U"À U$À UZÀ UrÀ UtÀ UÀ U¤À UõÀ V>À VpÀ V€À VªÀ VäÀ VéÀ WÀ WÀ WLÀ WgÀ WiÀ WµÀ WäÀ X
-À XÀ X\À XsÀ XzÀ X¹À YÀ YWÀ Y­À ZÀ Z>À ZEÀ Z‹À ZÆÀ ZêÀ ZñÀ [FÀ [À [•À [èÀ \8À \ŠÀ \ÜÀ \ãÀ ]/À ]GÀ ]NÀ ]À ]îÀ ^=À ^WÀ ^^À ^ªÀ ^ÃÀ ^ÅÀ _À _À _YÀ _`À _¤À _ÙÀ _ÛÀ `À `À `*À `1À `rÀ `¹À `çÀ a(À aRÀ aTÀ a“À a½À a¿À aøÀ aÿÀ bÀ bÀ b^À b¯À bÓÀ bÿÀ cÀ cBÀ c{À c}À cºÀ cîÀ cğÀ d6À d_À dfÀ d¤À dÏÀ dÖÀ e!À erÀ eÄÀ f À fÀ fÀ f(À f@À fYÀ f…À f«À fÎÀ fëÀ g-À g=À gqÀ gÀ g‹À g”À gŸÀ g·À g¹À g÷À gşÀ h4À hSÀ hUÀ hÀ h«À h­À hçÀ iÀ iÀ iBÀ iaÀ icÀ i¦À iÌÀ iÎÀ iîÀ iõÀ jAÀ jSÀ jZÀ jÀ jÕÀ k#À koÀ kµÀ kÒÀ kÔÀ l"À l)À lhÀ lªÀ láÀ mÀ mÀ mPÀ mWÀ m—À mÉÀ mËÀ nÀ nÀ n\À nŒÀ nÀ nµÀ n¼À nğÀ n÷À o,À oUÀ oWÀ o’À oµÀ o·À oÿÀ p)À p+À piÀ pŠÀ pŒÀ pËÀ pşÀ q À q=À qkÀ qmÀ q«À qçÀ qéÀ rÀ rRÀ rYÀ r«À rûÀ sLÀ ssÀ szÀ sËÀ tÀ tÀ tVÀ tiÀ tpÀ t¾À tíÀ tôÀ u<À u}À u“À ušÀ uíÀ uúÀ vÀ v À vWÀ v^À v®À vúÀ wÀ wÀ wWÀ w^À wuÀ wÂÀ xÀ xQÀ xXÀ x©À xÕÀ xÜÀ y6À yIÀ yPÀ yaÀ yhÀ y¦À yĞÀ yÒÀ zÀ z<À z>À z‹À zšÀ z¡À zØÀ {'À {.À {MÀ {nÀ {À {±À {¸À |	À |À |_À |°À |ÿÀ }À }?À }AÀ }‹À }’À }İÀ ~-À ~~À ~…À ~ÌÀ À eÀ lÀ ƒÀ ’À ©À ÈÀ ÓÀ úÀ €À €BÀ €MÀ €XÀ €nÀ €¤À €ÒÀ €ŞÀ €çÀ €òÀ À À ^À xÀ ªÀ ¬À çÀ ‚À ‚À ‚NÀ ‚{À ‚}À ‚¸À ‚ıÀ ƒ'À ƒ)À ƒ`À ƒgÀ ƒ‹À ƒ§À ƒ©À ƒåÀ „,À „3À „‚À „ĞÀ …!À …qÀ …À …¤À …òÀ †DÀ †KÀ †\À †cÀ †±À †ÄÀ †ÚÀ †úÀ †üÀ ‡9À ‡IÀ ‡yÀ ‡´À ‡¹À ‡ØÀ ‡ÚÀ ˆ À ˆHÀ ˆJÀ ˆ À ˆÍÀ ˆÏÀ ‰À ‰EÀ ‰GÀ ‰’À ‰ÙÀ ‰ÛÀ ŠÀ Š"À ŠkÀ ŠrÀ ŠƒÀ ŠŠÀ ŠÏÀ ‹!À ‹eÀ ‹¢À ‹¤À ‹ìÀ ‹óÀ Œ<À ŒŒÀ ŒÑÀ ŒğÀ ŒòÀ )À YÀ [À ŸÀ ÃÀ ÅÀ òÀ À 7À >À ‚À ÖÀ İÀ :À ?À AÀ †À À ŞÀ +À fÀ hÀ ¸À ¿À ĞÀ ‘!À ‘GÀ ‘™À ‘ÙÀ ’À ’GÀ ’iÀ ’™À ’ŸÀ ’¡À ’ëÀ ’òÀ “BÀ “cÀ “jÀ “{À “ÆÀ “İÀ ”*À ”sÀ ”ÄÀ •À •%À •bÀ •}À •§À •®À •ÔÀ •ôÀ –À –ZÀ –‹À –—À –»À –ßÀ —À —%À —†À —À —’À —”À —åÀ ˜0À ˜AÀ ˜ˆÀ ˜µÀ ˜¼À ™À ™SÀ ™ZÀ ™~À ™šÀ ™ñÀ šÀ š]À šÀ š¦À š«À š­À šºÀ šòÀ šôÀ ›À ›GÀ ›sÀ ›ˆÀ ›éÀ ›ñÀ œRÀ œgÀ œšÀ œµÀ œÎÀ œëÀ œõÀ œıÀ UÀ jÀ —À ®À ÃÀ óÀ ıÀ À À EÀ ^À uÀ  À ªÀ ²À ŸÀ ŸhÀ Ÿ}À ŸŞÀ ŸæÀ  GÀ  §À  ¼À  âÀ  şÀ ¡À ¡qÀ ¡{À ¡ƒÀ ¡˜À ¡¾À ¡ÚÀ ¡ôÀ ¢MÀ ¢WÀ ¢_À ¢tÀ ¢ÒÀ ¢ÚÀ £#À £oÀ £ÈÀ ¤À ¤+À ¤VÀ ¤wÀ ¤–À ¤³À ¤½À ¤ÅÀ ¤ÚÀ ¥8À ¥@À ¥UÀ ¥~À ¥À ¥ºÀ ¥êÀ ¥ôÀ ¥üÀ ¦aÀ ¦vÀ ¦¥À ¦ÃÀ ¦ßÀ ¦üÀ §À §À §tÀ §ÈÀ ¨À ¨ƒÀ ¨˜À ¨şÀ ©À ©ZÀ ©¸À ©ÍÀ ª3À ª;À ªPÀ ª€À ªšÀ ª²À ªåÀ ªïÀ ª÷À «À «!À «>À «`À «}À «¥À «¯À «·À «ÌÀ «ÿÀ ¬À ¬9À ¬VÀ ¬`À ¬hÀ ¬}À ¬«À ¬ÈÀ ¬ãÀ ­ À ­
-À ­À ­'À ­†À ­À ­£À ® À ®À ®À ®wÀ ®À ®”À ®¶À ®ÛÀ ®şÀ ¯CÀ ¯MÀ ¯UÀ ¯jÀ ¯ŒÀ ¯¶À ¯ŞÀ ¯ûÀ °À °À °"À °EÀ °hÀ °‰À °¦À °°À °¸À °ÍÀ ±À ±&À ±HÀ ±eÀ ±oÀ ±wÀ ±ŒÀ ±¶À ±ÙÀ ²'À ²dÀ ²„À ²¶À ²ÀÀ ²ÈÀ ²İÀ ³8À ³@À ³EÀ ³HÀ ³JÀ ³zÀ ³•À ³ãÀ ´À ´rÀ ´tÀ ´À ´èÀ ´êÀ µ(À µNÀ µ²À µ´À µÑÀ µÓÀ µïÀ ¶À ¶6À ¶eÀ ¶gÀ ¶À ¶À ¶äÀ ¶æÀ ·!À ·.À ·NÀ ·PÀ ·]À ·µÀ ··À ·ÄÀ ¸À ¸MÀ ¸OÀ ¸ŸÀ ¸¡À ¸ñÀ ¸óÀ ¹À ¹8À ¹XÀ ¹zÀ ¹àÀ º5À º7À ºPÀ ºÀ ºªÀ ºÅÀ ºÇÀ ºãÀ »À »;À »gÀ »iÀ »˜À »ìÀ ¼ À ¼xÀ ¼ØÀ ½À ½À ½5À ½NÀ ½±À ½½À ½¿À ¾À ¾kÀ ¾À ¾•À ¾—À ¾âÀ ¾øÀ ¿'À ¿WÀ ¿‹À ¿³À ¿ïÀ À)À À;À ÀbÀ ÀˆÀ À§À À±À ÁÀ Á%À Á€À Á‰À ÁÇÀ ÁÎÀ ÁĞÀ ÁõÀ ÂÀ Â4À Â6À Â_À Â‚À Â„À Â¶À ÂØÀ ÃÀ Ã2À ÃÀ ÃèÀ ÃïÀ ÃñÀ ÄÀ Ä<À ÄuÀ ÄŒÀ Ä»À ÄàÀ ÅÀ ÅDÀ ÅgÀ ÅšÀ Å¤À Å«À Å­À Å×À ÅøÀ Æ)À Æ1À Æ6À Æ8À ÆEÀ Æ[À ÆsÀ ÆÓÀ ÆùÀ ÇÀ Ç!À ÇrÀ Ç­À ÇËÀ ÇĞÀ ÇÒÀ ÇñÀ ÈÀ ÈdÀ È€À ÈËÀ ÈöÀ ÈşÀ ÉÀ ÉÀ ÉÀ É4À ÉXÀ É•À ÉšÀ ÉœÀ É©À ÉØÀ ÉÿÀ ÊEÀ ÊÀ ÊÎÀ ÊşÀ ËÀ Ë8À Ë?À ËAÀ ËuÀ ËÆÀ ÌÀ ÌÀ ÌÀ ÌWÀ ÌYÀ Ì¹À ÌòÀ Í%À Í.À Í5À Í7À ÍyÀ Í½À Î À ÎTÀ Î“À Î¡À ÎóÀ Ï!À ÏPÀ Ï{À Ï„À Ï¤À Ï«À Ï°À Ï²À Ï¿À Ğ	À Ğ)À ĞGÀ ĞNÀ ĞSÀ ĞUÀ ĞuÀ Ğ—À ĞĞÀ ĞÕÀ Ğ×À ÑÀ Ñ5À ÑVÀ ÑƒÀ ÑÀÀ ÑÜÀ ÑúÀ ÒÀ ÒÀ ÒÀ ÒÀ ÒKÀ ÒMÀ ÒZÀ ÒnÀ Ò¬À ÒÈÀ ÒåÀ Ó+À ÓVÀ ÓlÀ ÓqÀ ÓsÀ Ó¼À Ó¾À ÓÛÀ ÔÀ ÔÀ Ô	À ÔMÀ ÔœÀ ÔİÀ Õ&À ÕoÀ Õ„À Õ‹À ÕÀ ÕÁÀ ÕÖÀ ÕİÀ ÕßÀ Ö)À Ö>À ÖEÀ ÖGÀ Ö_À ÖtÀ Ö{À Ö}À Ö²À ÖïÀ ×À ×
-À ×À ×=À ×QÀ ×XÀ ×ZÀ ×mÀ ×rÀ ×tÀ ×”À ×§À ×ôÀ Ø	À ØÀ ØdÀ ØiÀ ØkÀ ØÄÀ ÙÀ ÙQÀ ÙfÀ Ù¡À Ù¬À Ù³À ÙµÀ ÙàÀ Ú À Ú"À ÚDÀ ÚhÀ ÚŒÀ Ú°À ÚéÀ Û$À Û/À Û6À Û8À ÛcÀ ÛƒÀ Û§À ÛËÀ ÛÛÀ ÛıÀ ÜÀ ÜCÀ ÜwÀ Ü À Ü«À Ü²À Ü·À Ü¹À ÜöÀ İÀ İVÀ İ}À İ„À İ‰À İ‹À İ±À İÕÀ İêÀ ŞÀ ŞÀ ŞYÀ Ş`À ŞeÀ ŞgÀ Ş‰À ŞÁÀ ŞÃÀ ŞíÀ ß0À ßFÀ ßKÀ ßMÀ ß‚À ßÀÀ ßÂÀ ßäÀ àÀ àOÀ àVÀ à˜À àÙÀ á+À áhÀ á«À á°À á²À áİÀ áêÀ â!À â#À â0À âÀ â’À âŸÀ âÖÀ ã.À ã}À ãŸÀ ãÊÀ ãõÀ ä3À äƒÀ äÀ ä»À ä½À äùÀ å.À å6À å;À ådÀ åfÀ åÀ åÍÀ æÀ ægÀ æ‡À æÀ æóÀ ç À ç%À ç'À ç4À ç\À ç‰À çÃÀ çöÀ èÀ è$À èIÀ èÀ èáÀ èéÀ èëÀ éÀ épÀ éµÀ éÊÀ éêÀ éòÀ ê'À êzÀ ê—À êñÀ ë5À ëkÀ ë™À ë¼À ëáÀ ìÀ ì)À ìjÀ ìvÀ ì~À ì€À ìĞÀ í"À ídÀ í À íÆÀ íæÀ îÀ î_À îŠÀ î–À îºÀ îŞÀ ï À ï$À ïvÀ ï¡À ï­À ï´À ï¶À ğÀ ğ*À ğkÀ ğ†À ğ¤À ğÅÀ ğîÀ ñÀ ñSÀ ñ‡À ñ‰À ñ¨À ñÈÀ òÀ ò:À òƒÀ ò©À òÒÀ òóÀ óÀ ónÀ óˆÀ óåÀ ôÀ ô|À ô³À ôµÀ ô×À õ&À õJÀ õšÀ õÀÀ õêÀ öÀ ö&À ö†À ö À öıÀ ÷3À ÷”À ÷ÄÀ øÀ øtÀ ø¥À ø²À ø¾À øîÀ ùÀ ù$À ù&À ùJÀ ùnÀ ù’À ùÚÀ úÀ ú+À úLÀ úgÀ úÅÀ úßÀ û:À û<À û^À û‚À ûÉÀ ûğÀ üÀ ü;À üVÀ ü´À üÎÀ ı)À ıYÀ ı²À ş	À ş:À şGÀ şSÀ şƒÀ ş­À ş¹À ş»À şßÀ ÿÀ ÿJÀ ÿqÀ ÿ›À ÿ¼À ÿ×À 5À OÀ ªÀ ÚÀ3ÀŠÀ»ÀÈÀÔÀÀ.À:ÀAÀCÀhÀ‘ÀªÀÈÀéÀÀPÀzÀ²ÀÕÀöÀ(ÀVÀŠÀÄÀİÀÀ/À_À‡ÀÁÀíÀÀMÀÀ¹ÀßÀÀ)ÀyÀÀÀÀ>ÀvÀ®ÀÚÀ	À	:À	|À	ªÀ	ÜÀ
-À
--À
-|À
-¨À
-ÖÀ
-ıÀ"À`ÀœÀÕÀüÀ3ÀsÀ£ÀÖÀ ÀVÀÀÄÀôÀ$ÀEÀŠÀ¸ÀŞÀÀXÀ¨ÀêÀ:ÀtÀ±ÀÔÀ2À^ÀjÀtÀ|À~À¤ÀÄÀÀIÀkÀŸÀÅÀïÀ)ÀOÀ{À°ÀÖÀñÀÿÀÀ"À,À3ÀÀËÀëÀóÀõÀÀfÀ‹À­ÀàÀîÀÀÀÀ7À\ÀÀİÀÿÀÀYÀ|À¾ÀüÀÀCÀ}À²ÀÚÀöÀÀZÀ¯ÀöÀÀ/À\ÀvÀÅÀÀ9ÀUÀvÀ¶ÀÀ|À×À8À•À±À³ÀÀWÀÀíÀJÀ¨À À bÀ ¢À ÀÀ!À!qÀ!ÍÀ!ıÀ",À"GÀ"`À"}À"œÀ"®À"¾À#	À#?À#\À#lÀ#zÀ#†À#À#˜À#À# À#¢À#ÚÀ$À$NÀ$‚À$¹À$ÂÀ%À%À%À%JÀ%¬À%®À%ßÀ%áÀ&%À&jÀ&“À&ÇÀ&ÉÀ&İÀ'RÀ'‚À'áÀ'æÀ(0À(5À(7À(‘À(“À(ÌÀ),À)?À)AÀ)p   )_TextFieldSelectionGestureDetectorBuilder	TextField_TextFieldState_m2StateInputStyle_m2CounterErrorStyle_m3StateInputStyle_m3InputStyle_m3CounterErrorStyle(flutter.material.textfield.wantKeepAlive€ëWhen the widget has focus, it will prevent itself from disposing via its
-underlying [EditableText]'s [AutomaticKeepAliveClientMixin.wantKeepAlive] in
-order to avoid losing the selection. Removing the focus will allow it to be
-disposed.)flutter.widgets.TextField.textInputAction€®The type of action button to use for the keyboard.
-
-Defaults to [TextInputAction.newline] if [keyboardType] is
-[TextInputType.multiline] and [TextInputAction.done] otherwise. flutter.material.textfield.onTap‚æCalled for the first tap in a series of taps.
-
-The text field builds a [GestureDetector] to handle input events like tap,
-to trigger focus requests, to move the caret, adjust the selection, etc.
-Handling some of those events by wrapping the text field with a competing
-GestureDetector is problematic.
-
-To unconditionally handle taps, without interfering with the text field's
-internal gesture detector, provide this callback.
-
-If the text field is created with [enabled] false, taps will not be
-recognized.
-
-To be notified when the text field gains or loses the focus, provide a
-[focusNode] and add a listener to that.
-
-To listen to arbitrary pointer events without competing with the
-text field's internal gesture detector, use a [Listener].(flutter.material.textfield.restorationId‚yRestoration ID to save and restore the state of the text field.
-
-If non-null, the text field will persist and restore its current scroll
-offset and - if no [controller] has been provided - the content of the
-text field. If a [controller] has been provided, it is the responsibility
-of the owner of that controller to persist and restore it, e.g. by using
-a [RestorableTextEditingController].
-
-The state of this widget is persisted in a [RestorationBucket] claimed
-from the surrounding [RestorationScope] using the provided restoration ID.
-
-See also:
-
- * [RestorationManager], which explains how state restoration works in
-   Flutter. â

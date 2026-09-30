@@ -4,6 +4,8 @@
 *.log
 *.pyc
 *.swp
+.tmp/
+.idea/caches/
 .buildlog/
 .history
 .DS_Store
