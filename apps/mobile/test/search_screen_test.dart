@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -309,6 +311,81 @@ void main() {
     expect(client.calls.last.cursor, isNull);
   });
 
+  testWidgets('loads both T02 cursor-search pages and keeps their results',
+      (tester) async {
+    tester.view.physicalSize = const Size(800, 320);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final fixture = _readT02Fixture();
+    final pollsById = {
+      for (final card in fixture['cards'] as List<dynamic>)
+        (card as Map<String, dynamic>)['id'] as String: card,
+    };
+    final cursorPages =
+        (fixture['cursorPages'] as List<dynamic>).cast<Map<String, dynamic>>();
+    final client = _FakeSearchApiClient(
+      pages: [
+        for (var index = 0; index < cursorPages.length; index += 1)
+          SearchPage(
+            items: (cursorPages[index]['pollIds'] as List<dynamic>)
+                .cast<String>()
+                .map((id) => PollSearchResult(
+                      score: 1,
+                      poll: PollSummary.fromJson(pollsById[id]!),
+                    ))
+                .toList(),
+            nextCursor: index + 1 < cursorPages.length
+                ? cursorPages[index + 1]['cursor'] as String?
+                : null,
+          ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      _app(client, searchHistory: MemorySearchHistoryStore()),
+    );
+    await tester.enterText(find.byType(TextField), 'motion');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(client.calls.map((call) => call.cursor), [null]);
+    expect(
+      find.byKey(const ValueKey('search-poll-result-motion-long-text')),
+      findsOneWidget,
+    );
+
+    final resultScrollable = find.byWidgetPredicate(
+      (widget) =>
+          widget is Scrollable && widget.axisDirection == AxisDirection.down,
+    );
+    final resultScroll = tester.state<ScrollableState>(resultScrollable);
+    // The short viewport makes the first page scrollable so the existing
+    // near-bottom listener can request its next cursor page.
+    expect(resultScroll.position.maxScrollExtent, greaterThan(0));
+
+    await tester.fling(find.byType(ListView), const Offset(0, -1200), 3000);
+    await tester.pumpAndSettle();
+
+    expect(client.calls.map((call) => call.cursor), [null, 't02-page-2']);
+    resultScroll.position.jumpTo(resultScroll.position.maxScrollExtent);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(
+        const ValueKey('search-poll-result-motion-count-100-image-error'),
+      ),
+      findsOneWidget,
+    );
+
+    resultScroll.position.jumpTo(0);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('search-poll-result-motion-long-text')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('places sort menu in the top-right search header button',
       (tester) async {
     final client = _FakeSearchApiClient(
@@ -355,6 +432,11 @@ Widget _app(
     ),
   );
 }
+
+Map<String, dynamic> _readT02Fixture() => jsonDecode(
+      File('../../test/fixtures/t02-motion-scroll-loading-polls.json')
+          .readAsStringSync(),
+    ) as Map<String, dynamic>;
 
 class _FakeProfilesApiClient extends ProfilesApiClient {
   @override

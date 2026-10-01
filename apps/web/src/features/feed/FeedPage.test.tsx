@@ -6,6 +6,7 @@ import { setupServer } from 'msw/node';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from 'vitest';
 import { SessionProvider } from '../../app/session-provider';
+import { t02MotionScrollCursorPages, t02MotionScrollPolls } from '../../test-utils/t02-motion-scroll-fixture';
 import { FeedPage } from './FeedPage';
 
 const poll = {
@@ -40,7 +41,11 @@ function renderFeed() {
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-beforeEach(() => server.use(http.get('/auth/me', () => HttpResponse.json({ error: 'unauthorized' }, { status: 401 }))));
+beforeEach(() => server.use(
+  http.get('/auth/me', () => HttpResponse.json({ error: 'unauthorized' }, { status: 401 })),
+  http.get('/polls', () => HttpResponse.json({ items: [] })),
+  http.get('/users', () => HttpResponse.json({ items: [] })),
+));
 afterEach(() => {
   server.resetHandlers();
   sessionStorage.clear();
@@ -62,6 +67,93 @@ test('renders polls with immediately clickable answer options', async () => {
   expect(screen.getByRole('button', { name: 'First (3 votes)' })).toHaveAccessibleDescription('Sign in to vote on this poll.');
   expect(screen.getByRole('button', { name: 'Comments (0)' })).toBeEnabled();
   expect(screen.getByRole('button', { name: 'Comments (0)' })).not.toHaveAccessibleDescription('Comments are not available yet.');
+});
+
+test('loads the shared T02 fixture with fixed count boundaries and cursor pages', async () => {
+  server.use(http.get('/polls', () => HttpResponse.json({ items: t02MotionScrollPolls })));
+  const { container } = renderFeed();
+
+  for (const card of t02MotionScrollPolls) {
+    expect(await screen.findByRole('heading', { name: card.question })).toBeInTheDocument();
+  }
+  expect(container.querySelectorAll('.poll-card')).toHaveLength(4);
+  expect(Array.from(container.querySelectorAll('.poll-card__image')).map((image) => image.getAttribute('src')))
+    .toEqual(t02MotionScrollPolls.slice(1).map((card) => card.imageUrl));
+  expect(t02MotionScrollPolls.map((card) => card.votesCount)).toEqual([9, 10, 99, 100]);
+  expect(t02MotionScrollCursorPages.map((page) => page.pollIds.length)).toEqual([2, 2]);
+});
+
+test('records a stale vote response replacing a newer like response', async () => {
+  const baselinePoll = t02MotionScrollPolls[0];
+  const firstOption = baselinePoll.options[0];
+  const votedPoll = {
+    ...baselinePoll,
+    options: baselinePoll.options.map((option) => option.id === firstOption.id
+      ? { ...option, votesCount: option.votesCount + 1 }
+      : option),
+    votesCount: baselinePoll.votesCount + 1,
+    viewerVoteOptionId: firstOption.id,
+  };
+  const likedPoll = {
+    ...baselinePoll,
+    likesCount: baselinePoll.likesCount + 1,
+    viewerHasLiked: true,
+  };
+  const responseOrder: string[] = [];
+  let releaseVoteResponse: () => void = () => undefined;
+  const voteResponseGate = new Promise<void>((resolve) => { releaseVoteResponse = resolve; });
+
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({
+      user: {
+        id: 'viewer-1',
+        email: 'viewer@example.test',
+        username: 'viewer',
+        status: 'active',
+        profile: {
+          displayName: 'Viewer',
+          pollsCount: 0,
+          followersCount: 0,
+          followingCount: 0,
+          countryCode: 'BY',
+          bio: null,
+          avatarObjectKey: null,
+          avatarUrl: null,
+        },
+      },
+    })),
+    http.get('/polls', () => HttpResponse.json({ items: [baselinePoll] })),
+    http.post('/polls/motion-long-text/votes', async () => {
+      responseOrder.push('vote-start');
+      await voteResponseGate;
+      responseOrder.push('vote-finish');
+      return HttpResponse.json({ poll: votedPoll }, { status: 201 });
+    }),
+    http.post('/polls/motion-long-text/likes', () => {
+      responseOrder.push('like-finish');
+      return HttpResponse.json({ poll: likedPoll }, { status: 201 });
+    }),
+  );
+
+  try {
+    const user = userEvent.setup();
+    renderFeed();
+
+    await user.click(await screen.findByRole('button', {
+      name: firstOption.text + ' (' + firstOption.votesCount + ' votes)',
+    }));
+    await waitFor(() => expect(responseOrder).toEqual(['vote-start']));
+    await user.click(screen.getByRole('button', { name: 'Like (9)' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Like (10)' }))
+      .toHaveAttribute('aria-pressed', 'true'));
+
+    releaseVoteResponse();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Like (9)' }))
+      .toHaveAttribute('aria-pressed', 'false'));
+    expect(responseOrder).toEqual(['vote-start', 'like-finish', 'vote-finish']);
+  } finally {
+    releaseVoteResponse();
+  }
 });
 
 test('uses an editorial feed heading and restrained contextual rail', async () => {

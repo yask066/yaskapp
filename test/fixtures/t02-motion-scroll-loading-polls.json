@@ -1,0 +1,82 @@
+{
+  "fixtureVersion": 1,
+  "purpose": "T02 motion, scroll, and loading baseline",
+  "cursorPages": [
+    { "cursor": null, "pollIds": ["motion-long-text", "motion-count-10"] },
+    { "cursor": "t02-page-2", "pollIds": ["motion-count-99", "motion-count-100-image-error"] }
+  ],
+  "cards": [
+    {
+      "id": "motion-long-text",
+      "author": { "id": "t02-author", "username": "baseline", "displayName": "Baseline Author", "avatarObjectKey": null, "avatarUrl": null },
+      "question": "Which parts of the reading experience should we improve first? We are collecting detailed feedback from people who browse long poll questions on small screens, switch between feed filters, and return to the same place after opening a discussion. Please describe the loading, layout, and reaction behavior you expect while the list is moving.",
+      "imageUrl": null,
+      "options": [
+        { "id": "motion-long-text-option-a", "text": "Keep the current position", "position": 0, "votesCount": 5 },
+        { "id": "motion-long-text-option-b", "text": "Show loading status", "position": 1, "votesCount": 4 }
+      ],
+      "votesCount": 9,
+      "commentsCount": 9,
+      "likesCount": 9,
+      "viewerHasLiked": false,
+      "allowVoteCancellation": true,
+      "createdAt": "2026-09-01T12:00:00.000Z",
+      "viewerVoteOptionId": null,
+      "endsAt": null
+    },
+    {
+      "id": "motion-count-10",
+      "author": { "id": "t02-author", "username": "baseline", "displayName": "Baseline Author", "avatarObjectKey": null, "avatarUrl": null },
+      "question": "Does the 9 to 10 count transition move a neighboring control?",
+      "imageUrl": "https://fixtures.invalid/media/landscape-16x9.svg",
+      "options": [
+        { "id": "motion-count-10-option-a", "text": "No movement", "position": 0, "votesCount": 6 },
+        { "id": "motion-count-10-option-b", "text": "A small movement", "position": 1, "votesCount": 4 }
+      ],
+      "votesCount": 10,
+      "commentsCount": 10,
+      "likesCount": 10,
+      "viewerHasLiked": false,
+      "allowVoteCancellation": true,
+      "createdAt": "2026-09-01T12:01:00.000Z",
+      "viewerVoteOptionId": null,
+      "endsAt": null
+    },
+    {
+      "id": "motion-count-99",
+      "author": { "id": "t02-author", "username": "baseline", "displayName": "Baseline Author", "avatarObjectKey": null, "avatarUrl": null },
+      "question": "Does the 99 to 100 count transition change card width or height?",
+      "imageUrl": "https://fixtures.invalid/media/portrait-4x5.svg",
+      "options": [
+        { "id": "motion-count-99-option-a", "text": "No layout change", "position": 0, "votesCount": 50 },
+        { "id": "motion-count-99-option-b", "text": "Visible layout change", "position": 1, "votesCount": 49 }
+      ],
+      "votesCount": 99,
+      "commentsCount": 99,
+      "likesCount": 99,
+      "viewerHasLiked": false,
+      "allowVoteCancellation": true,
+      "createdAt": "2026-09-01T12:02:00.000Z",
+      "viewerVoteOptionId": null,
+      "endsAt": null
+    },
+    {
+      "id": "motion-count-100-image-error",
+      "author": { "id": "t02-author", "username": "baseline", "displayName": "Baseline Author", "avatarObjectKey": null, "avatarUrl": null },
+      "question": "Does an image error preserve the reserved card area?",
+      "imageUrl": "https://fixtures.invalid/media/missing.svg",
+      "options": [
+        { "id": "motion-count-100-option-a", "text": "Area remains reserved", "position": 0, "votesCount": 55 },
+        { "id": "motion-count-100-option-b", "text": "Area collapses", "position": 1, "votesCount": 45 }
+      ],
+      "votesCount": 100,
+      "commentsCount": 100,
+      "likesCount": 100,
+      "viewerHasLiked": false,
+      "allowVoteCancellation": true,
+      "createdAt": "2026-09-01T12:03:00.000Z",
+      "viewerVoteOptionId": null,
+      "endsAt": null
+    }
+  ]
+}

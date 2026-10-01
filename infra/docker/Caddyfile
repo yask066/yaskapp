@@ -34,6 +34,21 @@ http://{$STAGING_PUBLIC_IP:127.0.0.1} {
     handle /media/* {
         reverse_proxy api:3000
     }
+    handle /notifications* {
+        reverse_proxy api:3000
+    }
+    handle /notification-preferences* {
+        reverse_proxy api:3000
+    }
+    handle /notification-devices* {
+        reverse_proxy api:3000
+    }
+    handle /realtime* {
+        reverse_proxy api:3000
+    }
+    handle /health* {
+        reverse_proxy api:3000
+    }
     handle /moderation/* {
         reverse_proxy api:3000
     }

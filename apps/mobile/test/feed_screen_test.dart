@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -29,6 +31,44 @@ void main() {
     expect(find.text('Trending'), findsNothing);
     expect(find.byTooltip('Search'), findsOneWidget);
     expect(find.byTooltip('Notifications'), findsNothing);
+  });
+
+  testWidgets(
+      'records the shared T02 fixture and current long-question truncation',
+      (tester) async {
+    final fixture = _readT02Fixture();
+    final polls = (fixture['cards'] as List<dynamic>)
+        .map((card) => PollSummary.fromJson(card as Map<String, dynamic>))
+        .toList();
+    final api = _FakePollsApiClient(initialPolls: polls);
+
+    expect(polls.map((poll) => poll.votesCount).toList(), [9, 10, 99, 100]);
+    expect(
+        (fixture['cursorPages'] as List<dynamic>)
+            .map((page) =>
+                (page as Map<String, dynamic>)['pollIds'] as List<dynamic>)
+            .map((ids) => ids.length)
+            .toList(),
+        [2, 2]);
+    expect(polls.map((poll) => poll.imageUrl == null).toList(),
+        [true, false, false, false]);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FeedScreen(
+          session: _session,
+          pollsApiClient: api,
+          realtimeClient: _FakeRealtimeClient(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text(polls.first.question), 240);
+
+    final question = tester.widget<Text>(find.text(polls.first.question));
+    expect(question.maxLines, 3);
+    expect(question.overflow, TextOverflow.ellipsis);
+    expect(api.listPollsCalls, 1);
   });
 
   testWidgets('opens SearchScreen with the current session', (tester) async {
@@ -210,6 +250,40 @@ void main() {
     expect(find.byIcon(Icons.favorite), findsOneWidget);
   });
 
+  testWidgets(
+      'records that a second mobile like is blocked while the first is pending',
+      (tester) async {
+    final poll = _poll(viewerHasLiked: false, likesCount: 3);
+    final likeResponse = Completer<PollSummary>();
+    final pollsApiClient = _FakePollsApiClient(
+      initialPolls: [poll],
+      likeResponse: likeResponse.future,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FeedScreen(
+          session: _session,
+          pollsApiClient: pollsApiClient,
+          realtimeClient: _FakeRealtimeClient(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final likeAction = find.byTooltip('Like');
+    await tester.tap(likeAction);
+    await tester.pump();
+    expect(pollsApiClient.likeCalls, 1);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    await tester.tap(likeAction);
+    await tester.pump();
+    expect(pollsApiClient.likeCalls, 1);
+
+    likeResponse.complete(_poll(viewerHasLiked: true, likesCount: 4));
+    await tester.pumpAndSettle();
+  });
   testWidgets('shows an error when liking fails', (tester) async {
     final poll = _poll(viewerHasLiked: false, likesCount: 3);
     final pollsApiClient = _FakePollsApiClient(
@@ -415,6 +489,13 @@ final _createCommentResult = CreatePollCommentResult(
   poll: _updatedPollWithComment,
 );
 
+Map<String, dynamic> _readT02Fixture() {
+  return jsonDecode(
+    File('../../test/fixtures/t02-motion-scroll-loading-polls.json')
+        .readAsStringSync(),
+  ) as Map<String, dynamic>;
+}
+
 class _FakePollsApiClient extends PollsApiClient {
   _FakePollsApiClient({
     required this.initialPolls,
@@ -423,6 +504,7 @@ class _FakePollsApiClient extends PollsApiClient {
     this.likedPoll,
     this.votedPoll,
     this.likeError,
+    this.likeResponse,
   });
 
   final List<PollSummary> initialPolls;
@@ -431,6 +513,7 @@ class _FakePollsApiClient extends PollsApiClient {
   final PollSummary? likedPoll;
   final PollSummary? votedPoll;
   final PollsApiException? likeError;
+  final Future<PollSummary>? likeResponse;
   int likeCalls = 0;
   int voteCalls = 0;
   int listPollsCalls = 0;
@@ -465,6 +548,11 @@ class _FakePollsApiClient extends PollsApiClient {
 
     if (likeError != null) {
       throw likeError;
+    }
+
+    final likeResponse = this.likeResponse;
+    if (likeResponse != null) {
+      return likeResponse;
     }
 
     return likedPoll!;
