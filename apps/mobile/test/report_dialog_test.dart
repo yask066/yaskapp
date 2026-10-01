@@ -35,12 +35,13 @@ void main() {
     expect(find.byTooltip('Close'), findsOneWidget);
     expect(_button(tester, 'Submit').onPressed, isNull);
 
-    await tester.tap(find.text('Select a reason'));
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Spam').last);
     await tester.pumpAndSettle();
 
     expect(_button(tester, 'Submit').onPressed, isNotNull);
+    await tester.ensureVisible(find.text('Cancel'));
     await tester.tap(find.text('Cancel'));
     await dialogFuture;
     client.close();

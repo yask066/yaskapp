@@ -250,8 +250,7 @@ void main() {
     expect(find.byIcon(Icons.favorite), findsOneWidget);
   });
 
-  testWidgets(
-      'records that a second mobile like is blocked while the first is pending',
+  testWidgets('blocks repeated likes while the first request is pending',
       (tester) async {
     final poll = _poll(viewerHasLiked: false, likesCount: 3);
     final likeResponse = Completer<PollSummary>();
@@ -277,8 +276,9 @@ void main() {
     expect(pollsApiClient.likeCalls, 1);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
-    await tester.tap(likeAction);
-    await tester.pump();
+    // The pending state replaces the Like action with a progress indicator,
+    // so there is no second actionable control to tap.
+    expect(likeAction, findsNothing);
     expect(pollsApiClient.likeCalls, 1);
 
     likeResponse.complete(_poll(viewerHasLiked: true, likesCount: 4));

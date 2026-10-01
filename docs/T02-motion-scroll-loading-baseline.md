@@ -56,7 +56,8 @@
 
 Flutter widget tests — из D:\yaskapp\apps\mobile:
 
-    flutter test test/feed_screen_test.dart
+    flutter test --no-pub test/feed_screen_test.dart
+    flutter test --no-pub
 
 Проверка двух страниц cursor-поиска из корня D:\yaskapp:
 
@@ -73,8 +74,13 @@ Flutter widget tests — из D:\yaskapp\apps\mobile:
 - Mock API: синтаксис Node.js проверен; normal отдаёт 4 карточки и SVG 200 / intentionally missing 404; error возвращает 503 на первый GET /polls и 4 карточки при retry.
 - git diff --check завершился без ошибок; Dart formatter подтвердил форматирование feed_screen_test.dart и search_screen_test.dart.
 - Cursor-поиск T02: Node HTTP-тест запустил mock server и выполнил оба реальных GET `/search`; проверены IDs обеих страниц и переход `null → t02-page-2 → null`. Мобильный виджетный сценарий выполнил запросы с cursor `[null, t02-page-2]`, показал результат второй страницы и сохранил первую после прокрутки вверх — 1/1.
-- Flutter `search_screen_test.dart`: полный файл — 13/18; прошёл новый T02 сценарий. Не прошли `shows discovery sections before a query is entered`, `shows the latest successful searches in reverse chronological order`, `clears the query from the search bar`, `shows empty and retryable error states`, `filter changes preserve query and reset pagination`.
-- Полный Flutter suite не запускался. На среде не обнаружен adb и нет Android/iOS физических устройств; это программные проверки, не device-run и не замер AC-12. T01 оставил модели и версии открытыми; эталонная матрица закреплена ниже.
+- Flutter SDK: 3.44.5 stable; Dart 3.12.2.
+- `flutter test --no-pub test/feed_screen_test.dart`: 11/11 прошли. Включены T02 fixture/truncation и pending-like проверки. Проверка pending like теперь утверждает, что действие скрыто под индикатором и повторный API-вызов не произошёл.
+- T02 мобильный cursor-сценарий `flutter test --no-pub test/search_screen_test.dart --plain-name "loads both T02 cursor-search pages and keeps their results"`: 1/1 прошёл; обе страницы отрисованы, cursor-последовательность `[null, t02-page-2]` подтверждена.
+- Полный `search_screen_test.dart`: 13/18 прошли; T02-сценарий прошёл. Упали `shows discovery sections before a query is entered`, `shows the latest successful searches in reverse chronological order`, `clears the query from the search bar`, `shows empty and retryable error states`, `filter changes preserve query and reset pagination`.
+- Полный `flutter test --no-pub`: 141 прошёл, 15 упали (exit code 1; 156 тестов). Упавшие: `auth_api_client_avatar_test.dart` — `uploads avatar as multipart field avatar`; `auth_screen_test.dart` — `does not select a country by default`, `keeps selected country after registration error`; `poll_card_report_test.dart` — `renders the poll actions with hierarchy and optional edit`; `profile_screen_test.dart` — `profile opens a dedicated settings page`, `refreshes my polls when requested after a new poll is created`, `updates my poll after like response`, `removes a poll after unliking it from liked polls`, `updates my polls comments count after returning from comments`; `search_screen_test.dart` — пять сценариев выше; `widget_test.dart` — `shows auth entry point`.
+- Чтобы suite мог завершиться, в `report_dialog_test.dart` тестовая навигация переведена на tap по самому dropdown и прокрутку `Cancel` в viewport; отдельный файл прошёл 1/1.
+- `adb` не найден в PATH; Android/iOS устройства и эмуляторы в среде недоступны. Проверены только программные Flutter widget tests; device-run и AC-12 frame-time замеры не выполнены. T01 оставил модели и версии устройств открытыми; эталонная матрица закреплена ниже.
 - Замеры длительности кадров и доли кадров за бюджетом не проводились.
 
 ### Живой web-прогон прокрутки и медиа — 1 октября 2026
