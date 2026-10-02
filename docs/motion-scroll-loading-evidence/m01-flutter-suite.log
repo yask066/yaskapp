@@ -1,0 +1,1042 @@
+00:00 +0: loading C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/api_config_test.dart
+00:00 +0: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/auth_session_test.dart: country catalog has no empty values or duplicates
+00:00 +1: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/auth_session_test.dart: parses a legacy profile without country
+00:00 +2: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/create_poll_screen_test.dart: create poll screen shows an add image action
+00:00 +3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/create_poll_screen_test.dart: create poll screen shows an add image action
+00:00 +3 -1: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/create_poll_screen_test.dart: create poll screen shows an add image action
+00:00 +3 -1: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/auth_api_client_avatar_test.dart: uploads avatar as multipart field avatar [E]
+  Bad state: Can't finalize a finalized Request.
+  package:http/src/base_request.dart 129:20    BaseRequest.finalize
+  package:http/src/request.dart 186:11         Request.finalize
+  test\auth_api_client_avatar_test.dart 19:37  main.<fn>.<fn>
+  package:http/src/mock_client.dart 54:36      new MockClient.<fn>
+  
+00:00 +4 -1: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/create_poll_screen_test.dart: create poll screen shows an add image action
+00:01 +5 -1: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+00:01 +6 -1: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+
+Warning: A call to tap() with finder "Found 1 widget with text "Sign Up": [
+  Text("Sign Up", inherit: true, size: 18.0, dependencies: [DefaultSelectionStyle, DefaultTextStyle, MediaQuery]),
+]" derived an Offset (Offset(400.0, 656.0)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+Indeed, Offset(400.0, 656.0) is outside the bounds of the root of the render tree, Size(800.0, 600.0).
+The finder corresponds to this RenderBox: RenderParagraph#aabb0 relayoutBoundary=up33
+The hit test result at that offset is: HitTestResult(HitTestEntry<HitTestTarget>#b78d5(_ReusableRenderView#40eb7), HitTestEntry<HitTestTarget>#798bf(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/auth_screen_test.dart:26:18)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#6      StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "tap()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "Select your country": []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/auth_screen_test.dart:29:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/auth_screen_test.dart line 29
+The test description was:
+  does not select a country by default
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:01 +6 -2: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/auth_screen_test.dart: does not select a country by default [E]
+  Test failed. See exception logs above.
+  The test description was: does not select a country by default
+  
+00:01 +6 -2: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/auth_screen_test.dart: keeps selected country after registration error
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following StateError was thrown running a test:
+Bad state: No element
+
+When the exception was thrown, this was the stack:
+#0      Iterable.first (dart:core/iterable.dart:663:7)
+#1      _FirstFinderMixin.filter (package:flutter_test/src/finders.dart:1383:28)
+#3      _AncestorFinderMixin.allCandidates (package:flutter_test/src/finders.dart:1857:49)
+#4      FinderBase.evaluate (package:flutter_test/src/finders.dart:1030:76)
+#5      WidgetController.widgetList (package:flutter_test/src/controller.dart:848:19)
+#6      WidgetController._maybeViewOf (package:flutter_test/src/controller.dart:795:34)
+#7      WidgetController.tap (package:flutter_test/src/controller.dart:1078:31)
+#8      main.<anonymous closure> (file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/auth_screen_test.dart:78:18)
+<asynchronous suspension>
+#9      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#10     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 2 frames from dart:async-patch and package:stack_trace)
+
+The test description was:
+  keeps selected country after registration error
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:01 +6 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/auth_screen_test.dart: keeps selected country after registration error [E]
+  Test failed. See exception logs above.
+  The test description was: keeps selected country after registration error
+  
+00:02 +6 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/edit_profile_screen_test.dart: does not show Log out on the edit profile screen
+00:03 +7 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/feed_screen_test.dart: shows one feed without category tabs
+00:03 +8 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/feed_screen_test.dart: shows one feed without category tabs
+00:04 +9 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/feed_screen_test.dart: shows one feed without category tabs
+00:04 +10 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/feed_screen_test.dart: shows one feed without category tabs
+00:04 +11 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/home_navigation_test.dart: uses the current user avatar for the Profile navigation item
+00:04 +12 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/home_navigation_test.dart: uses the current user avatar for the Profile navigation item
+00:04 +13 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/home_navigation_test.dart: uses the current user avatar for the Profile navigation item
+00:04 +14 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/home_navigation_test.dart: uses the current user avatar for the Profile navigation item
+00:05 +15 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:05 +16 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:05 +17 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:05 +18 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:05 +19 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:05 +20 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/feed_screen_test.dart: opens SearchScreen with the current session
+00:05 +21 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/feed_screen_test.dart: opens SearchScreen with the current session
+00:05 +22 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/feed_screen_test.dart: opens SearchScreen with the current session
+00:05 +23 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/feed_screen_test.dart: opens SearchScreen with the current session
+00:05 +24 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/feed_screen_test.dart: opens SearchScreen with the current session
+00:05 +25 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/feed_screen_test.dart: opens SearchScreen with the current session
+00:05 +26 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/feed_screen_test.dart: opens SearchScreen with the current session
+00:05 +27 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/feed_screen_test.dart: opens SearchScreen with the current session
+00:05 +28 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/feed_screen_test.dart: opens SearchScreen with the current session
+00:05 +29 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/feed_screen_test.dart: opens SearchScreen with the current session
+00:05 +30 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/feed_screen_test.dart: opens SearchScreen with the current session
+00:05 +31 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +32 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +33 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +34 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +35 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +36 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +37 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +38 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +39 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +40 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +41 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +42 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +43 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +44 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +45 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +46 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +47 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +48 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +49 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +50 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +51 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +52 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +53 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +54 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +55 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +56 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +57 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +58 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:07 +59 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:07 +60 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:07 +61 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:07 +62 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:07 +63 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:07 +64 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:07 +65 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:07 +66 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:07 +67 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:07 +68 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:07 +69 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:07 +70 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:07 +71 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:07 +72 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:07 +73 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +74 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +75 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +75 -3: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/poll_card_report_test.dart: renders the poll actions with hierarchy and optional edit
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "Cancel vote": []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/poll_card_report_test.dart:48:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/poll_card_report_test.dart line 48
+The test description was:
+  renders the poll actions with hierarchy and optional edit
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:08 +75 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +75 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/poll_card_report_test.dart: renders the poll actions with hierarchy and optional edit [E]
+  Test failed. See exception logs above.
+  The test description was: renders the poll actions with hierarchy and optional edit
+  
+00:08 +76 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +77 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notifications_screen_test.dart: pending banner materializes new items once and returns to top
+00:08 +78 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notifications_screen_test.dart: pending banner materializes new items once and returns to top
+00:08 +79 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/notifications_screen_test.dart: pending banner materializes new items once and returns to top
+00:08 +80 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:08 +81 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:08 +82 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:09 +83 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:09 +84 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:09 +85 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:09 +86 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:09 +87 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:09 +88 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:09 +89 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:09 +90 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:09 +91 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:09 +92 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:09 +93 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:09 +94 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:09 +95 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:09 +96 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:09 +97 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:09 +98 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:10 +99 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:10 +100 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+Pending timers:
+Timer (duration: 0:00:20.000000, periodic: true), created:
+#0      new FakeTimer._ (package:fake_async/fake_async.dart:342:62)
+#1      FakeAsync._createTimer (package:fake_async/fake_async.dart:260:29)
+#2      FakeAsync.run.<anonymous closure> (package:fake_async/fake_async.dart:187:15)
+#5      RealtimeClient._startHeartbeat (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:247:29)
+#6      RealtimeClient.connect (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:180:5)
+#7      ProfileScreenState.initState (package:yaskapp_mobile/src/features/profile/profile_screen.dart:66:29)
+#8      StatefulElement._firstBuild (package:flutter/src/widgets/framework.dart:5950:55)
+#9      ComponentElement.mount (package:flutter/src/widgets/framework.dart:5793:5)
+...     Normal element mounting (260 frames)
+#269    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#270    MultiChildRenderObjectElement.inflateWidget (package:flutter/src/widgets/framework.dart:7264:36)
+#271    MultiChildRenderObjectElement.mount (package:flutter/src/widgets/framework.dart:7279:32)
+...     Normal element mounting (467 frames)
+#738    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#739    Element.updateChild (package:flutter/src/widgets/framework.dart:4053:20)
+#740    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#741    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#742    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#743    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#744    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#745    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#746    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#747    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#748    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#749    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#750    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#751    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#752    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#753    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#754    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#755    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#756    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#757    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#758    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#759    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#760    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#761    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#762    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#763    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#764    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#765    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#766    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#767    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#768    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#769    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#770    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#771    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#772    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#773    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#774    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#775    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#776    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#777    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#778    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#779    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#780    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#781    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#782    _RawViewElement._updateChild (package:flutter/src/widgets/view.dart:481:16)
+#783    _RawViewElement.update (package:flutter/src/widgets/view.dart:568:5)
+#784    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#785    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#786    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#787    StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#788    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#789    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#790    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#791    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#792    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#793    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#794    RootElement._rebuild (package:flutter/src/widgets/binding.dart:2091:16)
+#795    RootElement.update (package:flutter/src/widgets/binding.dart:2069:5)
+#796    RootElement.performRebuild (package:flutter/src/widgets/binding.dart:2083:7)
+#797    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#798    BuildScope._tryRebuild (package:flutter/src/widgets/framework.dart:2750:15)
+#799    BuildScope._flushDirtyElements (package:flutter/src/widgets/framework.dart:2807:11)
+#800    BuildOwner.buildScope (package:flutter/src/widgets/framework.dart:3111:18)
+#801    AutomatedTestWidgetsFlutterBinding.drawFrame (package:flutter_test/src/binding.dart:2431:19)
+#802    RendererBinding._handlePersistentFrameCallback (package:flutter/src/rendering/binding.dart:509:5)
+#803    SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1430:15)
+#804    SchedulerBinding.handleDrawFrame (package:flutter/src/scheduler/binding.dart:1345:9)
+#805    AutomatedTestWidgetsFlutterBinding.pump.<anonymous closure> (package:flutter_test/src/binding.dart:2260:9)
+#808    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#809    AutomatedTestWidgetsFlutterBinding.pump (package:flutter_test/src/binding.dart:2249:27)
+#810    WidgetTester.pumpWidget.<anonymous closure> (package:flutter_test/src/widget_tester.dart:598:22)
+#813    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#814    WidgetTester.pumpWidget (package:flutter_test/src/widget_tester.dart:595:27)
+#815    main.<anonymous closure> (file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart:16:18)
+#816    testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:29)
+<asynchronous suspension>
+#817    TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 7 frames from dart:async and package:stack_trace)
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+A Timer is still pending even after the widget tree was disposed.
+'package:flutter_test/src/binding.dart':
+Failed assertion: line 2542 pos 12: '!timersPending'
+
+When the exception was thrown, this was the stack:
+#2      AutomatedTestWidgetsFlutterBinding._verifyInvariants (package:flutter_test/src/binding.dart:2542:12)
+#3      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1973:7)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from class _AssertionError and package:stack_trace)
+
+The test description was:
+  profile opens a dedicated settings page
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:10 +101 -4: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:10 +101 -5: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/poll_comments_screen_test.dart: tracks the latest updated poll summary after comment creation
+00:10 +101 -5: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page [E]
+  Test failed. See exception logs above.
+  The test description was: profile opens a dedicated settings page
+  
+00:10 +102 -5: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/poll_comments_screen_test.dart: tracks the latest updated poll summary after comment creation
+00:10 +103 -5: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/poll_comments_screen_test.dart: tracks the latest updated poll summary after comment creation
+00:10 +104 -5: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: refreshes my polls when requested after a new poll is created
+Pending timers:
+Timer (duration: 0:00:20.000000, periodic: true), created:
+#0      new FakeTimer._ (package:fake_async/fake_async.dart:342:62)
+#1      FakeAsync._createTimer (package:fake_async/fake_async.dart:260:29)
+#2      FakeAsync.run.<anonymous closure> (package:fake_async/fake_async.dart:187:15)
+#5      RealtimeClient._startHeartbeat (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:247:29)
+#6      RealtimeClient.connect (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:180:5)
+#7      ProfileScreenState.initState (package:yaskapp_mobile/src/features/profile/profile_screen.dart:66:29)
+#8      StatefulElement._firstBuild (package:flutter/src/widgets/framework.dart:5950:55)
+#9      ComponentElement.mount (package:flutter/src/widgets/framework.dart:5793:5)
+...     Normal element mounting (260 frames)
+#269    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#270    MultiChildRenderObjectElement.inflateWidget (package:flutter/src/widgets/framework.dart:7264:36)
+#271    MultiChildRenderObjectElement.mount (package:flutter/src/widgets/framework.dart:7279:32)
+...     Normal element mounting (467 frames)
+#738    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#739    Element.updateChild (package:flutter/src/widgets/framework.dart:4053:20)
+#740    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#741    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#742    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#743    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#744    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#745    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#746    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#747    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#748    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#749    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#750    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#751    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#752    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#753    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#754    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#755    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#756    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#757    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#758    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#759    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#760    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#761    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#762    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#763    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#764    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#765    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#766    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#767    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#768    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#769    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#770    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#771    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#772    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#773    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#774    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#775    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#776    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#777    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#778    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#779    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#780    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#781    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#782    _RawViewElement._updateChild (package:flutter/src/widgets/view.dart:481:16)
+#783    _RawViewElement.update (package:flutter/src/widgets/view.dart:568:5)
+#784    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#785    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#786    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#787    StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#788    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#789    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#790    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#791    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#792    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#793    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#794    RootElement._rebuild (package:flutter/src/widgets/binding.dart:2091:16)
+#795    RootElement.update (package:flutter/src/widgets/binding.dart:2069:5)
+#796    RootElement.performRebuild (package:flutter/src/widgets/binding.dart:2083:7)
+#797    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#798    BuildScope._tryRebuild (package:flutter/src/widgets/framework.dart:2750:15)
+#799    BuildScope._flushDirtyElements (package:flutter/src/widgets/framework.dart:2807:11)
+#800    BuildOwner.buildScope (package:flutter/src/widgets/framework.dart:3111:18)
+#801    AutomatedTestWidgetsFlutterBinding.drawFrame (package:flutter_test/src/binding.dart:2431:19)
+#802    RendererBinding._handlePersistentFrameCallback (package:flutter/src/rendering/binding.dart:509:5)
+#803    SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1430:15)
+#804    SchedulerBinding.handleDrawFrame (package:flutter/src/scheduler/binding.dart:1345:9)
+#805    AutomatedTestWidgetsFlutterBinding.pump.<anonymous closure> (package:flutter_test/src/binding.dart:2260:9)
+#808    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#809    AutomatedTestWidgetsFlutterBinding.pump (package:flutter_test/src/binding.dart:2249:27)
+#810    WidgetTester.pumpWidget.<anonymous closure> (package:flutter_test/src/widget_tester.dart:598:22)
+#813    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#814    WidgetTester.pumpWidget (package:flutter_test/src/widget_tester.dart:595:27)
+#815    main.<anonymous closure> (file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart:60:18)
+#816    testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:29)
+<asynchronous suspension>
+#817    TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 7 frames from dart:async and package:stack_trace)
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+A Timer is still pending even after the widget tree was disposed.
+'package:flutter_test/src/binding.dart':
+Failed assertion: line 2542 pos 12: '!timersPending'
+
+When the exception was thrown, this was the stack:
+#2      AutomatedTestWidgetsFlutterBinding._verifyInvariants (package:flutter_test/src/binding.dart:2542:12)
+#3      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1973:7)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from class _AssertionError and package:stack_trace)
+
+The test description was:
+  refreshes my polls when requested after a new poll is created
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:10 +104 -6: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/poll_comments_screen_test.dart: returns the latest updated poll summary when leaving
+00:10 +104 -6: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: refreshes my polls when requested after a new poll is created [E]
+  Test failed. See exception logs above.
+  The test description was: refreshes my polls when requested after a new poll is created
+  
+00:10 +105 -6: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: updates my poll after like response
+Pending timers:
+Timer (duration: 0:00:20.000000, periodic: true), created:
+#0      new FakeTimer._ (package:fake_async/fake_async.dart:342:62)
+#1      FakeAsync._createTimer (package:fake_async/fake_async.dart:260:29)
+#2      FakeAsync.run.<anonymous closure> (package:fake_async/fake_async.dart:187:15)
+#5      RealtimeClient._startHeartbeat (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:247:29)
+#6      RealtimeClient.connect (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:180:5)
+#7      ProfileScreenState.initState (package:yaskapp_mobile/src/features/profile/profile_screen.dart:66:29)
+#8      StatefulElement._firstBuild (package:flutter/src/widgets/framework.dart:5950:55)
+#9      ComponentElement.mount (package:flutter/src/widgets/framework.dart:5793:5)
+...     Normal element mounting (260 frames)
+#269    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#270    MultiChildRenderObjectElement.inflateWidget (package:flutter/src/widgets/framework.dart:7264:36)
+#271    MultiChildRenderObjectElement.mount (package:flutter/src/widgets/framework.dart:7279:32)
+...     Normal element mounting (467 frames)
+#738    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#739    Element.updateChild (package:flutter/src/widgets/framework.dart:4053:20)
+#740    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#741    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#742    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#743    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#744    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#745    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#746    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#747    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#748    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#749    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#750    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#751    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#752    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#753    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#754    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#755    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#756    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#757    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#758    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#759    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#760    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#761    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#762    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#763    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#764    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#765    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#766    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#767    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#768    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#769    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#770    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#771    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#772    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#773    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#774    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#775    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#776    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#777    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#778    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#779    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#780    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#781    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#782    _RawViewElement._updateChild (package:flutter/src/widgets/view.dart:481:16)
+#783    _RawViewElement.update (package:flutter/src/widgets/view.dart:568:5)
+#784    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#785    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#786    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#787    StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#788    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#789    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#790    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#791    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#792    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#793    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#794    RootElement._rebuild (package:flutter/src/widgets/binding.dart:2091:16)
+#795    RootElement.update (package:flutter/src/widgets/binding.dart:2069:5)
+#796    RootElement.performRebuild (package:flutter/src/widgets/binding.dart:2083:7)
+#797    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#798    BuildScope._tryRebuild (package:flutter/src/widgets/framework.dart:2750:15)
+#799    BuildScope._flushDirtyElements (package:flutter/src/widgets/framework.dart:2807:11)
+#800    BuildOwner.buildScope (package:flutter/src/widgets/framework.dart:3111:18)
+#801    AutomatedTestWidgetsFlutterBinding.drawFrame (package:flutter_test/src/binding.dart:2431:19)
+#802    RendererBinding._handlePersistentFrameCallback (package:flutter/src/rendering/binding.dart:509:5)
+#803    SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1430:15)
+#804    SchedulerBinding.handleDrawFrame (package:flutter/src/scheduler/binding.dart:1345:9)
+#805    AutomatedTestWidgetsFlutterBinding.pump.<anonymous closure> (package:flutter_test/src/binding.dart:2260:9)
+#808    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#809    AutomatedTestWidgetsFlutterBinding.pump (package:flutter_test/src/binding.dart:2249:27)
+#810    WidgetTester.pumpWidget.<anonymous closure> (package:flutter_test/src/widget_tester.dart:598:22)
+#813    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#814    WidgetTester.pumpWidget (package:flutter_test/src/widget_tester.dart:595:27)
+#815    main.<anonymous closure> (file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart:98:18)
+#816    testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:29)
+<asynchronous suspension>
+#817    TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 7 frames from dart:async and package:stack_trace)
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+A Timer is still pending even after the widget tree was disposed.
+'package:flutter_test/src/binding.dart':
+Failed assertion: line 2542 pos 12: '!timersPending'
+
+When the exception was thrown, this was the stack:
+#2      AutomatedTestWidgetsFlutterBinding._verifyInvariants (package:flutter_test/src/binding.dart:2542:12)
+#3      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1973:7)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from class _AssertionError and package:stack_trace)
+
+The test description was:
+  updates my poll after like response
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:10 +105 -7: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:10 +105 -7: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: updates my poll after like response [E]
+  Test failed. See exception logs above.
+  The test description was: updates my poll after like response
+  
+00:10 +106 -7: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:10 +107 -7: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:11 +107 -7: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: removes a poll after unliking it from liked polls
+Pending timers:
+Timer (duration: 0:00:20.000000, periodic: true), created:
+#0      new FakeTimer._ (package:fake_async/fake_async.dart:342:62)
+#1      FakeAsync._createTimer (package:fake_async/fake_async.dart:260:29)
+#2      FakeAsync.run.<anonymous closure> (package:fake_async/fake_async.dart:187:15)
+#5      RealtimeClient._startHeartbeat (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:247:29)
+#6      RealtimeClient.connect (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:180:5)
+#7      ProfileScreenState.initState (package:yaskapp_mobile/src/features/profile/profile_screen.dart:66:29)
+#8      StatefulElement._firstBuild (package:flutter/src/widgets/framework.dart:5950:55)
+#9      ComponentElement.mount (package:flutter/src/widgets/framework.dart:5793:5)
+...     Normal element mounting (260 frames)
+#269    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#270    MultiChildRenderObjectElement.inflateWidget (package:flutter/src/widgets/framework.dart:7264:36)
+#271    MultiChildRenderObjectElement.mount (package:flutter/src/widgets/framework.dart:7279:32)
+...     Normal element mounting (467 frames)
+#738    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#739    Element.updateChild (package:flutter/src/widgets/framework.dart:4053:20)
+#740    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#741    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#742    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#743    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#744    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#745    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#746    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#747    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#748    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#749    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#750    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#751    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#752    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#753    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#754    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#755    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#756    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#757    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#758    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#759    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#760    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#761    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#762    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#763    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#764    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#765    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#766    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#767    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#768    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#769    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#770    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#771    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#772    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#773    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#774    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#775    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#776    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#777    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#778    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#779    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#780    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#781    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#782    _RawViewElement._updateChild (package:flutter/src/widgets/view.dart:481:16)
+#783    _RawViewElement.update (package:flutter/src/widgets/view.dart:568:5)
+#784    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#785    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#786    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#787    StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#788    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#789    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#790    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#791    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#792    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#793    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#794    RootElement._rebuild (package:flutter/src/widgets/binding.dart:2091:16)
+#795    RootElement.update (package:flutter/src/widgets/binding.dart:2069:5)
+#796    RootElement.performRebuild (package:flutter/src/widgets/binding.dart:2083:7)
+#797    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#798    BuildScope._tryRebuild (package:flutter/src/widgets/framework.dart:2750:15)
+#799    BuildScope._flushDirtyElements (package:flutter/src/widgets/framework.dart:2807:11)
+#800    BuildOwner.buildScope (package:flutter/src/widgets/framework.dart:3111:18)
+#801    AutomatedTestWidgetsFlutterBinding.drawFrame (package:flutter_test/src/binding.dart:2431:19)
+#802    RendererBinding._handlePersistentFrameCallback (package:flutter/src/rendering/binding.dart:509:5)
+#803    SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1430:15)
+#804    SchedulerBinding.handleDrawFrame (package:flutter/src/scheduler/binding.dart:1345:9)
+#805    AutomatedTestWidgetsFlutterBinding.pump.<anonymous closure> (package:flutter_test/src/binding.dart:2260:9)
+#808    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#809    AutomatedTestWidgetsFlutterBinding.pump (package:flutter_test/src/binding.dart:2249:27)
+#810    WidgetTester.pumpWidget.<anonymous closure> (package:flutter_test/src/widget_tester.dart:598:22)
+#813    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#814    WidgetTester.pumpWidget (package:flutter_test/src/widget_tester.dart:595:27)
+#815    main.<anonymous closure> (file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart:147:18)
+#816    testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:29)
+<asynchronous suspension>
+#817    TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 7 frames from dart:async and package:stack_trace)
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+A Timer is still pending even after the widget tree was disposed.
+'package:flutter_test/src/binding.dart':
+Failed assertion: line 2542 pos 12: '!timersPending'
+
+When the exception was thrown, this was the stack:
+#2      AutomatedTestWidgetsFlutterBinding._verifyInvariants (package:flutter_test/src/binding.dart:2542:12)
+#3      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1973:7)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from class _AssertionError and package:stack_trace)
+
+The test description was:
+  removes a poll after unliking it from liked polls
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:11 +107 -8: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:11 +107 -8: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: removes a poll after unliking it from liked polls [E]
+  Test failed. See exception logs above.
+  The test description was: removes a poll after unliking it from liked polls
+  
+00:11 +108 -8: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:11 +109 -8: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:11 +110 -8: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:11 +111 -8: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:11 +112 -8: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:11 +113 -8: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:11 +114 -8: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:11 +115 -8: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:11 +115 -8: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: updates my polls comments count after returning from comments
+Pending timers:
+Timer (duration: 0:00:20.000000, periodic: true), created:
+#0      new FakeTimer._ (package:fake_async/fake_async.dart:342:62)
+#1      FakeAsync._createTimer (package:fake_async/fake_async.dart:260:29)
+#2      FakeAsync.run.<anonymous closure> (package:fake_async/fake_async.dart:187:15)
+#5      RealtimeClient._startHeartbeat (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:247:29)
+#6      RealtimeClient.connect (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:180:5)
+#7      ProfileScreenState.initState (package:yaskapp_mobile/src/features/profile/profile_screen.dart:66:29)
+#8      StatefulElement._firstBuild (package:flutter/src/widgets/framework.dart:5950:55)
+#9      ComponentElement.mount (package:flutter/src/widgets/framework.dart:5793:5)
+...     Normal element mounting (260 frames)
+#269    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#270    MultiChildRenderObjectElement.inflateWidget (package:flutter/src/widgets/framework.dart:7264:36)
+#271    MultiChildRenderObjectElement.mount (package:flutter/src/widgets/framework.dart:7279:32)
+...     Normal element mounting (467 frames)
+#738    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#739    Element.updateChild (package:flutter/src/widgets/framework.dart:4053:20)
+#740    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#741    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#742    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#743    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#744    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#745    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#746    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#747    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#748    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#749    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#750    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#751    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#752    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#753    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#754    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#755    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#756    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#757    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#758    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#759    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#760    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#761    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#762    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#763    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#764    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#765    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#766    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#767    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#768    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#769    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#770    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#771    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#772    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#773    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#774    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#775    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#776    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#777    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#778    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#779    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#780    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#781    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#782    _RawViewElement._updateChild (package:flutter/src/widgets/view.dart:481:16)
+#783    _RawViewElement.update (package:flutter/src/widgets/view.dart:568:5)
+#784    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#785    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#786    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#787    StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#788    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#789    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#790    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#791    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#792    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#793    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#794    RootElement._rebuild (package:flutter/src/widgets/binding.dart:2091:16)
+#795    RootElement.update (package:flutter/src/widgets/binding.dart:2069:5)
+#796    RootElement.performRebuild (package:flutter/src/widgets/binding.dart:2083:7)
+#797    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#798    BuildScope._tryRebuild (package:flutter/src/widgets/framework.dart:2750:15)
+#799    BuildScope._flushDirtyElements (package:flutter/src/widgets/framework.dart:2807:11)
+#800    BuildOwner.buildScope (package:flutter/src/widgets/framework.dart:3111:18)
+#801    AutomatedTestWidgetsFlutterBinding.drawFrame (package:flutter_test/src/binding.dart:2431:19)
+#802    RendererBinding._handlePersistentFrameCallback (package:flutter/src/rendering/binding.dart:509:5)
+#803    SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1430:15)
+#804    SchedulerBinding.handleDrawFrame (package:flutter/src/scheduler/binding.dart:1345:9)
+#805    AutomatedTestWidgetsFlutterBinding.pump.<anonymous closure> (package:flutter_test/src/binding.dart:2260:9)
+#808    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#809    AutomatedTestWidgetsFlutterBinding.pump (package:flutter_test/src/binding.dart:2249:27)
+#810    WidgetTester.pumpWidget.<anonymous closure> (package:flutter_test/src/widget_tester.dart:598:22)
+#813    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#814    WidgetTester.pumpWidget (package:flutter_test/src/widget_tester.dart:595:27)
+#815    main.<anonymous closure> (file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart:196:20)
+#816    testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:29)
+<asynchronous suspension>
+#817    TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 7 frames from dart:async and package:stack_trace)
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+A Timer is still pending even after the widget tree was disposed.
+'package:flutter_test/src/binding.dart':
+Failed assertion: line 2542 pos 12: '!timersPending'
+
+When the exception was thrown, this was the stack:
+#2      AutomatedTestWidgetsFlutterBinding._verifyInvariants (package:flutter_test/src/binding.dart:2542:12)
+#3      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1973:7)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from class _AssertionError and package:stack_trace)
+
+The test description was:
+  updates my polls comments count after returning from comments
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:11 +115 -9: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:11 +115 -9: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/profile_screen_test.dart: updates my polls comments count after returning from comments [E]
+  Test failed. See exception logs above.
+  The test description was: updates my polls comments count after returning from comments
+  
+Warning: At least one test in this suite creates an HttpClient. When running a test suite that uses
+TestWidgetsFlutterBinding, all HTTP requests will return status code 400, and no network request
+will actually be made. Any test expecting a real network connection and status code will fail.
+To test code that needs an HttpClient, provide your own HttpClient implementation to the code under
+test, so that your test can consistently provide a testable response to the code under test.
+00:11 +116 -9: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:12 +117 -9: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:12 +118 -9: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:12 +119 -9: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:12 +120 -9: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:12 +121 -9: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:12 +122 -9: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:12 +123 -9: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:12 +124 -9: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:12 +125 -9: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:12 +126 -9: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "Which feature should be next?": []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart:32:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart line 32
+The test description was:
+  shows discovery sections before a query is entered
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:13 +126 -10: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/widget_test.dart: shows auth entry point
+00:13 +126 -10: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered [E]
+  Test failed. See exception logs above.
+  The test description was: shows discovery sections before a query is entered
+  
+Warning: At least one test in this suite creates an HttpClient. When running a test suite that uses
+TestWidgetsFlutterBinding, all HTTP requests will return status code 400, and no network request
+will actually be made. Any test expecting a real network connection and status code will fail.
+To test code that needs an HttpClient, provide your own HttpClient implementation to the code under
+test, so that your test can consistently provide a testable response to the code under test.
+00:13 +127 -10: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/widget_test.dart: shows auth entry point
+
+Warning: A call to tap() with finder "Found 1 widget with text "Sign Up": [
+  Text("Sign Up", inherit: true, size: 18.0, dependencies: [DefaultSelectionStyle, DefaultTextStyle, MediaQuery]),
+]" derived an Offset (Offset(400.0, 656.0)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+Indeed, Offset(400.0, 656.0) is outside the bounds of the root of the render tree, Size(800.0, 600.0).
+The finder corresponds to this RenderBox: RenderParagraph#fb58f relayoutBoundary=up33
+The hit test result at that offset is: HitTestResult(HitTestEntry<HitTestTarget>#85300(_ReusableRenderView#0c6ba), HitTestEntry<HitTestTarget>#43694(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/widget_test.dart:19:18)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#6      StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "tap()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly 2 matching candidates
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "REGISTER": []>
+   Which: means none were found but some were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/widget_test.dart:22:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/widget_test.dart line 22
+The test description was:
+  shows auth entry point
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:13 +127 -11: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: shows the latest successful searches in reverse chronological order
+00:13 +127 -11: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/widget_test.dart: shows auth entry point [E]
+  Test failed. See exception logs above.
+  The test description was: shows auth entry point
+  
+Warning: At least one test in this suite creates an HttpClient. When running a test suite that uses
+TestWidgetsFlutterBinding, all HTTP requests will return status code 400, and no network request
+will actually be made. Any test expecting a real network connection and status code will fail.
+To test code that needs an HttpClient, provide your own HttpClient implementation to the code under
+test, so that your test can consistently provide a testable response to the code under test.
+00:13 +128 -11: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: shows the latest successful searches in reverse chronological order
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: a value less than <226.0>
+  Actual: <226.0>
+   Which: is not a value less than <226.0>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart:53:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart line 53
+The test description was:
+  shows the latest successful searches in reverse chronological order
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:13 +128 -12: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: shows the latest successful searches in reverse chronological order [E]
+  Test failed. See exception logs above.
+  The test description was: shows the latest successful searches in reverse chronological order
+  
+00:13 +128 -12: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: persists and clears recent searches
+00:13 +129 -12: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: clears the query from the search bar
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+The finder "Found 0 widgets with widget matching predicate: []" (used in a call to "tap()") could
+not find any matching widgets.
+
+When the exception was thrown, this was the stack:
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2095:7)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart:74:18)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  clears the query from the search bar
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:14 +129 -13: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: clears the query from the search bar [E]
+  Test failed. See exception logs above.
+  The test description was: clears the query from the search bar
+  
+00:14 +129 -13: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: focuses search input and does not request for a short query
+00:14 +130 -13: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: debounces valid input and renders mixed results
+00:14 +131 -13: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: does not run a second search after submitting debounced input
+00:14 +132 -13: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: records result click only after tapping a result
+00:14 +133 -13: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: wires poll voting actions from search results
+00:15 +134 -13: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: opens the full poll card in a modal when tapping a poll result
+00:15 +135 -13: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: allows voting from the poll preview modal
+00:15 +136 -13: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: opens the preview when tapping a top poll
+00:15 +137 -13: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: shows empty and retryable error states
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "Could not complete search.": []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart:249:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart line 249
+The test description was:
+  shows empty and retryable error states
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:15 +137 -14: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: shows empty and retryable error states [E]
+  Test failed. See exception logs above.
+  The test description was: shows empty and retryable error states
+  
+00:15 +137 -14: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: shows a useful API error message when search fails
+00:15 +138 -14: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: ignores an in-flight response after the query is cleared
+00:16 +139 -14: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: filter changes preserve query and reset pagination
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+pumpAndSettle timed out
+
+When the exception was thrown, this was the stack:
+#0      WidgetTester.pumpAndSettle.<anonymous closure> (package:flutter_test/src/widget_tester.dart:717:11)
+<asynchronous suspension>
+#1      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#2      main.<anonymous closure> (file:///C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart:307:5)
+<asynchronous suspension>
+#3      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#4      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  filter changes preserve query and reset pagination
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:20 +139 -15: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: filter changes preserve query and reset pagination [E]
+  Test failed. See exception logs above.
+  The test description was: filter changes preserve query and reset pagination
+  
+00:20 +139 -15: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: loads both T02 cursor-search pages and keeps their results
+00:20 +140 -15: C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/search_screen_test.dart: places sort menu in the top-right search header button
+00:20 +141 -15: Some tests failed.
+
+Failing tests:
+  C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/auth_api_client_avatar_test.dart: uploads avatar as multipart field avatar
+  C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+  C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/auth_screen_test.dart: keeps selected country after registration error
+  C:/Users/user/Documents/Codex/2026-10-02/new-chat-2/work/portable-repo/apps/mobile/test/poll_card_report_test.dart: renders the poll actions with hierarchy and optional edit
+  ... and 11 more

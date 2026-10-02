@@ -1,0 +1,68 @@
+
+ RUN  v3.2.4 D:/yaskapp/apps/web
+
+ ✓ src/components/PollCard.test.tsx (14 tests) 534ms
+ ✓ src/features/polls/usePollMutations.test.tsx (1 test) 159ms
+stderr | src/features/feed/FeedPage.test.tsx > uses an editorial feed heading and restrained contextual rail
+[MSW] Error: intercepted a request without a matching request handler:
+
+  • GET /polls?limit=20
+
+If you still wish to intercept this unhandled request, please create a request handler for it.
+Read more: https://mswjs.io/docs/http/intercepting-requests
+
+stderr | src/features/feed/FeedPage.test.tsx > renders a discovery rail alongside the feed
+[MSW] Error: intercepted a request without a matching request handler:
+
+  • GET /polls?limit=20
+
+If you still wish to intercept this unhandled request, please create a request handler for it.
+Read more: https://mswjs.io/docs/http/intercepting-requests
+
+stderr | src/features/feed/FeedPage.test.tsx > renders the reference desktop discovery cards
+[MSW] Error: intercepted a request without a matching request handler:
+
+  • GET /polls?limit=20
+
+If you still wish to intercept this unhandled request, please create a request handler for it.
+Read more: https://mswjs.io/docs/http/intercepting-requests
+
+stderr | src/features/feed/FeedPage.test.tsx > renders the reference composer and feed segments
+[MSW] Error: intercepted a request without a matching request handler:
+
+  • GET /polls?limit=20
+
+If you still wish to intercept this unhandled request, please create a request handler for it.
+Read more: https://mswjs.io/docs/http/intercepting-requests
+
+stderr | src/features/feed/FeedPage.test.tsx > uses the current mobile add icon in the composer
+[MSW] Error: intercepted a request without a matching request handler:
+
+  • GET /polls?limit=20
+
+If you still wish to intercept this unhandled request, please create a request handler for it.
+Read more: https://mswjs.io/docs/http/intercepting-requests
+
+stderr | src/features/feed/FeedPage.test.tsx > renders the reference discovery sections
+[MSW] Error: intercepted a request without a matching request handler:
+
+  • GET /polls?limit=20
+
+If you still wish to intercept this unhandled request, please create a request handler for it.
+Read more: https://mswjs.io/docs/http/intercepting-requests
+
+stderr | src/features/feed/FeedPage.test.tsx > uses the supplied reference labels and abbreviated trend counts
+[MSW] Error: intercepted a request without a matching request handler:
+
+  • GET /polls?limit=20
+
+If you still wish to intercept this unhandled request, please create a request handler for it.
+Read more: https://mswjs.io/docs/http/intercepting-requests
+
+ ✓ src/features/feed/FeedPage.test.tsx (15 tests) 1037ms
+
+ Test Files  3 passed (3)
+      Tests  30 passed (30)
+   Start at  15:59:39
+   Duration  4.99s (transform 274ms, setup 3.08s, collect 1.73s, tests 1.73s, environment 4.88s, prepare 634ms)
+

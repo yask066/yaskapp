@@ -1,0 +1,46 @@
+{
+  "date": "2026-10-02",
+  "results": [
+    {
+      "scenario": "normal",
+      "polls": 4,
+      "image": 200,
+      "missing": 404
+    },
+    {
+      "scenario": "delay",
+      "status": 200,
+      "elapsedMs": 2010.3388999999997
+    },
+    {
+      "scenario": "error",
+      "initial": 503,
+      "retry": 200,
+      "polls": 4
+    },
+    {
+      "scenario": "reorder",
+      "order": [
+        "vote-start",
+        "like-finish",
+        "vote-finish"
+      ],
+      "like": {
+        "likesCount": 10,
+        "viewerHasLiked": true
+      },
+      "lateVote": {
+        "likesCount": 9,
+        "viewerHasLiked": false,
+        "votesCount": 10,
+        "viewerVoteOptionId": "motion-long-text-option-a"
+      },
+      "note": "HTTP fixture only, no realtime or client merge"
+    },
+    {
+      "scenario": "timeout",
+      "status": 504,
+      "elapsedMs": 15008.791000000001
+    }
+  ]
+}

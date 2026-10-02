@@ -1,0 +1,30 @@
+{
+  "head": "455e8f443a982ec3c5cbe7063a4b4670a06d1dec",
+  "date": "2026-10-02",
+  "lib": {
+    "files": 43,
+    "matched": 43,
+    "mismatches": []
+  },
+  "tests": {
+    "files": 29,
+    "matched": 29,
+    "mismatches": []
+  },
+  "flutterSuite": {
+    "passed": 141,
+    "failed": 15,
+    "exitCode": 1
+  },
+  "webSuite": {
+    "files": 24,
+    "tests": 122,
+    "exitCode": 0
+  },
+  "webTargeted": {
+    "files": 3,
+    "tests": 30,
+    "exitCode": 0,
+    "unhandledMSWErrors": 7
+  }
+}

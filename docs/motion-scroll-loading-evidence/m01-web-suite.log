@@ -1,0 +1,118 @@
+
+ RUN  v3.2.4 D:/yaskapp/apps/web
+
+ ✓ src/features/notifications/realtime-client.test.ts (4 tests) 17ms
+ ✓ src/features/notifications/notification-store.test.tsx (14 tests) 516ms
+ ✓ src/components/AppLayout.test.tsx (9 tests) 622ms
+ ✓ src/components/PollCard.test.tsx (14 tests) 871ms
+ ✓ src/features/notifications/notifications.e2e.test.tsx (10 tests) 827ms
+ ✓ src/features/notifications/NotificationsPage.test.tsx (4 tests) 451ms
+ ✓ src/api/client.test.ts (4 tests) 95ms
+stderr | src/features/profiles/ProfilePage.test.tsx > opens the selected poll comments route from the profile card
+[MSW] Error: intercepted a request without a matching request handler:
+
+  • GET /auth/me
+
+If you still wish to intercept this unhandled request, please create a request handler for it.
+Read more: https://mswjs.io/docs/http/intercepting-requests
+
+ ✓ src/app/session-provider.test.tsx (4 tests) 424ms
+stderr | src/features/feed/FeedPage.test.tsx > uses an editorial feed heading and restrained contextual rail
+[MSW] Error: intercepted a request without a matching request handler:
+
+  • GET /polls?limit=20
+
+If you still wish to intercept this unhandled request, please create a request handler for it.
+Read more: https://mswjs.io/docs/http/intercepting-requests
+
+stderr | src/features/comments/PollDetailPage.test.tsx > shows a Login link instead of a comment text area for anonymous visitors
+[MSW] Error: intercepted a request without a matching request handler:
+
+  • GET /auth/me
+
+If you still wish to intercept this unhandled request, please create a request handler for it.
+Read more: https://mswjs.io/docs/http/intercepting-requests
+
+stderr | src/features/feed/FeedPage.test.tsx > renders a discovery rail alongside the feed
+[MSW] Error: intercepted a request without a matching request handler:
+
+  • GET /polls?limit=20
+
+If you still wish to intercept this unhandled request, please create a request handler for it.
+Read more: https://mswjs.io/docs/http/intercepting-requests
+
+stderr | src/features/feed/FeedPage.test.tsx > renders the reference desktop discovery cards
+[MSW] Error: intercepted a request without a matching request handler:
+
+  • GET /polls?limit=20
+
+If you still wish to intercept this unhandled request, please create a request handler for it.
+Read more: https://mswjs.io/docs/http/intercepting-requests
+
+stderr | src/features/feed/FeedPage.test.tsx > renders the reference composer and feed segments
+[MSW] Error: intercepted a request without a matching request handler:
+
+  • GET /polls?limit=20
+
+If you still wish to intercept this unhandled request, please create a request handler for it.
+Read more: https://mswjs.io/docs/http/intercepting-requests
+
+ ✓ src/features/search/SearchPage.test.tsx (2 tests) 813ms
+   ✓ submits a validated poll search and keeps the entered query after a request error  541ms
+stderr | src/features/feed/FeedPage.test.tsx > uses the current mobile add icon in the composer
+[MSW] Error: intercepted a request without a matching request handler:
+
+  • GET /polls?limit=20
+
+If you still wish to intercept this unhandled request, please create a request handler for it.
+Read more: https://mswjs.io/docs/http/intercepting-requests
+
+ ✓ src/features/profiles/ProfilePage.test.tsx (4 tests) 1548ms
+   ✓ renders an authored poll and replaces profile follow state with the returned relationship  638ms
+   ✓ uploads an avatar and preserves edited profile fields in the authenticated session  716ms
+stderr | src/features/feed/FeedPage.test.tsx > renders the reference discovery sections
+[MSW] Error: intercepted a request without a matching request handler:
+
+  • GET /polls?limit=20
+
+If you still wish to intercept this unhandled request, please create a request handler for it.
+Read more: https://mswjs.io/docs/http/intercepting-requests
+
+ ✓ src/features/polls/CreatePollPage.test.tsx (2 tests) 1046ms
+   ✓ prepends the returned poll before returning to the feed after creation  1015ms
+ ✓ src/features/comments/CommentThread.test.tsx (3 tests) 1669ms
+   ✓ shows the reply count, retries a failed page, loads more, and collapses the thread  673ms
+   ✓ cancels a reply composer and submits a reply to the root comment  934ms
+stderr | src/features/feed/FeedPage.test.tsx > uses the supplied reference labels and abbreviated trend counts
+[MSW] Error: intercepted a request without a matching request handler:
+
+  • GET /polls?limit=20
+
+If you still wish to intercept this unhandled request, please create a request handler for it.
+Read more: https://mswjs.io/docs/http/intercepting-requests
+
+ ✓ src/features/auth/AuthPage.test.tsx (5 tests) 1589ms
+   ✓ submitting Login and Password signs in and returns to the feed  849ms
+   ✓ rejects a protocol-relative next destination after sign in  544ms
+ ✓ src/features/feed/FeedPage.test.tsx (15 tests) 2285ms
+   ✓ renders polls with immediately clickable answer options  538ms
+   ✓ records a stale vote response replacing a newer like response  422ms
+ ✓ src/features/comments/PollDetailPage.test.tsx (5 tests) 2480ms
+   ✓ shows a poll and comments, then adds the returned comment and authoritative count  981ms
+   ✓ replaces cached feed and profile polls with the poll returned after a comment is created  525ms
+   ✓ updates root repliesCount and the authoritative poll count after posting a reply  699ms
+ ✓ src/api/polls.test.ts (5 tests) 174ms
+ ✓ src/api/notifications.test.ts (5 tests) 87ms
+ ✓ src/features/notifications/notification-target.test.ts (2 tests) 4ms
+ ✓ src/app/router.test.tsx (3 tests) 164ms
+ ✓ src/styles/global.css.test.ts (3 tests) 4ms
+ ✓ src/features/polls/usePollMutations.test.tsx (1 test) 213ms
+ ✓ src/test/setup.test.tsx (1 test) 112ms
+ ✓ src/components/Avatar.test.tsx (2 tests) 101ms
+ ✓ src/app/App.test.tsx (1 test) 143ms
+
+ Test Files  24 passed (24)
+      Tests  122 passed (122)
+   Start at  16:01:57
+   Duration  10.22s (transform 2.35s, setup 32.67s, collect 11.93s, tests 16.25s, environment 53.90s, prepare 7.78s)
+

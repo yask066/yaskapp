@@ -1,0 +1,69 @@
+{
+  "date": "2026-10-02",
+  "build": "Vite dev, HEAD 455e8f443a982ec3c5cbe7063a4b4670a06d1dec",
+  "browser": "Codex in-app browser; engine version not established",
+  "origin": "http://127.0.0.1:5179",
+  "api": "http://127.0.0.1:3128",
+  "scenario": "normal",
+  "mediaDelayMs": 5000,
+  "viewport": {
+    "width": 739,
+    "height": 626,
+    "dpr": 1.1979166269302368
+  },
+  "userScrollDuringMeasurement": false,
+  "before": [
+    {
+      "id": "motion-count-10",
+      "complete": false,
+      "naturalWidth": 0,
+      "imageHeight": 0,
+      "cardHeight": 459.1304626464844,
+      "optionsY": 1173.69140625
+    },
+    {
+      "id": "motion-count-99",
+      "complete": false,
+      "naturalWidth": 0,
+      "imageHeight": 0,
+      "cardHeight": 459.1304626464844,
+      "optionsY": 1648.8131103515625
+    },
+    {
+      "id": "motion-count-100-image-error",
+      "complete": false,
+      "naturalWidth": 0,
+      "imageHeight": 0,
+      "cardHeight": 459.1304626464844,
+      "optionsY": 2123.934814453125
+    }
+  ],
+  "after": [
+    {
+      "id": "motion-count-10",
+      "complete": true,
+      "naturalWidth": 267,
+      "imageHeight": 345.9261169433594,
+      "cardHeight": 786.6913452148438,
+      "optionsY": 1501.2523193359375
+    },
+    {
+      "id": "motion-count-99",
+      "complete": true,
+      "naturalWidth": 120,
+      "imageHeight": 768.7435302734375,
+      "cardHeight": 1209.5087890625,
+      "optionsY": 2726.75244140625
+    },
+    {
+      "id": "motion-count-100-image-error",
+      "complete": true,
+      "naturalWidth": 0,
+      "imageHeight": 0,
+      "cardHeight": 459.1304626464844,
+      "optionsY": 3201.8740234375
+    }
+  ],
+  "ac12": "not measured",
+  "flutterDeviceGeometry": "not checked"
+}

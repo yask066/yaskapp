@@ -1,0 +1,18 @@
+[
+  {
+    "name": "Windows",
+    "id": "windows",
+    "isSupported": true,
+    "targetPlatform": "windows-x64",
+    "emulator": false,
+    "sdk": "Microsoft Windows [Version 10.0.26200.9457]",
+    "capabilities": {
+      "hotReload": true,
+      "hotRestart": true,
+      "screenshot": false,
+      "flutterExit": true,
+      "hardwareRendering": false,
+      "startPaused": true
+    }
+  }
+]
