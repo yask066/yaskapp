@@ -11,7 +11,7 @@
 **Spec:** [PRD: Плавные реакции, появление карточек и стабильная прокрутка](../../prd-motion-scroll-loading.md).
 
 **Дата:** 2 октября 2026 года.  
-**Статус:** M01 завершена 2 октября 2026 года; аудит и evidence сохранены в репозитории. M02–M27 не начаты.  
+**Статус:** M01 и M02 завершены 2 октября 2026 года; аудит и evidence сохранены в репозитории. M03–M27 не начаты.
 **Нумерация:** M01–M27; исторические T01/T02 не переименовываются и не считаются закрытыми задачами этого плана.
 
 ## Global Constraints
@@ -116,11 +116,13 @@
 
 **Файлы:** изменить T02 JSON, mock server/test и web fixture adapter; расширить Flutter `feed_screen_test.dart`, `search_screen_test.dart` и web mutation tests при подключении harness.
 
-- [ ] Добавить данные `0`, `9/10`, `99/100`, `999/1000`, равные результаты, длинный текст, медленное/ошибочное media, две страницы с повторным ID. Генератор profiling создаёт 100 уникальных ID; feed API остаётся одностраничным.
-- [ ] Добавить управляемые gates для response order и realtime injection в клиентские тесты. HTTP mock не обозначать realtime-проверкой.
-- [ ] Проверить `race_preserves_independent_fields`: после vote-start → like-finish → vote-finish итог `viewerHasLiked=true`, новый `likesCount`, актуальные votes; добавить обратный порядок и stale refetch.
-- [ ] Проверить fixture/server: `node --test scripts/t02-motion-scroll-baseline-server.test.mjs`; все HTTP/fixture assertions проходят. Ожидаемые race failures остаются входом M05/M06, а не маскируются permissive assertions.
-- [ ] Записать seed, scenario, задержки и команды в audit; сохранить изменения отдельным commit.
+- [x] Добавить данные `0`, `9/10`, `99/100`, `999/1000`, равные результаты, длинный текст, медленное/ошибочное media, две страницы с повторным ID. Генератор profiling создаёт 100 уникальных ID; feed API остаётся одностраничным.
+- [x] Добавить управляемые gates для response order и realtime injection в клиентские тесты. HTTP mock не обозначать realtime-проверкой.
+- [x] Проверить `race_preserves_independent_fields`: после vote-start → like-finish → vote-finish итог `viewerHasLiked=true`, новый `likesCount`, актуальные votes; добавить обратный порядок и stale refetch.
+- [x] Проверить fixture/server: `node --test scripts/t02-motion-scroll-baseline-server.test.mjs`; все HTTP/fixture assertions проходят. Ожидаемые race failures остаются входом M05/M06, а не маскируются permissive assertions.
+- [x] Записать seed, scenario, задержки и команды в audit; сохранить изменения отдельным commit.
+
+**Выполнено 2 октября 2026 года:** [M02: сценарии, команды и результаты](../../motion-scroll-loading-audit.md#9-m02-fixture-и-управляемые-сценарии). Node 10/10; web 126/126, включая три явно ожидаемых failures M05; Flutter полный suite 142 passed / 15 прежних failed / 5 известных regression cases skipped по умолчанию. Отдельный opt-in запуск воспроизвёл четыре строгих failures M06 и page-dedup failure M14. Assertions требуют правильный итог; merge и dedup здесь не исправлялись. Realtime инъецируется в существующую Flutter Feed подписку; web Poll realtime отсутствует и не объявлен проверенным. G0 остаётся закрытым.
 
 **Готово:** любой сценарий запускается повторно с фиксированными данными; normal/error/retry и page dedup проверены. **AC:** поддерживает AC-02–AC-15.
 

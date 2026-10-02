@@ -218,3 +218,82 @@ Evidence/logs, harness config, probe script и SHA-256 verification summary пр
 Запуск npm внутри песочницы остановился до тестов с EPERM на `.vite-temp`; повторный запуск выполнен с предоставленным разрешением. Исторические evidence-логи сохранены дословно, включая пробелы и диагностические сообщения. Новая проверка Flutter не выполнялась: подтверждены соответствие исходного HEAD и наличие всех 15 failures в импортированном логе, а не заявлен повторный widget run.
 
 Самостоятельный review при закрытии M01: все пять пунктов task 1 подтверждены артефактами; M02–M27 не отмечены выполненными. Проверены ссылки на evidence и JSON, изменены только документы и evidence; приложение, tests и исторический T02 не изменены. Whitespace в исходных `.log` сохранён как часть сырого evidence; он не является дефектом приложения.
+
+## 9. M02: fixture и управляемые сценарии
+
+Выполнена 2 октября 2026 года от `9c48b9d`, в ветке `codex/m02-motion-fixtures`. Разделы 1–8 сохраняют исторический результат M01. Изменены fixture, HTTP harness, test adapters и клиентские тесты; production Flutter/web state и backend не менялись.
+
+### Данные и воспроизводимость
+
+Общий JSON: `test/fixtures/t02-motion-scroll-loading-polls.json`, fixtureVersion=2, seed=`20261002`. Восемь карточек с counts `9, 10, 99, 100, 0, 999, 1000, 10`; последняя содержит равные результаты `5/5`. Длинный вопрос, landscape/portrait media и отсутствующее media сохранены. Search возвращает две страницы: первая содержит long-text/count-10, вторая повторяет count-10 перед count-99/count-100-image-error. Пять входных записей соответствуют четырём уникальным ID.
+
+Profiling генераторы HTTP, web и Flutter используют один seed и одну схему: циклический выбор исходной карточки `(seed + index) % 8`, ID `motion-profile-20261002-001` … `100`, новые option IDs. Создаются 100 уникальных poll IDs и 200 option IDs; входные данные не мутируются. `/polls` остаётся одностраничным, без `nextCursor`; 100 карточек включаются только сценарием `profiling` либо тестовым адаптером. Это подготовка данных, не замер AC-12.
+
+HTTP сценарии: `normal`, `delay` (2000 мс), `error` (первый feed GET 503, повторный 200), `timeout` (15000 мс → 504), `reorder` (like 100 мс, vote 800 мс), `reorder-reverse` (vote 100 мс, like 800 мс), `profiling`. Media delay задаётся отдельно `T02_MEDIA_DELAY_MS`; фиксированный slow-media сценарий — 2000 мс, короткая HTTP-проверка — 40 мс. Missing media стабильно возвращает 404 при повторе; исправное media — SVG 200.
+
+Пример запуска из корня в PowerShell:
+
+```powershell
+$env:T02_HOST='127.0.0.1'
+$env:T02_PORT='3000'
+$env:T02_SCENARIO='profiling'
+$env:T02_SEED='20261002'
+$env:T02_MEDIA_DELAY_MS='2000'
+node scripts/t02-motion-scroll-baseline-server.mjs
+```
+
+### Client gates и строгие проверки
+
+Web mutation tests проходят через настоящий `usePollMutations`, API decode и QueryClient, MSW удерживает ответы отдельными gates. Проверяются feed, popular, user-polls и detail caches. Flutter использует реальные FeedScreen callbacks и отображаемый PollCard, Completable vote/like/refetch и инъекцию `PollVoteRealtimeEvent` в существующий subscribed stream. Realtime событие приходит дважды до позднего HTTP vote; проверяется отсутствие двойного increment и сохранение viewer-specific полей.
+
+Общие snapshots и порядок находятся в `race` JSON. Желаемый итог обоих порядков: votes=10, option votes=[6,4], selected first option, likes=10, viewerHasLiked=true. Realtime-сценарий требует votes=11/[7,4], сохраняя selected option и like. Stale refetch запускается до действий и доставляется после их завершения.
+
+| Строгий сценарий | Web | Flutter | Владелец исправления |
+|---|---|---|---|
+| vote-start → like-finish → vote-finish | Воспроизведён откат likes 10/true → 9/false | Тот же откат | M03/M05/M06 |
+| like-start → vote-finish → like-finish | Воспроизведён откат votes 10 → 9 и selected option → null | Тот же откат | M03/M05/M06 |
+| stale refetch после completed vote/like | Оба поля возвращаются к baseline | Тот же откат | M03/M05/M06 |
+| duplicate realtime до позднего HTTP | Poll realtime transport отсутствует; не проверен | Realtime votes=11; поздний HTTP откатывает до 10 и теряет like | M03/M06 |
+| повтор ID между cursor pages | Feed/search pagination не добавлялась | 5 строк вместо 4 уникальных (9 children вместо 7 с separators) | M14 |
+
+Старая web characterization-проверка, утверждавшая именно ошибочный откат, заменена строгими mutation regressions. Web использует явно помеченный `test.fails`: неожиданное прохождение требует убрать expected-failure modifier в M05. Для вывода сырых failures задаётся `M02_RUN_KNOWN_FAILURES=1`. Flutter, где нет такого modifier, по умолчанию явно пропускает 5 известных red cases; opt-in через `--dart-define=M02_RUN_KNOWN_FAILURES=true`. В M06/M14 убрать соответствующий skip после исправления. Ни один assertion правильного состояния не ослаблен.
+
+HTTP mock не считается realtime-тестом; web Poll realtime не создавался. Flutter injection проверяет клиентскую подписку и merge, а не реальный websocket/backend delivery. Остальные поверхности, session switch, lifecycle и scroll остаются входом последующих задач.
+
+### Команды и свежие результаты
+
+```powershell
+# Корень
+node --test scripts/t02-motion-scroll-baseline-server.test.mjs
+npm run test -w @yaskapp/web -- --run
+npm run typecheck -w @yaskapp/web
+npm run lint -w @yaskapp/web
+$env:M02_RUN_KNOWN_FAILURES='1'
+npm run test -w @yaskapp/web -- --run src/features/polls/usePollMutations.test.tsx
+Remove-Item Env:M02_RUN_KNOWN_FAILURES
+
+# apps/mobile; используемый локальный SDK D:/flutter
+$env:LOCALAPPDATA='D:/yaskapp/.dart-appdata'
+D:/flutter/bin/flutter.bat test --no-pub --reporter expanded
+D:/flutter/bin/flutter.bat test --no-pub --dart-define=M02_RUN_KNOWN_FAILURES=true --plain-name M06 test/feed_screen_test.dart
+D:/flutter/bin/flutter.bat test --no-pub --dart-define=M02_RUN_KNOWN_FAILURES=true --plain-name M14 test/search_screen_test.dart
+D:/flutter/bin/cache/dart-sdk/bin/dart.exe analyze test/feed_screen_test.dart test/search_screen_test.dart test/support/motion_scroll_fixture.dart
+```
+
+| Проверка | Фактический результат |
+|---|---|
+| Node HTTP/fixture | 10/10 passed, exit 0; включая normal, retry, оба reorder, media, delay/timeout и profiling |
+| Web full suite | 25 файлов, 126 passed, exit 0; 123 обычных и 3 expected failures M05. Сохраняются прежние MSW unhandled-request diagnostics |
+| Web raw regressions | 1 passed / 3 failed, exit 1; [сырой лог](motion-scroll-loading-evidence/m02-web-races.txt) |
+| Web TypeScript | passed, exit 0 |
+| ESLint только четырёх изменённых TS/TSX файлов | passed, exit 0 |
+| Web full lint | exit 1: прежние warnings missing `repliesQuery` в CommentThread.tsx:71 и `sessionIdentity` в notification-store.tsx:181; эти production файлы не изменены |
+| Flutter full suite | 142 passed / 15 failed / 5 skipped, exit 1; все 15 failures совпадают с реестром M01 в разделе 3; [полный лог](motion-scroll-loading-evidence/m02-mobile-suite.txt) |
+| Flutter raw M06 | 4 failed, exit 1; каждый дошёл до строгого final-state assertion; [лог](motion-scroll-loading-evidence/m02-mobile-races.txt) |
+| Flutter raw M14 | 1 failed, exit 1; desired unique-row count 7, actual 9; [лог](motion-scroll-loading-evidence/m02-mobile-dedup.txt) |
+| Dart analyze | нет новых issues; exit 1 из-за прежнего unused local `navy` в feed_screen_test.dart (теперь строка 270; подтверждено в исходном HEAD) |
+| git diff --check | passed для исходников/документов; пробелы в сырых логах сохраняются как evidence |
+
+Vite и SDK требуют записи служебных файлов: запуски выполнялись вне sandbox с разрешением. Первая Flutter попытка в sandbox не дала вывода и остановлена; Windows batch launcher также некорректно передал regex с `|`, поэтому M06 и M14 запущены отдельными командами без regex. Эти setup failures не считаются correctness results.
+
+Проведён самостоятельный review против M02 и PRD; делегирование не применялось по ограничению плана. Известные merge/page-dedup failures остаются строгими входами M05/M06/M14, прежние 15 Flutter failures и три статических предупреждения не скрыты. Device profiling, text scale 200% geometry и G0 в M02 не измерялись. M03–M27 не исполнялись.

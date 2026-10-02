@@ -1,0 +1,165 @@
+00:00 +0: loading D:/yaskapp/apps/mobile/test/feed_screen_test.dart
+00:00 +0: M06 race_preserves_independent_fields
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: {
+            'votesCount': 10,
+            'optionVotes': [6, 4],
+            'viewerVoteOptionId': 'motion-long-text-option-a',
+            'likesCount': 10,
+            'viewerHasLiked': true
+          }
+  Actual: {
+            'votesCount': 10,
+            'optionVotes': [6, 4],
+            'viewerVoteOptionId': 'motion-long-text-option-a',
+            'likesCount': 9,
+            'viewerHasLiked': false
+          }
+   Which: at location ['likesCount'] is <9> instead of <10>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/feed_screen_test.dart:85:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///D:/yaskapp/apps/mobile/test/feed_screen_test.dart line 85
+The test description was:
+  M06 race_preserves_independent_fields
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:01 +0 -1: M06 race_preserves_independent_fields [E]
+  Test failed. See exception logs above.
+  The test description was: M06 race_preserves_independent_fields
+  
+Warning: At least one test in this suite creates an HttpClient. When running a test suite that uses
+TestWidgetsFlutterBinding, all HTTP requests will return status code 400, and no network request
+will actually be made. Any test expecting a real network connection and status code will fail.
+To test code that needs an HttpClient, provide your own HttpClient implementation to the code under
+test, so that your test can consistently provide a testable response to the code under test.
+00:01 +0 -1: M06 race_preserves_independent_fields_reverse
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: {
+            'votesCount': 10,
+            'optionVotes': [6, 4],
+            'viewerVoteOptionId': 'motion-long-text-option-a',
+            'likesCount': 10,
+            'viewerHasLiked': true
+          }
+  Actual: {
+            'votesCount': 9,
+            'optionVotes': [5, 4],
+            'viewerVoteOptionId': null,
+            'likesCount': 10,
+            'viewerHasLiked': true
+          }
+   Which: at location ['votesCount'] is <9> instead of <10>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/feed_screen_test.dart:85:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///D:/yaskapp/apps/mobile/test/feed_screen_test.dart line 85
+The test description was:
+  M06 race_preserves_independent_fields_reverse
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:01 +0 -2: M06 race_preserves_independent_fields_reverse [E]
+  Test failed. See exception logs above.
+  The test description was: M06 race_preserves_independent_fields_reverse
+  
+00:01 +0 -2: M06 stale_refetch preserves completed vote and like
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: {
+            'votesCount': 10,
+            'optionVotes': [6, 4],
+            'viewerVoteOptionId': 'motion-long-text-option-a',
+            'likesCount': 10,
+            'viewerHasLiked': true
+          }
+  Actual: {
+            'votesCount': 9,
+            'optionVotes': [5, 4],
+            'viewerVoteOptionId': null,
+            'likesCount': 9,
+            'viewerHasLiked': false
+          }
+   Which: at location ['votesCount'] is <9> instead of <10>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/feed_screen_test.dart:132:7)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///D:/yaskapp/apps/mobile/test/feed_screen_test.dart line 132
+The test description was:
+  M06 stale_refetch preserves completed vote and like
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:01 +0 -3: M06 stale_refetch preserves completed vote and like [E]
+  Test failed. See exception logs above.
+  The test description was: M06 stale_refetch preserves completed vote and like
+  
+00:01 +0 -3: M06 realtime_before_http preserves viewer fields and newer votes
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: {
+            'votesCount': 11,
+            'optionVotes': [7, 4],
+            'viewerVoteOptionId': 'motion-long-text-option-a',
+            'likesCount': 10,
+            'viewerHasLiked': true
+          }
+  Actual: {
+            'votesCount': 10,
+            'optionVotes': [6, 4],
+            'viewerVoteOptionId': 'motion-long-text-option-a',
+            'likesCount': 9,
+            'viewerHasLiked': false
+          }
+   Which: at location ['votesCount'] is <10> instead of <11>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/feed_screen_test.dart:175:7)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///D:/yaskapp/apps/mobile/test/feed_screen_test.dart line 175
+The test description was:
+  M06 realtime_before_http preserves viewer fields and newer votes
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:01 +0 -4: M06 realtime_before_http preserves viewer fields and newer votes [E]
+  Test failed. See exception logs above.
+  The test description was: M06 realtime_before_http preserves viewer fields and newer votes
+  
+00:01 +0 -4: Some tests failed.
+
+Failing tests:
+  D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M06 race_preserves_independent_fields
+  D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M06 race_preserves_independent_fields_reverse
+  D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M06 realtime_before_http preserves viewer fields and newer votes
+  D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M06 stale_refetch preserves completed vote and like

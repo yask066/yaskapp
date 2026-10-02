@@ -1,0 +1,1049 @@
+00:00 +0: loading D:/yaskapp/apps/mobile/test/api_config_test.dart
+00:00 +0: D:/yaskapp/apps/mobile/test/api_config_test.dart: uses the staging VPS endpoints when no deployment overrides are provided
+00:00 +1: D:/yaskapp/apps/mobile/test/auth_api_client_avatar_test.dart: uploads avatar as multipart field avatar
+00:00 +1 -1: D:/yaskapp/apps/mobile/test/auth_api_client_avatar_test.dart: uploads avatar as multipart field avatar [E]
+  Bad state: Can't finalize a finalized Request.
+  package:http/src/base_request.dart 129:20    BaseRequest.finalize
+  package:http/src/request.dart 186:11         Request.finalize
+  test\auth_api_client_avatar_test.dart 19:37  main.<fn>.<fn>
+  package:http/src/mock_client.dart 54:36      new MockClient.<fn>
+  
+00:00 +1 -1: D:/yaskapp/apps/mobile/test/auth_api_client_avatar_test.dart: deletes avatar with authorization
+00:00 +2 -1: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+00:00 +3 -1: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+00:00 +4 -1: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+00:01 +5 -1: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+00:01 +5 ~1 -1: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+00:01 +5 ~2 -1: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+00:01 +5 ~3 -1: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+00:01 +5 ~4 -1: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+
+Warning: A call to tap() with finder "Found 1 widget with text "Sign Up": [
+  Text("Sign Up", inherit: true, size: 18.0, dependencies: [DefaultSelectionStyle, DefaultTextStyle, MediaQuery]),
+]" derived an Offset (Offset(400.0, 656.0)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+Indeed, Offset(400.0, 656.0) is outside the bounds of the root of the render tree, Size(800.0, 600.0).
+The finder corresponds to this RenderBox: RenderParagraph#cf525 relayoutBoundary=up33
+The hit test result at that offset is: HitTestResult(HitTestEntry<HitTestTarget>#f8a49(_ReusableRenderView#59796), HitTestEntry<HitTestTarget>#270c2(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/auth_screen_test.dart:26:18)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#6      StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "tap()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "Select your country": []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/auth_screen_test.dart:29:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///D:/yaskapp/apps/mobile/test/auth_screen_test.dart line 29
+The test description was:
+  does not select a country by default
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:02 +5 ~4 -2: D:/yaskapp/apps/mobile/test/create_poll_screen_test.dart: create poll screen shows an add image action
+00:02 +5 ~4 -2: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default [E]
+  Test failed. See exception logs above.
+  The test description was: does not select a country by default
+  
+00:02 +6 ~4 -2: D:/yaskapp/apps/mobile/test/edit_profile_screen_test.dart: does not show Log out on the edit profile screen
+00:02 +7 ~4 -2: D:/yaskapp/apps/mobile/test/edit_profile_screen_test.dart: does not show Log out on the edit profile screen
+00:02 +8 ~4 -2: D:/yaskapp/apps/mobile/test/edit_profile_screen_test.dart: does not show Log out on the edit profile screen
+00:02 +9 ~4 -2: D:/yaskapp/apps/mobile/test/edit_profile_screen_test.dart: does not show Log out on the edit profile screen
+00:02 +10 ~4 -2: D:/yaskapp/apps/mobile/test/edit_profile_screen_test.dart: does not show Log out on the edit profile screen
+00:02 +11 ~4 -2: D:/yaskapp/apps/mobile/test/edit_profile_screen_test.dart: does not show Log out on the edit profile screen
+00:02 +12 ~4 -2: D:/yaskapp/apps/mobile/test/edit_profile_screen_test.dart: does not show Log out on the edit profile screen
+00:02 +13 ~4 -2: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: shows one feed without category tabs
+00:02 +13 ~4 -2: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: keeps selected country after registration error
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following StateError was thrown running a test:
+Bad state: No element
+
+When the exception was thrown, this was the stack:
+#0      Iterable.first (dart:core/iterable.dart:663:7)
+#1      _FirstFinderMixin.filter (package:flutter_test/src/finders.dart:1383:28)
+#3      _AncestorFinderMixin.allCandidates (package:flutter_test/src/finders.dart:1857:49)
+#4      FinderBase.evaluate (package:flutter_test/src/finders.dart:1030:76)
+#5      WidgetController.widgetList (package:flutter_test/src/controller.dart:848:19)
+#6      WidgetController._maybeViewOf (package:flutter_test/src/controller.dart:795:34)
+#7      WidgetController.tap (package:flutter_test/src/controller.dart:1078:31)
+#8      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/auth_screen_test.dart:78:18)
+<asynchronous suspension>
+#9      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#10     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 2 frames from dart:async-patch and package:stack_trace)
+
+The test description was:
+  keeps selected country after registration error
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:02 +13 ~4 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: shows one feed without category tabs
+00:02 +13 ~4 -3: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: keeps selected country after registration error [E]
+  Test failed. See exception logs above.
+  The test description was: keeps selected country after registration error
+  
+00:02 +14 ~4 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: shows one feed without category tabs
+00:02 +15 ~4 -3: D:/yaskapp/apps/mobile/test/home_navigation_test.dart: uses the current user avatar for the Profile navigation item
+00:02 +16 ~4 -3: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:03 +17 ~4 -3: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:03 +18 ~4 -3: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:03 +19 ~4 -3: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:03 +20 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:03 +21 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:03 +22 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:03 +23 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:03 +24 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:03 +25 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:03 +26 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:03 +27 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:03 +28 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:03 +29 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:03 +30 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:03 +31 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:03 +32 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:03 +33 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:03 +34 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:03 +35 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:03 +36 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:03 +37 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:03 +38 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +39 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +40 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +41 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +42 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +43 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +44 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +45 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +46 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +47 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +48 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +49 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +50 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +51 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +52 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +53 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +54 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +55 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +56 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +57 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +58 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +59 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +60 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +61 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +62 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +63 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +64 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +65 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:04 +66 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:05 +67 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:05 +68 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:05 +69 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:05 +70 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:05 +71 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:05 +72 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:05 +73 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:05 +74 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:05 +75 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:05 +76 ~4 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:06 +77 ~4 -3: D:/yaskapp/apps/mobile/test/poll_card_report_test.dart: renders the poll actions with hierarchy and optional edit
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "Cancel vote": []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/poll_card_report_test.dart:48:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///D:/yaskapp/apps/mobile/test/poll_card_report_test.dart line 48
+The test description was:
+  renders the poll actions with hierarchy and optional edit
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:06 +77 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:06 +77 ~4 -4: D:/yaskapp/apps/mobile/test/poll_card_report_test.dart: renders the poll actions with hierarchy and optional edit [E]
+  Test failed. See exception logs above.
+  The test description was: renders the poll actions with hierarchy and optional edit
+  
+00:06 +78 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:06 +79 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:06 +80 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:06 +81 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:06 +82 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:06 +83 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:06 +84 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:06 +85 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:06 +86 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:06 +87 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:06 +88 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:06 +89 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:06 +90 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:06 +91 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:07 +92 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:07 +93 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:07 +94 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:07 +95 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:07 +96 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:07 +97 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:07 +98 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:07 +99 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+Pending timers:
+Timer (duration: 0:00:20.000000, periodic: true), created:
+00:07 +100 ~4 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+#0      new FakeTimer._ (package:fake_async/fake_async.dart:342:62)
+#1      FakeAsync._createTimer (package:fake_async/fake_async.dart:260:29)
+#2      FakeAsync.run.<anonymous closure> (package:fake_async/fake_async.dart:187:15)
+#5      RealtimeClient._startHeartbeat (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:247:29)
+#6      RealtimeClient.connect (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:180:5)
+#7      ProfileScreenState.initState (package:yaskapp_mobile/src/features/profile/profile_screen.dart:66:29)
+#8      StatefulElement._firstBuild (package:flutter/src/widgets/framework.dart:5950:55)
+#9      ComponentElement.mount (package:flutter/src/widgets/framework.dart:5793:5)
+...     Normal element mounting (260 frames)
+#269    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#270    MultiChildRenderObjectElement.inflateWidget (package:flutter/src/widgets/framework.dart:7264:36)
+#271    MultiChildRenderObjectElement.mount (package:flutter/src/widgets/framework.dart:7279:32)
+...     Normal element mounting (467 frames)
+#738    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#739    Element.updateChild (package:flutter/src/widgets/framework.dart:4053:20)
+#740    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#741    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#742    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#743    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#744    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#745    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#746    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#747    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#748    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#749    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#750    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#751    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#752    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#753    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#754    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#755    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#756    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#757    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#758    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#759    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#760    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#761    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#762    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#763    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#764    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#765    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#766    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#767    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#768    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#769    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#770    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#771    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#772    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#773    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#774    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#775    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#776    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#777    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#778    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#779    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#780    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#781    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#782    _RawViewElement._updateChild (package:flutter/src/widgets/view.dart:481:16)
+#783    _RawViewElement.update (package:flutter/src/widgets/view.dart:568:5)
+#784    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#785    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#786    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#787    StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#788    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#789    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#790    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#791    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#792    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#793    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#794    RootElement._rebuild (package:flutter/src/widgets/binding.dart:2091:16)
+#795    RootElement.update (package:flutter/src/widgets/binding.dart:2069:5)
+#796    RootElement.performRebuild (package:flutter/src/widgets/binding.dart:2083:7)
+#797    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#798    BuildScope._tryRebuild (package:flutter/src/widgets/framework.dart:2750:15)
+#799    BuildScope._flushDirtyElements (package:flutter/src/widgets/framework.dart:2807:11)
+#800    BuildOwner.buildScope (package:flutter/src/widgets/framework.dart:3111:18)
+#801    AutomatedTestWidgetsFlutterBinding.drawFrame (package:flutter_test/src/binding.dart:2431:19)
+#802    RendererBinding._handlePersistentFrameCallback (package:flutter/src/rendering/binding.dart:509:5)
+#803    SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1430:15)
+#804    SchedulerBinding.handleDrawFrame (package:flutter/src/scheduler/binding.dart:1345:9)
+#805    AutomatedTestWidgetsFlutterBinding.pump.<anonymous closure> (package:flutter_test/src/binding.dart:2260:9)
+#808    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#809    AutomatedTestWidgetsFlutterBinding.pump (package:flutter_test/src/binding.dart:2249:27)
+#810    WidgetTester.pumpWidget.<anonymous closure> (package:flutter_test/src/widget_tester.dart:598:22)
+#813    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#814    WidgetTester.pumpWidget (package:flutter_test/src/widget_tester.dart:595:27)
+#815    main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:16:18)
+#816    testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:29)
+<asynchronous suspension>
+#817    TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 7 frames from dart:async and package:stack_trace)
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+A Timer is still pending even after the widget tree was disposed.
+'package:flutter_test/src/binding.dart':
+Failed assertion: line 2542 pos 12: '!timersPending'
+
+When the exception was thrown, this was the stack:
+#2      AutomatedTestWidgetsFlutterBinding._verifyInvariants (package:flutter_test/src/binding.dart:2542:12)
+#3      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1973:7)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from class _AssertionError and package:stack_trace)
+
+The test description was:
+  profile opens a dedicated settings page
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:07 +100 ~4 -5: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: appends created comment to the visible list
+00:07 +100 ~4 -5: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page [E]
+  Test failed. See exception logs above.
+  The test description was: profile opens a dedicated settings page
+  
+00:07 +101 ~4 -5: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: appends created comment to the visible list
+00:07 +102 ~4 -5: D:/yaskapp/apps/mobile/test/public_profile_screen_test.dart: shows public polls created by the user
+00:07 +103 ~4 -5: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: refreshes my polls when requested after a new poll is created
+00:07 +104 ~4 -5: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: refreshes my polls when requested after a new poll is created
+00:07 +105 ~4 -5: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: refreshes my polls when requested after a new poll is created
+Pending timers:
+Timer (duration: 0:00:20.000000, periodic: true), created:
+#0      new FakeTimer._ (package:fake_async/fake_async.dart:342:62)
+#1      FakeAsync._createTimer (package:fake_async/fake_async.dart:260:29)
+#2      FakeAsync.run.<anonymous closure> (package:fake_async/fake_async.dart:187:15)
+#5      RealtimeClient._startHeartbeat (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:247:29)
+#6      RealtimeClient.connect (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:180:5)
+#7      ProfileScreenState.initState (package:yaskapp_mobile/src/features/profile/profile_screen.dart:66:29)
+#8      StatefulElement._firstBuild (package:flutter/src/widgets/framework.dart:5950:55)
+#9      ComponentElement.mount (package:flutter/src/widgets/framework.dart:5793:5)
+...     Normal element mounting (260 frames)
+#269    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#270    MultiChildRenderObjectElement.inflateWidget (package:flutter/src/widgets/framework.dart:7264:36)
+#271    MultiChildRenderObjectElement.mount (package:flutter/src/widgets/framework.dart:7279:32)
+...     Normal element mounting (467 frames)
+#738    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#739    Element.updateChild (package:flutter/src/widgets/framework.dart:4053:20)
+#740    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#741    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#742    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#743    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#744    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#745    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#746    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#747    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#748    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#749    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#750    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#751    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#752    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#753    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#754    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#755    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#756    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#757    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#758    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#759    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#760    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#761    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#762    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#763    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#764    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#765    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#766    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#767    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#768    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#769    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#770    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#771    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#772    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#773    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#774    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#775    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#776    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#777    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#778    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#779    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#780    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#781    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#782    _RawViewElement._updateChild (package:flutter/src/widgets/view.dart:481:16)
+#783    _RawViewElement.update (package:flutter/src/widgets/view.dart:568:5)
+#784    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#785    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#786    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#787    StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#788    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#789    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#790    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#791    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#792    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#793    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#794    RootElement._rebuild (package:flutter/src/widgets/binding.dart:2091:16)
+#795    RootElement.update (package:flutter/src/widgets/binding.dart:2069:5)
+#796    RootElement.performRebuild (package:flutter/src/widgets/binding.dart:2083:7)
+#797    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#798    BuildScope._tryRebuild (package:flutter/src/widgets/framework.dart:2750:15)
+#799    BuildScope._flushDirtyElements (package:flutter/src/widgets/framework.dart:2807:11)
+#800    BuildOwner.buildScope (package:flutter/src/widgets/framework.dart:3111:18)
+#801    AutomatedTestWidgetsFlutterBinding.drawFrame (package:flutter_test/src/binding.dart:2431:19)
+#802    RendererBinding._handlePersistentFrameCallback (package:flutter/src/rendering/binding.dart:509:5)
+#803    SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1430:15)
+#804    SchedulerBinding.handleDrawFrame (package:flutter/src/scheduler/binding.dart:1345:9)
+#805    AutomatedTestWidgetsFlutterBinding.pump.<anonymous closure> (package:flutter_test/src/binding.dart:2260:9)
+#808    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#809    AutomatedTestWidgetsFlutterBinding.pump (package:flutter_test/src/binding.dart:2249:27)
+#810    WidgetTester.pumpWidget.<anonymous closure> (package:flutter_test/src/widget_tester.dart:598:22)
+#813    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#814    WidgetTester.pumpWidget (package:flutter_test/src/widget_tester.dart:595:27)
+#815    main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:60:18)
+#816    testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:29)
+<asynchronous suspension>
+#817    TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 7 frames from dart:async and package:stack_trace)
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+A Timer is still pending even after the widget tree was disposed.
+'package:flutter_test/src/binding.dart':
+Failed assertion: line 2542 pos 12: '!timersPending'
+
+When the exception was thrown, this was the stack:
+#2      AutomatedTestWidgetsFlutterBinding._verifyInvariants (package:flutter_test/src/binding.dart:2542:12)
+#3      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1973:7)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from class _AssertionError and package:stack_trace)
+
+The test description was:
+  refreshes my polls when requested after a new poll is created
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:07 +105 ~4 -6: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:07 +105 ~4 -6: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: refreshes my polls when requested after a new poll is created [E]
+  Test failed. See exception logs above.
+  The test description was: refreshes my polls when requested after a new poll is created
+  
+00:07 +106 ~4 -6: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:08 +107 ~4 -6: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:08 +107 ~4 -6: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: updates my poll after like response
+Pending timers:
+Timer (duration: 0:00:20.000000, periodic: true), created:
+#0      new FakeTimer._ (package:fake_async/fake_async.dart:342:62)
+#1      FakeAsync._createTimer (package:fake_async/fake_async.dart:260:29)
+#2      FakeAsync.run.<anonymous closure> (package:fake_async/fake_async.dart:187:15)
+#5      RealtimeClient._startHeartbeat (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:247:29)
+#6      RealtimeClient.connect (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:180:5)
+#7      ProfileScreenState.initState (package:yaskapp_mobile/src/features/profile/profile_screen.dart:66:29)
+#8      StatefulElement._firstBuild (package:flutter/src/widgets/framework.dart:5950:55)
+#9      ComponentElement.mount (package:flutter/src/widgets/framework.dart:5793:5)
+...     Normal element mounting (260 frames)
+#269    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#270    MultiChildRenderObjectElement.inflateWidget (package:flutter/src/widgets/framework.dart:7264:36)
+#271    MultiChildRenderObjectElement.mount (package:flutter/src/widgets/framework.dart:7279:32)
+...     Normal element mounting (467 frames)
+#738    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#739    Element.updateChild (package:flutter/src/widgets/framework.dart:4053:20)
+#740    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#741    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#742    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#743    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#744    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#745    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#746    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#747    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#748    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#749    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#750    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#751    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#752    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#753    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#754    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#755    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#756    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#757    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#758    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#759    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#760    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#761    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#762    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#763    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#764    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#765    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#766    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#767    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#768    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#769    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#770    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#771    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#772    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#773    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#774    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#775    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#776    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#777    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#778    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#779    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#780    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#781    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#782    _RawViewElement._updateChild (package:flutter/src/widgets/view.dart:481:16)
+#783    _RawViewElement.update (package:flutter/src/widgets/view.dart:568:5)
+#784    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#785    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#786    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#787    StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#788    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#789    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#790    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#791    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#792    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#793    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#794    RootElement._rebuild (package:flutter/src/widgets/binding.dart:2091:16)
+#795    RootElement.update (package:flutter/src/widgets/binding.dart:2069:5)
+#796    RootElement.performRebuild (package:flutter/src/widgets/binding.dart:2083:7)
+#797    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#798    BuildScope._tryRebuild (package:flutter/src/widgets/framework.dart:2750:15)
+#799    BuildScope._flushDirtyElements (package:flutter/src/widgets/framework.dart:2807:11)
+#800    BuildOwner.buildScope (package:flutter/src/widgets/framework.dart:3111:18)
+#801    AutomatedTestWidgetsFlutterBinding.drawFrame (package:flutter_test/src/binding.dart:2431:19)
+#802    RendererBinding._handlePersistentFrameCallback (package:flutter/src/rendering/binding.dart:509:5)
+#803    SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1430:15)
+#804    SchedulerBinding.handleDrawFrame (package:flutter/src/scheduler/binding.dart:1345:9)
+#805    AutomatedTestWidgetsFlutterBinding.pump.<anonymous closure> (package:flutter_test/src/binding.dart:2260:9)
+#808    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#809    AutomatedTestWidgetsFlutterBinding.pump (package:flutter_test/src/binding.dart:2249:27)
+#810    WidgetTester.pumpWidget.<anonymous closure> (package:flutter_test/src/widget_tester.dart:598:22)
+#813    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#814    WidgetTester.pumpWidget (package:flutter_test/src/widget_tester.dart:595:27)
+#815    main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:98:18)
+#816    testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:29)
+<asynchronous suspension>
+#817    TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 7 frames from dart:async and package:stack_trace)
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+A Timer is still pending even after the widget tree was disposed.
+'package:flutter_test/src/binding.dart':
+Failed assertion: line 2542 pos 12: '!timersPending'
+
+When the exception was thrown, this was the stack:
+#2      AutomatedTestWidgetsFlutterBinding._verifyInvariants (package:flutter_test/src/binding.dart:2542:12)
+#3      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1973:7)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from class _AssertionError and package:stack_trace)
+
+The test description was:
+  updates my poll after like response
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:08 +108 ~4 -6: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:08 +108 ~4 -7: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:08 +108 ~4 -7: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: updates my poll after like response [E]
+  Test failed. See exception logs above.
+  The test description was: updates my poll after like response
+  
+00:08 +109 ~4 -7: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:08 +110 ~4 -7: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:08 +111 ~4 -7: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:08 +111 ~4 -7: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: removes a poll after unliking it from liked polls
+Pending timers:
+Timer (duration: 0:00:20.000000, periodic: true), created:
+#0      new FakeTimer._ (package:fake_async/fake_async.dart:342:62)
+#1      FakeAsync._createTimer (package:fake_async/fake_async.dart:260:29)
+#2      FakeAsync.run.<anonymous closure> (package:fake_async/fake_async.dart:187:15)
+#5      RealtimeClient._startHeartbeat (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:247:29)
+#6      RealtimeClient.connect (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:180:5)
+#7      ProfileScreenState.initState (package:yaskapp_mobile/src/features/profile/profile_screen.dart:66:29)
+#8      StatefulElement._firstBuild (package:flutter/src/widgets/framework.dart:5950:55)
+#9      ComponentElement.mount (package:flutter/src/widgets/framework.dart:5793:5)
+...     Normal element mounting (260 frames)
+#269    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#270    MultiChildRenderObjectElement.inflateWidget (package:flutter/src/widgets/framework.dart:7264:36)
+#271    MultiChildRenderObjectElement.mount (package:flutter/src/widgets/framework.dart:7279:32)
+...     Normal element mounting (467 frames)
+#738    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#739    Element.updateChild (package:flutter/src/widgets/framework.dart:4053:20)
+#740    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#741    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#742    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#743    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#744    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#745    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#746    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#747    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#748    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#749    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#750    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#751    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#752    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#753    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#754    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#755    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#756    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#757    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#758    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#759    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#760    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#761    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#762    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#763    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#764    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#765    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#766    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#767    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#768    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#769    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#770    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#771    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#772    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#773    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#774    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#775    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#776    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#777    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#778    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#779    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#780    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#781    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#782    _RawViewElement._updateChild (package:flutter/src/widgets/view.dart:481:16)
+#783    _RawViewElement.update (package:flutter/src/widgets/view.dart:568:5)
+#784    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#785    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#786    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#787    StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#788    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#789    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#790    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#791    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#792    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#793    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#794    RootElement._rebuild (package:flutter/src/widgets/binding.dart:2091:16)
+#795    RootElement.update (package:flutter/src/widgets/binding.dart:2069:5)
+#796    RootElement.performRebuild (package:flutter/src/widgets/binding.dart:2083:7)
+#797    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#798    BuildScope._tryRebuild (package:flutter/src/widgets/framework.dart:2750:15)
+#799    BuildScope._flushDirtyElements (package:flutter/src/widgets/framework.dart:2807:11)
+#800    BuildOwner.buildScope (package:flutter/src/widgets/framework.dart:3111:18)
+#801    AutomatedTestWidgetsFlutterBinding.drawFrame (package:flutter_test/src/binding.dart:2431:19)
+#802    RendererBinding._handlePersistentFrameCallback (package:flutter/src/rendering/binding.dart:509:5)
+#803    SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1430:15)
+#804    SchedulerBinding.handleDrawFrame (package:flutter/src/scheduler/binding.dart:1345:9)
+#805    AutomatedTestWidgetsFlutterBinding.pump.<anonymous closure> (package:flutter_test/src/binding.dart:2260:9)
+#808    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#809    AutomatedTestWidgetsFlutterBinding.pump (package:flutter_test/src/binding.dart:2249:27)
+#810    WidgetTester.pumpWidget.<anonymous closure> (package:flutter_test/src/widget_tester.dart:598:22)
+#813    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#814    WidgetTester.pumpWidget (package:flutter_test/src/widget_tester.dart:595:27)
+#815    main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:147:18)
+#816    testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:29)
+<asynchronous suspension>
+#817    TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 7 frames from dart:async and package:stack_trace)
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+A Timer is still pending even after the widget tree was disposed.
+'package:flutter_test/src/binding.dart':
+Failed assertion: line 2542 pos 12: '!timersPending'
+
+When the exception was thrown, this was the stack:
+#2      AutomatedTestWidgetsFlutterBinding._verifyInvariants (package:flutter_test/src/binding.dart:2542:12)
+#3      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1973:7)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from class _AssertionError and package:stack_trace)
+
+The test description was:
+  removes a poll after unliking it from liked polls
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:08 +111 ~4 -8: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:08 +111 ~4 -8: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: removes a poll after unliking it from liked polls [E]
+  Test failed. See exception logs above.
+  The test description was: removes a poll after unliking it from liked polls
+  
+00:08 +112 ~4 -8: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:08 +113 ~4 -8: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:08 +114 ~4 -8: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:09 +115 ~4 -8: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: updates my polls comments count after returning from comments
+00:09 +116 ~4 -8: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: updates my polls comments count after returning from comments
+Pending timers:
+Timer (duration: 0:00:20.000000, periodic: true), created:
+#0      new FakeTimer._ (package:fake_async/fake_async.dart:342:62)
+#1      FakeAsync._createTimer (package:fake_async/fake_async.dart:260:29)
+#2      FakeAsync.run.<anonymous closure> (package:fake_async/fake_async.dart:187:15)
+#5      RealtimeClient._startHeartbeat (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:247:29)
+#6      RealtimeClient.connect (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:180:5)
+#7      ProfileScreenState.initState (package:yaskapp_mobile/src/features/profile/profile_screen.dart:66:29)
+#8      StatefulElement._firstBuild (package:flutter/src/widgets/framework.dart:5950:55)
+#9      ComponentElement.mount (package:flutter/src/widgets/framework.dart:5793:5)
+...     Normal element mounting (260 frames)
+#269    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#270    MultiChildRenderObjectElement.inflateWidget (package:flutter/src/widgets/framework.dart:7264:36)
+#271    MultiChildRenderObjectElement.mount (package:flutter/src/widgets/framework.dart:7279:32)
+...     Normal element mounting (467 frames)
+#738    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#739    Element.updateChild (package:flutter/src/widgets/framework.dart:4053:20)
+#740    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#741    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#742    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#743    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#744    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#745    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#746    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#747    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#748    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#749    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#750    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#751    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#752    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#753    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#754    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#755    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#756    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#757    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#758    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#759    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#760    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#761    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#762    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#763    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#764    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#765    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#766    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#767    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#768    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#769    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#770    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#771    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#772    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#773    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#774    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#775    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#776    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#777    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#778    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#779    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#780    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#781    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#782    _RawViewElement._updateChild (package:flutter/src/widgets/view.dart:481:16)
+#783    _RawViewElement.update (package:flutter/src/widgets/view.dart:568:5)
+#784    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#785    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#786    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#787    StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#788    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#789    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#790    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#791    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#792    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#793    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#794    RootElement._rebuild (package:flutter/src/widgets/binding.dart:2091:16)
+#795    RootElement.update (package:flutter/src/widgets/binding.dart:2069:5)
+#796    RootElement.performRebuild (package:flutter/src/widgets/binding.dart:2083:7)
+#797    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#798    BuildScope._tryRebuild (package:flutter/src/widgets/framework.dart:2750:15)
+#799    BuildScope._flushDirtyElements (package:flutter/src/widgets/framework.dart:2807:11)
+#800    BuildOwner.buildScope (package:flutter/src/widgets/framework.dart:3111:18)
+#801    AutomatedTestWidgetsFlutterBinding.drawFrame (package:flutter_test/src/binding.dart:2431:19)
+#802    RendererBinding._handlePersistentFrameCallback (package:flutter/src/rendering/binding.dart:509:5)
+#803    SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1430:15)
+#804    SchedulerBinding.handleDrawFrame (package:flutter/src/scheduler/binding.dart:1345:9)
+#805    AutomatedTestWidgetsFlutterBinding.pump.<anonymous closure> (package:flutter_test/src/binding.dart:2260:9)
+#808    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#809    AutomatedTestWidgetsFlutterBinding.pump (package:flutter_test/src/binding.dart:2249:27)
+#810    WidgetTester.pumpWidget.<anonymous closure> (package:flutter_test/src/widget_tester.dart:598:22)
+#813    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#814    WidgetTester.pumpWidget (package:flutter_test/src/widget_tester.dart:595:27)
+#815    main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:196:20)
+#816    testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:29)
+<asynchronous suspension>
+#817    TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 7 frames from dart:async and package:stack_trace)
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+A Timer is still pending even after the widget tree was disposed.
+'package:flutter_test/src/binding.dart':
+Failed assertion: line 2542 pos 12: '!timersPending'
+
+When the exception was thrown, this was the stack:
+#2      AutomatedTestWidgetsFlutterBinding._verifyInvariants (package:flutter_test/src/binding.dart:2542:12)
+#3      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1973:7)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from class _AssertionError and package:stack_trace)
+
+The test description was:
+  updates my polls comments count after returning from comments
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:09 +116 ~4 -9: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:09 +116 ~4 -9: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: updates my polls comments count after returning from comments [E]
+  Test failed. See exception logs above.
+  The test description was: updates my polls comments count after returning from comments
+  
+Warning: At least one test in this suite creates an HttpClient. When running a test suite that uses
+TestWidgetsFlutterBinding, all HTTP requests will return status code 400, and no network request
+will actually be made. Any test expecting a real network connection and status code will fail.
+To test code that needs an HttpClient, provide your own HttpClient implementation to the code under
+test, so that your test can consistently provide a testable response to the code under test.
+00:09 +117 ~4 -9: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:09 +118 ~4 -9: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:09 +119 ~4 -9: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:09 +120 ~4 -9: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:09 +121 ~4 -9: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:09 +122 ~4 -9: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:09 +123 ~4 -9: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:09 +124 ~4 -9: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:09 +125 ~4 -9: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:10 +126 ~4 -9: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "Which feature should be next?": []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/search_screen_test.dart:33:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///D:/yaskapp/apps/mobile/test/search_screen_test.dart line 33
+The test description was:
+  shows discovery sections before a query is entered
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:10 +126 ~4 -10: D:/yaskapp/apps/mobile/test/widget_test.dart: shows auth entry point
+00:10 +126 ~4 -10: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered [E]
+  Test failed. See exception logs above.
+  The test description was: shows discovery sections before a query is entered
+  
+Warning: At least one test in this suite creates an HttpClient. When running a test suite that uses
+TestWidgetsFlutterBinding, all HTTP requests will return status code 400, and no network request
+will actually be made. Any test expecting a real network connection and status code will fail.
+To test code that needs an HttpClient, provide your own HttpClient implementation to the code under
+test, so that your test can consistently provide a testable response to the code under test.
+00:10 +126 ~4 -10: D:/yaskapp/apps/mobile/test/widget_test.dart: shows auth entry point
+
+Warning: A call to tap() with finder "Found 1 widget with text "Sign Up": [
+  Text("Sign Up", inherit: true, size: 18.0, dependencies: [DefaultSelectionStyle, DefaultTextStyle, MediaQuery]),
+]" derived an Offset (Offset(400.0, 656.0)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+Indeed, Offset(400.0, 656.0) is outside the bounds of the root of the render tree, Size(800.0, 600.0).
+The finder corresponds to this RenderBox: RenderParagraph#ed48d relayoutBoundary=up33
+The hit test result at that offset is: HitTestResult(HitTestEntry<HitTestTarget>#bb28f(_ReusableRenderView#7fe4f), HitTestEntry<HitTestTarget>#a8d24(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/widget_test.dart:19:18)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#6      StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "tap()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly 2 matching candidates
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "REGISTER": []>
+   Which: means none were found but some were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/widget_test.dart:22:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///D:/yaskapp/apps/mobile/test/widget_test.dart line 22
+The test description was:
+  shows auth entry point
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:10 +126 ~4 -11: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: opens the report dialog from another user comment menu
+00:10 +126 ~4 -11: D:/yaskapp/apps/mobile/test/widget_test.dart: shows auth entry point [E]
+  Test failed. See exception logs above.
+  The test description was: shows auth entry point
+  
+Warning: At least one test in this suite creates an HttpClient. When running a test suite that uses
+TestWidgetsFlutterBinding, all HTTP requests will return status code 400, and no network request
+will actually be made. Any test expecting a real network connection and status code will fail.
+To test code that needs an HttpClient, provide your own HttpClient implementation to the code under
+test, so that your test can consistently provide a testable response to the code under test.
+00:10 +127 ~4 -11: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows the latest successful searches in reverse chronological order
+00:10 +128 ~4 -11: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows the latest successful searches in reverse chronological order
+00:10 +129 ~4 -11: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows the latest successful searches in reverse chronological order
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: a value less than <226.0>
+  Actual: <226.0>
+   Which: is not a value less than <226.0>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/search_screen_test.dart:54:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///D:/yaskapp/apps/mobile/test/search_screen_test.dart line 54
+The test description was:
+  shows the latest successful searches in reverse chronological order
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:10 +129 ~4 -12: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows the latest successful searches in reverse chronological order [E]
+  Test failed. See exception logs above.
+  The test description was: shows the latest successful searches in reverse chronological order
+  
+00:10 +129 ~4 -12: D:/yaskapp/apps/mobile/test/search_screen_test.dart: persists and clears recent searches
+00:10 +130 ~4 -12: D:/yaskapp/apps/mobile/test/search_screen_test.dart: clears the query from the search bar
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+The finder "Found 0 widgets with widget matching predicate: []" (used in a call to "tap()") could
+not find any matching widgets.
+
+When the exception was thrown, this was the stack:
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2095:7)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/search_screen_test.dart:75:18)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  clears the query from the search bar
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:11 +130 ~4 -13: D:/yaskapp/apps/mobile/test/search_screen_test.dart: clears the query from the search bar [E]
+  Test failed. See exception logs above.
+  The test description was: clears the query from the search bar
+  
+00:11 +130 ~4 -13: D:/yaskapp/apps/mobile/test/search_screen_test.dart: focuses search input and does not request for a short query
+00:11 +131 ~4 -13: D:/yaskapp/apps/mobile/test/search_screen_test.dart: debounces valid input and renders mixed results
+00:11 +132 ~4 -13: D:/yaskapp/apps/mobile/test/search_screen_test.dart: does not run a second search after submitting debounced input
+00:11 +133 ~4 -13: D:/yaskapp/apps/mobile/test/search_screen_test.dart: records result click only after tapping a result
+00:11 +134 ~4 -13: D:/yaskapp/apps/mobile/test/search_screen_test.dart: wires poll voting actions from search results
+00:11 +135 ~4 -13: D:/yaskapp/apps/mobile/test/search_screen_test.dart: opens the full poll card in a modal when tapping a poll result
+00:12 +136 ~4 -13: D:/yaskapp/apps/mobile/test/search_screen_test.dart: allows voting from the poll preview modal
+00:12 +137 ~4 -13: D:/yaskapp/apps/mobile/test/search_screen_test.dart: opens the preview when tapping a top poll
+00:12 +138 ~4 -13: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows empty and retryable error states
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "Could not complete search.": []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/search_screen_test.dart:250:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///D:/yaskapp/apps/mobile/test/search_screen_test.dart line 250
+The test description was:
+  shows empty and retryable error states
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:12 +138 ~4 -14: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows empty and retryable error states [E]
+  Test failed. See exception logs above.
+  The test description was: shows empty and retryable error states
+  
+00:12 +138 ~4 -14: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows a useful API error message when search fails
+00:12 +139 ~4 -14: D:/yaskapp/apps/mobile/test/search_screen_test.dart: ignores an in-flight response after the query is cleared
+00:12 +140 ~4 -14: D:/yaskapp/apps/mobile/test/search_screen_test.dart: filter changes preserve query and reset pagination
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+pumpAndSettle timed out
+
+When the exception was thrown, this was the stack:
+#0      WidgetTester.pumpAndSettle.<anonymous closure> (package:flutter_test/src/widget_tester.dart:717:11)
+<asynchronous suspension>
+#1      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#2      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/search_screen_test.dart:308:5)
+<asynchronous suspension>
+#3      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#4      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  filter changes preserve query and reset pagination
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:16 +140 ~4 -15: D:/yaskapp/apps/mobile/test/search_screen_test.dart: filter changes preserve query and reset pagination [E]
+  Test failed. See exception logs above.
+  The test description was: filter changes preserve query and reset pagination
+  
+00:16 +140 ~4 -15: D:/yaskapp/apps/mobile/test/search_screen_test.dart: loads both T02 cursor-search pages and keeps their results
+00:17 +141 ~4 -15: D:/yaskapp/apps/mobile/test/search_screen_test.dart: M14 page_dedup keeps one row per poll ID
+00:17 +141 ~5 -15: D:/yaskapp/apps/mobile/test/search_screen_test.dart: places sort menu in the top-right search header button
+00:17 +142 ~5 -15: Some tests failed.
+
+Failing tests:
+  D:/yaskapp/apps/mobile/test/auth_api_client_avatar_test.dart: uploads avatar as multipart field avatar
+  D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+  D:/yaskapp/apps/mobile/test/auth_screen_test.dart: keeps selected country after registration error
+  D:/yaskapp/apps/mobile/test/poll_card_report_test.dart: renders the poll actions with hierarchy and optional edit
+  ... and 11 more

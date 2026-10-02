@@ -9,6 +9,17 @@ const current = new Map([...initial].map(([id, poll]) => [id, structuredClone(po
 const scenario = process.env.T02_SCENARIO ?? 'normal';
 const port = Number(process.env.T02_PORT ?? 3000);
 const mediaDelayMs = Number(process.env.T02_MEDIA_DELAY_MS ?? 0);
+const independentSnapshots = scenario === 'reorder' || scenario === 'reorder-reverse';
+const seed = Number(process.env.T02_SEED ?? fixture.seed);
+if (scenario === 'profiling') {
+  current.clear();
+  for (let index = 0; index < fixture.profiling.count; index += 1) {
+    const poll = structuredClone(fixture.cards[(seed + index) % fixture.cards.length]);
+    poll.id = `${fixture.profiling.idPrefix}-${seed}-${String(index + 1).padStart(3, '0')}`;
+    poll.options = poll.options.map((option, optionIndex) => ({ ...option, id: `${poll.id}-option-${optionIndex}` }));
+    current.set(poll.id, poll);
+  }
+}
 let feedRequests = 0;
 
 function json(response, status, body) {
@@ -25,7 +36,7 @@ function withHost(poll, origin) {
   return result;
 }
 function snapshot(id, kind, value) {
-  const poll = structuredClone(scenario === 'reorder' ? initial.get(id) : current.get(id));
+  const poll = structuredClone(independentSnapshots ? initial.get(id) : current.get(id));
   if (!poll) return null;
   if (kind === 'like') {
     poll.viewerHasLiked = value;
@@ -34,7 +45,7 @@ function snapshot(id, kind, value) {
     const option = poll.options.find((item) => item.id === value);
     if (option) { option.votesCount += 1; poll.votesCount += 1; poll.viewerVoteOptionId = option.id; }
   }
-  if (scenario !== 'reorder') current.set(id, structuredClone(poll));
+  if (!independentSnapshots) current.set(id, structuredClone(poll));
   return poll;
 }
 const authUser = {
@@ -68,10 +79,10 @@ const server = createServer(async (request, response) => {
     feedRequests += 1;
     if (scenario === 'error' && feedRequests === 1) return json(response, 503, { error: 'T02 first feed request fails by design' });
     if (scenario === 'timeout') {
-      await wait(15000);
+      await wait(fixture.network.timeoutMs);
       return json(response, 504, { error: 'T02 feed fixture timeout' });
     }
-    if (scenario === 'delay') await wait(2000);
+    if (scenario === 'delay') await wait(fixture.network.delayMs);
     return json(response, 200, { items: [...current.values()].map((poll) => withHost(poll, origin)) });
   }
 
@@ -93,7 +104,10 @@ const server = createServer(async (request, response) => {
       }
       const poll = snapshot(id, isLike ? 'like' : 'vote', isLike ? request.method === 'POST' : optionId);
       if (!poll) return json(response, 404, { error: 'not_found' });
-      if (scenario === 'reorder') await wait(isLike ? 100 : 800);
+      if (independentSnapshots) {
+        const shortResponse = scenario === 'reorder' ? isLike : !isLike;
+        await wait(shortResponse ? fixture.network.reorderLikeMs : fixture.network.reorderVoteMs);
+      }
       return json(response, 201, { poll: withHost(poll, origin) });
     }
   }
@@ -110,5 +124,5 @@ const server = createServer(async (request, response) => {
 
 server.listen(port, process.env.T02_HOST ?? '0.0.0.0', () => {
   console.log('T02 baseline fixture server listening on port ' + port + ' (scenario: ' + scenario + ', media delay: ' + mediaDelayMs + ' ms)');
-  console.log('Scenarios: normal, delay, reorder, error, timeout');
+  console.log('Scenarios: normal, delay, reorder, reorder-reverse, error, timeout, profiling (seed: ' + seed + ')');
 });

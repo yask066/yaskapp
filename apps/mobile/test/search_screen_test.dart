@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'support/motion_scroll_fixture.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -311,80 +312,90 @@ void main() {
     expect(client.calls.last.cursor, isNull);
   });
 
-  testWidgets('loads both T02 cursor-search pages and keeps their results',
-      (tester) async {
-    tester.view.physicalSize = const Size(800, 320);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+  for (final verifyDedup in [false, true]) {
+    testWidgets(
+        verifyDedup
+            ? 'M14 page_dedup keeps one row per poll ID'
+            : 'loads both T02 cursor-search pages and keeps their results',
+        (tester) async {
+      tester.view.physicalSize = const Size(800, 320);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    final fixture = _readT02Fixture();
-    final pollsById = {
-      for (final card in fixture['cards'] as List<dynamic>)
-        (card as Map<String, dynamic>)['id'] as String: card,
-    };
-    final cursorPages =
-        (fixture['cursorPages'] as List<dynamic>).cast<Map<String, dynamic>>();
-    final client = _FakeSearchApiClient(
-      pages: [
-        for (var index = 0; index < cursorPages.length; index += 1)
-          SearchPage(
-            items: (cursorPages[index]['pollIds'] as List<dynamic>)
-                .cast<String>()
-                .map((id) => PollSearchResult(
-                      score: 1,
-                      poll: PollSummary.fromJson(pollsById[id]!),
-                    ))
-                .toList(),
-            nextCursor: index + 1 < cursorPages.length
-                ? cursorPages[index + 1]['cursor'] as String?
-                : null,
-          ),
-      ],
-    );
+      final fixture = _readT02Fixture();
+      final pollsById = {
+        for (final card in fixture['cards'] as List<dynamic>)
+          (card as Map<String, dynamic>)['id'] as String: card,
+      };
+      final cursorPages = (fixture['cursorPages'] as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+      final client = _FakeSearchApiClient(
+        pages: [
+          for (var index = 0; index < cursorPages.length; index += 1)
+            SearchPage(
+              items: (cursorPages[index]['pollIds'] as List<dynamic>)
+                  .cast<String>()
+                  .map((id) => PollSearchResult(
+                        score: 1,
+                        poll: PollSummary.fromJson(pollsById[id]!),
+                      ))
+                  .toList(),
+              nextCursor: index + 1 < cursorPages.length
+                  ? cursorPages[index + 1]['cursor'] as String?
+                  : null,
+            ),
+        ],
+      );
 
-    await tester.pumpWidget(
-      _app(client, searchHistory: MemorySearchHistoryStore()),
-    );
-    await tester.enterText(find.byType(TextField), 'motion');
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        _app(client, searchHistory: MemorySearchHistoryStore()),
+      );
+      await tester.enterText(find.byType(TextField), 'motion');
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
 
-    expect(client.calls.map((call) => call.cursor), [null]);
-    expect(
-      find.byKey(const ValueKey('search-poll-result-motion-long-text')),
-      findsOneWidget,
-    );
+      expect(client.calls.map((call) => call.cursor), [null]);
+      expect(
+        find.byKey(const ValueKey('search-poll-result-motion-long-text')),
+        findsOneWidget,
+      );
 
-    final resultScrollable = find.byWidgetPredicate(
-      (widget) =>
-          widget is Scrollable && widget.axisDirection == AxisDirection.down,
-    );
-    final resultScroll = tester.state<ScrollableState>(resultScrollable);
-    // The short viewport makes the first page scrollable so the existing
-    // near-bottom listener can request its next cursor page.
-    expect(resultScroll.position.maxScrollExtent, greaterThan(0));
+      final resultScrollable = find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable && widget.axisDirection == AxisDirection.down,
+      );
+      final resultScroll = tester.state<ScrollableState>(resultScrollable);
+      // The short viewport makes the first page scrollable so the existing
+      // near-bottom listener can request its next cursor page.
+      expect(resultScroll.position.maxScrollExtent, greaterThan(0));
 
-    await tester.fling(find.byType(ListView), const Offset(0, -1200), 3000);
-    await tester.pumpAndSettle();
+      await tester.fling(find.byType(ListView), const Offset(0, -1200), 3000);
+      await tester.pumpAndSettle();
 
-    expect(client.calls.map((call) => call.cursor), [null, 't02-page-2']);
-    resultScroll.position.jumpTo(resultScroll.position.maxScrollExtent);
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(
-        const ValueKey('search-poll-result-motion-count-100-image-error'),
-      ),
-      findsOneWidget,
-    );
+      expect(client.calls.map((call) => call.cursor), [null, 't02-page-2']);
+      resultScroll.position.jumpTo(resultScroll.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(
+          const ValueKey('search-poll-result-motion-count-100-image-error'),
+        ),
+        findsOneWidget,
+      );
 
-    resultScroll.position.jumpTo(0);
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const ValueKey('search-poll-result-motion-long-text')),
-      findsOneWidget,
-    );
-  });
+      if (verifyDedup) {
+        final list = tester.widget<ListView>(find.byType(ListView));
+        // Four unique rows with three separators; the overlapping ID adds no row.
+        expect(list.childrenDelegate.estimatedChildCount, 7);
+      }
+      resultScroll.position.jumpTo(0);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('search-poll-result-motion-long-text')),
+        findsOneWidget,
+      );
+    }, skip: verifyDedup && !runMotionKnownFailures);
+  }
 
   testWidgets('places sort menu in the top-right search header button',
       (tester) async {

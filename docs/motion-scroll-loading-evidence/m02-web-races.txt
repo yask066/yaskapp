@@ -1,0 +1,122 @@
+
+> @yaskapp/web@0.1.0 test
+> vitest --run src/features/polls/usePollMutations.test.tsx
+
+
+ RUN  v3.2.4 D:/yaskapp/apps/web
+
+ ❯ src/features/polls/usePollMutations.test.tsx (4 tests | 3 failed) 789ms
+   ✓ replaces every cached poll with the authoritative poll returned after a vote 153ms
+   × M05 race_preserves_independent_fields 269ms
+     → expected { votesCount: 10, …(4) } to deeply equal { votesCount: 10, …(4) }
+   × M05 race_preserves_independent_fields_reverse 231ms
+     → expected { votesCount: 9, …(4) } to deeply equal { votesCount: 10, …(4) }
+   × M05 stale_refetch preserves completed vote and like 132ms
+     → expected { votesCount: 9, …(4) } to deeply equal { votesCount: 10, …(4) }
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/features/polls/usePollMutations.test.tsx > M05 race_preserves_independent_fields
+AssertionError: expected { votesCount: 10, …(4) } to deeply equal { votesCount: 10, …(4) }
+
+- Expected
++ Received
+
+  {
+-   "likesCount": 10,
++   "likesCount": 9,
+    "optionVotes": [
+      6,
+      4,
+    ],
+-   "viewerHasLiked": true,
++   "viewerHasLiked": false,
+    "viewerVoteOptionId": "motion-long-text-option-a",
+    "votesCount": 10,
+  }
+
+ ❯ src/features/polls/usePollMutations.test.tsx:97:70
+     95|       for (const key of keys) {
+     96|         const data = client.getQueryData<Poll | Poll[]>(key)!;
+     97|         expect(reactionFields(Array.isArray(data) ? data[0] : data)).t…
+       |                                                                      ^
+     98|       }
+     99|     } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/features/polls/usePollMutations.test.tsx > M05 race_preserves_independent_fields_reverse
+AssertionError: expected { votesCount: 9, …(4) } to deeply equal { votesCount: 10, …(4) }
+
+- Expected
++ Received
+
+  {
+    "likesCount": 10,
+    "optionVotes": [
+-     6,
++     5,
+      4,
+    ],
+    "viewerHasLiked": true,
+-   "viewerVoteOptionId": "motion-long-text-option-a",
+-   "votesCount": 10,
++   "viewerVoteOptionId": null,
++   "votesCount": 9,
+  }
+
+ ❯ src/features/polls/usePollMutations.test.tsx:97:70
+     95|       for (const key of keys) {
+     96|         const data = client.getQueryData<Poll | Poll[]>(key)!;
+     97|         expect(reactionFields(Array.isArray(data) ? data[0] : data)).t…
+       |                                                                      ^
+     98|       }
+     99|     } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/features/polls/usePollMutations.test.tsx > M05 stale_refetch preserves completed vote and like
+AssertionError: expected { votesCount: 9, …(4) } to deeply equal { votesCount: 10, …(4) }
+
+- Expected
++ Received
+
+  {
+-   "likesCount": 10,
++   "likesCount": 9,
+    "optionVotes": [
+-     6,
++     5,
+      4,
+    ],
+-   "viewerHasLiked": true,
+-   "viewerVoteOptionId": "motion-long-text-option-a",
+-   "votesCount": 10,
++   "viewerHasLiked": false,
++   "viewerVoteOptionId": null,
++   "votesCount": 9,
+  }
+
+ ❯ src/features/polls/usePollMutations.test.tsx:129:66
+    127|     refetchGate.release([t02RacePoll()]);
+    128|     await refetch;
+    129|     expect(reactionFields(client.getQueryData<Poll[]>(key)![0])).toEqu…
+       |                                                                  ^
+    130|   } finally {
+    131|     refetchGate.release([t02RacePoll()]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 1 passed (4)
+   Start at  20:18:03
+   Duration  3.20s (transform 105ms, setup 607ms, collect 408ms, tests 789ms, environment 907ms, prepare 195ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path D:\yaskapp\apps\web
+npm error workspace @yaskapp/web@0.1.0
+npm error location D:\yaskapp\apps\web
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c vitest --run src/features/polls/usePollMutations.test.tsx

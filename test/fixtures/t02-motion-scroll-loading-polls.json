@@ -1,19 +1,48 @@
 {
-  "fixtureVersion": 1,
-  "purpose": "T02 motion, scroll, and loading baseline",
+  "fixtureVersion": 2,
+  "purpose": "T02 baseline + M02 deterministic correctness, layout and profiling inputs",
   "cursorPages": [
-    { "cursor": null, "pollIds": ["motion-long-text", "motion-count-10"] },
-    { "cursor": "t02-page-2", "pollIds": ["motion-count-99", "motion-count-100-image-error"] }
+    {
+      "cursor": null,
+      "pollIds": [
+        "motion-long-text",
+        "motion-count-10"
+      ]
+    },
+    {
+      "cursor": "t02-page-2",
+      "pollIds": [
+        "motion-count-10",
+        "motion-count-99",
+        "motion-count-100-image-error"
+      ]
+    }
   ],
   "cards": [
     {
       "id": "motion-long-text",
-      "author": { "id": "t02-author", "username": "baseline", "displayName": "Baseline Author", "avatarObjectKey": null, "avatarUrl": null },
+      "author": {
+        "id": "t02-author",
+        "username": "baseline",
+        "displayName": "Baseline Author",
+        "avatarObjectKey": null,
+        "avatarUrl": null
+      },
       "question": "Which parts of the reading experience should we improve first? We are collecting detailed feedback from people who browse long poll questions on small screens, switch between feed filters, and return to the same place after opening a discussion. Please describe the loading, layout, and reaction behavior you expect while the list is moving.",
       "imageUrl": null,
       "options": [
-        { "id": "motion-long-text-option-a", "text": "Keep the current position", "position": 0, "votesCount": 5 },
-        { "id": "motion-long-text-option-b", "text": "Show loading status", "position": 1, "votesCount": 4 }
+        {
+          "id": "motion-long-text-option-a",
+          "text": "Keep the current position",
+          "position": 0,
+          "votesCount": 5
+        },
+        {
+          "id": "motion-long-text-option-b",
+          "text": "Show loading status",
+          "position": 1,
+          "votesCount": 4
+        }
       ],
       "votesCount": 9,
       "commentsCount": 9,
@@ -26,12 +55,28 @@
     },
     {
       "id": "motion-count-10",
-      "author": { "id": "t02-author", "username": "baseline", "displayName": "Baseline Author", "avatarObjectKey": null, "avatarUrl": null },
+      "author": {
+        "id": "t02-author",
+        "username": "baseline",
+        "displayName": "Baseline Author",
+        "avatarObjectKey": null,
+        "avatarUrl": null
+      },
       "question": "Does the 9 to 10 count transition move a neighboring control?",
       "imageUrl": "https://fixtures.invalid/media/landscape-16x9.svg",
       "options": [
-        { "id": "motion-count-10-option-a", "text": "No movement", "position": 0, "votesCount": 6 },
-        { "id": "motion-count-10-option-b", "text": "A small movement", "position": 1, "votesCount": 4 }
+        {
+          "id": "motion-count-10-option-a",
+          "text": "No movement",
+          "position": 0,
+          "votesCount": 6
+        },
+        {
+          "id": "motion-count-10-option-b",
+          "text": "A small movement",
+          "position": 1,
+          "votesCount": 4
+        }
       ],
       "votesCount": 10,
       "commentsCount": 10,
@@ -44,12 +89,28 @@
     },
     {
       "id": "motion-count-99",
-      "author": { "id": "t02-author", "username": "baseline", "displayName": "Baseline Author", "avatarObjectKey": null, "avatarUrl": null },
+      "author": {
+        "id": "t02-author",
+        "username": "baseline",
+        "displayName": "Baseline Author",
+        "avatarObjectKey": null,
+        "avatarUrl": null
+      },
       "question": "Does the 99 to 100 count transition change card width or height?",
       "imageUrl": "https://fixtures.invalid/media/portrait-4x5.svg",
       "options": [
-        { "id": "motion-count-99-option-a", "text": "No layout change", "position": 0, "votesCount": 50 },
-        { "id": "motion-count-99-option-b", "text": "Visible layout change", "position": 1, "votesCount": 49 }
+        {
+          "id": "motion-count-99-option-a",
+          "text": "No layout change",
+          "position": 0,
+          "votesCount": 50
+        },
+        {
+          "id": "motion-count-99-option-b",
+          "text": "Visible layout change",
+          "position": 1,
+          "votesCount": 49
+        }
       ],
       "votesCount": 99,
       "commentsCount": 99,
@@ -62,12 +123,28 @@
     },
     {
       "id": "motion-count-100-image-error",
-      "author": { "id": "t02-author", "username": "baseline", "displayName": "Baseline Author", "avatarObjectKey": null, "avatarUrl": null },
+      "author": {
+        "id": "t02-author",
+        "username": "baseline",
+        "displayName": "Baseline Author",
+        "avatarObjectKey": null,
+        "avatarUrl": null
+      },
       "question": "Does an image error preserve the reserved card area?",
       "imageUrl": "https://fixtures.invalid/media/missing.svg",
       "options": [
-        { "id": "motion-count-100-option-a", "text": "Area remains reserved", "position": 0, "votesCount": 55 },
-        { "id": "motion-count-100-option-b", "text": "Area collapses", "position": 1, "votesCount": 45 }
+        {
+          "id": "motion-count-100-option-a",
+          "text": "Area remains reserved",
+          "position": 0,
+          "votesCount": 55
+        },
+        {
+          "id": "motion-count-100-option-b",
+          "text": "Area collapses",
+          "position": 1,
+          "votesCount": 45
+        }
       ],
       "votesCount": 100,
       "commentsCount": 100,
@@ -77,6 +154,240 @@
       "createdAt": "2026-09-01T12:03:00.000Z",
       "viewerVoteOptionId": null,
       "endsAt": null
+    },
+    {
+      "id": "motion-count-zero",
+      "author": {
+        "id": "t02-author",
+        "username": "baseline",
+        "displayName": "Baseline Author",
+        "avatarObjectKey": null,
+        "avatarUrl": null
+      },
+      "question": "Can an empty poll reserve stable controls before its first vote?",
+      "imageUrl": null,
+      "options": [
+        {
+          "id": "motion-count-zero-option-a",
+          "text": "Keep the current position",
+          "position": 0,
+          "votesCount": 0
+        },
+        {
+          "id": "motion-count-zero-option-b",
+          "text": "Show loading status",
+          "position": 1,
+          "votesCount": 0
+        }
+      ],
+      "votesCount": 0,
+      "commentsCount": 0,
+      "likesCount": 0,
+      "viewerHasLiked": false,
+      "allowVoteCancellation": true,
+      "createdAt": "2026-09-01T12:00:00.000Z",
+      "viewerVoteOptionId": null,
+      "endsAt": null
+    },
+    {
+      "id": "motion-count-999",
+      "author": {
+        "id": "t02-author",
+        "username": "baseline",
+        "displayName": "Baseline Author",
+        "avatarObjectKey": null,
+        "avatarUrl": null
+      },
+      "question": "Does the 999 to 1000 count transition move neighboring controls?",
+      "imageUrl": null,
+      "options": [
+        {
+          "id": "motion-count-999-option-a",
+          "text": "Keep the current position",
+          "position": 0,
+          "votesCount": 500
+        },
+        {
+          "id": "motion-count-999-option-b",
+          "text": "Show loading status",
+          "position": 1,
+          "votesCount": 499
+        }
+      ],
+      "votesCount": 999,
+      "commentsCount": 999,
+      "likesCount": 999,
+      "viewerHasLiked": false,
+      "allowVoteCancellation": true,
+      "createdAt": "2026-09-01T12:00:00.000Z",
+      "viewerVoteOptionId": null,
+      "endsAt": null
+    },
+    {
+      "id": "motion-count-1000",
+      "author": {
+        "id": "t02-author",
+        "username": "baseline",
+        "displayName": "Baseline Author",
+        "avatarObjectKey": null,
+        "avatarUrl": null
+      },
+      "question": "Does a four-digit count preserve the reserved card geometry?",
+      "imageUrl": null,
+      "options": [
+        {
+          "id": "motion-count-1000-option-a",
+          "text": "Keep the current position",
+          "position": 0,
+          "votesCount": 500
+        },
+        {
+          "id": "motion-count-1000-option-b",
+          "text": "Show loading status",
+          "position": 1,
+          "votesCount": 500
+        }
+      ],
+      "votesCount": 1000,
+      "commentsCount": 1000,
+      "likesCount": 1000,
+      "viewerHasLiked": false,
+      "allowVoteCancellation": true,
+      "createdAt": "2026-09-01T12:00:00.000Z",
+      "viewerVoteOptionId": null,
+      "endsAt": null
+    },
+    {
+      "id": "motion-equal-results",
+      "author": {
+        "id": "t02-author",
+        "username": "baseline",
+        "displayName": "Baseline Author",
+        "avatarObjectKey": null,
+        "avatarUrl": null
+      },
+      "question": "Do equal results remain readable with text scaled to 200 percent?",
+      "imageUrl": null,
+      "options": [
+        {
+          "id": "motion-equal-results-option-a",
+          "text": "Keep the current position",
+          "position": 0,
+          "votesCount": 5
+        },
+        {
+          "id": "motion-equal-results-option-b",
+          "text": "Show loading status",
+          "position": 1,
+          "votesCount": 5
+        }
+      ],
+      "votesCount": 10,
+      "commentsCount": 10,
+      "likesCount": 10,
+      "viewerHasLiked": false,
+      "allowVoteCancellation": true,
+      "createdAt": "2026-09-01T12:00:00.000Z",
+      "viewerVoteOptionId": null,
+      "endsAt": null
     }
-  ]
+  ],
+  "seed": 20261002,
+  "profiling": {
+    "count": 100,
+    "idPrefix": "motion-profile"
+  },
+  "network": {
+    "delayMs": 2000,
+    "timeoutMs": 15000,
+    "reorderVoteMs": 800,
+    "reorderLikeMs": 100,
+    "slowMediaMs": 2000
+  },
+  "race": {
+    "pollId": "motion-long-text",
+    "optionId": "motion-long-text-option-a",
+    "snapshots": {
+      "vote": {
+        "options": [
+          {
+            "id": "motion-long-text-option-a",
+            "text": "Keep the current position",
+            "position": 0,
+            "votesCount": 6
+          },
+          {
+            "id": "motion-long-text-option-b",
+            "text": "Show loading status",
+            "position": 1,
+            "votesCount": 4
+          }
+        ],
+        "votesCount": 10,
+        "viewerVoteOptionId": "motion-long-text-option-a"
+      },
+      "like": {
+        "likesCount": 10,
+        "viewerHasLiked": true
+      },
+      "realtime": {
+        "options": [
+          {
+            "id": "motion-long-text-option-a",
+            "text": "Keep the current position",
+            "position": 0,
+            "votesCount": 7
+          },
+          {
+            "id": "motion-long-text-option-b",
+            "text": "Show loading status",
+            "position": 1,
+            "votesCount": 4
+          }
+        ],
+        "votesCount": 11,
+        "viewerVoteOptionId": null
+      }
+    },
+    "expected": {
+      "votesCount": 10,
+      "optionVotes": [
+        6,
+        4
+      ],
+      "viewerVoteOptionId": "motion-long-text-option-a",
+      "likesCount": 10,
+      "viewerHasLiked": true
+    },
+    "orders": {
+      "race_preserves_independent_fields": [
+        "vote-start",
+        "like-start",
+        "like-finish",
+        "vote-finish"
+      ],
+      "race_preserves_independent_fields_reverse": [
+        "like-start",
+        "vote-start",
+        "vote-finish",
+        "like-finish"
+      ],
+      "stale_refetch": [
+        "refetch-start",
+        "vote-start",
+        "vote-finish",
+        "like-start",
+        "like-finish",
+        "refetch-finish"
+      ],
+      "realtime_before_http": [
+        "vote-start",
+        "like-start",
+        "like-finish",
+        "realtime",
+        "realtime",
+        "vote-finish"
+      ]
+    }
+  }
 }

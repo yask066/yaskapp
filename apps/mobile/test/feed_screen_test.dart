@@ -12,8 +12,180 @@ import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
 import 'package:yaskapp_mobile/src/features/realtime/realtime_client.dart';
 import 'package:yaskapp_mobile/src/features/search/search_api_client.dart';
 import 'package:yaskapp_mobile/src/features/search/search_screen.dart';
+import 'support/motion_scroll_fixture.dart';
 
 void main() {
+  test('M02 profiling uses the shared seed and creates 100 unique IDs', () {
+    final polls = motionProfilingPolls();
+    expect(polls, hasLength(100));
+    expect(polls.first.id, 'motion-profile-20261002-001');
+    expect(polls.last.id, 'motion-profile-20261002-100');
+    expect(polls.map((poll) => poll.id).toSet(), hasLength(100));
+    expect(
+        polls.expand((poll) => poll.options.map((option) => option.id)).toSet(),
+        hasLength(200));
+    expect(polls.first.options.first.votesCount, 50);
+    expect(motionProfilingPolls(seed: 42).first.id, 'motion-profile-42-001');
+  });
+
+  for (final reverse in [false, true]) {
+    testWidgets(
+        'M06 race_preserves_independent_fields${reverse ? '_reverse' : ''}',
+        (tester) async {
+      final baseline = motionRacePoll();
+      final vote = Completer<PollSummary>();
+      final like = Completer<PollSummary>();
+      final api = _FakePollsApiClient(
+          initialPolls: [baseline],
+          voteResponse: vote.future,
+          likeResponse: like.future);
+      final realtime = _FakeRealtimeClient();
+      addTearDown(realtime.close);
+      await tester.pumpWidget(MaterialApp(
+          home: FeedScreen(
+              session: _session,
+              pollsApiClient: api,
+              realtimeClient: realtime)));
+      await tester.pumpAndSettle();
+      try {
+        if (reverse) {
+          tester.widget<PollCard>(find.byType(PollCard)).onToggleLike!();
+        } else {
+          tester
+              .widget<PollCard>(find.byType(PollCard))
+              .onVote!(baseline.options.first);
+        }
+        await tester.pump();
+        if (reverse) {
+          tester
+              .widget<PollCard>(find.byType(PollCard))
+              .onVote!(baseline.options.first);
+        } else {
+          tester.widget<PollCard>(find.byType(PollCard)).onToggleLike!();
+        }
+        await tester.pump();
+        expect(api.voteCalls, 1);
+        expect(api.likeCalls, 1);
+        (reverse ? vote : like)
+            .complete(motionRacePoll(reverse ? 'vote' : 'like'));
+        await tester.pump();
+        await tester.pump();
+        final intermediate =
+            tester.widget<PollCard>(find.byType(PollCard)).poll;
+        expect(reverse ? intermediate.votesCount : intermediate.likesCount, 10);
+        (reverse ? like : vote)
+            .complete(motionRacePoll(reverse ? 'like' : 'vote'));
+        await tester.pumpAndSettle();
+        final race = motionScrollFixture['race'] as Map<String, dynamic>;
+        expect(
+            api.responseOrder,
+            (race['orders'] as Map<String, dynamic>)[reverse
+                ? 'race_preserves_independent_fields_reverse'
+                : 'race_preserves_independent_fields']);
+        expect(
+            _reactionFields(
+                tester.widget<PollCard>(find.byType(PollCard)).poll),
+            race['expected']);
+      } finally {
+        if (!vote.isCompleted) vote.complete(motionRacePoll('vote'));
+        if (!like.isCompleted) like.complete(motionRacePoll('like'));
+        await tester.pumpAndSettle();
+      }
+    }, skip: !runMotionKnownFailures);
+  }
+
+  testWidgets('M06 stale_refetch preserves completed vote and like',
+      (tester) async {
+    final refetch = Completer<List<PollSummary>>();
+    final api = _FakePollsApiClient(
+        initialPolls: [motionRacePoll()],
+        refreshResponse: refetch.future,
+        votedPoll: motionRacePoll('vote'),
+        likedPoll: motionRacePoll('vote')
+            .copyWith(likesCount: 10, viewerHasLiked: true));
+    final realtime = _FakeRealtimeClient();
+    addTearDown(realtime.close);
+    await tester.pumpWidget(MaterialApp(
+        home: FeedScreen(
+            session: _session, pollsApiClient: api, realtimeClient: realtime)));
+    await tester.pumpAndSettle();
+    final refresh = tester
+        .widget<RefreshIndicator>(find.byType(RefreshIndicator))
+        .onRefresh();
+    try {
+      await tester.pump();
+      expect(api.listPollsCalls, 2);
+      tester
+          .widget<PollCard>(find.byType(PollCard))
+          .onVote!(motionRacePoll().options.first);
+      await tester.pumpAndSettle();
+      tester.widget<PollCard>(find.byType(PollCard)).onToggleLike!();
+      await tester.pumpAndSettle();
+      final expected =
+          (motionScrollFixture['race'] as Map<String, dynamic>)['expected'];
+      expect(
+          _reactionFields(tester.widget<PollCard>(find.byType(PollCard)).poll),
+          expected);
+      refetch.complete([motionRacePoll()]);
+      await refresh;
+      await tester.pumpAndSettle();
+      expect(
+          _reactionFields(tester.widget<PollCard>(find.byType(PollCard)).poll),
+          expected);
+    } finally {
+      if (!refetch.isCompleted) refetch.complete([motionRacePoll()]);
+      await refresh;
+    }
+  }, skip: !runMotionKnownFailures);
+
+  testWidgets(
+      'M06 realtime_before_http preserves viewer fields and newer votes',
+      (tester) async {
+    final vote = Completer<PollSummary>();
+    final api = _FakePollsApiClient(
+        initialPolls: [motionRacePoll()],
+        voteResponse: vote.future,
+        likedPoll: motionRacePoll('like'));
+    final realtime = _FakeRealtimeClient();
+    addTearDown(realtime.close);
+    await tester.pumpWidget(MaterialApp(
+        home: FeedScreen(
+            session: _session, pollsApiClient: api, realtimeClient: realtime)));
+    await tester.pumpAndSettle();
+    try {
+      tester
+          .widget<PollCard>(find.byType(PollCard))
+          .onVote!(motionRacePoll().options.first);
+      await tester.pump();
+      tester.widget<PollCard>(find.byType(PollCard)).onToggleLike!();
+      await tester.pump();
+      await tester.pump();
+      expect(tester.widget<PollCard>(find.byType(PollCard)).poll.viewerHasLiked,
+          true);
+      realtime.injectVote(motionRacePoll('realtime'));
+      await tester.pump();
+      expect(
+          tester.widget<PollCard>(find.byType(PollCard)).poll.votesCount, 11);
+      realtime.injectVote(motionRacePoll('realtime'));
+      await tester.pump();
+      expect(
+          tester.widget<PollCard>(find.byType(PollCard)).poll.votesCount, 11);
+      vote.complete(motionRacePoll('vote'));
+      await tester.pumpAndSettle();
+      expect(
+          _reactionFields(tester.widget<PollCard>(find.byType(PollCard)).poll),
+          {
+            ...(motionScrollFixture['race'] as Map<String, dynamic>)['expected']
+                as Map<String, dynamic>,
+            'votesCount': 11,
+            'optionVotes': [7, 4],
+          });
+    } finally {
+      if (!vote.isCompleted) vote.complete(motionRacePoll('vote'));
+      await tester.pumpAndSettle();
+    }
+  }, skip: !runMotionKnownFailures);
+
   testWidgets('shows one feed without category tabs', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -42,16 +214,17 @@ void main() {
         .toList();
     final api = _FakePollsApiClient(initialPolls: polls);
 
-    expect(polls.map((poll) => poll.votesCount).toList(), [9, 10, 99, 100]);
+    expect(polls.map((poll) => poll.votesCount).toList(),
+        [9, 10, 99, 100, 0, 999, 1000, 10]);
     expect(
         (fixture['cursorPages'] as List<dynamic>)
             .map((page) =>
                 (page as Map<String, dynamic>)['pollIds'] as List<dynamic>)
             .map((ids) => ids.length)
             .toList(),
-        [2, 2]);
+        [2, 3]);
     expect(polls.map((poll) => poll.imageUrl == null).toList(),
-        [true, false, false, false]);
+        [true, false, false, false, true, true, true, true]);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -399,6 +572,14 @@ const _session = AuthSession(
   expiresIn: '15m',
 );
 
+Map<String, dynamic> _reactionFields(PollSummary poll) => {
+      'votesCount': poll.votesCount,
+      'optionVotes': poll.options.map((option) => option.votesCount).toList(),
+      'viewerVoteOptionId': poll.viewerVoteOptionId,
+      'likesCount': poll.likesCount,
+      'viewerHasLiked': poll.viewerHasLiked,
+    };
+
 PollSummary _poll({
   required bool viewerHasLiked,
   required int likesCount,
@@ -505,6 +686,8 @@ class _FakePollsApiClient extends PollsApiClient {
     this.votedPoll,
     this.likeError,
     this.likeResponse,
+    this.voteResponse,
+    this.refreshResponse,
   });
 
   final List<PollSummary> initialPolls;
@@ -514,6 +697,9 @@ class _FakePollsApiClient extends PollsApiClient {
   final PollSummary? votedPoll;
   final PollsApiException? likeError;
   final Future<PollSummary>? likeResponse;
+  final Future<PollSummary>? voteResponse;
+  final Future<List<PollSummary>>? refreshResponse;
+  final responseOrder = <String>[];
   int likeCalls = 0;
   int voteCalls = 0;
   int listPollsCalls = 0;
@@ -525,6 +711,7 @@ class _FakePollsApiClient extends PollsApiClient {
     String sort = 'newest',
   }) async {
     listPollsCalls++;
+    if (listPollsCalls > 1 && refreshResponse != null) return refreshResponse!;
     return initialPolls;
   }
 
@@ -535,7 +722,10 @@ class _FakePollsApiClient extends PollsApiClient {
     required String accessToken,
   }) async {
     voteCalls++;
-    return votedPoll!;
+    responseOrder.add('vote-start');
+    final result = voteResponse == null ? votedPoll! : await voteResponse!;
+    responseOrder.add('vote-finish');
+    return result;
   }
 
   @override
@@ -544,6 +734,7 @@ class _FakePollsApiClient extends PollsApiClient {
     required String accessToken,
   }) async {
     likeCalls++;
+    responseOrder.add('like-start');
     final likeError = this.likeError;
 
     if (likeError != null) {
@@ -552,9 +743,12 @@ class _FakePollsApiClient extends PollsApiClient {
 
     final likeResponse = this.likeResponse;
     if (likeResponse != null) {
-      return likeResponse;
+      final result = await likeResponse;
+      responseOrder.add('like-finish');
+      return result;
     }
 
+    responseOrder.add('like-finish');
     return likedPoll!;
   }
 
@@ -588,6 +782,8 @@ class _FakeSearchApiClient extends SearchApiClient {
 
 class _FakeRealtimeClient extends RealtimeClient {
   final _controller = StreamController<PollVoteRealtimeEvent>.broadcast();
+  void injectVote(PollSummary poll) =>
+      _controller.add(PollVoteRealtimeEvent(poll: poll));
 
   @override
   Stream<PollVoteRealtimeEvent> get pollVotes => _controller.stream;
