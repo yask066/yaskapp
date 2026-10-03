@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'poll_summary.dart';
@@ -57,11 +59,13 @@ class PollOperationToken {
 
 class PollMergeResult {
   const PollMergeResult({
+    required this.accepted,
     required this.state,
     required this.changedGroups,
     required this.needsReconcile,
   });
 
+  final bool accepted;
   final PollSummary? state;
   final Set<PollStateGroup> changedGroups;
   final bool needsReconcile;
@@ -105,6 +109,8 @@ class PollStateStore extends ChangeNotifier {
   int _sessionEpoch = 0;
   int _nextOperationId = 0;
 
+  void Function(String pollId, int sessionEpoch)? onReconcileRequested;
+
   int get sessionEpoch => _sessionEpoch;
   String? get viewerId => _viewerId;
 
@@ -121,6 +127,7 @@ class PollStateStore extends ChangeNotifier {
   PollMergeResult ingest(PollSummary incoming, PollIngress ingress) {
     final current = _polls[incoming.id];
     final rejected = PollMergeResult(
+      accepted: false,
       state: current?.poll,
       changedGroups: const {},
       needsReconcile: false,
@@ -137,9 +144,11 @@ class PollStateStore extends ChangeNotifier {
     final validViewer = ingress.origin != PollOrigin.realtime &&
         _viewerId != null &&
         ingress.viewerId == _viewerId;
-    if (!_validSnapshot(incoming, validateViewer: validViewer) ||
+    if (!_validOptionIdentity(incoming) ||
         current != null && !_samePresentation(current.poll, incoming)) {
+      _requestReconcile(incoming.id);
       return PollMergeResult(
+        accepted: false,
         state: current?.poll,
         changedGroups: {},
         needsReconcile: true,
@@ -150,18 +159,37 @@ class PollStateStore extends ChangeNotifier {
         incoming.stateRevisions == null &&
         (ingress.origin != PollOrigin.http ||
             ingress.startedGeneration != generationFor(incoming.id))) {
+      _requestReconcile(incoming.id);
       return const PollMergeResult(
+        accepted: false,
         state: null,
         changedGroups: {},
         needsReconcile: true,
       );
     }
-    final initial = current == null && !validViewer
-        ? incoming.copyWith(
-            viewerHasLiked: false,
-            hasViewerHasLikedField: false,
-            clearViewerVoteOptionId: true,
-            hasViewerVoteOptionIdField: false,
+    final revisions = incoming.stateRevisions;
+    final votePayloadValid = _validVotePayload(incoming);
+    final likesPayloadValid = incoming.likesCount >= 0;
+    final commentsPayloadValid = incoming.commentsCount >= 0;
+    final viewerVoteValid = !validViewer ||
+        !incoming.hasViewerVoteOptionIdField ||
+        incoming.viewerVoteOptionId == null ||
+        incoming.options
+            .any((option) => option.id == incoming.viewerVoteOptionId);
+    final voteGroupValid =
+        votePayloadValid && !(revisions?.votesInvalid ?? false);
+    final likesGroupValid =
+        likesPayloadValid && !(revisions?.likesInvalid ?? false);
+    final commentsGroupValid =
+        commentsPayloadValid && !(revisions?.commentsInvalid ?? false);
+    final initial = current == null
+        ? _initialPresentation(
+            incoming,
+            validViewer: validViewer,
+            viewerVoteValid: viewerVoteValid,
+            voteGroupValid: voteGroupValid,
+            likesGroupValid: likesGroupValid,
+            commentsGroupValid: commentsGroupValid,
           )
         : incoming;
     final stored =
@@ -170,13 +198,11 @@ class PollStateStore extends ChangeNotifier {
     final changed = <PollStateGroup>{};
     var needsReconcile = false;
     var next = current?.poll ?? initial;
-    final revisions = incoming.stateRevisions;
     final isBootstrap = ingress.origin == PollOrigin.http &&
         ingress.startedGeneration == generationFor(incoming.id);
 
-    BigInt? incomingRevision(String? raw) =>
-        raw == null ? null : BigInt.parse(raw);
     void acceptGroup({
+      required bool valid,
       required BigInt? revision,
       required BigInt? watermark,
       required bool bootstrapped,
@@ -184,6 +210,10 @@ class PollStateStore extends ChangeNotifier {
       required bool equal,
       required void Function() apply,
     }) {
+      if (!valid) {
+        needsReconcile = true;
+        return;
+      }
       if (revision != null) {
         if (watermark == null || revision > watermark) {
           apply();
@@ -199,11 +229,12 @@ class PollStateStore extends ChangeNotifier {
       needsReconcile = true;
     }
 
-    final voteRevision = incomingRevision(revisions?.votes);
-    final likesRevision = incomingRevision(revisions?.likes);
-    final commentsRevision = incomingRevision(revisions?.comments);
+    final voteRevision = revisions?.votesValue;
+    final likesRevision = revisions?.likesValue;
+    final commentsRevision = revisions?.commentsValue;
 
     acceptGroup(
+      valid: voteGroupValid,
       revision: voteRevision,
       watermark: stored.votesRevision,
       bootstrapped: stored.votesBootstrapped,
@@ -218,6 +249,7 @@ class PollStateStore extends ChangeNotifier {
       },
     );
     acceptGroup(
+      valid: likesGroupValid,
       revision: likesRevision,
       watermark: stored.likesRevision,
       bootstrapped: stored.likesBootstrapped,
@@ -231,6 +263,7 @@ class PollStateStore extends ChangeNotifier {
       },
     );
     acceptGroup(
+      valid: commentsGroupValid,
       revision: commentsRevision,
       watermark: stored.commentsRevision,
       bootstrapped: stored.commentsBootstrapped,
@@ -246,6 +279,7 @@ class PollStateStore extends ChangeNotifier {
 
     if (validViewer && incoming.hasViewerVoteOptionIdField) {
       acceptGroup(
+        valid: voteGroupValid && viewerVoteValid,
         revision: voteRevision,
         watermark: stored.viewerVoteRevision,
         bootstrapped: stored.viewerVoteBootstrapped,
@@ -265,6 +299,7 @@ class PollStateStore extends ChangeNotifier {
     }
     if (validViewer && incoming.hasViewerHasLikedField) {
       acceptGroup(
+        valid: likesGroupValid,
         revision: likesRevision,
         watermark: stored.viewerLikeRevision,
         bootstrapped: stored.viewerLikeBootstrapped,
@@ -300,7 +335,9 @@ class PollStateStore extends ChangeNotifier {
       _polls[incoming.id] = stored;
       notifyListeners();
     }
+    if (needsReconcile) _requestReconcile(incoming.id);
     return PollMergeResult(
+      accepted: true,
       state: _polls[incoming.id]?.poll,
       changedGroups: Set.unmodifiable(changed),
       needsReconcile: needsReconcile,
@@ -328,10 +365,11 @@ class PollStateStore extends ChangeNotifier {
     return token;
   }
 
-  void completeOperation(PollOperationToken token, [PollSummary? snapshot]) {
-    if (!_owns(token)) return;
+  bool completeOperation(PollOperationToken token, [PollSummary? snapshot]) {
+    if (!_owns(token)) return false;
+    var accepted = true;
     if (snapshot != null) {
-      ingest(
+      accepted = ingest(
           snapshot,
           PollIngress(
             origin: PollOrigin.mutation,
@@ -340,10 +378,11 @@ class PollStateStore extends ChangeNotifier {
             expectedPollId: token.pollId,
             requestId: token.operationId,
             startedGeneration: generationFor(token.pollId),
-          ));
+          )).accepted;
     }
     _pending.remove((token.pollId, token.action));
     notifyListeners();
+    return accepted;
   }
 
   void failOperation(PollOperationToken token, {required bool ambiguous}) {
@@ -389,21 +428,62 @@ class PollStateStore extends ChangeNotifier {
       token.viewerId == _viewerId &&
       _pending[(token.pollId, token.action)] == token;
 
-  bool _validSnapshot(PollSummary poll, {required bool validateViewer}) {
-    if (poll.votesCount < 0 || poll.likesCount < 0 || poll.commentsCount < 0) {
-      return false;
-    }
+  bool _validOptionIdentity(PollSummary poll) {
     final ids = poll.options.map((option) => option.id).toSet();
-    if (ids.length != poll.options.length ||
-        poll.options.any((option) => option.votesCount < 0)) {
-      return false;
-    }
-    if (poll.options.fold<int>(0, (sum, option) => sum + option.votesCount) !=
-        poll.votesCount) {
-      return false;
-    }
-    final selected = poll.viewerVoteOptionId;
-    return !validateViewer || selected == null || ids.contains(selected);
+    final positions = poll.options.map((option) => option.position).toSet();
+    return ids.length == poll.options.length &&
+        positions.length == poll.options.length &&
+        poll.options.every((option) => option.id.isNotEmpty);
+  }
+
+  bool _validVotePayload(PollSummary poll) =>
+      poll.votesCount >= 0 &&
+      poll.options.every((option) => option.votesCount >= 0) &&
+      poll.options.fold<int>(0, (sum, option) => sum + option.votesCount) ==
+          poll.votesCount;
+
+  PollSummary _initialPresentation(
+    PollSummary incoming, {
+    required bool validViewer,
+    required bool viewerVoteValid,
+    required bool voteGroupValid,
+    required bool likesGroupValid,
+    required bool commentsGroupValid,
+  }) {
+    return incoming.copyWith(
+      votesCount: voteGroupValid ? incoming.votesCount : 0,
+      options: voteGroupValid
+          ? incoming.options
+          : incoming.options
+              .map((option) => PollOptionSummary(
+                    id: option.id,
+                    text: option.text,
+                    position: option.position,
+                    votesCount: 0,
+                  ))
+              .toList(),
+      likesCount: likesGroupValid ? incoming.likesCount : 0,
+      commentsCount: commentsGroupValid ? incoming.commentsCount : 0,
+      viewerHasLiked:
+          validViewer && incoming.hasViewerHasLikedField && likesGroupValid
+              ? incoming.viewerHasLiked
+              : false,
+      hasViewerHasLikedField:
+          validViewer && incoming.hasViewerHasLikedField && likesGroupValid,
+      clearViewerVoteOptionId:
+          !validViewer || !voteGroupValid || !viewerVoteValid,
+      hasViewerVoteOptionIdField: validViewer &&
+          incoming.hasViewerVoteOptionIdField &&
+          voteGroupValid &&
+          viewerVoteValid,
+    );
+  }
+
+  void _requestReconcile(String pollId) {
+    final callback = onReconcileRequested;
+    if (callback == null) return;
+    final epoch = _sessionEpoch;
+    scheduleMicrotask(() => callback(pollId, epoch));
   }
 
   bool _samePresentation(PollSummary a, PollSummary b) =>

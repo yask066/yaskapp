@@ -59,7 +59,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _ownsPollsApiClient = widget._pollsApiClient == null;
     _pollsApiClient = widget._pollsApiClient ?? PollsApiClient();
     _pollStateStore = widget.pollStateStore;
-    _pollsApiClient.bindPollStateStore(_pollStateStore);
+    _pollsApiClient.bindPollStateStore(
+      _pollStateStore,
+      accessToken: widget.session.accessToken,
+    );
     final epoch = _pollStateStore.sessionEpoch;
     _pollVoteSubscription =
         widget.realtimeSession.realtimeClient.pollVotes.listen((event) {

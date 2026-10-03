@@ -429,20 +429,26 @@ class FeedScreenState extends State<FeedScreen> {
   void _replacePollInFeed(PollSummary updatedPoll) {
     final store = PollStateScope.maybeOf(context);
     if (store != null) {
-      updatedPoll = store
-              .ingest(
-                updatedPoll,
-                PollIngress(
-                  origin: PollOrigin.mutation,
-                  sessionEpoch: store.sessionEpoch,
-                  viewerId: store.viewerId,
-                  expectedPollId: updatedPoll.id,
-                  requestId: 'feed-operation-${++_pollRequestSequence}',
-                  startedGeneration: store.generationFor(updatedPoll.id),
-                ),
-              )
-              .state ??
-          updatedPoll;
+      final result = store.ingest(
+        updatedPoll,
+        PollIngress(
+          origin: PollOrigin.mutation,
+          sessionEpoch: store.sessionEpoch,
+          viewerId: store.viewerId,
+          expectedPollId: updatedPoll.id,
+          requestId: 'feed-operation-${++_pollRequestSequence}',
+          startedGeneration: store.generationFor(updatedPoll.id),
+        ),
+      );
+      if (!result.accepted) {
+        if (store.isDeleted(updatedPoll.id)) {
+          setState(() {
+            _polls.removeWhere((poll) => poll.id == updatedPoll.id);
+          });
+        }
+        return;
+      }
+      updatedPoll = result.state ?? updatedPoll;
     }
     _replacePollInFeedValue(updatedPoll);
   }

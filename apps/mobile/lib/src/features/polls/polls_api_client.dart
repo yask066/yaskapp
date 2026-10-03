@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -47,6 +48,18 @@ class CreatePollCommentResult {
   final PollSummary poll;
 }
 
+class PollReconciliationFailure {
+  const PollReconciliationFailure({
+    required this.pollId,
+    required this.sessionEpoch,
+    required this.error,
+  });
+
+  final String pollId;
+  final int sessionEpoch;
+  final Object error;
+}
+
 class PollsApiClient {
   PollsApiClient({
     ApiConfig config = const ApiConfig(),
@@ -58,9 +71,51 @@ class PollsApiClient {
   final http.Client _httpClient;
   PollStateStore? _pollStateStore;
   int _requestSequence = 0;
+  String? _sessionAccessToken;
+  bool _closed = false;
+  final Set<(int, String)> _reconciliationFlights = {};
+  final StreamController<PollReconciliationFailure> _reconciliationFailures =
+      StreamController.broadcast();
 
-  void bindPollStateStore(PollStateStore store) {
+  Stream<PollReconciliationFailure> get reconciliationFailures =>
+      _reconciliationFailures.stream;
+
+  void bindPollStateStore(PollStateStore store, {String? accessToken}) {
+    final previous = _pollStateStore;
+    if (previous != null &&
+        previous.onReconcileRequested == _queueReconciliation) {
+      previous.onReconcileRequested = null;
+    }
     _pollStateStore = store;
+    _sessionAccessToken = accessToken;
+    store.onReconcileRequested = _queueReconciliation;
+  }
+
+  void _queueReconciliation(String pollId, int sessionEpoch) {
+    final store = _pollStateStore;
+    final key = (sessionEpoch, pollId);
+    if (_closed ||
+        store == null ||
+        store.sessionEpoch != sessionEpoch ||
+        store.isDeleted(pollId) ||
+        !_reconciliationFlights.add(key)) {
+      return;
+    }
+    unawaited(() async {
+      try {
+        await getPoll(pollId: pollId, accessToken: _sessionAccessToken);
+      } catch (error) {
+        if (!_closed && store.sessionEpoch == sessionEpoch) {
+          _reconciliationFailures.add(PollReconciliationFailure(
+            pollId: pollId,
+            sessionEpoch: sessionEpoch,
+            error: error,
+          ));
+        }
+      } finally {
+        _reconciliationFlights.remove(key);
+      }
+    }());
   }
 
   _PollReadContext _captureRead({String? expectedPollId}) {
@@ -77,25 +132,23 @@ class PollsApiClient {
     );
   }
 
-  PollSummary _ingestRead(PollSummary poll, _PollReadContext context) {
+  PollSummary? _ingestRead(PollSummary poll, _PollReadContext context) {
     final store = context.store;
     if (store == null) return poll;
-    return store
-            .ingest(
-              poll,
-              PollIngress(
-                origin: PollOrigin.http,
-                sessionEpoch: context.epoch,
-                viewerId: context.viewerId,
-                expectedPollId: context.expectedPollId,
-                requestId: context.requestId,
-                startedGeneration: context.startedGeneration ??
-                    context.generationSnapshot[poll.id] ??
-                    0,
-              ),
-            )
-            .state ??
-        poll;
+    final result = store.ingest(
+      poll,
+      PollIngress(
+        origin: PollOrigin.http,
+        sessionEpoch: context.epoch,
+        viewerId: context.viewerId,
+        expectedPollId: context.expectedPollId,
+        requestId: context.requestId,
+        startedGeneration: context.startedGeneration ??
+            context.generationSnapshot[poll.id] ??
+            0,
+      ),
+    );
+    return result.accepted ? result.state : null;
   }
 
   List<PollSummary> _ingestReadList(
@@ -104,32 +157,71 @@ class PollsApiClient {
   ) {
     final unique = <String, PollSummary>{};
     for (final poll in polls) {
-      unique[poll.id] = _ingestRead(poll, context);
+      final canonical = _ingestRead(poll, context);
+      if (canonical != null) unique[poll.id] = canonical;
     }
     return unique.values.toList();
   }
 
-  PollSummary _ingestMutation(PollSummary poll, String requestId) {
+  _PollMutationContext _captureMutation({String? expectedPollId}) {
     final store = _pollStateStore;
+    return _PollMutationContext(
+      store: store,
+      epoch: store?.sessionEpoch ?? 0,
+      viewerId: store?.viewerId,
+      expectedPollId: expectedPollId,
+      requestId: 'mutation-${++_requestSequence}',
+      startedGeneration: expectedPollId == null
+          ? 0
+          : store?.generationFor(expectedPollId) ?? 0,
+    );
+  }
+
+  PollSummary _ingestMutation(PollSummary poll, _PollMutationContext context) {
+    final store = context.store;
     if (store == null) return poll;
-    return store
-            .ingest(
-              poll,
-              PollIngress(
-                origin: PollOrigin.mutation,
-                sessionEpoch: store.sessionEpoch,
-                viewerId: store.viewerId,
-                expectedPollId: poll.id,
-                requestId: requestId,
-                startedGeneration: store.generationFor(poll.id),
-              ),
-            )
-            .state ??
-        poll;
+    final result = store.ingest(
+      poll,
+      PollIngress(
+        origin: PollOrigin.mutation,
+        sessionEpoch: context.epoch,
+        viewerId: context.viewerId,
+        expectedPollId: context.expectedPollId ?? poll.id,
+        requestId: context.requestId,
+        startedGeneration: context.startedGeneration,
+      ),
+    );
+    if (!result.accepted || result.state == null) {
+      throw const PollsApiException(
+          'Poll response was rejected because its session or state is stale.');
+    }
+    return result.state!;
+  }
+
+  PollSummary _completeOperation(
+    PollStateStore store,
+    PollOperationToken token,
+    PollSummary poll,
+  ) {
+    if (!store.completeOperation(token, poll)) {
+      throw const PollsApiException(
+          'Poll action response was rejected because its session or state is stale.');
+    }
+    final canonical = store.pollById(token.pollId);
+    if (canonical == null) {
+      throw const PollsApiException('Poll is no longer available.');
+    }
+    return canonical;
   }
 
   void close() {
+    _closed = true;
     _httpClient.close();
+    final store = _pollStateStore;
+    if (store != null && store.onReconcileRequested == _queueReconciliation) {
+      store.onReconcileRequested = null;
+    }
+    unawaited(_reconciliationFailures.close());
   }
 
   Future<List<PollSummary>> listPolls({
@@ -180,10 +272,15 @@ class PollsApiClient {
         if (accessToken != null) 'authorization': 'Bearer $accessToken',
       },
     );
-    return _ingestRead(
+    final poll = _ingestRead(
       _decodePollResponse(response, 'Poll response is invalid.'),
       readContext,
     );
+    if (poll == null) {
+      throw const PollsApiException(
+          'Poll response was rejected because its session or state is stale.');
+    }
+    return poll;
   }
 
   Future<List<PollSummary>> listMyPolls({
@@ -292,6 +389,7 @@ class PollsApiClient {
     String? imageFilename,
     String? imageContentType,
   }) async {
+    final mutationContext = _captureMutation();
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls',
     );
@@ -345,7 +443,7 @@ class PollsApiClient {
       throw const PollsApiException('Create poll response is invalid.');
     }
 
-    return _ingestMutation(PollSummary.fromJson(poll), 'create-${poll['id']}');
+    return _ingestMutation(PollSummary.fromJson(poll), mutationContext);
   }
 
   MediaType? _mediaType(String contentType) {
@@ -393,8 +491,7 @@ class PollsApiClient {
 
       final updated = PollSummary.fromJson(poll);
       if (operation != null) {
-        stateStore!.completeOperation(operation, updated);
-        return stateStore.pollById(pollId) ?? updated;
+        return _completeOperation(stateStore!, operation, updated);
       }
       return updated;
     } catch (error) {
@@ -433,8 +530,7 @@ class PollsApiClient {
       final updated =
           _decodePollResponse(response, 'Cancel vote response is invalid.');
       if (operation != null) {
-        stateStore!.completeOperation(operation, updated);
-        return stateStore.pollById(pollId) ?? updated;
+        return _completeOperation(stateStore!, operation, updated);
       }
       return updated;
     } catch (error) {
@@ -506,8 +602,7 @@ class PollsApiClient {
       final updated =
           _decodePollResponse(response, 'Like response is invalid.');
       if (operation != null) {
-        stateStore!.completeOperation(operation, updated);
-        return stateStore.pollById(pollId) ?? updated;
+        return _completeOperation(stateStore!, operation, updated);
       }
       return updated;
     } catch (error) {
@@ -546,8 +641,7 @@ class PollsApiClient {
       final updated =
           _decodePollResponse(response, 'Unlike response is invalid.');
       if (operation != null) {
-        stateStore!.completeOperation(operation, updated);
-        return stateStore.pollById(pollId) ?? updated;
+        return _completeOperation(stateStore!, operation, updated);
       }
       return updated;
     } catch (error) {
@@ -713,6 +807,7 @@ class PollsApiClient {
     required String accessToken,
     String? parentCommentId,
   }) async {
+    final mutationContext = _captureMutation(expectedPollId: pollId);
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls/$pollId/comments',
     );
@@ -737,7 +832,7 @@ class PollsApiClient {
 
     return CreatePollCommentResult(
       comment: PollCommentSummary.fromJson(comment),
-      poll: _ingestMutation(PollSummary.fromJson(poll), 'comment-$pollId'),
+      poll: _ingestMutation(PollSummary.fromJson(poll), mutationContext),
     );
   }
 
@@ -809,4 +904,22 @@ class _PollReadContext {
   final String requestId;
   final int? startedGeneration;
   final Map<String, int> generationSnapshot;
+}
+
+class _PollMutationContext {
+  const _PollMutationContext({
+    required this.store,
+    required this.epoch,
+    required this.viewerId,
+    required this.expectedPollId,
+    required this.requestId,
+    required this.startedGeneration,
+  });
+
+  final PollStateStore? store;
+  final int epoch;
+  final String? viewerId;
+  final String? expectedPollId;
+  final String requestId;
+  final int startedGeneration;
 }

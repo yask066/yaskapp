@@ -120,6 +120,57 @@ void main() {
       expect(store.pollById('poll-1')?.votesCount, 10);
     });
 
+    test('an invalid vote group does not block a valid like revision', () {
+      final store = PollStateStore(viewerId: 'user-1');
+      store.ingest(poll(), ingress(PollOrigin.http));
+      final result = store.ingest(
+        poll(
+          votes: 99,
+          optionA: 90,
+          optionB: 4,
+          votesRevision: '2',
+          likes: 11,
+          likesRevision: '2',
+        ),
+        ingress(PollOrigin.mutation),
+      );
+
+      expect(result.needsReconcile, isTrue);
+      expect(result.state?.votesCount, 10);
+      expect(result.state?.likesCount, 11);
+    });
+
+    test('malformed vote revision still accepts valid like revision', () {
+      final store = PollStateStore(viewerId: 'user-1');
+      store.ingest(poll(), ingress(PollOrigin.http));
+      final incoming = poll(likes: 12).copyWith(
+        stateRevisions: PollStateRevisions.fromJson({
+          'votes': '01',
+          'likes': '2',
+          'comments': '1',
+        }),
+      );
+
+      final result = store.ingest(incoming, ingress(PollOrigin.mutation));
+
+      expect(result.needsReconcile, isTrue);
+      expect(result.state?.votesCount, 10);
+      expect(result.state?.likesCount, 12);
+    });
+
+    test('invalid viewer vote field does not block viewer like field', () {
+      final store = PollStateStore(viewerId: 'user-1');
+      final incoming = poll(vote: 'unknown-option', liked: true);
+
+      final result = store.ingest(incoming, ingress(PollOrigin.http));
+
+      expect(result.needsReconcile, isTrue);
+      expect(result.state?.viewerVoteOptionId, isNull);
+      expect(result.state?.hasViewerVoteOptionIdField, isFalse);
+      expect(result.state?.viewerHasLiked, isTrue);
+      expect(result.state?.hasViewerHasLikedField, isTrue);
+    });
+
     test('pending operations are scoped by poll and action and owned by token',
         () {
       final store = PollStateStore(viewerId: 'user-1');

@@ -186,9 +186,9 @@ class PollSummary {
           : DateTime.parse(json['endsAt'] as String).toLocal(),
       stateRevisions: revisionsJson == null
           ? null
-          : PollStateRevisions.fromJson(
-              revisionsJson as Map<String, dynamic>,
-            ),
+          : revisionsJson is Map<String, dynamic>
+              ? PollStateRevisions.fromJson(revisionsJson)
+              : const PollStateRevisions.invalid(),
       hasViewerHasLikedField: json.containsKey('viewerHasLiked'),
       hasViewerVoteOptionIdField: json.containsKey('viewerVoteOptionId'),
     );
@@ -289,33 +289,54 @@ class PollStateRevisions {
     required this.votes,
     required this.likes,
     required this.comments,
+    this.votesInvalid = false,
+    this.likesInvalid = false,
+    this.commentsInvalid = false,
   });
 
+  const PollStateRevisions.invalid()
+      : votes = null,
+        likes = null,
+        comments = null,
+        votesInvalid = true,
+        likesInvalid = true,
+        commentsInvalid = true;
+
   factory PollStateRevisions.fromJson(Map<String, dynamic> json) {
-    String parse(String key) {
+    (String?, bool) parse(String key) {
       final value = json[key];
       if (value is! String || !RegExp(r'^(0|[1-9][0-9]*)$').hasMatch(value)) {
-        throw FormatException('Invalid Poll $key revision');
+        return (null, true);
       }
       final parsed = BigInt.parse(value);
       if (parsed > BigInt.parse('9223372036854775807')) {
-        throw FormatException('Poll $key revision exceeds BIGINT');
+        return (null, true);
       }
-      return value;
+      return (value, false);
     }
 
+    final (votes, votesInvalid) = parse('votes');
+    final (likes, likesInvalid) = parse('likes');
+    final (comments, commentsInvalid) = parse('comments');
     return PollStateRevisions(
-      votes: parse('votes'),
-      likes: parse('likes'),
-      comments: parse('comments'),
+      votes: votes,
+      likes: likes,
+      comments: comments,
+      votesInvalid: votesInvalid,
+      likesInvalid: likesInvalid,
+      commentsInvalid: commentsInvalid,
     );
   }
 
-  final String votes;
-  final String likes;
-  final String comments;
+  final String? votes;
+  final String? likes;
+  final String? comments;
+  final bool votesInvalid;
+  final bool likesInvalid;
+  final bool commentsInvalid;
 
-  BigInt get votesValue => BigInt.parse(votes);
-  BigInt get likesValue => BigInt.parse(likes);
-  BigInt get commentsValue => BigInt.parse(comments);
+  BigInt? get votesValue => votes == null ? null : BigInt.parse(votes!);
+  BigInt? get likesValue => likes == null ? null : BigInt.parse(likes!);
+  BigInt? get commentsValue =>
+      comments == null ? null : BigInt.parse(comments!);
 }

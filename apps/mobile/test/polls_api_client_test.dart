@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:yaskapp_mobile/src/core/config/api_config.dart';
+import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
 import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_state_store.dart';
 
@@ -35,6 +36,146 @@ void main() {
     expect(sentRequest.headers['authorization'], 'Bearer access-token');
     expect(poll.id, 'poll-1');
     client.close();
+  });
+
+  test('does not return a poll rejected by the session tombstone', () async {
+    final store = PollStateStore(viewerId: 'user-1');
+    store.markDeleted(
+      'poll-1',
+      PollIngress(
+        origin: PollOrigin.realtime,
+        sessionEpoch: store.sessionEpoch,
+        viewerId: null,
+        expectedPollId: 'poll-1',
+        requestId: 'deleted',
+        startedGeneration: 0,
+      ),
+    );
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((request) async => http.Response(
+          jsonEncode(request.url.path == '/polls/poll-1'
+              ? {'poll': _pollJson(commentsCount: 0)}
+              : {
+                  'items': [_pollJson(commentsCount: 0)]
+                }),
+          200)),
+    )..bindPollStateStore(store);
+
+    await expectLater(
+      client.getPoll(pollId: 'poll-1'),
+      throwsA(isA<PollsApiException>()),
+    );
+    expect(await client.listPolls(), isEmpty);
+    expect(store.pollById('poll-1'), isNull);
+    client.close();
+    store.dispose();
+  });
+
+  test('create response from an old session is rejected', () async {
+    final response = Completer<http.Response>();
+    final started = Completer<void>();
+    final store = PollStateStore(viewerId: 'user-1');
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((_) {
+        started.complete();
+        return response.future;
+      }),
+    )..bindPollStateStore(store);
+    final create = client.createPoll(
+      question: 'Question?',
+      options: const ['A', 'B'],
+      accessToken: 'user-one-token',
+    );
+    await started.future;
+    store.clear(viewerId: 'user-2');
+    response.complete(http.Response(
+      jsonEncode({'poll': _pollJson(commentsCount: 0)}),
+      201,
+    ));
+
+    await expectLater(create, throwsA(isA<PollsApiException>()));
+    expect(store.pollById('poll-1'), isNull);
+    client.close();
+    store.dispose();
+  });
+
+  test(
+      'like response cannot return a poll deleted while the request is pending',
+      () async {
+    final response = Completer<http.Response>();
+    final started = Completer<void>();
+    final store = PollStateStore(viewerId: 'user-1');
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((_) {
+        started.complete();
+        return response.future;
+      }),
+    )..bindPollStateStore(store);
+    final like = client.likePoll(pollId: 'poll-1', accessToken: 'token');
+    await started.future;
+    store.markDeleted(
+      'poll-1',
+      PollIngress(
+        origin: PollOrigin.realtime,
+        sessionEpoch: store.sessionEpoch,
+        viewerId: null,
+        expectedPollId: 'poll-1',
+        requestId: 'delete',
+        startedGeneration: 0,
+      ),
+    );
+    response.complete(http.Response(
+      jsonEncode({'poll': _pollJson(commentsCount: 0)}),
+      200,
+    ));
+
+    await expectLater(like, throwsA(isA<PollsApiException>()));
+    expect(store.pollById('poll-1'), isNull);
+    client.close();
+    store.dispose();
+  });
+
+  test('coalesces reconciliation for repeated unversioned realtime events',
+      () async {
+    var getCount = 0;
+    final started = Completer<void>();
+    final store = PollStateStore(viewerId: 'user-1');
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((request) async {
+        if (request.method == 'GET') {
+          getCount++;
+          started.complete();
+          return http.Response(
+              jsonEncode({'poll': _pollJson(commentsCount: 0)}), 200);
+        }
+        throw StateError('Unexpected request');
+      }),
+    )..bindPollStateStore(store, accessToken: 'user-token');
+    final event = PollSummary.fromJson(_pollJson(commentsCount: 0));
+    for (var i = 0; i < 2; i++) {
+      store.ingest(
+        event,
+        PollIngress(
+          origin: PollOrigin.realtime,
+          sessionEpoch: store.sessionEpoch,
+          viewerId: null,
+          expectedPollId: event.id,
+          requestId: 'event-$i',
+          startedGeneration: 0,
+        ),
+      );
+    }
+    await started.future;
+    await Future<void>.delayed(Duration.zero);
+
+    expect(getCount, 1);
+    expect(store.pollById('poll-1'), isNotNull);
+    client.close();
+    store.dispose();
   });
 
   test('loads a comment by ID for notification deep links', () async {

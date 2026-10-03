@@ -86,23 +86,24 @@ void main() {
     expect(poll.hasViewerVoteOptionIdField, isFalse);
   });
 
-  test('rejects malformed and out-of-range state revisions', () {
-    expect(
-      () => PollStateRevisions.fromJson({
-        'votes': '01',
-        'likes': '0',
-        'comments': '0',
-      }),
-      throwsFormatException,
-    );
-    expect(
-      () => PollStateRevisions.fromJson({
-        'votes': '9223372036854775808',
-        'likes': '0',
-        'comments': '0',
-      }),
-      throwsFormatException,
-    );
+  test('isolates malformed state revisions by group', () {
+    final revisions = PollStateRevisions.fromJson({
+      'votes': '01',
+      'likes': '0',
+      'comments': '0',
+    });
+    expect(revisions.votesInvalid, isTrue);
+    expect(revisions.votes, isNull);
+    expect(revisions.likesValue, BigInt.zero);
+    expect(revisions.commentsValue, BigInt.zero);
+
+    final overflow = PollStateRevisions.fromJson({
+      'votes': '9223372036854775808',
+      'likes': '0',
+      'comments': '0',
+    });
+    expect(overflow.votesInvalid, isTrue);
+    expect(overflow.likesValue, BigInt.zero);
   });
 
   test('parses poll comment summary from json', () {
