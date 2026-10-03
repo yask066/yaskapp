@@ -1,0 +1,49 @@
+M03 closure — 2026-10-03 (UTC+03)
+Source HEAD: 8a794e5 (M02); branch: codex/m03-poll-state-contract
+Scope: docs/motion-poll-state-contract.md, plan status, decision probe and logs only.
+
+Decision: M04 required. Add independent BIGINT revisions (votes/likes/comments)
+as decimal strings in stateRevisions, coherent DTO reads, real authenticated
+search viewer fields, removal of both viewer fields from Poll broadcasts.
+Client contract: independent aggregate/viewer watermarks, session epoch,
+terminal deletion and operation-owned pending tokens. M04 is not executed.
+
+Fresh commands and observed outcomes:
+1. node docs/motion-scroll-loading-evidence/m03-contract-probe.mjs
+   Exit 0; 23/23 semantic decision checks passed; fixtureVersion=2, seed=20261002.
+   Full output: m03-model-output.txt.
+2. node --test scripts/t02-motion-scroll-baseline-server.test.mjs
+   Exit 0; 10 passed, 0 failed/cancelled/skipped; duration 20128.6705 ms.
+   Full output: m03-fixture-output.txt.
+
+Probe annotations of versions are hypothetical contract inputs, not existing
+backend output. Probe is an independent decision model, not a production reducer
+or a test of document text. Existing M02 fixture was read without modification.
+
+Self-review against M03 checklist and PRD FR-01–FR-03 / AC-03:
+- updatedAt writers, transaction boundaries, DTOs and client decoders inspected.
+- Equal/older/newer/unknown/invalid revisions have explicit decisions.
+- Realtime excludes personal state; old aggregate does not suppress personal ack.
+- Coherent snapshot is required across counters/options/revisions/viewer reads.
+- Legacy compatibility/failure behavior, rollout and exact wire fields specified.
+- Reducer/controller inputs, nullable rejection result and pending tokens fixed.
+- C01–C14 specify downstream tests including session/deletion/search/cache shapes.
+- Only M03 is closed in plan; M04–M27 remain open, G0 remains closed.
+
+Rulings/adaptations (cost if wrong):
+- Document-only work used current checkout on its own branch, no extra worktree
+  (later isolation of these documents may be needed).
+- Windows used a direct PowerShell ledger rather than bash task helpers
+  (bookkeeping may need replay on a bash host).
+- Review was performed by the author; no delegation because the plan requires
+  separate human authorization (independent review may find missed issues).
+No deferred minor findings.
+
+Setup failures, not test failures: sandbox denied branch ref creation, ledger
+directory creation and evidence log redirection. These actions were retried with
+tool-granted escalation. No DB migration or application implementation ran.
+
+Not measured/verified in M03: production backend revisions, DB integration,
+client merge/cache fan-out, client full suites, transport/reconnect/lifecycle,
+device profiling, geometry/text scale, AC-12 and G0. M02 red M05/M06/M14 cases and
+previous unrelated failures remain the input to their owning tasks.

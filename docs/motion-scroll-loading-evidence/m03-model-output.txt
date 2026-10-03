@@ -1,0 +1,25 @@
+PASS M02 forward response order
+PASS M02 reverse response order
+PASS M02 stale refetch after both actions
+PASS coherent second committed snapshot
+PASS M02 duplicate realtime before late HTTP: independent viewer watermark
+PASS broadcast never changes either viewer field
+PASS equal revision and identical payload are a full no-op
+PASS equal revision conflict preserves accepted payload and requests reconcile
+PASS comments group is independent from stale reaction groups
+PASS missing revision cannot replace known state
+PASS legacy bootstrap remains unverified and has no known watermark
+PASS absent authenticated viewer keys preserve known personal fields
+PASS malformed revisions rejected; valid independent group accepted
+PASS bigint ordering is exact above JS safe integer
+PASS invalid vote sum rejected without suppressing fresh like
+PASS logout/login drops old epoch even for same principal
+PASS different principal or wrong poll ID rejected
+PASS deletion is absorbing across late HTTP/refetch/realtime
+PASS old epoch deletion cannot delete new session state
+PASS 10 taps per action admit one request; independent actions and polls allowed
+PASS old completion cannot clear retry pending in same epoch
+PASS old session completion cannot clear new session pending
+PASS M02 source fixture unchanged
+M03 decision model: 23/23 passed; fixtureVersion=2; seed=20261002
+Not verified here: production reducer, DB isolation/atomicity, cache fan-out, transport, lifecycle or G0.

@@ -1,0 +1,18 @@
+✔ serves the two T02 search pages through the existing cursor contract (148.9508ms)
+✔ fixture covers zero, digit boundaries, equal results and overlapping pages (0.9369ms)
+✔ normal feed stays single-page; initial error can be retried (149.1917ms)
+✔ profiling feed creates 100 stable unique poll and option IDs (158.9194ms)
+✔ media error preserves a repeatable error; valid media loads after delay (270.8123ms)
+✔ reorder returns independent snapshots in the configured HTTP order (948.3783ms)
+✔ reorder-reverse returns independent snapshots in the configured HTTP order (932.9797ms)
+✔ normal mutations return accumulated vote and like state (127.1416ms)
+✔ delay uses the fixture deadline and HTTP status (2157.8228ms)
+✔ timeout uses the fixture deadline and HTTP status (15146.7546ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20128.6705
