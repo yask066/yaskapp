@@ -1,17 +1,21 @@
 import { useState, type FormEvent } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { search } from '../../api/search';
 import { PollCard } from '../../components/PollCard';
 import { Avatar } from '../../components/Avatar';
 import { useSession } from '../../app/session-provider';
+import { fetchPollQuery } from '../polls/poll-state';
 type SearchType = 'all' | 'polls' | 'users'; type SearchSort = 'relevance' | 'newest' | 'popular';
 export function SearchPage() {
   const { user } = useSession();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
   const [type, setType] = useState<SearchType>('all');
   const [sort, setSort] = useState<SearchSort>('relevance');
-  const searchMutation = useMutation({ mutationFn: () => search({ q: query.trim(), type, sort }) });
+  const searchMutation = useMutation({
+    mutationFn: () => fetchPollQuery(queryClient, user?.id ?? null, () => search({ q: query.trim(), type, sort }), false),
+  });
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (query.trim().length >= 2) searchMutation.mutate();

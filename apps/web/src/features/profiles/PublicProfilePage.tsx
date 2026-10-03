@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { followUser, getPublicProfile, listUserPolls, unfollowUser } from '../../api/profiles';
 import type { FollowRelationship, PublicProfile } from '../../api/models';
 import { useSession } from '../../app/session-provider';
+import { fetchPollQuery } from '../polls/poll-state';
 import { AsyncState } from '../../components/AsyncState';
 import { Avatar } from '../../components/Avatar';
 import { PollCard } from '../../components/PollCard';
@@ -12,7 +13,7 @@ function replaceFollowState(profile: PublicProfile, relationship: FollowRelation
 export function PublicProfilePage() {
   const { userId = '' } = useParams(); const { status, user } = useSession(); const queryClient = useQueryClient(); const navigate = useNavigate();
   const profileQuery = useQuery({ queryKey: ['profile', userId], queryFn: () => getPublicProfile(userId), enabled: Boolean(userId) && status !== 'loading' });
-  const pollsQuery = useQuery({ queryKey: ['user-polls', userId], queryFn: () => listUserPolls(userId), enabled: Boolean(userId) && status !== 'loading' });
+  const pollsQuery = useQuery({ queryKey: ['user-polls', userId], queryFn: () => fetchPollQuery(queryClient, user?.id ?? null, () => listUserPolls(userId)), enabled: Boolean(userId) && status !== 'loading' });
   const followMutation = useMutation({ mutationFn: (following: boolean) => following ? unfollowUser(userId) : followUser(userId), onSuccess: (relationship) => queryClient.setQueryData<PublicProfile>(['profile', userId], (profile) => profile ? replaceFollowState(profile, relationship) : profile) });
   if (user?.id === userId) return <Navigate to="/me" replace />;
   if (profileQuery.isPending) return <main id="main-content"><AsyncState state="loading" /></main>;

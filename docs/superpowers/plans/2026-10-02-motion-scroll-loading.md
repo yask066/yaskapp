@@ -11,7 +11,7 @@
 **Spec:** [PRD: Плавные реакции, появление карточек и стабильная прокрутка](../../prd-motion-scroll-loading.md).
 
 **Дата:** 2 октября 2026 года.  
-**Статус:** M01 и M02 завершены 2 октября 2026 года; M03 завершена 3 октября 2026 года. Аудит, контракт и evidence сохранены в репозитории. M04–M27 не начаты; по решению M03 задача M04 обязательна.
+**Статус:** M01 и M02 завершены 2 октября 2026 года; M03 и M05 завершены 3 октября 2026 года. Аудит, контракт, реализация и evidence сохранены в репозитории. Код M04 присутствует, обязательные DB verification/evidence остаются открытыми; M06–M27 не начаты.
 **Нумерация:** M01–M27; исторические T01/T02 не переименовываются и не считаются закрытыми задачами этого плана.
 
 ## Global Constraints
@@ -166,11 +166,13 @@
 
 **Интерфейсы:** `usePollMutations()` сохраняет `vote`, `cancelVote`, `toggleLike`, `deletePoll`; добавляет `isVoting(pollId: string): boolean`, `isLiking(pollId: string): boolean`. Cache ingress применяет merge M03 вместо безусловной замены Poll.
 
-- [ ] Добавить failing tests: оба response orders, duplicate, stale refetch, 10 like/vote taps → один запрос; poll B доступен пока poll A pending.
-- [ ] Реализовать per-poll/action pending. Vote/cancel одного опроса взаимно исключаются; like и vote могут идти параллельно.
-- [ ] Подключить merge ко всем загруженным представлениям Poll, включая search data с nested result shape, detail и user-polls. Не превращать неизвестный cache shape в `Poll[]`.
-- [ ] Проверить отказ, closed poll, invalid option и existing optimistic behavior: rollback только своих полей, без новой optimistic системы.
-- [ ] Запустить `usePollMutations.test.tsx`, `poll-state.test.ts` и затронутые page tests; typecheck проходит. Сохранить отдельный commit.
+- [x] Добавить failing tests: оба response orders, duplicate, stale refetch, 10 like/vote taps → один запрос; poll B доступен пока poll A pending.
+- [x] Реализовать per-poll/action pending. Vote/cancel одного опроса взаимно исключаются; like и vote могут идти параллельно.
+- [x] Подключить merge ко всем загруженным представлениям Poll, включая search data с nested result shape, detail и user-polls. Не превращать неизвестный cache shape в `Poll[]`.
+- [x] Проверить отказ, closed poll, invalid option и existing optimistic behavior: rollback только своих полей, без новой optimistic системы.
+- [x] Запустить `usePollMutations.test.tsx`, `poll-state.test.ts` и затронутые page tests; typecheck проходит. Сохранить отдельный commit.
+
+**Выполнено 3 октября 2026 года:** `poll-state.ts` сравнивает независимые BIGINT revisions, сохраняет viewer presence/watermarks отдельно, объединяет loaded Poll во feed/detail/profile/search caches, отсекает response после смены session и legacy refetch, начатый до mutation. Pending vote/cancel и like изолированы по Poll; duplicate taps блокируются, соседний Poll остаётся доступен. Regression tests подтвердили оба порядка ответа, stale refetch, duplicate, nested search, равные/большие revisions, отказы закрытого опроса/неверного варианта и session epoch. Full web suite 136/136; typecheck, production build и lint изменённых файлов проходят. Полный lint сообщает 2 прежних warnings в `CommentThread.tsx` и `notification-store.tsx`. G0/M04 backend integration evidence этим не закрываются.
 
 **Готово:** новый like переживает старый vote snapshot, и наоборот; pending не блокирует всю ленту. **AC:** AC-02, AC-03.
 

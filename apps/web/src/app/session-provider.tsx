@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { getMe, login, logout, register } from '../api/auth';
 import { ApiError, apiClient } from '../api/client';
 import type { AuthUser } from '../api/models';
+import { resetPollSession } from '../features/polls/poll-state';
 
 type SessionStatus = 'loading' | 'authenticated' | 'anonymous';
 
@@ -27,6 +28,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const clearSession = useCallback(() => {
     setSessionEpoch((epoch) => epoch + 1);
+    resetPollSession(queryClient);
     queryClient.clear();
     setUser(null);
     setStatus('anonymous');
@@ -52,9 +54,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const establishSession = useCallback((nextUser: AuthUser) => {
     setSessionEpoch((epoch) => epoch + 1);
+    resetPollSession(queryClient);
     setUser(nextUser);
     setStatus('authenticated');
-  }, []);
+  }, [queryClient]);
 
   const value = useMemo<SessionState>(() => ({
     status, user, sessionEpoch,
@@ -71,4 +74,10 @@ export function useSession(): SessionState {
   const value = useContext(SessionContext);
   if (!value) throw new Error('useSession must be used within a SessionProvider.');
   return value;
+}
+
+// This hook is also consumed by isolated feature tests without a session provider.
+// eslint-disable-next-line react-refresh/only-export-components
+export function useOptionalSession(): SessionState | null {
+  return useContext(SessionContext);
 }

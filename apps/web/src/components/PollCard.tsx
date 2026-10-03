@@ -13,9 +13,10 @@ interface PollCardProps {
   onDelete?: (pollId: string) => void;
   onOpenComments?: (poll: Poll) => void;
   isVoting?: boolean;
+  isLiking?: boolean;
 }
 
-export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelete, onOpenComments, isVoting = false }: PollCardProps) {
+export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelete, onOpenComments, isVoting = false, isLiking = false }: PollCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const authorName = poll.author.displayName || poll.author.username;
   const isClosed = Boolean(poll.endsAt && new Date(poll.endsAt).getTime() <= Date.now());
@@ -62,7 +63,7 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
         {!onVote ? <p id={`poll-${poll.id}-vote-help`}>{voteHelp}</p> : null}
       </section>
       <footer className="poll-actions poll-card__actions">
-        <button className="poll-action-button" type="button" disabled={!onLike} onClick={() => onLike?.(poll.id, poll.viewerHasLiked)} aria-label={`Like (${poll.likesCount})`} aria-pressed={poll.viewerHasLiked} aria-describedby={onLike ? undefined : `poll-${poll.id}-like-help`}>
+        <button className="poll-action-button" type="button" disabled={!onLike || isLiking} onClick={() => onLike?.(poll.id, poll.viewerHasLiked)} aria-label={`Like (${poll.likesCount})`} aria-pressed={poll.viewerHasLiked} aria-describedby={onLike ? undefined : `poll-${poll.id}-like-help`}>
           <MaterialIcon className="poll-action-icon" name={poll.viewerHasLiked ? 'favorite' : 'favorite_border'} /><span className="poll-action-label">Like</span> <span className="poll-action-count">{poll.likesCount}</span>
         </button>
         {!onLike ? <p id={`poll-${poll.id}-like-help`}>{likeHelp}</p> : null}

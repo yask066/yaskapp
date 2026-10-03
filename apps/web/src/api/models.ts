@@ -67,7 +67,14 @@ export interface Poll {
   createdAt: string;
   viewerVoteOptionId: string | null;
   endsAt: string | null;
+  stateRevisions?: PollStateRevisions;
+  /** Decoder presence metadata; absent viewer keys are not confirmations. */
+  viewerState?: { hasLiked?: boolean; voteOptionId?: string | null };
+  /** Client-only independent viewer watermarks. */
+  viewerStateRevisions?: { hasLiked?: string; voteOptionId?: string };
 }
+
+export interface PollStateRevisions { votes?: string; likes?: string; comments?: string }
 
 export interface PollComment {
   id: string;
@@ -186,12 +193,40 @@ export function decodeAuthSession(value: unknown): AuthSession {
 
 export function decodePoll(value: unknown): Poll {
   const source = object(value);
-  return {
+  const revisions = source.stateRevisions === undefined ? undefined : object(source.stateRevisions);
+  const stateRevisions = revisions ? {
+    votes: revision(revisions.votes), likes: revision(revisions.likes), comments: revision(revisions.comments),
+  } : undefined;
+  const options = array(source.options).map(decodePollOption);
+  const votesCount = number(source.votesCount);
+  const commentsCount = number(source.commentsCount);
+  const likesCount = number(source.likesCount);
+  const viewerVoteOptionId = nullableString(source.viewerVoteOptionId);
+  if (!Number.isSafeInteger(votesCount) || votesCount < 0 || !Number.isSafeInteger(commentsCount) || commentsCount < 0 ||
+    !Number.isSafeInteger(likesCount) || likesCount < 0 || new Set(options.map((option) => option.id)).size !== options.length ||
+    options.some((option) => !Number.isSafeInteger(option.votesCount) || option.votesCount < 0) ||
+    options.reduce((sum, option) => sum + option.votesCount, 0) !== votesCount ||
+    (viewerVoteOptionId !== null && !options.some((option) => option.id === viewerVoteOptionId))) invalidResponse();
+  const decoded: Poll = {
     id: string(source.id), author: decodePollAuthor(source.author), question: string(source.question), imageUrl: nullableString(source.imageUrl),
-    options: array(source.options).map(decodePollOption), votesCount: number(source.votesCount), commentsCount: number(source.commentsCount),
-    likesCount: number(source.likesCount), viewerHasLiked: boolean(source.viewerHasLiked), allowVoteCancellation: boolean(source.allowVoteCancellation),
-    createdAt: string(source.createdAt), viewerVoteOptionId: nullableString(source.viewerVoteOptionId), endsAt: nullableString(source.endsAt),
+    options, votesCount, commentsCount,
+    likesCount, viewerHasLiked: boolean(source.viewerHasLiked), allowVoteCancellation: boolean(source.allowVoteCancellation),
+    createdAt: string(source.createdAt), viewerVoteOptionId, endsAt: nullableString(source.endsAt),
+    ...(stateRevisions ? { stateRevisions } : {}),
   };
+  Object.defineProperty(decoded, 'viewerState', {
+    value: {
+      ...(Object.hasOwn(source, 'viewerHasLiked') ? { hasLiked: boolean(source.viewerHasLiked) } : {}),
+      ...(Object.hasOwn(source, 'viewerVoteOptionId') ? { voteOptionId: nullableString(source.viewerVoteOptionId) } : {}),
+    },
+    enumerable: false,
+  });
+  return decoded;
+}
+
+function revision(value: unknown): string {
+  if (typeof value !== 'string' || !/^(0|[1-9][0-9]*)$/.test(value) || BigInt(value) > 9223372036854775807n) invalidResponse();
+  return value;
 }
 
 function decodePollAuthor(value: unknown): PollAuthor {

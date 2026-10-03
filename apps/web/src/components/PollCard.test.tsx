@@ -30,6 +30,13 @@ test('votes immediately when an available option is clicked', async () => {
   expect(onVote).toHaveBeenCalledWith('poll-1', 'option-1');
 });
 
+test('disables only the like action while that poll like is pending', () => {
+  renderWithProviders(<PollCard poll={poll} viewerId="user-1" onVote={vi.fn()} onLike={vi.fn()} isLiking />);
+
+  expect(screen.getByRole('button', { name: 'Like (2)' })).toBeDisabled();
+  expect(screen.getByText('First').closest('button')).toBeEnabled();
+});
+
 test('does not render a separate vote button', () => {
   renderWithProviders(<PollCard poll={poll} viewerId="user-1" onVote={vi.fn()} />);
 
