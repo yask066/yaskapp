@@ -9,6 +9,7 @@ import '../polls/poll_card.dart';
 import '../polls/poll_comments_screen.dart';
 import '../polls/poll_summary.dart';
 import '../polls/polls_api_client.dart';
+import '../polls/poll_state_scope.dart';
 import '../realtime/realtime_client.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
@@ -140,6 +141,7 @@ class ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _toggleLike(PollSummary poll) async {
+    poll = PollStateScope.maybeOf(context)?.pollById(poll.id) ?? poll;
     if (_likingPollIds.contains(poll.id)) {
       return;
     }

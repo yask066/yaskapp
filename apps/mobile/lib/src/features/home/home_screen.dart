@@ -13,6 +13,9 @@ import '../notifications/notifications_screen.dart';
 import '../notifications/notification_navigator.dart';
 import '../notifications/notification_store.dart';
 import '../realtime/realtime_session.dart';
+import '../polls/poll_state_store.dart';
+import '../polls/poll_state_scope.dart';
+import '../realtime/realtime_client.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -21,6 +24,7 @@ class HomeScreen extends StatefulWidget {
     required this.onLogout,
     required this.onUserUpdated,
     required this.realtimeSession,
+    required this.pollStateStore,
     super.key,
     PollsApiClient? pollsApiClient,
   }) : _pollsApiClient = pollsApiClient;
@@ -30,6 +34,7 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback onLogout;
   final ValueChanged<AuthUser> onUserUpdated;
   final RealtimeSession realtimeSession;
+  final PollStateStore pollStateStore;
   final PollsApiClient? _pollsApiClient;
 
   @override
@@ -42,6 +47,9 @@ class _HomeScreenState extends State<HomeScreen> {
   late final PollsApiClient _pollsApiClient;
   late final bool _ownsPollsApiClient;
   late final NotificationStore _notificationStore;
+  late final PollStateStore _pollStateStore;
+  StreamSubscription<PollVoteRealtimeEvent>? _pollVoteSubscription;
+  StreamSubscription<PollDeletedRealtimeEvent>? _pollDeletedSubscription;
   final _feedKey = GlobalKey<FeedScreenState>();
   final _profileKey = GlobalKey<ProfileScreenState>();
 
@@ -50,6 +58,37 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _ownsPollsApiClient = widget._pollsApiClient == null;
     _pollsApiClient = widget._pollsApiClient ?? PollsApiClient();
+    _pollStateStore = widget.pollStateStore;
+    _pollsApiClient.bindPollStateStore(_pollStateStore);
+    final epoch = _pollStateStore.sessionEpoch;
+    _pollVoteSubscription =
+        widget.realtimeSession.realtimeClient.pollVotes.listen((event) {
+      _pollStateStore.ingest(
+        event.poll,
+        PollIngress(
+          origin: PollOrigin.realtime,
+          sessionEpoch: epoch,
+          viewerId: null,
+          expectedPollId: event.poll.id,
+          requestId: 'realtime-vote-${event.poll.id}',
+          startedGeneration: _pollStateStore.generationFor(event.poll.id),
+        ),
+      );
+    });
+    _pollDeletedSubscription =
+        widget.realtimeSession.realtimeClient.pollDeletions.listen((event) {
+      _pollStateStore.markDeleted(
+        event.pollId,
+        PollIngress(
+          origin: PollOrigin.realtime,
+          sessionEpoch: epoch,
+          viewerId: null,
+          expectedPollId: event.pollId,
+          requestId: 'realtime-delete-${event.pollId}',
+          startedGeneration: _pollStateStore.generationFor(event.pollId),
+        ),
+      );
+    });
     _notificationStore = widget.realtimeSession.notificationStore;
     _unreadNotifications = _notificationStore.state.unreadCount;
     _notificationStore.addListener(_handleNotificationStoreChanged);
@@ -57,6 +96,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    unawaited(_pollVoteSubscription?.cancel());
+    unawaited(_pollDeletedSubscription?.cancel());
     if (_ownsPollsApiClient) {
       _pollsApiClient.close();
     }
@@ -82,59 +123,62 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          FeedScreen(
-            key: _feedKey,
-            session: widget.session,
-            pollsApiClient: _pollsApiClient,
-            realtimeClient: widget.realtimeSession.realtimeClient,
-            onPollCreated: (_) {
-              unawaited(_profileKey.currentState?.refreshMyPolls());
-            },
-          ),
-          SubscriptionsScreen(
-            session: widget.session,
-            pollsApiClient: _pollsApiClient,
-            realtimeClient: widget.realtimeSession.realtimeClient,
-          ),
-          NotificationNavigationScope(
-            accessToken: widget.session.accessToken,
-            currentUserId: widget.session.user.id,
-            pollsApiClient: _pollsApiClient,
-            child: NotificationsScreen(
-              isActive: _selectedIndex == 2,
-              notificationStore: _notificationStore,
+    return PollStateScope(
+      store: _pollStateStore,
+      child: Scaffold(
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: [
+            FeedScreen(
+              key: _feedKey,
+              session: widget.session,
+              pollsApiClient: _pollsApiClient,
+              realtimeClient: widget.realtimeSession.realtimeClient,
+              onPollCreated: (_) {
+                unawaited(_profileKey.currentState?.refreshMyPolls());
+              },
             ),
-          ),
-          ProfileScreen(
-            key: _profileKey,
-            user: widget.session.user,
-            accessToken: widget.session.accessToken,
-            authApiClient: widget.authApiClient,
-            pollsApiClient: _pollsApiClient,
-            realtimeClient: widget.realtimeSession.realtimeClient,
-            onLogout: widget.onLogout,
-            onUserUpdated: widget.onUserUpdated,
-          ),
-        ],
-      ),
-      bottomNavigationBar: MainBottomNavigation(
-        user: widget.session.user,
-        selectedIndex: _selectedIndex,
-        onCreate: _openCreatePoll,
-        unreadNotifications: _unreadNotifications,
-        onSelected: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
+            SubscriptionsScreen(
+              session: widget.session,
+              pollsApiClient: _pollsApiClient,
+              realtimeClient: widget.realtimeSession.realtimeClient,
+            ),
+            NotificationNavigationScope(
+              accessToken: widget.session.accessToken,
+              currentUserId: widget.session.user.id,
+              pollsApiClient: _pollsApiClient,
+              child: NotificationsScreen(
+                isActive: _selectedIndex == 2,
+                notificationStore: _notificationStore,
+              ),
+            ),
+            ProfileScreen(
+              key: _profileKey,
+              user: widget.session.user,
+              accessToken: widget.session.accessToken,
+              authApiClient: widget.authApiClient,
+              pollsApiClient: _pollsApiClient,
+              realtimeClient: widget.realtimeSession.realtimeClient,
+              onLogout: widget.onLogout,
+              onUserUpdated: widget.onUserUpdated,
+            ),
+          ],
+        ),
+        bottomNavigationBar: MainBottomNavigation(
+          user: widget.session.user,
+          selectedIndex: _selectedIndex,
+          onCreate: _openCreatePoll,
+          unreadNotifications: _unreadNotifications,
+          onSelected: (index) {
+            setState(() {
+              _selectedIndex = index;
+            });
 
-          if (index == 3) {
-            unawaited(_profileKey.currentState?.refreshMyPolls());
-          }
-        },
+            if (index == 3) {
+              unawaited(_profileKey.currentState?.refreshMyPolls());
+            }
+          },
+        ),
       ),
     );
   }

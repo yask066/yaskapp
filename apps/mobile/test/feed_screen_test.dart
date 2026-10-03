@@ -9,6 +9,8 @@ import 'package:yaskapp_mobile/src/features/feed/feed_screen.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_card.dart';
 import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
+import 'package:yaskapp_mobile/src/features/polls/poll_state_scope.dart';
+import 'package:yaskapp_mobile/src/features/polls/poll_state_store.dart';
 import 'package:yaskapp_mobile/src/features/realtime/realtime_client.dart';
 import 'package:yaskapp_mobile/src/features/search/search_api_client.dart';
 import 'package:yaskapp_mobile/src/features/search/search_screen.dart';
@@ -40,12 +42,10 @@ void main() {
           voteResponse: vote.future,
           likeResponse: like.future);
       final realtime = _FakeRealtimeClient();
+      final store = _seedPollStore(baseline);
       addTearDown(realtime.close);
-      await tester.pumpWidget(MaterialApp(
-          home: FeedScreen(
-              session: _session,
-              pollsApiClient: api,
-              realtimeClient: realtime)));
+      addTearDown(store.dispose);
+      await tester.pumpWidget(_feedWithStore(api, realtime, store));
       await tester.pumpAndSettle();
       try {
         if (reverse) {
@@ -91,7 +91,7 @@ void main() {
         if (!like.isCompleted) like.complete(motionRacePoll('like'));
         await tester.pumpAndSettle();
       }
-    }, skip: !runMotionKnownFailures);
+    });
   }
 
   testWidgets('M06 stale_refetch preserves completed vote and like',
@@ -101,13 +101,12 @@ void main() {
         initialPolls: [motionRacePoll()],
         refreshResponse: refetch.future,
         votedPoll: motionRacePoll('vote'),
-        likedPoll: motionRacePoll('vote')
-            .copyWith(likesCount: 10, viewerHasLiked: true));
+        likedPoll: motionRacePoll('like'));
     final realtime = _FakeRealtimeClient();
+    final store = _seedPollStore(motionRacePoll());
     addTearDown(realtime.close);
-    await tester.pumpWidget(MaterialApp(
-        home: FeedScreen(
-            session: _session, pollsApiClient: api, realtimeClient: realtime)));
+    addTearDown(store.dispose);
+    await tester.pumpWidget(_feedWithStore(api, realtime, store));
     await tester.pumpAndSettle();
     final refresh = tester
         .widget<RefreshIndicator>(find.byType(RefreshIndicator))
@@ -136,7 +135,7 @@ void main() {
       if (!refetch.isCompleted) refetch.complete([motionRacePoll()]);
       await refresh;
     }
-  }, skip: !runMotionKnownFailures);
+  });
 
   testWidgets(
       'M06 realtime_before_http preserves viewer fields and newer votes',
@@ -147,10 +146,10 @@ void main() {
         voteResponse: vote.future,
         likedPoll: motionRacePoll('like'));
     final realtime = _FakeRealtimeClient();
+    final store = _seedPollStore(motionRacePoll());
     addTearDown(realtime.close);
-    await tester.pumpWidget(MaterialApp(
-        home: FeedScreen(
-            session: _session, pollsApiClient: api, realtimeClient: realtime)));
+    addTearDown(store.dispose);
+    await tester.pumpWidget(_feedWithStore(api, realtime, store));
     await tester.pumpAndSettle();
     try {
       tester
@@ -184,7 +183,7 @@ void main() {
       if (!vote.isCompleted) vote.complete(motionRacePoll('vote'));
       await tester.pumpAndSettle();
     }
-  }, skip: !runMotionKnownFailures);
+  });
 
   testWidgets('shows one feed without category tabs', (tester) async {
     await tester.pumpWidget(
@@ -571,6 +570,38 @@ const _session = AuthSession(
   tokenType: 'Bearer',
   expiresIn: '15m',
 );
+
+PollStateStore _seedPollStore(PollSummary poll) {
+  final store = PollStateStore(viewerId: _session.user.id);
+  store.ingest(
+    poll,
+    PollIngress(
+      origin: PollOrigin.http,
+      sessionEpoch: store.sessionEpoch,
+      viewerId: _session.user.id,
+      expectedPollId: null,
+      requestId: 'feed-test-initial',
+      startedGeneration: store.generationFor(poll.id),
+    ),
+  );
+  return store;
+}
+
+Widget _feedWithStore(
+  PollsApiClient api,
+  RealtimeClient realtime,
+  PollStateStore store,
+) =>
+    MaterialApp(
+      home: PollStateScope(
+        store: store,
+        child: FeedScreen(
+          session: _session,
+          pollsApiClient: api,
+          realtimeClient: realtime,
+        ),
+      ),
+    );
 
 Map<String, dynamic> _reactionFields(PollSummary poll) => {
       'votesCount': poll.votesCount,

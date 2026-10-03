@@ -58,6 +58,53 @@ void main() {
     expect(poll.isClosed, isTrue);
   });
 
+  test('parses exact state revisions and preserves absent viewer fields', () {
+    final poll = PollSummary.fromJson({
+      'id': 'poll-1',
+      'author': {
+        'id': 'user-1',
+        'username': 'ada',
+        'displayName': 'Ada Lovelace',
+      },
+      'question': 'Which option?',
+      'options': [
+        {'id': 'option-1', 'text': 'First', 'position': 0, 'votesCount': 0},
+      ],
+      'votesCount': 0,
+      'commentsCount': 0,
+      'likesCount': 0,
+      'createdAt': '2026-07-21T10:00:00.000Z',
+      'stateRevisions': {
+        'votes': '9007199254740993',
+        'likes': '2',
+        'comments': '0',
+      },
+    });
+
+    expect(poll.stateRevisions?.votesValue, BigInt.parse('9007199254740993'));
+    expect(poll.hasViewerHasLikedField, isFalse);
+    expect(poll.hasViewerVoteOptionIdField, isFalse);
+  });
+
+  test('rejects malformed and out-of-range state revisions', () {
+    expect(
+      () => PollStateRevisions.fromJson({
+        'votes': '01',
+        'likes': '0',
+        'comments': '0',
+      }),
+      throwsFormatException,
+    );
+    expect(
+      () => PollStateRevisions.fromJson({
+        'votes': '9223372036854775808',
+        'likes': '0',
+        'comments': '0',
+      }),
+      throwsFormatException,
+    );
+  });
+
   test('parses poll comment summary from json', () {
     final comment = PollCommentSummary.fromJson({
       'id': 'comment-1',

@@ -152,10 +152,14 @@ class PollSummary {
     this.viewerVoteOptionId,
     this.endsAt,
     this.votedOptionIndex,
+    this.stateRevisions,
+    this.hasViewerHasLikedField = true,
+    this.hasViewerVoteOptionIdField = true,
   });
 
   factory PollSummary.fromJson(Map<String, dynamic> json) {
     final optionsJson = json['options'] as List<dynamic>;
+    final revisionsJson = json['stateRevisions'];
 
     return PollSummary(
       id: json['id'] as String,
@@ -180,6 +184,13 @@ class PollSummary {
       endsAt: (json['endsAt'] as String?) == null
           ? null
           : DateTime.parse(json['endsAt'] as String).toLocal(),
+      stateRevisions: revisionsJson == null
+          ? null
+          : PollStateRevisions.fromJson(
+              revisionsJson as Map<String, dynamic>,
+            ),
+      hasViewerHasLikedField: json.containsKey('viewerHasLiked'),
+      hasViewerVoteOptionIdField: json.containsKey('viewerVoteOptionId'),
     );
   }
 
@@ -197,6 +208,9 @@ class PollSummary {
   final String? viewerVoteOptionId;
   final DateTime? endsAt;
   final int? votedOptionIndex;
+  final PollStateRevisions? stateRevisions;
+  final bool hasViewerHasLikedField;
+  final bool hasViewerVoteOptionIdField;
 
   bool get isClosed => endsAt != null && !endsAt!.isAfter(DateTime.now());
 
@@ -220,14 +234,19 @@ class PollSummary {
     int? commentsCount,
     String? viewerVoteOptionId,
     bool clearViewerVoteOptionId = false,
+    int? votesCount,
+    List<PollOptionSummary>? options,
+    PollStateRevisions? stateRevisions,
+    bool? hasViewerHasLikedField,
+    bool? hasViewerVoteOptionIdField,
   }) {
     return PollSummary(
       id: id,
       author: author,
       question: question,
       imageUrl: imageUrl,
-      options: options,
-      votesCount: votesCount,
+      options: options ?? this.options,
+      votesCount: votesCount ?? this.votesCount,
       commentsCount: commentsCount ?? this.commentsCount,
       likesCount: likesCount ?? this.likesCount,
       viewerHasLiked: viewerHasLiked ?? this.viewerHasLiked,
@@ -238,6 +257,11 @@ class PollSummary {
           : viewerVoteOptionId ?? this.viewerVoteOptionId,
       endsAt: endsAt,
       votedOptionIndex: votedOptionIndex,
+      stateRevisions: stateRevisions ?? this.stateRevisions,
+      hasViewerHasLikedField:
+          hasViewerHasLikedField ?? this.hasViewerHasLikedField,
+      hasViewerVoteOptionIdField:
+          hasViewerVoteOptionIdField ?? this.hasViewerVoteOptionIdField,
     );
   }
 
@@ -258,4 +282,40 @@ class PollSummary {
 
     return '${elapsed.inDays} d';
   }
+}
+
+class PollStateRevisions {
+  const PollStateRevisions({
+    required this.votes,
+    required this.likes,
+    required this.comments,
+  });
+
+  factory PollStateRevisions.fromJson(Map<String, dynamic> json) {
+    String parse(String key) {
+      final value = json[key];
+      if (value is! String || !RegExp(r'^(0|[1-9][0-9]*)$').hasMatch(value)) {
+        throw FormatException('Invalid Poll $key revision');
+      }
+      final parsed = BigInt.parse(value);
+      if (parsed > BigInt.parse('9223372036854775807')) {
+        throw FormatException('Poll $key revision exceeds BIGINT');
+      }
+      return value;
+    }
+
+    return PollStateRevisions(
+      votes: parse('votes'),
+      likes: parse('likes'),
+      comments: parse('comments'),
+    );
+  }
+
+  final String votes;
+  final String likes;
+  final String comments;
+
+  BigInt get votesValue => BigInt.parse(votes);
+  BigInt get likesValue => BigInt.parse(likes);
+  BigInt get commentsValue => BigInt.parse(comments);
 }

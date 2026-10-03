@@ -8,6 +8,8 @@ import '../auth/auth_session.dart';
 import '../polls/poll_card.dart';
 import '../polls/poll_comments_screen.dart';
 import '../polls/polls_api_client.dart';
+import '../polls/poll_state_scope.dart';
+import '../polls/poll_state_store.dart';
 import '../polls/poll_summary.dart';
 import '../profile/profiles_api_client.dart';
 import '../profile/public_profile.dart';
@@ -177,6 +179,11 @@ class _SearchScreenState extends State<SearchScreen> {
     if (query.length < 2) return;
 
     final requestId = ++_requestId;
+    final pollStore = PollStateScope.maybeOf(context);
+    final sessionEpoch = pollStore?.sessionEpoch ?? 0;
+    final viewerId = pollStore?.viewerId;
+    final startedGenerations =
+        pollStore?.generationSnapshot ?? const <String, int>{};
     if (mounted) {
       setState(() {
         _error = null;
@@ -202,8 +209,27 @@ class _SearchScreenState extends State<SearchScreen> {
           .timeout(const Duration(seconds: 10));
 
       if (!mounted || requestId != _requestId) return;
+      final items = page.items.map((item) {
+        if (item is! PollSearchResult || pollStore == null) return item;
+        final poll = pollStore
+            .ingest(
+              item.poll,
+              PollIngress(
+                origin: PollOrigin.http,
+                sessionEpoch: sessionEpoch,
+                viewerId: viewerId,
+                expectedPollId: item.poll.id,
+                requestId: 'search-$requestId',
+                startedGeneration: startedGenerations[item.poll.id] ?? 0,
+              ),
+            )
+            .state;
+        return poll == null
+            ? item
+            : PollSearchResult(score: item.score, poll: poll);
+      }).toList();
       setState(() {
-        _items = reset ? page.items : [..._items, ...page.items];
+        _items = reset ? items : [..._items, ...items];
         _nextCursor = page.nextCursor;
         _hasSearched = true;
         if (page.items.isEmpty && reset) {
@@ -426,6 +452,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<PollSummary?> _toggleLike(PollSummary poll) async {
+    poll = PollStateScope.maybeOf(context)?.pollById(poll.id) ?? poll;
     if (_likingPollIds.contains(poll.id)) return null;
     setState(() => _likingPollIds.add(poll.id));
     try {
@@ -923,7 +950,8 @@ class _SearchScreenState extends State<SearchScreen> {
                             const SizedBox(height: 10),
                             Text(
                                 '${poll.votesCount} votes  •  ${_formatPollAge(poll)}',
-                                style: const TextStyle(color: Color(0xFF667085))),
+                                style:
+                                    const TextStyle(color: Color(0xFF667085))),
                           ]),
                     ),
                   ),
@@ -1161,12 +1189,10 @@ class _PollPreviewDialogState extends State<_PollPreviewDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final canVote = !_poll.isClosed &&
-        _poll.selectedOptionIndex == null &&
-        !_isVoting;
-    final canCancelVote = !_poll.isClosed &&
-        _poll.selectedOptionIndex != null &&
-        !_isVoting;
+    final canVote =
+        !_poll.isClosed && _poll.selectedOptionIndex == null && !_isVoting;
+    final canCancelVote =
+        !_poll.isClosed && _poll.selectedOptionIndex != null && !_isVoting;
 
     return Dialog(
       key: const ValueKey('poll-preview-dialog'),

@@ -7,6 +7,7 @@ import '../polls/poll_card.dart';
 import '../polls/poll_comments_screen.dart';
 import '../polls/poll_summary.dart';
 import '../polls/polls_api_client.dart';
+import '../polls/poll_state_scope.dart';
 import '../realtime/realtime_client.dart';
 import '../reports/report_dialog.dart';
 import '../reports/reports_api_client.dart';
@@ -206,6 +207,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   }
 
   Future<void> _toggleLike(PollSummary poll) async {
+    poll = PollStateScope.maybeOf(context)?.pollById(poll.id) ?? poll;
     if (_likingPollIds.contains(poll.id)) return;
     setState(() => _likingPollIds.add(poll.id));
     try {

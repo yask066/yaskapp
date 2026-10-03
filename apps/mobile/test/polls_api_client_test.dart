@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -6,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:yaskapp_mobile/src/core/config/api_config.dart';
 import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
+import 'package:yaskapp_mobile/src/features/polls/poll_state_store.dart';
 
 void main() {
   const config = ApiConfig(baseUrl: 'http://api.test');
@@ -106,6 +108,47 @@ void main() {
     );
 
     expect(poll.id, 'poll-1');
+  });
+
+  test('keeps one vote request pending per poll across callers', () async {
+    final responseGate = Completer<http.Response>();
+    final requestStarted = Completer<void>();
+    var voteRequests = 0;
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((request) async {
+        if (request.method == 'GET') {
+          return http.Response(
+            jsonEncode({'poll': _pollJson(commentsCount: 0)}),
+            200,
+          );
+        }
+        voteRequests++;
+        if (!requestStarted.isCompleted) requestStarted.complete();
+        return responseGate.future;
+      }),
+    );
+    final store = PollStateStore(viewerId: 'user-1');
+    client.bindPollStateStore(store);
+    await client.getPoll(pollId: 'poll-1', accessToken: 'token');
+
+    final first = client.vote(
+        pollId: 'poll-1', optionId: 'option-1', accessToken: 'token');
+    expect(store.isVoting('poll-1'), isTrue);
+    await requestStarted.future;
+    final duplicate = await client.vote(
+        pollId: 'poll-1', optionId: 'option-1', accessToken: 'token');
+    expect(duplicate.id, 'poll-1');
+    expect(voteRequests, 1);
+
+    responseGate.complete(http.Response(
+      jsonEncode({'poll': _pollJson(commentsCount: 0)}),
+      201,
+    ));
+    await first;
+    expect(store.isVoting('poll-1'), isFalse);
+    client.close();
+    store.dispose();
   });
 
   test('keeps missing option errors distinct from missing routes', () async {

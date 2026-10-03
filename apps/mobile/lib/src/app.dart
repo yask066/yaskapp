@@ -12,6 +12,8 @@ import 'features/notifications/firebase_push_service.dart';
 import 'features/notifications/notification_devices_api_client.dart';
 import 'features/polls/polls_api_client.dart';
 import 'features/realtime/realtime_session.dart';
+import 'features/polls/poll_state_store.dart';
+import 'features/polls/poll_state_scope.dart';
 
 class YaskappApp extends StatefulWidget {
   const YaskappApp({
@@ -39,6 +41,7 @@ class _YaskappAppState extends State<YaskappApp> {
   late final bool _ownsAuthApiClient;
   AuthSession? _session;
   late final RealtimeSession _realtimeSession;
+  late final PollStateStore _pollStateStore;
   var _isBootstrapping = true;
 
   @override
@@ -51,6 +54,7 @@ class _YaskappAppState extends State<YaskappApp> {
     _notificationDevicesApiClient = NotificationDevicesApiClient();
     _firebasePushService = FirebasePushService();
     _realtimeSession = RealtimeSession();
+    _pollStateStore = PollStateStore(viewerId: null);
     _initializePushRegistration();
     _bootstrapSession();
   }
@@ -63,6 +67,7 @@ class _YaskappAppState extends State<YaskappApp> {
     _pushTokenSubscription?.cancel();
     _notificationDevicesApiClient.close();
     unawaited(_realtimeSession.close());
+    _pollStateStore.dispose();
 
     super.dispose();
   }
@@ -93,6 +98,7 @@ class _YaskappAppState extends State<YaskappApp> {
           expiresIn: 'persisted',
         );
       });
+      _pollStateStore.clear(viewerId: user.id);
       unawaited(_realtimeSession.start(_session!));
       unawaited(_registerPushToken(accessToken));
     } catch (_) {
@@ -108,6 +114,7 @@ class _YaskappAppState extends State<YaskappApp> {
 
   Future<void> _setSession(AuthSession session) async {
     await _authSessionStore.saveAccessToken(session.accessToken);
+    _pollStateStore.clear(viewerId: session.user.id);
 
     if (!mounted) {
       return;
@@ -134,6 +141,7 @@ class _YaskappAppState extends State<YaskappApp> {
     }
     await _authSessionStore.clear();
     await _realtimeSession.stop();
+    _pollStateStore.clear();
 
     if (!mounted) {
       return;
@@ -229,6 +237,10 @@ class _YaskappAppState extends State<YaskappApp> {
         useMaterial3: true,
       ),
       debugShowCheckedModeBanner: false,
+      builder: (context, child) => PollStateScope(
+        store: _pollStateStore,
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: _isBootstrapping
           ? const _AuthBootstrapScreen()
           : session == null
@@ -243,6 +255,7 @@ class _YaskappAppState extends State<YaskappApp> {
                   onUserUpdated: _updateUser,
                   pollsApiClient: widget.pollsApiClient,
                   realtimeSession: _realtimeSession,
+                  pollStateStore: _pollStateStore,
                 ),
     );
   }

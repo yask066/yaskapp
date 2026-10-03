@@ -184,11 +184,11 @@
 
 **Интерфейсы:** session-scoped `PollStateStore` предоставляет `PollSummary? pollById(String id)`, `bool isVoting(String id)`, `bool isLiking(String id)`, `void clear()`. Ingress и operation completion следуют сигнатурам M03; store не создаёт собственное WebSocket-соединение.
 
-- [ ] Добавить тесты M05 для Dart store и Flutter widget integration; исходный screen-local replace не считается достаточным.
-- [ ] Реализовать merge и дедуп по ID, pending vote/cancel и like отдельно; inject одну session-owned instance в существующие поверхности.
-- [ ] Обновить Feed, subscriptions, profile/public profile, search и poll comments там, где они показывают тот же Poll. Сохранить доступные сейчас действия.
-- [ ] Сохранить viewer fields при broadcast; проверить totals/options, zero votes, closed/deleted poll и response errors.
-- [ ] Выполнить store + affected widget tests и analyze; сохранить отдельный commit.
+- [x] Добавить тесты M05 для Dart store и Flutter widget integration; исходный screen-local replace не считается достаточным.
+- [x] Реализовать merge и дедуп по ID, pending vote/cancel и like отдельно; inject одну session-owned instance в существующие поверхности.
+- [x] Обновить Feed, subscriptions, profile/public profile, search и poll comments там, где они показывают тот же Poll. Сохранить доступные сейчас действия.
+- [x] Сохранить viewer fields при broadcast; проверить totals/options, zero votes, closed/deleted poll и response errors.
+- [x] Выполнить store + affected widget tests и analyze; сохранить отдельный commit.
 
 **Готово:** возврат между уже загруженными экранами не показывает старое состояние реакций. **AC:** AC-02, AC-03.
 

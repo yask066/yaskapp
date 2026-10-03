@@ -6,6 +6,8 @@ import '../../core/widgets/user_avatar.dart';
 import 'poll_card.dart';
 import 'poll_summary.dart';
 import 'polls_api_client.dart';
+import 'poll_state_scope.dart';
+import 'poll_state_store.dart';
 import '../reports/report_dialog.dart';
 import '../reports/reports_api_client.dart';
 
@@ -46,6 +48,30 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
   bool _isSubmittingComment = false;
   bool _isDeletingComment = false;
   bool _isLikingPoll = false;
+  bool _pollDeleted = false;
+  PollStateStore? _pollStateStore;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final nextStore = PollStateScope.maybeOf(context);
+    if (identical(nextStore, _pollStateStore)) return;
+    _pollStateStore?.removeListener(_handlePollStateChanged);
+    _pollStateStore = nextStore;
+    _pollStateStore?.addListener(_handlePollStateChanged);
+    _handlePollStateChanged();
+  }
+
+  void _handlePollStateChanged() {
+    if (_pollStateStore?.isDeleted(_poll.id) == true) {
+      if (mounted && !_pollDeleted) setState(() => _pollDeleted = true);
+      return;
+    }
+    final current = _pollStateStore?.pollById(_poll.id);
+    if (!mounted || current == null || identical(current, _poll)) return;
+    setState(() => _poll = current);
+  }
+
   bool _targetCommentFocusScheduled = false;
   String? _targetRootCommentId;
   String? _targetReplyId;
@@ -64,6 +90,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
 
   @override
   void dispose() {
+    _pollStateStore?.removeListener(_handlePollStateChanged);
     _commentController.dispose();
     if (_ownsReportsApiClient) _reportsApiClient.close();
     super.dispose();
@@ -416,6 +443,13 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_pollDeleted) {
+      return const Scaffold(
+        body: SafeArea(
+          child: Center(child: Text('This poll is no longer available.')),
+        ),
+      );
+    }
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {

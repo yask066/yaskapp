@@ -8,6 +8,8 @@ import '../polls/poll_card.dart';
 import '../polls/poll_comments_screen.dart';
 import '../polls/poll_summary.dart';
 import '../polls/polls_api_client.dart';
+import '../polls/poll_state_scope.dart';
+import '../polls/poll_state_store.dart';
 import '../profile/profiles_api_client.dart';
 import '../profile/public_profile_screen.dart';
 import '../realtime/realtime_client.dart';
@@ -61,6 +63,7 @@ class FeedScreenState extends State<FeedScreen> {
   StreamSubscription<PollVoteRealtimeEvent>? _pollVoteSubscription;
   StreamSubscription<PollDeletedRealtimeEvent>? _pollDeletedSubscription;
   List<PollSummary> _polls = [];
+  int _pollRequestSequence = 0;
   var _hasLoadedPolls = false;
   final Set<String> _votingPollIds = {};
   final Set<String> _likingPollIds = {};
@@ -125,6 +128,11 @@ class FeedScreenState extends State<FeedScreen> {
   }
 
   Future<void> _refreshPolls() async {
+    final store = PollStateScope.maybeOf(context);
+    final epoch = store?.sessionEpoch ?? 0;
+    final viewerId = store?.viewerId;
+    final generations = store?.generationSnapshot ?? const <String, int>{};
+    final requestId = 'feed-refresh-${++_pollRequestSequence}';
     try {
       final nextPolls = await _loadPolls();
 
@@ -132,8 +140,26 @@ class FeedScreenState extends State<FeedScreen> {
         return;
       }
 
+      final mergedPolls = store == null
+          ? nextPolls
+          : nextPolls.map((poll) {
+              return store
+                      .ingest(
+                        poll,
+                        PollIngress(
+                          origin: PollOrigin.http,
+                          sessionEpoch: epoch,
+                          viewerId: viewerId,
+                          expectedPollId: null,
+                          requestId: requestId,
+                          startedGeneration: generations[poll.id] ?? 0,
+                        ),
+                      )
+                      .state ??
+                  poll;
+            }).toList();
       setState(() {
-        _polls = nextPolls;
+        _polls = mergedPolls;
       });
     } catch (_) {
       if (!mounted) {
@@ -157,9 +183,26 @@ class FeedScreenState extends State<FeedScreen> {
       return;
     }
 
+    final store = PollStateScope.maybeOf(context);
     final currentPoll = _polls[existingIndex];
-    _replacePollInFeed(
-      event.poll.copyWith(viewerVoteOptionId: currentPoll.viewerVoteOptionId),
+    final updated = store
+        ?.ingest(
+          event.poll,
+          PollIngress(
+            origin: PollOrigin.realtime,
+            sessionEpoch: store.sessionEpoch,
+            viewerId: null,
+            expectedPollId: event.poll.id,
+            requestId: 'feed-realtime-${event.poll.id}',
+            startedGeneration: store.generationFor(event.poll.id),
+          ),
+        )
+        .state;
+    _replacePollInFeedValue(
+      updated ??
+          event.poll.copyWith(
+            viewerVoteOptionId: currentPoll.viewerVoteOptionId,
+          ),
     );
   }
 
@@ -265,6 +308,7 @@ class FeedScreenState extends State<FeedScreen> {
   }
 
   Future<void> _toggleLike(PollSummary poll) async {
+    poll = PollStateScope.maybeOf(context)?.pollById(poll.id) ?? poll;
     if (_likingPollIds.contains(poll.id)) {
       return;
     }
@@ -383,6 +427,27 @@ class FeedScreenState extends State<FeedScreen> {
   }
 
   void _replacePollInFeed(PollSummary updatedPoll) {
+    final store = PollStateScope.maybeOf(context);
+    if (store != null) {
+      updatedPoll = store
+              .ingest(
+                updatedPoll,
+                PollIngress(
+                  origin: PollOrigin.mutation,
+                  sessionEpoch: store.sessionEpoch,
+                  viewerId: store.viewerId,
+                  expectedPollId: updatedPoll.id,
+                  requestId: 'feed-operation-${++_pollRequestSequence}',
+                  startedGeneration: store.generationFor(updatedPoll.id),
+                ),
+              )
+              .state ??
+          updatedPoll;
+    }
+    _replacePollInFeedValue(updatedPoll);
+  }
+
+  void _replacePollInFeedValue(PollSummary updatedPoll) {
     setState(() {
       _polls = _polls
           .map((currentPoll) =>

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/config/api_config.dart';
 import '../../core/widgets/user_avatar.dart';
 import 'poll_summary.dart';
+import 'poll_state_scope.dart';
 
 class PollCard extends StatelessWidget {
   const PollCard({
@@ -38,6 +39,44 @@ class PollCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final store = PollStateScope.maybeOf(context);
+    if (store == null) {
+      return _buildCard(context, poll, isVoting: isVoting, isLiking: isLiking);
+    }
+    return AnimatedBuilder(
+      animation: store,
+      builder: (context, _) {
+        if (store.isDeleted(poll.id)) return const SizedBox.shrink();
+        return PollCard(
+          poll: store.pollById(poll.id) ?? poll,
+          accessToken: accessToken,
+          onVote: store.isVoting(poll.id) ? null : onVote,
+          onEditPoll: onEditPoll,
+          onCancelVote: store.isVoting(poll.id) ? null : onCancelVote,
+          onDeletePoll: onDeletePoll,
+          onReport: onReport,
+          onOpenAuthor: onOpenAuthor,
+          onOpenComments: onOpenComments,
+          onToggleLike: store.isLiking(poll.id) ? null : onToggleLike,
+          isVoting: isVoting || store.isVoting(poll.id),
+          isLiking: isLiking || store.isLiking(poll.id),
+          compact: compact,
+        )._buildCard(
+          context,
+          store.pollById(poll.id) ?? poll,
+          isVoting: isVoting || store.isVoting(poll.id),
+          isLiking: isLiking || store.isLiking(poll.id),
+        );
+      },
+    );
+  }
+
+  Widget _buildCard(
+    BuildContext context,
+    PollSummary poll, {
+    required bool isVoting,
+    required bool isLiking,
+  }) {
     final rankedOptionIndices = List<int>.generate(
       poll.options.length,
       (index) => index,

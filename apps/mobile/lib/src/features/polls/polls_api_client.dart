@@ -6,6 +6,7 @@ import 'package:http_parser/http_parser.dart';
 
 import '../../core/config/api_config.dart';
 import 'poll_summary.dart';
+import 'poll_state_store.dart';
 
 class PollsApiException implements Exception {
   const PollsApiException(this.message, {this.statusCode, this.code});
@@ -55,6 +56,77 @@ class PollsApiClient {
 
   final ApiConfig _config;
   final http.Client _httpClient;
+  PollStateStore? _pollStateStore;
+  int _requestSequence = 0;
+
+  void bindPollStateStore(PollStateStore store) {
+    _pollStateStore = store;
+  }
+
+  _PollReadContext _captureRead({String? expectedPollId}) {
+    final store = _pollStateStore;
+    return _PollReadContext(
+      store: store,
+      epoch: store?.sessionEpoch ?? 0,
+      viewerId: store?.viewerId,
+      expectedPollId: expectedPollId,
+      requestId: 'read-${++_requestSequence}',
+      startedGeneration:
+          expectedPollId == null ? null : store?.generationFor(expectedPollId),
+      generationSnapshot: store?.generationSnapshot ?? const {},
+    );
+  }
+
+  PollSummary _ingestRead(PollSummary poll, _PollReadContext context) {
+    final store = context.store;
+    if (store == null) return poll;
+    return store
+            .ingest(
+              poll,
+              PollIngress(
+                origin: PollOrigin.http,
+                sessionEpoch: context.epoch,
+                viewerId: context.viewerId,
+                expectedPollId: context.expectedPollId,
+                requestId: context.requestId,
+                startedGeneration: context.startedGeneration ??
+                    context.generationSnapshot[poll.id] ??
+                    0,
+              ),
+            )
+            .state ??
+        poll;
+  }
+
+  List<PollSummary> _ingestReadList(
+    List<PollSummary> polls,
+    _PollReadContext context,
+  ) {
+    final unique = <String, PollSummary>{};
+    for (final poll in polls) {
+      unique[poll.id] = _ingestRead(poll, context);
+    }
+    return unique.values.toList();
+  }
+
+  PollSummary _ingestMutation(PollSummary poll, String requestId) {
+    final store = _pollStateStore;
+    if (store == null) return poll;
+    return store
+            .ingest(
+              poll,
+              PollIngress(
+                origin: PollOrigin.mutation,
+                sessionEpoch: store.sessionEpoch,
+                viewerId: store.viewerId,
+                expectedPollId: poll.id,
+                requestId: requestId,
+                startedGeneration: store.generationFor(poll.id),
+              ),
+            )
+            .state ??
+        poll;
+  }
 
   void close() {
     _httpClient.close();
@@ -65,6 +137,7 @@ class PollsApiClient {
     String? accessToken,
     String sort = 'newest',
   }) async {
+    final readContext = _captureRead();
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls',
       queryParameters: {
@@ -86,17 +159,20 @@ class PollsApiClient {
       throw const PollsApiException('Poll feed response is invalid.');
     }
 
-    return items
-        .map(
-          (item) => PollSummary.fromJson(item as Map<String, dynamic>),
-        )
-        .toList();
+    return _ingestReadList(
+        items
+            .map(
+              (item) => PollSummary.fromJson(item as Map<String, dynamic>),
+            )
+            .toList(),
+        readContext);
   }
 
   Future<PollSummary> getPoll({
     required String pollId,
     String? accessToken,
   }) async {
+    final readContext = _captureRead(expectedPollId: pollId);
     final uri = Uri.parse(_config.baseUrl).replace(path: '/polls/$pollId');
     final response = await _httpClient.get(
       uri,
@@ -104,13 +180,17 @@ class PollsApiClient {
         if (accessToken != null) 'authorization': 'Bearer $accessToken',
       },
     );
-    return _decodePollResponse(response, 'Poll response is invalid.');
+    return _ingestRead(
+      _decodePollResponse(response, 'Poll response is invalid.'),
+      readContext,
+    );
   }
 
   Future<List<PollSummary>> listMyPolls({
     required String accessToken,
     int limit = 20,
   }) async {
+    final readContext = _captureRead();
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/profiles/me/polls',
       queryParameters: {
@@ -131,11 +211,13 @@ class PollsApiClient {
       throw const PollsApiException('My polls response is invalid.');
     }
 
-    return items
-        .map(
-          (item) => PollSummary.fromJson(item as Map<String, dynamic>),
-        )
-        .toList();
+    return _ingestReadList(
+        items
+            .map(
+              (item) => PollSummary.fromJson(item as Map<String, dynamic>),
+            )
+            .toList(),
+        readContext);
   }
 
   Future<List<PollSummary>> listUserPolls({
@@ -143,6 +225,7 @@ class PollsApiClient {
     String? accessToken,
     int limit = 20,
   }) async {
+    final readContext = _captureRead();
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/users/$userId/polls',
       queryParameters: {'limit': limit.toString()},
@@ -160,15 +243,18 @@ class PollsApiClient {
       throw const PollsApiException('User polls response is invalid.');
     }
 
-    return items
-        .map((item) => PollSummary.fromJson(item as Map<String, dynamic>))
-        .toList();
+    return _ingestReadList(
+        items
+            .map((item) => PollSummary.fromJson(item as Map<String, dynamic>))
+            .toList(),
+        readContext);
   }
 
   Future<List<PollSummary>> listSubscriptions({
     required String accessToken,
     int limit = 20,
   }) async {
+    final readContext = _captureRead();
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls/subscriptions',
       queryParameters: {
@@ -188,11 +274,13 @@ class PollsApiClient {
       throw const PollsApiException('Subscriptions response is invalid.');
     }
 
-    return items
-        .map(
-          (item) => PollSummary.fromJson(item as Map<String, dynamic>),
-        )
-        .toList();
+    return _ingestReadList(
+        items
+            .map(
+              (item) => PollSummary.fromJson(item as Map<String, dynamic>),
+            )
+            .toList(),
+        readContext);
   }
 
   Future<PollSummary> createPoll({
@@ -257,7 +345,7 @@ class PollsApiClient {
       throw const PollsApiException('Create poll response is invalid.');
     }
 
-    return PollSummary.fromJson(poll);
+    return _ingestMutation(PollSummary.fromJson(poll), 'create-${poll['id']}');
   }
 
   MediaType? _mediaType(String contentType) {
@@ -275,44 +363,89 @@ class PollsApiClient {
     required String optionId,
     required String accessToken,
   }) async {
-    final uri = Uri.parse(_config.baseUrl).replace(
-      path: '/polls/$pollId/votes',
-    );
-    final response = await _httpClient.post(
-      uri,
-      headers: {
-        'authorization': 'Bearer $accessToken',
-        'content-type': 'application/json',
-      },
-      body: jsonEncode({
-        'optionId': optionId,
-      }),
-    );
-    final body = _decodeObject(response);
-    final poll = body['poll'];
-
-    if (poll is! Map<String, dynamic>) {
-      throw const PollsApiException('Vote response is invalid.');
+    final stateStore = _pollStateStore;
+    final operation = stateStore?.beginOperation(pollId, PollAction.vote);
+    if (stateStore != null && operation == null) {
+      final current = stateStore.pollById(pollId);
+      if (current != null) return current;
+      throw const PollsApiException('Poll action already in progress.');
     }
+    try {
+      final uri = Uri.parse(_config.baseUrl).replace(
+        path: '/polls/$pollId/votes',
+      );
+      final response = await _httpClient.post(
+        uri,
+        headers: {
+          'authorization': 'Bearer $accessToken',
+          'content-type': 'application/json',
+        },
+        body: jsonEncode({
+          'optionId': optionId,
+        }),
+      );
+      final body = _decodeObject(response);
+      final poll = body['poll'];
 
-    return PollSummary.fromJson(poll);
+      if (poll is! Map<String, dynamic>) {
+        throw const PollsApiException('Vote response is invalid.');
+      }
+
+      final updated = PollSummary.fromJson(poll);
+      if (operation != null) {
+        stateStore!.completeOperation(operation, updated);
+        return stateStore.pollById(pollId) ?? updated;
+      }
+      return updated;
+    } catch (error) {
+      if (operation != null) {
+        stateStore!.failOperation(
+          operation,
+          ambiguous: error is! PollsApiException,
+        );
+      }
+      rethrow;
+    }
   }
 
   Future<PollSummary> cancelVote({
     required String pollId,
     required String accessToken,
   }) async {
-    final uri = Uri.parse(_config.baseUrl).replace(
-      path: '/polls/$pollId/votes',
-    );
-    final response = await _httpClient.delete(
-      uri,
-      headers: {
-        'authorization': 'Bearer $accessToken',
-      },
-    );
+    final stateStore = _pollStateStore;
+    final operation = stateStore?.beginOperation(pollId, PollAction.vote);
+    if (stateStore != null && operation == null) {
+      final current = stateStore.pollById(pollId);
+      if (current != null) return current;
+      throw const PollsApiException('Poll action already in progress.');
+    }
+    try {
+      final uri = Uri.parse(_config.baseUrl).replace(
+        path: '/polls/$pollId/votes',
+      );
+      final response = await _httpClient.delete(
+        uri,
+        headers: {
+          'authorization': 'Bearer $accessToken',
+        },
+      );
 
-    return _decodePollResponse(response, 'Cancel vote response is invalid.');
+      final updated =
+          _decodePollResponse(response, 'Cancel vote response is invalid.');
+      if (operation != null) {
+        stateStore!.completeOperation(operation, updated);
+        return stateStore.pollById(pollId) ?? updated;
+      }
+      return updated;
+    } catch (error) {
+      if (operation != null) {
+        stateStore!.failOperation(
+          operation,
+          ambiguous: error is! PollsApiException,
+        );
+      }
+      rethrow;
+    }
   }
 
   Future<void> deletePoll({
@@ -332,40 +465,100 @@ class PollsApiClient {
     if (response.statusCode != 204) {
       _decodeObject(response);
     }
+    final store = _pollStateStore;
+    if (store != null) {
+      store.markDeleted(
+        pollId,
+        PollIngress(
+          origin: PollOrigin.mutation,
+          sessionEpoch: store.sessionEpoch,
+          viewerId: store.viewerId,
+          expectedPollId: pollId,
+          requestId: 'delete-$pollId',
+          startedGeneration: store.generationFor(pollId),
+        ),
+      );
+    }
   }
 
   Future<PollSummary> likePoll({
     required String pollId,
     required String accessToken,
   }) async {
-    final uri = Uri.parse(_config.baseUrl).replace(
-      path: '/polls/$pollId/likes',
-    );
-    final response = await _httpClient.post(
-      uri,
-      headers: {
-        'authorization': 'Bearer $accessToken',
-      },
-    );
+    final stateStore = _pollStateStore;
+    final operation = stateStore?.beginOperation(pollId, PollAction.like);
+    if (stateStore != null && operation == null) {
+      final current = stateStore.pollById(pollId);
+      if (current != null) return current;
+      throw const PollsApiException('Poll action already in progress.');
+    }
+    try {
+      final uri = Uri.parse(_config.baseUrl).replace(
+        path: '/polls/$pollId/likes',
+      );
+      final response = await _httpClient.post(
+        uri,
+        headers: {
+          'authorization': 'Bearer $accessToken',
+        },
+      );
 
-    return _decodePollResponse(response, 'Like response is invalid.');
+      final updated =
+          _decodePollResponse(response, 'Like response is invalid.');
+      if (operation != null) {
+        stateStore!.completeOperation(operation, updated);
+        return stateStore.pollById(pollId) ?? updated;
+      }
+      return updated;
+    } catch (error) {
+      if (operation != null) {
+        stateStore!.failOperation(
+          operation,
+          ambiguous: error is! PollsApiException,
+        );
+      }
+      rethrow;
+    }
   }
 
   Future<PollSummary> unlikePoll({
     required String pollId,
     required String accessToken,
   }) async {
-    final uri = Uri.parse(_config.baseUrl).replace(
-      path: '/polls/$pollId/likes',
-    );
-    final response = await _httpClient.delete(
-      uri,
-      headers: {
-        'authorization': 'Bearer $accessToken',
-      },
-    );
+    final stateStore = _pollStateStore;
+    final operation = stateStore?.beginOperation(pollId, PollAction.like);
+    if (stateStore != null && operation == null) {
+      final current = stateStore.pollById(pollId);
+      if (current != null) return current;
+      throw const PollsApiException('Poll action already in progress.');
+    }
+    try {
+      final uri = Uri.parse(_config.baseUrl).replace(
+        path: '/polls/$pollId/likes',
+      );
+      final response = await _httpClient.delete(
+        uri,
+        headers: {
+          'authorization': 'Bearer $accessToken',
+        },
+      );
 
-    return _decodePollResponse(response, 'Unlike response is invalid.');
+      final updated =
+          _decodePollResponse(response, 'Unlike response is invalid.');
+      if (operation != null) {
+        stateStore!.completeOperation(operation, updated);
+        return stateStore.pollById(pollId) ?? updated;
+      }
+      return updated;
+    } catch (error) {
+      if (operation != null) {
+        stateStore!.failOperation(
+          operation,
+          ambiguous: error is! PollsApiException,
+        );
+      }
+      rethrow;
+    }
   }
 
   Future<List<PollCommentSummary>> listComments({
@@ -544,7 +737,7 @@ class PollsApiClient {
 
     return CreatePollCommentResult(
       comment: PollCommentSummary.fromJson(comment),
-      poll: PollSummary.fromJson(poll),
+      poll: _ingestMutation(PollSummary.fromJson(poll), 'comment-$pollId'),
     );
   }
 
@@ -596,4 +789,24 @@ class PollsApiClient {
 
     return decoded;
   }
+}
+
+class _PollReadContext {
+  const _PollReadContext({
+    required this.store,
+    required this.epoch,
+    required this.viewerId,
+    required this.expectedPollId,
+    required this.requestId,
+    required this.startedGeneration,
+    required this.generationSnapshot,
+  });
+
+  final PollStateStore? store;
+  final int epoch;
+  final String? viewerId;
+  final String? expectedPollId;
+  final String requestId;
+  final int? startedGeneration;
+  final Map<String, int> generationSnapshot;
 }

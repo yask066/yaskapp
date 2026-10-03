@@ -3,7 +3,8 @@ import 'dart:io';
 
 import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
 
-// Shared wire inputs only. No merge behavior lives in this test adapter.
+// Shared input adapter. Adds M03 test revisions without changing source fixtures;
+// no merge behavior lives here.
 final motionScrollFixture = jsonDecode(
   File('../../test/fixtures/t02-motion-scroll-loading-polls.json')
       .readAsStringSync(),
@@ -15,10 +16,16 @@ PollSummary motionRacePoll([String? kind]) {
       .cast<Map<String, dynamic>>()
       .singleWhere((poll) => poll['id'] == race['pollId']);
   final patches = race['snapshots'] as Map<String, dynamic>;
-  return PollSummary.fromJson({
+  final snapshot = <String, dynamic>{
     ...baseline,
     if (kind != null) ...patches[kind] as Map<String, dynamic>,
-  });
+  };
+  snapshot['stateRevisions'] = {
+    'votes': kind == 'vote' || kind == 'realtime' ? '2' : '1',
+    'likes': kind == 'like' ? '2' : '1',
+    'comments': '0',
+  };
+  return PollSummary.fromJson(snapshot);
 }
 
 List<PollSummary> motionProfilingPolls({int? seed}) {
