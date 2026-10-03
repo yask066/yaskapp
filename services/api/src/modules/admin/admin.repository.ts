@@ -332,6 +332,25 @@ export async function deleteAdminComment(
   try {
     await client.query('BEGIN');
 
+    const pollRef = await client.query<{ poll_id: string }>(
+      'SELECT poll_id FROM comments WHERE id = $1',
+      [commentId]
+    );
+    const pollId = pollRef.rows[0]?.poll_id;
+    if (!pollId) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' };
+    }
+
+    const lockedPoll = await client.query(
+      `SELECT id FROM polls WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+      [pollId]
+    );
+    if (lockedPoll.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' };
+    }
+
     const current = await client.query<{
       poll_id: string;
       deleted_at: Date | null;
@@ -339,10 +358,10 @@ export async function deleteAdminComment(
       `
         SELECT poll_id, deleted_at
         FROM comments
-        WHERE id = $1
+        WHERE id = $1 AND poll_id = $2
         FOR UPDATE
       `,
-      [commentId]
+      [commentId, pollId]
     );
     const comment = current.rows[0];
 
@@ -367,7 +386,9 @@ export async function deleteAdminComment(
     await client.query(
       `
         UPDATE polls
-        SET comments_count = GREATEST(comments_count - 1, 0), updated_at = now()
+        SET comments_count = GREATEST(comments_count - 1, 0),
+            comments_revision = comments_revision + 1,
+            updated_at = now()
         WHERE id = $1
       `,
       [comment.poll_id]

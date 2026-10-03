@@ -74,6 +74,7 @@ type PollResponse = {
     likesCount: number;
     viewerHasLiked: boolean;
     viewerVoteOptionId: string | null;
+    stateRevisions: { votes: string; likes: string; comments: string };
   };
 };
 
@@ -1346,6 +1347,8 @@ test('concurrent votes keep poll and option counters consistent', async () => {
 
   const row = state.rows[0];
   assert.equal(row?.vote_rows, '1');
+  const versionedPoll = await app.inject({ method: 'GET', url: `/polls/${createdPoll.id}`, headers: bearer(registered.accessToken) });
+  assert.deepEqual(versionedPoll.json<PollResponse>().poll.stateRevisions, { votes: '1', likes: '0', comments: '0' });
   assert.equal((row?.first_option_votes ?? 0) + (row?.second_option_votes ?? 0), 1);
   assert.equal(row?.poll_votes_total, 1);
 });
@@ -2361,6 +2364,7 @@ test('authenticated user can create a poll comment', async () => {
   assert.equal(createdComment.likesCount, 0);
   assert.equal(createdCommentResponse.poll.id, createdPoll.id);
   assert.equal(createdCommentResponse.poll.commentsCount, 1);
+  assert.deepEqual(createdCommentResponse.poll.stateRevisions, { votes: '0', likes: '0', comments: '1' });
 
   const commentRowResult = await db.query<{
     poll_id: string;
@@ -2489,6 +2493,7 @@ test('current user can like a poll once', async () => {
   assert.equal(likedPoll.id, createdPoll.id);
   assert.equal(likedPoll.likesCount, 1);
   assert.equal(likedPoll.viewerHasLiked, true);
+  assert.deepEqual(likedPoll.stateRevisions, { votes: '0', likes: '1', comments: '0' });
 
   const likedPollCounterResult = await db.query<{ likes_count: number }>(
     'SELECT likes_count FROM polls WHERE id = $1',
@@ -2520,6 +2525,7 @@ test('current user can like a poll once', async () => {
   assert.equal(duplicateLikedPoll.id, createdPoll.id);
   assert.equal(duplicateLikedPoll.likesCount, 1);
   assert.equal(duplicateLikedPoll.viewerHasLiked, true);
+  assert.deepEqual(duplicateLikedPoll.stateRevisions, { votes: '0', likes: '1', comments: '0' });
 
   const unauthenticatedFeedResponse = await app.inject({
     method: 'GET',

@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg';
+import type { PollStateRevisions } from '@yaskapp/shared';
 
 import { db } from '../../config/database.js';
 import { AdminCursorError, encodeAdminCursor } from '../admin/pagination.js';
@@ -51,6 +52,7 @@ export type Poll = {
   allowVoteCancellation: boolean;
   viewerHasLiked: boolean;
   viewerVoteOptionId: string | null;
+  stateRevisions: PollStateRevisions;
   options: PollOption[];
   createdAt: string;
   updatedAt: string;
@@ -97,6 +99,9 @@ type PollRow = {
   votes_count: number;
   comments_count: number;
   likes_count: number;
+  votes_revision: string;
+  likes_revision: string;
+  comments_revision: string;
   allow_vote_cancellation: boolean;
   created_at: Date;
   updated_at: Date;
@@ -155,6 +160,11 @@ function mapPoll(
     votesCount: row.votes_count,
     commentsCount: row.comments_count,
     likesCount: row.likes_count,
+    stateRevisions: {
+      votes: row.votes_revision,
+      likes: row.likes_revision,
+      comments: row.comments_revision
+    },
     allowVoteCancellation: row.allow_vote_cancellation,
     viewerHasLiked: viewerLikedPollIds.has(row.id),
     viewerVoteOptionId: viewerVoteOptionIds.get(row.id) ?? null,
@@ -216,6 +226,9 @@ async function findPollRowsByIds(client: PoolClient, pollIds: string[]) {
         p.votes_count,
         p.comments_count,
         p.likes_count,
+        p.votes_revision::text AS votes_revision,
+        p.likes_revision::text AS likes_revision,
+        p.comments_revision::text AS comments_revision,
         p.allow_vote_cancellation,
         p.created_at,
         p.updated_at,
@@ -317,6 +330,18 @@ async function hydratePolls(client: PoolClient, pollIds: string[], viewerId?: st
       viewerVoteOptionIds
     )
   );
+}
+
+async function withPollReadSnapshot<T>(client: PoolClient, read: () => Promise<T>) {
+  await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+  try {
+    const result = await read();
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  }
 }
 
 export async function createPollRecord(input: CreatePollRecordInput) {
@@ -511,7 +536,7 @@ export async function deletePollCommentRecord(input: {
     await client.query(
       `
         UPDATE polls
-        SET comments_count = GREATEST(comments_count - $2, 0), updated_at = now()
+        SET comments_count = GREATEST(comments_count - $2, 0), comments_revision = comments_revision + 1, updated_at = now()
         WHERE id = $1
       `,
       [input.pollId, deletedCount]
@@ -535,6 +560,7 @@ export async function listPublicPollRecords(
   const client = await db.connect();
 
   try {
+    return await withPollReadSnapshot(client, async () => {
     const result = await client.query<{ id: string }>(
       `
         SELECT id
@@ -555,6 +581,7 @@ export async function listPublicPollRecords(
       result.rows.map((row) => row.id),
       viewerId
     );
+    });
   } finally {
     client.release();
   }
@@ -567,6 +594,7 @@ export async function listSubscriptionPollRecords(
   const client = await db.connect();
 
   try {
+    return await withPollReadSnapshot(client, async () => {
     const result = await client.query<{ id: string }>(
       `
         SELECT p.id
@@ -588,6 +616,7 @@ export async function listSubscriptionPollRecords(
       result.rows.map((row) => row.id),
       followerId
     );
+    });
   } finally {
     client.release();
   }
@@ -601,6 +630,7 @@ export async function listPollRecordsByAuthor(
   const client = await db.connect();
 
   try {
+    return await withPollReadSnapshot(client, async () => {
     const result = await client.query<{ id: string }>(
       `
         SELECT id
@@ -618,6 +648,7 @@ export async function listPollRecordsByAuthor(
       result.rows.map((row) => row.id),
       viewerId
     );
+    });
   } finally {
     client.release();
   }
@@ -631,6 +662,7 @@ export async function listPublicPollRecordsByAuthor(
   const client = await db.connect();
 
   try {
+    return await withPollReadSnapshot(client, async () => {
     const result = await client.query<{ id: string }>(
       `
         SELECT id
@@ -649,6 +681,7 @@ export async function listPublicPollRecordsByAuthor(
       result.rows.map((row) => row.id),
       viewerId
     );
+    });
   } finally {
     client.release();
   }
@@ -658,9 +691,10 @@ export async function findPollRecordById(pollId: string) {
   const client = await db.connect();
 
   try {
-    const [poll] = await hydratePolls(client, [pollId]);
-
-    return poll ?? null;
+    return await withPollReadSnapshot(client, async () => {
+      const [poll] = await hydratePolls(client, [pollId]);
+      return poll ?? null;
+    });
   } finally {
     client.release();
   }
@@ -673,6 +707,7 @@ export async function findViewablePollRecordById(
   const client = await db.connect();
 
   try {
+    return await withPollReadSnapshot(client, async () => {
     const result = await client.query<{ id: string }>(
       `
         SELECT p.id
@@ -701,6 +736,7 @@ export async function findViewablePollRecordById(
     if (result.rowCount === 0) return null;
     const [poll] = await hydratePolls(client, [pollId], viewerId);
     return poll ?? null;
+    });
   } finally {
     client.release();
   }
@@ -1084,7 +1120,8 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
     await client.query(
       `
         UPDATE polls
-        SET comments_count = comments_count + 1
+        SET comments_count = comments_count + 1,
+            comments_revision = comments_revision + 1
         WHERE id = $1
       `,
       [input.pollId]
@@ -1322,7 +1359,8 @@ export async function likePollRecord(input: {
       await client.query(
         `
           UPDATE polls
-          SET likes_count = likes_count + 1
+          SET likes_count = likes_count + 1,
+              likes_revision = likes_revision + 1
           WHERE id = $1
         `,
         [input.pollId]
@@ -1389,7 +1427,8 @@ export async function unlikePollRecord(input: {
       await client.query(
         `
           UPDATE polls
-          SET likes_count = GREATEST(likes_count - 1, 0)
+          SET likes_count = GREATEST(likes_count - 1, 0),
+              likes_revision = likes_revision + 1
           WHERE id = $1
         `,
         [input.pollId]
@@ -1483,7 +1522,8 @@ export async function createVoteRecord(input: {
     await client.query(
       `
         UPDATE polls
-        SET votes_count = votes_count + 1
+        SET votes_count = votes_count + 1,
+            votes_revision = votes_revision + 1
         WHERE id = $1
       `,
       [input.pollId]
@@ -1587,7 +1627,8 @@ export async function cancelVoteRecord(input: {
       await client.query(
         `
           UPDATE polls
-          SET votes_count = GREATEST(votes_count - 1, 0)
+          SET votes_count = GREATEST(votes_count - 1, 0),
+              votes_revision = votes_revision + 1
           WHERE id = $1
         `,
         [input.pollId]
@@ -1689,7 +1730,8 @@ export async function setVoteRecord(input: {
       await client.query(
         `
           UPDATE polls
-          SET votes_count = votes_count + 1
+          SET votes_count = votes_count + 1,
+              votes_revision = votes_revision + 1
           WHERE id = $1
         `,
         [input.pollId]
@@ -1736,6 +1778,13 @@ export async function setVoteRecord(input: {
       );
 
       optionVotesCount = optionResult.rows[0]?.votes_count ?? 0;
+    }
+
+    if (currentOptionId && currentOptionId !== input.optionId) {
+      await client.query(
+        'UPDATE polls SET votes_revision = votes_revision + 1 WHERE id = $1',
+        [input.pollId]
+      );
     }
 
     const [updatedPoll] = await hydratePolls(client, [input.pollId], input.voterId);

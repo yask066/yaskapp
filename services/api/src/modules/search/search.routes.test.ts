@@ -34,6 +34,7 @@ const repositories: SearchRepositories = {
         allowVoteCancellation: false,
         viewerHasLiked: false,
         viewerVoteOptionId: null,
+      stateRevisions: { votes: '0', likes: '0', comments: '0' },
         options: [],
         createdAt: '2026-08-30T10:00:00.000Z',
         updatedAt: '2026-08-30T10:00:00.000Z',

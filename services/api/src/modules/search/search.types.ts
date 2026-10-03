@@ -37,6 +37,11 @@ export type SearchPollRow = {
   comments_count: number;
   likes_count: number;
   allow_vote_cancellation: boolean;
+  votes_revision: string;
+  likes_revision: string;
+  comments_revision: string;
+  viewer_has_liked: boolean;
+  viewer_vote_option_id: string | null;
   options: PollOption[];
   created_at: Date;
   updated_at: Date;

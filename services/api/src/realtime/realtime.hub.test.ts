@@ -131,6 +131,7 @@ test('realtime vote events omit viewer-specific vote state', () => {
         allowVoteCancellation: false,
         viewerHasLiked: false,
         viewerVoteOptionId: 'option-1',
+        stateRevisions: { votes: '1', likes: '0', comments: '0' },
         options: [],
         createdAt: '2026-08-23T10:00:00.000Z',
         updatedAt: '2026-08-23T10:00:00.000Z',
@@ -149,6 +150,7 @@ test('realtime vote events omit viewer-specific vote state', () => {
 
     assert.equal(event.payload.poll.id, 'poll-1');
     assert.equal('viewerVoteOptionId' in event.payload.poll, false);
+    assert.equal('viewerHasLiked' in event.payload.poll, false);
   } finally {
     removeClient();
   }
@@ -186,6 +188,7 @@ test('realtime vote update events broadcast aggregate poll state', () => {
         allowVoteCancellation: false,
         viewerHasLiked: false,
         viewerVoteOptionId: null,
+        stateRevisions: { votes: '0', likes: '0', comments: '0' },
         options: [],
         createdAt: '2026-08-23T10:00:00.000Z',
         updatedAt: '2026-08-23T10:00:00.000Z',
@@ -201,6 +204,7 @@ test('realtime vote update events broadcast aggregate poll state', () => {
     assert.equal(event.type, 'poll.vote.updated');
     assert.equal(event.payload.poll.id, 'poll-2');
     assert.equal('viewerVoteOptionId' in event.payload.poll, false);
+    assert.equal('viewerHasLiked' in event.payload.poll, false);
   } finally {
     removeClient();
   }

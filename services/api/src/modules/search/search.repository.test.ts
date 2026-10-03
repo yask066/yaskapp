@@ -20,6 +20,18 @@ const baseInput: SearchRepositoryInput = {
   limit: 20
 };
 
+test('poll search returns revisions and authenticated viewer state in the poll snapshot', () => {
+  const { text } = buildPollSearchQuery(baseInput);
+
+  assert.match(text, /p\.votes_revision::text AS votes_revision/);
+  assert.match(text, /p\.likes_revision::text AS likes_revision/);
+  assert.match(text, /p\.comments_revision::text AS comments_revision/);
+  assert.match(text, /viewer_has_liked/);
+  assert.match(text, /viewer_vote_option_id/);
+  assert.match(text, /l\.user_id = \$\d+::uuid AND l\.poll_id = p\.id/);
+  assert.match(text, /pv\.voter_id = \$\d+::uuid AND pv\.poll_id = p\.id/);
+});
+
 test('search repository query covers public visibility, matching, relevance and stable cursor ordering', () => {
   const cursor = { score: 0.8, createdAt: '2026-08-30T10:00:00.000Z', id: 'poll-1' };
   const { text, values } = buildPollSearchQuery({ ...baseInput, cursor });
@@ -35,6 +47,7 @@ test('search repository query covers public visibility, matching, relevance and 
   assert.deepEqual(values, [
     'climate change',
     '%climate change%',
+    'viewer-id',
     0.8,
     '2026-08-30T10:00:00.000Z',
     'poll-1',
@@ -45,7 +58,7 @@ test('search repository query covers public visibility, matching, relevance and 
 test('search repository query supports newest and popular ordering with username/display-name matching', () => {
   const newest = buildPollSearchQuery({ ...baseInput, sort: 'newest', cursor: undefined });
   assert.match(newest.text, /ORDER BY p\.created_at DESC, p\.id DESC/);
-  assert.deepEqual(newest.values, ['climate change', '%climate change%', 21]);
+  assert.deepEqual(newest.values, ['climate change', '%climate change%', 'viewer-id', 21]);
 
   const popularPoll = buildPollSearchQuery({ ...baseInput, sort: 'popular', cursor: undefined });
   const popularPollSelect = popularPoll.text.split('FROM polls')[0];
@@ -90,7 +103,7 @@ test('poll search also matches a partial question', () => {
   assert.match(text, /p\.question ILIKE \$2/);
   assert.match(text, /to_tsvector\('simple', p\.question\) @@ plainto_tsquery\('simple', \$1\)/);
   assert.match(text, /json_agg\([\s\S]*json_build_object\(/);
-  assert.deepEqual(values, ['climate change', '%climate change%', 21]);
+  assert.deepEqual(values, ['climate change', '%climate change%', 'viewer-id', 21]);
 });
 
 test('user search does not require pg_trgm to execute', () => {
@@ -146,6 +159,11 @@ test('search repository decodes opaque cursor values and maps poll/user rows', (
     comments_count: 1,
     likes_count: 3,
     allow_vote_cancellation: true,
+    votes_revision: '12',
+    likes_revision: '5',
+    comments_revision: '2',
+    viewer_has_liked: true,
+    viewer_vote_option_id: 'option-1',
     options: [
       { id: 'option-1', text: 'Yes', position: 0, votesCount: 4 },
       { id: 'option-2', text: 'No', position: 1, votesCount: 0 }
@@ -157,6 +175,9 @@ test('search repository decodes opaque cursor values and maps poll/user rows', (
   });
   assert.equal(poll.poll.id, 'poll-1');
   assert.equal(poll.poll.author.username, 'alice');
+  assert.deepEqual(poll.poll.stateRevisions, { votes: '12', likes: '5', comments: '2' });
+  assert.equal(poll.poll.viewerHasLiked, true);
+  assert.equal(poll.poll.viewerVoteOptionId, 'option-1');
   assert.deepEqual(poll.poll.options, [
     { id: 'option-1', text: 'Yes', position: 0, votesCount: 4 },
     { id: 'option-2', text: 'No', position: 1, votesCount: 0 }

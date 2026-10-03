@@ -66,7 +66,7 @@ const userPopularityScore = '(pr.followers_count * 2 + pr.polls_count)';
 export function buildPollSearchQuery(input: SearchInput): Query {
   const query = normalizedQuery(input.query);
   const likeQuery = `%${escapeLikePattern(query)}%`;
-  const values: unknown[] = [query, likeQuery];
+  const values: unknown[] = [query, likeQuery, input.viewerId];
   const scoreExpression = input.sort === 'popular' ? pollPopularityScore : pollScore;
   const cursor = cursorPredicate(scoreExpression, input.cursor, values, 'p.created_at', 'p.id');
   const orderBy = input.sort === 'newest'
@@ -97,6 +97,18 @@ export function buildPollSearchQuery(input: SearchInput): Query {
         p.comments_count,
         p.likes_count,
         p.allow_vote_cancellation,
+        p.votes_revision::text AS votes_revision,
+        p.likes_revision::text AS likes_revision,
+        p.comments_revision::text AS comments_revision,
+        EXISTS (
+          SELECT 1 FROM likes l
+          WHERE l.user_id = $3::uuid AND l.poll_id = p.id
+        ) AS viewer_has_liked,
+        (
+          SELECT pv.option_id
+          FROM poll_votes pv
+          WHERE pv.voter_id = $3::uuid AND pv.poll_id = p.id
+        ) AS viewer_vote_option_id,
         COALESCE(
           (
             SELECT json_agg(
@@ -304,8 +316,13 @@ export function mapPollSearchRow(row: SearchPollRow): SearchPollRecord {
       commentsCount: row.comments_count,
       likesCount: row.likes_count,
       allowVoteCancellation: row.allow_vote_cancellation,
-      viewerHasLiked: false,
-      viewerVoteOptionId: null,
+      viewerHasLiked: row.viewer_has_liked,
+      viewerVoteOptionId: row.viewer_vote_option_id,
+      stateRevisions: {
+        votes: row.votes_revision,
+        likes: row.likes_revision,
+        comments: row.comments_revision
+      },
       options: row.options,
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),

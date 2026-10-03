@@ -16,7 +16,7 @@ type RealtimeSocket = {
 type PollVoteCreatedEvent = {
   type: 'poll.vote.created';
   payload: {
-    poll: Omit<Poll, 'viewerVoteOptionId'>;
+    poll: Omit<Poll, 'viewerVoteOptionId' | 'viewerHasLiked'>;
     vote: {
       pollId: string;
       optionId: string;
@@ -28,7 +28,7 @@ type PollVoteCreatedEvent = {
 type PollVoteUpdatedEvent = {
   type: 'poll.vote.updated';
   payload: {
-    poll: Omit<Poll, 'viewerVoteOptionId'>;
+    poll: Omit<Poll, 'viewerVoteOptionId' | 'viewerHasLiked'>;
   };
 };
 
@@ -325,9 +325,13 @@ export function sendNotificationRead(
 }
 
 function sanitizePoll(
-  poll: Poll | Omit<Poll, 'viewerVoteOptionId'>
-): Omit<Poll, 'viewerVoteOptionId'> {
-  const { viewerVoteOptionId: _viewerVoteOptionId, ...safePoll } = poll as Poll;
+  poll: Poll | Omit<Poll, 'viewerVoteOptionId' | 'viewerHasLiked'>
+): Omit<Poll, 'viewerVoteOptionId' | 'viewerHasLiked'> {
+  const {
+    viewerVoteOptionId: _viewerVoteOptionId,
+    viewerHasLiked: _viewerHasLiked,
+    ...safePoll
+  } = poll as Poll;
 
   return safePoll;
 }

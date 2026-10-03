@@ -15,6 +15,12 @@ export type PollOption = {
   votesCount: number;
 };
 
+export type PollStateRevisions = {
+  votes: string;
+  likes: string;
+  comments: string;
+};
+
 export type PollComment = {
   id: string;
   pollId: string;
@@ -54,6 +60,7 @@ export type Poll = {
   allowVoteCancellation: boolean;
   viewerHasLiked: boolean;
   viewerVoteOptionId: string | null;
+  stateRevisions: PollStateRevisions;
   createdAt: string;
   updatedAt: string;
   endsAt: string | null;
