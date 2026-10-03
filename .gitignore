@@ -16,6 +16,7 @@
 backups/
 infra/docker/secrets/
 .worktrees/
+.superpowers/
 
 # Node.js
 node_modules/
