@@ -142,22 +142,23 @@ class FeedScreenState extends State<FeedScreen> {
 
       final mergedPolls = store == null
           ? nextPolls
-          : nextPolls.map((poll) {
-              return store
-                      .ingest(
-                        poll,
-                        PollIngress(
-                          origin: PollOrigin.http,
-                          sessionEpoch: epoch,
-                          viewerId: viewerId,
-                          expectedPollId: null,
-                          requestId: requestId,
-                          startedGeneration: generations[poll.id] ?? 0,
-                        ),
-                      )
-                      .state ??
-                  poll;
-            }).toList();
+          : nextPolls
+              .map((poll) {
+                final result = store.ingest(
+                  poll,
+                  PollIngress(
+                    origin: PollOrigin.http,
+                    sessionEpoch: epoch,
+                    viewerId: viewerId,
+                    expectedPollId: null,
+                    requestId: requestId,
+                    startedGeneration: generations[poll.id] ?? 0,
+                  ),
+                );
+                return result.accepted ? result.state : null;
+              })
+              .whereType<PollSummary>()
+              .toList();
       setState(() {
         _polls = mergedPolls;
       });
@@ -185,25 +186,35 @@ class FeedScreenState extends State<FeedScreen> {
 
     final store = PollStateScope.maybeOf(context);
     final currentPoll = _polls[existingIndex];
-    final updated = store
-        ?.ingest(
-          event.poll,
-          PollIngress(
-            origin: PollOrigin.realtime,
-            sessionEpoch: store.sessionEpoch,
-            viewerId: null,
-            expectedPollId: event.poll.id,
-            requestId: 'feed-realtime-${event.poll.id}',
-            startedGeneration: store.generationFor(event.poll.id),
-          ),
-        )
-        .state;
-    _replacePollInFeedValue(
-      updated ??
-          event.poll.copyWith(
-            viewerVoteOptionId: currentPoll.viewerVoteOptionId,
-          ),
+    if (store == null) {
+      _replacePollInFeedValue(
+        event.poll.copyWith(
+          viewerVoteOptionId: currentPoll.viewerVoteOptionId,
+        ),
+      );
+      return;
+    }
+    final result = store.ingest(
+      event.poll,
+      PollIngress(
+        origin: PollOrigin.realtime,
+        sessionEpoch: store.sessionEpoch,
+        viewerId: null,
+        expectedPollId: event.poll.id,
+        requestId: 'feed-realtime-${event.poll.id}',
+        startedGeneration: store.generationFor(event.poll.id),
+      ),
     );
+    if (!result.accepted) {
+      if (store.isDeleted(event.poll.id)) {
+        setState(() {
+          _polls.removeWhere((poll) => poll.id == event.poll.id);
+        });
+      }
+      return;
+    }
+    final updated = result.state;
+    if (updated != null) _replacePollInFeedValue(updated);
   }
 
   void _handleRealtimeDeletion(PollDeletedRealtimeEvent event) {

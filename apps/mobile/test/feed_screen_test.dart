@@ -185,6 +185,73 @@ void main() {
     }
   });
 
+  testWidgets('M06 stale refresh cannot restore a tombstoned poll',
+      (tester) async {
+    final refreshResponse = Completer<List<PollSummary>>();
+    final baseline = motionRacePoll();
+    final api = _FakePollsApiClient(
+      initialPolls: [baseline],
+      refreshResponse: refreshResponse.future,
+    );
+    final realtime = _FakeRealtimeClient();
+    final store = _seedPollStore(baseline);
+    addTearDown(realtime.close);
+    addTearDown(store.dispose);
+    await tester.pumpWidget(_feedWithStore(api, realtime, store));
+    await tester.pumpAndSettle();
+    final refresh = tester
+        .widget<RefreshIndicator>(find.byType(RefreshIndicator))
+        .onRefresh();
+    await tester.pump();
+    store.markDeleted(
+      baseline.id,
+      PollIngress(
+        origin: PollOrigin.realtime,
+        sessionEpoch: store.sessionEpoch,
+        viewerId: null,
+        expectedPollId: baseline.id,
+        requestId: 'deleted',
+        startedGeneration: store.generationFor(baseline.id),
+      ),
+    );
+    refreshResponse.complete([baseline]);
+    await refresh;
+    await tester.pumpAndSettle();
+    store.clear(viewerId: 'user-1');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PollCard), findsNothing);
+  });
+
+  testWidgets('M06 realtime vote cannot restore a tombstoned poll',
+      (tester) async {
+    final baseline = motionRacePoll();
+    final api = _FakePollsApiClient(initialPolls: [baseline]);
+    final realtime = _FakeRealtimeClient();
+    final store = _seedPollStore(baseline);
+    addTearDown(realtime.close);
+    addTearDown(store.dispose);
+    await tester.pumpWidget(_feedWithStore(api, realtime, store));
+    await tester.pumpAndSettle();
+    store.markDeleted(
+      baseline.id,
+      PollIngress(
+        origin: PollOrigin.realtime,
+        sessionEpoch: store.sessionEpoch,
+        viewerId: null,
+        expectedPollId: baseline.id,
+        requestId: 'deleted',
+        startedGeneration: store.generationFor(baseline.id),
+      ),
+    );
+    realtime.injectVote(motionRacePoll('realtime'));
+    await tester.pump();
+    store.clear(viewerId: 'user-1');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PollCard), findsNothing);
+  });
+
   testWidgets('shows one feed without category tabs', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
