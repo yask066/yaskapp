@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { expect, test } from 'vitest';
 import { Avatar } from './Avatar';
 
@@ -21,4 +21,14 @@ test('renders uploaded avatars as round cropped images', () => {
     borderRadius: '50%',
     objectFit: 'cover',
   });
+});
+
+test('keeps avatar dimensions when the image fails to load', () => {
+  render(<Avatar name="Ada Lovelace" src="/ada.webp" size={28} />);
+  const image = screen.getByRole('img', { name: "Ada Lovelace's avatar" });
+
+  fireEvent.error(image);
+
+  expect(screen.getByLabelText("Ada Lovelace's avatar")).toHaveClass('avatar--fallback');
+  expect(screen.getByLabelText("Ada Lovelace's avatar")).toHaveStyle({ width: '28px', height: '28px' });
 });

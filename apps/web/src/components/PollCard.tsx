@@ -42,20 +42,21 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
         </div>
       </header>
       <h2 className="poll-card__question" id={`poll-${poll.id}-question`}><Link to={`/polls/${poll.id}`}>{poll.question}</Link></h2>
-      {poll.imageUrl ? <img className="poll-card__image" src={poll.imageUrl} alt="" /> : null}
+      {poll.imageUrl ? <PollMedia key={poll.imageUrl} src={poll.imageUrl} /> : null}
       <section aria-label="Vote on this poll">
         <fieldset className="poll-options poll-card__options">
           <legend>Choose an option</legend>
           {poll.options.map((option) => (
             (() => {
-              const percentage = poll.votesCount ? Math.round((option.votesCount / poll.votesCount) * 100) : 0;
+              const percentage = poll.votesCount ? Math.min(100, Math.round((option.votesCount / poll.votesCount) * 100)) : 0;
               const canVote = Boolean(onVote) && !hasVoted && !isClosed && !isVoting;
+              const isPendingOption = isVoting && poll.viewerVoteOptionId === option.id;
               return <button className={`poll-option${poll.viewerVoteOptionId === option.id ? ' is-selected' : ''}${hasVoted ? ' is-results' : ''}`} key={option.id} type="button" disabled={!canVote} onClick={() => onVote?.(poll.id, option.id)} aria-label={`${option.text} (${formatVotes(option.votesCount)})`} aria-describedby={onVote ? undefined : `poll-${poll.id}-vote-help`}>
                 <span className="poll-option-label poll-option__content">{option.text}</span>
-                <span className="poll-option-votes">{formatVotes(option.votesCount)}</span>
+                <span className="poll-option-votes">{formatVotes(option.votesCount, true)}</span>
                 <span className="poll-option-percent">{percentage}%</span>
                 <span className="poll-result-bar" role="progressbar" aria-label={option.text} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage}><span style={{ width: `${percentage}%` }} /></span>
-                {isVoting && poll.viewerVoteOptionId === option.id ? <span className="poll-option-loading" aria-label="Submitting vote">…</span> : null}
+                <span className="poll-option-loading" role={isPendingOption ? 'status' : undefined} aria-hidden={!isPendingOption} aria-label={isPendingOption ? 'Submitting vote' : undefined}>{isPendingOption ? '…' : ''}</span>
               </button>;
             })()
           ))}
@@ -63,12 +64,12 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
         {!onVote ? <p id={`poll-${poll.id}-vote-help`}>{voteHelp}</p> : null}
       </section>
       <footer className="poll-actions poll-card__actions">
-        <button className="poll-action-button" type="button" disabled={!onLike || isLiking} onClick={() => onLike?.(poll.id, poll.viewerHasLiked)} aria-label={`Like (${poll.likesCount})`} aria-pressed={poll.viewerHasLiked} aria-describedby={onLike ? undefined : `poll-${poll.id}-like-help`}>
-          <MaterialIcon className="poll-action-icon" name={poll.viewerHasLiked ? 'favorite' : 'favorite_border'} /><span className="poll-action-label">Like</span> <span className="poll-action-count">{poll.likesCount}</span>
+        <button className="poll-action-button" type="button" disabled={!onLike || isLiking} onClick={() => onLike?.(poll.id, poll.viewerHasLiked)} aria-label={`Like (${formatFullCount(poll.likesCount)})`} aria-pressed={poll.viewerHasLiked} aria-describedby={onLike ? undefined : `poll-${poll.id}-like-help`}>
+          <MaterialIcon className="poll-action-icon" name={poll.viewerHasLiked ? 'favorite' : 'favorite_border'} /><span className="poll-action-label">Like</span> <span className="poll-action-count">{formatCompactCount(poll.likesCount)}</span>
         </button>
         {!onLike ? <p id={`poll-${poll.id}-like-help`}>{likeHelp}</p> : null}
-        <button className="poll-action-button" type="button" disabled={!onOpenComments} onClick={() => onOpenComments?.(poll)} aria-label={`Comments (${poll.commentsCount})`} aria-describedby={onOpenComments ? undefined : `poll-${poll.id}-comments-help`}>
-          <MaterialIcon className="poll-action-icon" name="mode_comment_outlined" /><span className="poll-action-label">Comments</span> <span className="poll-action-count">{poll.commentsCount}</span>
+        <button className="poll-action-button" type="button" disabled={!onOpenComments} onClick={() => onOpenComments?.(poll)} aria-label={`Comments (${formatFullCount(poll.commentsCount)})`} aria-describedby={onOpenComments ? undefined : `poll-${poll.id}-comments-help`}>
+          <MaterialIcon className="poll-action-icon" name="mode_comment_outlined" /><span className="poll-action-label">Comments</span> <span className="poll-action-count">{formatCompactCount(poll.commentsCount)}</span>
         </button>
         {!onOpenComments ? <p id={`poll-${poll.id}-comments-help`}>Comments are not available yet.</p> : null}
       </footer>
@@ -76,8 +77,37 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
   );
 }
 
-function formatVotes(count: number) {
-  return `${count} ${count === 1 ? 'vote' : 'votes'}`;
+function PollMedia({ src }: { src: string }) {
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  return (
+    <div className="poll-card__media">
+      {failed ? (
+        <div className="poll-card__media-fallback">
+          <span>Image unavailable</span>
+          <button type="button" onClick={() => { setFailed(false); setAttempt((value) => value + 1); }} aria-label="Retry image">Retry</button>
+        </div>
+      ) : (
+        <img key={attempt} className="poll-card__image" src={src} alt="" onError={() => setFailed(true)} />
+      )}
+    </div>
+  );
+}
+
+const compactCountFormatter = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
+
+function formatFullCount(count: number) {
+  return count.toLocaleString('en-US');
+}
+
+function formatCompactCount(count: number) {
+  return count >= 1000 ? compactCountFormatter.format(count) : String(count);
+}
+
+function formatVotes(count: number, compact = false) {
+  const formattedCount = compact ? formatCompactCount(count) : formatFullCount(count);
+  return `${formattedCount} ${count === 1 ? 'vote' : 'votes'}`;
 }
 
 function formatPollDate(value: string) {
