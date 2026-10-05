@@ -323,41 +323,56 @@ class PollCard extends StatelessWidget {
               const SizedBox(height: 8),
             ],
             SizedBox(height: compact ? 16 : 18),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _Metric(
-                  icon: Icons.people_outline,
-                  label: '${poll.votesCount} votes',
-                  animatedValue: poll.votesCount,
-                  dense: compact,
-                ),
-                _Metric(
-                  icon: Icons.mode_comment_outlined,
-                  label: '${poll.commentsCount}',
-                  tooltip: 'Comments',
-                  onTap: onOpenComments,
-                  dense: compact,
-                ),
-                _Metric(
-                  icon: poll.viewerHasLiked
-                      ? Icons.favorite
-                      : Icons.favorite_border,
-                  label: '${poll.likesCount}',
-                  animatedValue: poll.likesCount,
-                  isActive: poll.viewerHasLiked,
-                  isLoading: isLiking,
-                  tooltip: poll.viewerHasLiked ? 'Unlike' : 'Like',
-                  onTap: onToggleLike,
-                  dense: compact,
-                ),
-                _Metric(
-                  icon: Icons.forward_outlined,
-                  label: '',
-                  tooltip: 'Share',
-                  dense: compact,
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final metrics = [
+                  _Metric(
+                    icon: Icons.people_outline,
+                    label: '${poll.votesCount} votes',
+                    animatedValue: poll.votesCount,
+                    dense: compact,
+                  ),
+                  _Metric(
+                    icon: Icons.mode_comment_outlined,
+                    label: '${poll.commentsCount}',
+                    tooltip: 'Comments',
+                    onTap: onOpenComments,
+                    dense: compact,
+                  ),
+                  _Metric(
+                    icon: poll.viewerHasLiked
+                        ? Icons.favorite
+                        : Icons.favorite_border,
+                    label: '${poll.likesCount}',
+                    animatedValue: poll.likesCount,
+                    isActive: poll.viewerHasLiked,
+                    isLoading: isLiking,
+                    tooltip: poll.viewerHasLiked ? 'Unlike' : 'Like',
+                    onTap: onToggleLike,
+                    dense: compact,
+                  ),
+                  _Metric(
+                    icon: Icons.forward_outlined,
+                    label: '',
+                    tooltip: 'Share',
+                    dense: compact,
+                  ),
+                ];
+
+                if (constraints.maxWidth < 340) {
+                  return Wrap(
+                    spacing: 16,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.spaceBetween,
+                    children: metrics,
+                  );
+                }
+
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: metrics,
+                );
+              },
             ),
           ],
         ),
@@ -477,7 +492,7 @@ class _PollOptionButton extends StatelessWidget {
                           color: accentColor,
                         ),
                       ),
-                      if (isLoading) const _OptionLoading(),
+                      _OptionLoadingSlot(isLoading: isLoading),
                     ],
                   )
                 : Column(
@@ -506,7 +521,7 @@ class _PollOptionButton extends StatelessWidget {
                         color: accentColor,
                         height: progressHeight,
                       ),
-                      if (isLoading) const _OptionLoading(),
+                      _OptionLoadingSlot(isLoading: isLoading),
                     ],
                   ),
           ),
@@ -620,10 +635,21 @@ class _OptionLoading extends StatelessWidget {
   }
 }
 
+class _OptionLoadingSlot extends StatelessWidget {
+  const _OptionLoadingSlot({required this.isLoading});
+
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) => SizedBox.square(
+        dimension: 18,
+        child: isLoading ? const _OptionLoading() : null,
+      );
+}
+
 class _Metric extends StatelessWidget {
   const _Metric({
     this.icon,
-    this.assetPath,
     required this.label,
     this.isActive = false,
     this.isLoading = false,
@@ -634,7 +660,6 @@ class _Metric extends StatelessWidget {
   });
 
   final IconData? icon;
-  final String? assetPath;
   final String label;
   final bool isActive;
   final bool isLoading;
@@ -657,21 +682,14 @@ class _Metric extends StatelessWidget {
                   strokeWidth: 2,
                   color: isActive ? colors.error : colors.primary,
                 )
-              : assetPath == null
-                  ? Icon(
-                      icon,
-                      size: 22,
-                      color: isActive ? colors.error : colors.onSurfaceVariant,
-                    )
-                  : Image.asset(
-                      assetPath!,
-                      width: 22,
-                      height: 22,
-                      fit: BoxFit.contain,
-                    ),
+              : Icon(
+                  icon,
+                  size: 22,
+                  color: isActive ? colors.error : colors.onSurfaceVariant,
+                ),
         ),
         const SizedBox(width: 6),
-        if (animatedValue == null)
+        if (animatedValue == null && int.tryParse(label) == null)
           Text(
             label,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -680,20 +698,10 @@ class _Metric extends StatelessWidget {
                 ),
           )
         else
-          TweenAnimationBuilder<int>(
-            tween: IntTween(end: animatedValue!),
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutCubic,
-            builder: (context, value, child) {
-              final suffix = label.endsWith(' votes') ? ' votes' : '';
-              return Text(
-                '$value$suffix',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF10142D),
-                      fontSize: 14,
-                    ),
-              );
-            },
+          _MetricCount(
+            value: animatedValue ?? int.parse(label),
+            suffix: label.endsWith(' votes') ? ' votes' : '',
+            animate: animatedValue != null,
           ),
       ],
     );
@@ -714,4 +722,61 @@ class _Metric extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MetricCount extends StatelessWidget {
+  const _MetricCount({
+    required this.value,
+    required this.suffix,
+    required this.animate,
+  });
+
+  final int value;
+  final String suffix;
+  final bool animate;
+
+  @override
+  Widget build(BuildContext context) {
+    final textStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+      color: const Color(0xFF10142D),
+      fontSize: 14,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    final fontSize = textStyle?.fontSize ?? 14;
+    final scaledFontSize = MediaQuery.textScalerOf(context).scale(fontSize);
+    final reservedCharacters = suffix.isEmpty ? 4 : 9;
+    final slotWidth = reservedCharacters * scaledFontSize * 0.62;
+
+    Widget render(int currentValue) => Semantics(
+          label: '$currentValue$suffix',
+          child: ExcludeSemantics(
+            child: SizedBox(
+              width: slotWidth,
+              child: Text(
+                '${_compactCount(currentValue)}$suffix',
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.clip,
+                style: textStyle,
+              ),
+            ),
+          ),
+        );
+
+    if (!animate) return render(value);
+
+    return TweenAnimationBuilder<int>(
+      tween: IntTween(end: value),
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOutCubic,
+      builder: (context, currentValue, child) => render(currentValue),
+    );
+  }
+}
+
+String _compactCount(int count) {
+  if (count < 1000) return '$count';
+  if (count < 1000000) return '${count ~/ 1000}K';
+  if (count < 1000000000) return '${count ~/ 1000000}M';
+  return '${count ~/ 1000000000}B';
 }

@@ -11,7 +11,7 @@
 **Spec:** [PRD: Плавные реакции, появление карточек и стабильная прокрутка](../../prd-motion-scroll-loading.md).
 
 **Дата:** 2 октября 2026 года.  
-**Статус:** M01 и M02 завершены 2 октября 2026 года; M03 и M05 завершены 3 октября 2026 года; M07 и M08 завершены 5 октября 2026 года; M09 завершена 5 октября 2026 года. Аудит, контракт, реализация и evidence сохранены в репозитории. Код M04 присутствует, обязательные DB verification/evidence остаются открытыми; состояние M06 отражено в checklist ниже, M10–M27 не начаты.
+**Статус:** M01 и M02 завершены 2 октября 2026 года; M03 и M05 завершены 3 октября 2026 года; M07–M10 завершены 5 октября 2026 года. Аудит, контракт, реализации и evidence сохранены в репозитории. Код M04 присутствует, обязательные DB verification/evidence остаются открытыми; M11–M27 не начаты.
 **Нумерация:** M01–M27; исторические T01/T02 не переименовываются и не считаются закрытыми задачами этого плана.
 
 ## Global Constraints
@@ -238,11 +238,13 @@
 
 **Зависимости:** M06. **Файлы:** `poll_card.dart`, `user_avatar.dart`, `poll_card_layout_test.dart`, `poll_card_report_test.dart`.
 
-- [ ] Widget tests измеряют `tester.getRect` для карточки и действий до/после media/pending/count transitions; tolerance 2 logical px.
-- [ ] Сохранить существующий media AspectRatio/fallback, стабилизировать slots счётчиков и действий; не ломать compact card variant.
-- [ ] Проверить длинные тексты, 0/100%, разрядность, selected/vote cancel и text scale 200% на узком экране; overflow отсутствует.
-- [ ] При необходимости split presentation-карточки по ответственности без изменения бизнес-правил.
-- [ ] Выполнить layout/report/affected screen tests и analyze; сохранить commit.
+- [x] Widget tests измеряют `tester.getRect` для карточки и действий до/после media/pending/count transitions; tolerance 2 logical px.
+- [x] Сохранить существующий media AspectRatio/fallback, стабилизировать slots счётчиков и действий; не ломать compact card variant.
+- [x] Проверить длинные тексты, 0/100%, разрядность, selected/vote cancel и text scale 200% на узком экране; overflow отсутствует.
+- [x] При необходимости split presentation-карточки по ответственности без изменения бизнес-правил. Split не потребовался.
+- [x] Выполнить layout/report/affected screen tests и analyze; сохранить commit.
+
+**Выполнено 5 октября 2026 года:** pending option slots и счётчики сохраняют геометрию; narrow actions wrap без overflow при 200% text scale. Rect checks, count/media/layout cases и affected suites — 66/66; targeted analyze чистый. Broad Profile/Search sweep по-прежнему показывает 10 известных baseline failures из M02/M08. [Проверка M10](../../motion-scroll-loading-evidence/m10-verification.md) содержит результаты и ограничения.
 
 **Готово:** размеры конкретной карточки стабильны при реакции и pending во всех используемых вариантах. **AC:** AC-04.
 
