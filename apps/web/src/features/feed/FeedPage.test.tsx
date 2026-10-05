@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest';
 import { SessionProvider } from '../../app/session-provider';
 import { t02MotionScrollCursorPages, t02MotionScrollPolls } from '../../test-utils/t02-motion-scroll-fixture';
 import { FeedPage } from './FeedPage';
@@ -28,8 +28,8 @@ const poll = {
 const server = setupServer();
 
 function renderFeed() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  return { queryClient, ...render(
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
         <MemoryRouter>
@@ -37,7 +37,7 @@ function renderFeed() {
         </MemoryRouter>
       </SessionProvider>
     </QueryClientProvider>,
-  );
+  ) };
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -49,8 +49,40 @@ beforeEach(() => server.use(
 afterEach(() => {
   server.resetHandlers();
   sessionStorage.clear();
+  vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 afterAll(() => server.close());
+
+test('read_timeout_then_retry_ignores_old_response in the feed UI without automatic retry', async () => {
+  vi.useFakeTimers();
+  let requests = 0; let release!: (response: Response) => void;
+  vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+    if (String(url) === '/auth/me') return Promise.resolve(Response.json({ error: 'unauthorized' }, { status: 401 }));
+    requests += 1;
+    if (requests === 1) return new Promise((resolve) => { release = resolve; });
+    return Promise.resolve(Response.json({ items: [{ ...poll, question: 'Fresh retry result?' }] }));
+  });
+  const view = renderFeed();
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  expect(requests).toBe(1);
+  expect(screen.getByRole('status')).toHaveTextContent('Loading');
+  await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+  expect(screen.getByRole('alert')).toHaveTextContent('timed out');
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+  expect(requests).toBe(1);
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Retry' })); await vi.advanceTimersByTimeAsync(0); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+  expect(screen.getByText('Fresh retry result?')).toBeInTheDocument();
+  await act(async () => { release(Response.json({ items: [poll] })); await vi.advanceTimersByTimeAsync(0); });
+  expect(screen.queryByText('Which option?')).not.toBeInTheDocument();
+  expect(requests).toBe(2);
+  view.unmount(); view.queryClient.clear();
+  await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+  expect(vi.getTimerCount()).toBe(0);
+});
 
 test('renders polls with immediately clickable answer options', async () => {
   server.use(

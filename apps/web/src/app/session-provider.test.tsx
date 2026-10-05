@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SessionProvider, useSession } from './session-provider';
@@ -29,6 +29,7 @@ function SessionProbe() {
   return <>
     <output>{session.status === 'authenticated' && session.user ? session.user.username : session.status}</output>
     <button type="button" onClick={() => session.signOut()}>Sign out</button>
+    <button type="button" onClick={() => { void session.signIn({ login: 'second', password: 'password' }).catch(() => undefined); }}>Sign in</button>
   </>;
 }
 
@@ -50,10 +51,52 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   server.resetHandlers();
   sessionStorage.clear();
+  vi.restoreAllMocks();
 });
 afterAll(() => server.close());
 
 describe('SessionProvider', () => {
+  it('leaves loading when login fails after cancelling an unfinished restore', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      if (String(url) === '/auth/me') return new Promise(() => undefined);
+      return Promise.resolve(Response.json({ error: 'server_error' }, { status: 503 }));
+    });
+    renderSession();
+    await act(async () => { screen.getByRole('button', { name: 'Sign in' }).click(); });
+    expect(screen.getByText('anonymous')).toBeInTheDocument();
+  });
+  it.each([200, 401])('does not apply an old restore response (%s) after signing in as another user', async (status) => {
+    let release!: (response: Response) => void;
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      if (String(url) === '/auth/me') return new Promise((resolve) => { release = resolve; });
+      return Promise.resolve(Response.json({ user: { ...user, id: 'user-2', username: 'second' } }));
+    });
+    const { queryClient } = renderSession();
+    queryClient.setQueryData(['profile', 'someone'], { viewerIsFollowing: true });
+    await act(async () => { screen.getByRole('button', { name: 'Sign in' }).click(); });
+    expect(await screen.findByText('second')).toBeInTheDocument();
+    await act(async () => { release(Response.json({ user }, { status })); });
+    expect(screen.getByText('second')).toBeInTheDocument();
+    expect(queryClient.getQueryData(['profile', 'someone'])).toBeUndefined();
+  });
+
+  it('does not apply a login response after sign-out', async () => {
+    let release!: (response: Response) => void;
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      if (String(url) === '/auth/login') return new Promise((resolve) => { release = resolve; });
+      if (String(url) === '/auth/logout') return Promise.resolve(new Response(null, { status: 204 }));
+      return Promise.resolve(Response.json({ user }));
+    });
+    renderSession();
+    await screen.findByText('member');
+    await act(async () => { screen.getByRole('button', { name: 'Sign in' }).click(); });
+    await act(async () => {
+      screen.getByRole('button', { name: 'Sign out' }).click();
+      release(Response.json({ user: { ...user, id: 'user-2', username: 'second' } }));
+    });
+    expect(screen.getByText('anonymous')).toBeInTheDocument();
+  });
+
   it('restores a cookie session and loads the current user', async () => {
     server.use(
       http.get('/auth/me', ({ request }) => {

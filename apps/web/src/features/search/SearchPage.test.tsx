@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { MemoryRouter } from 'react-router-dom';
-import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest';
 import { SessionProvider } from '../../app/session-provider';
 import { SearchPage } from './SearchPage';
 
@@ -18,8 +18,33 @@ function renderPage() {
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => { server.resetHandlers(); sessionStorage.clear(); });
+afterEach(() => { server.resetHandlers(); sessionStorage.clear(); vi.restoreAllMocks(); });
 afterAll(() => server.close());
+
+test.each(['query', 'type', 'sort'])('ignores an old search response when %s changes and permits a new search', async (field) => {
+  let release!: (response: Response) => void;
+  let searches = 0;
+  vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+    if (String(url) === '/auth/me') return Promise.resolve(Response.json({ user: currentUser }));
+    searches += 1;
+    if (searches === 1) return new Promise((resolve) => { release = resolve; });
+    return Promise.resolve(Response.json({ items: [{ type: 'poll', score: 1, poll: { ...poll, id: 'fresh-poll', question: 'Fresh result?' } }], nextCursor: null }));
+  });
+  const user = userEvent.setup();
+  renderPage();
+  await user.type(screen.getByLabelText('Search'), 'climate');
+  await user.click(screen.getByRole('button', { name: 'Search' }));
+  await waitFor(() => expect(searches).toBe(1));
+  if (field === 'query') { await user.clear(screen.getByLabelText('Search')); await user.type(screen.getByLabelText('Search'), 'energy'); }
+  if (field === 'type') await user.click(screen.getByRole('tab', { name: 'Polls' }));
+  if (field === 'sort') await user.selectOptions(screen.getByLabelText('Sort'), 'newest');
+  expect(screen.getByRole('button', { name: 'Search' })).toBeEnabled();
+  await user.click(screen.getByRole('button', { name: 'Search' }));
+  expect(await screen.findByText('Fresh result?')).toBeInTheDocument();
+  await act(async () => { release(Response.json({ items: [{ type: 'poll', score: 1, poll }], nextCursor: null })); });
+  expect(screen.queryByText('Climate action?')).not.toBeInTheDocument();
+  expect(screen.getByText('Fresh result?')).toBeInTheDocument();
+});
 
 test('renders the shared search page structure', async () => {
   server.use(http.get('/auth/me', () => HttpResponse.json({ user: currentUser })));

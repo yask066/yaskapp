@@ -1,14 +1,14 @@
 import { apiClient } from './client';
 import { decodePoll, decodePollComment, decodePollCommentRepliesPage, responseField, responseItems, type Poll, type PollComment, type PollCommentRepliesPage } from './models';
 
-export function listPolls(input: { sort?: 'newest' | 'popular'; limit?: number } = {}): Promise<Poll[]> {
+export function listPolls(input: { sort?: 'newest' | 'popular'; limit?: number } = {}, signal?: AbortSignal): Promise<Poll[]> {
   const params = new URLSearchParams({ limit: String(input.limit ?? 20) });
   if (input.sort && input.sort !== 'newest') params.set('sort', input.sort);
-  return apiClient.get(`/polls?${params}`, (body) => responseItems(body, decodePoll));
+  return apiClient.get(`/polls?${params}`, (body) => responseItems(body, decodePoll), signal);
 }
 
-export function getPoll(pollId: string): Promise<Poll> {
-  return apiClient.get(`/polls/${pollId}`, (body) => responseField(body, 'poll', decodePoll));
+export function getPoll(pollId: string, signal?: AbortSignal): Promise<Poll> {
+  return apiClient.get(`/polls/${pollId}`, (body) => responseField(body, 'poll', decodePoll), signal);
 }
 
 export function createPoll(input: { question: string; options: string[]; allowVoteCancellation: boolean; image?: File }): Promise<Poll> {
@@ -45,27 +45,30 @@ export function deletePoll(pollId: string): Promise<void> {
   return apiClient.send(`/polls/${pollId}`, { method: 'DELETE' }, () => undefined);
 }
 
-export function listComments(pollId: string): Promise<PollComment[]> {
-  return apiClient.get(`/polls/${pollId}/comments?limit=50`, (body) => responseItems(body, decodePollComment));
+export function listComments(pollId: string, signal?: AbortSignal): Promise<PollComment[]> {
+  return apiClient.get(`/polls/${pollId}/comments?limit=50`, (body) => responseItems(body, decodePollComment), signal);
 }
 
 export function listCommentReplies(
   pollId: string,
   rootCommentId: string,
   input: { limit?: number; cursor?: string } = {},
+  signal?: AbortSignal,
 ): Promise<PollCommentRepliesPage> {
   const params = new URLSearchParams({ limit: String(input.limit ?? 20) });
   if (input.cursor !== undefined) params.set('cursor', input.cursor);
   return apiClient.get(
     `/polls/${pollId}/comments/${rootCommentId}/replies?${params}`,
     decodePollCommentRepliesPage,
+    signal,
   );
 }
 
-export function getComment(pollId: string, commentId: string): Promise<PollComment> {
+export function getComment(pollId: string, commentId: string, signal?: AbortSignal): Promise<PollComment> {
   return apiClient.get(
     `/polls/${pollId}/comments/${commentId}`,
     (value) => responseField(value, 'comment', decodePollComment),
+    signal,
   );
 }
 

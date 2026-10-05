@@ -1,8 +1,14 @@
 import '@testing-library/jest-dom/vitest';
+import { transferableAbortController } from 'node:util';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, type RenderOptions } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { createElement, type ReactElement, type ReactNode } from 'react';
+
+// Node fetch/Request (and MSW) require signals from their own realm.
+const nodeController = transferableAbortController();
+globalThis.AbortController = nodeController.constructor as typeof AbortController;
+globalThis.AbortSignal = nodeController.signal.constructor as typeof AbortSignal;
 
 export function renderWithProviders(ui: ReactElement, options?: Omit<RenderOptions, 'wrapper'>) {
   const queryClient = new QueryClient({

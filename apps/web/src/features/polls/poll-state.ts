@@ -2,16 +2,17 @@ import type { Poll } from '../../api/models';
 import type { QueryClient } from '@tanstack/react-query';
 import { CancelledError } from '@tanstack/react-query';
 import { getPoll } from '../../api/polls';
+import { ApiError } from '../../api/client';
 
 export type PollOrigin = 'http' | 'mutation' | 'realtime';
 type MergeResult = { poll: Poll; needsReconcile: boolean };
 const groups = ['votes', 'likes', 'comments'] as const;
 type Group = typeof groups[number];
-type ClientState = { polls: Map<string, Poll>; tombstones: Set<string>; pending: Map<string, string>; epoch: number; generation: number; pollGenerations: Map<string, number>; reconciliationRequests: Set<string> };
+type ClientState = { polls: Map<string, Poll>; tombstones: Set<string>; pending: Map<string, string>; epoch: number; generation: number; pollGenerations: Map<string, number>; reconciliationRequests: Map<string, Promise<void>> };
 const clients = new WeakMap<QueryClient, ClientState>();
 function clientState(client: QueryClient): ClientState {
   let state = clients.get(client);
-  if (!state) { state = { polls: new Map(), tombstones: new Set(), pending: new Map(), epoch: 0, generation: 0, pollGenerations: new Map(), reconciliationRequests: new Set() }; clients.set(client, state); }
+  if (!state) { state = { polls: new Map(), tombstones: new Set(), pending: new Map(), epoch: 0, generation: 0, pollGenerations: new Map(), reconciliationRequests: new Map() }; clients.set(client, state); }
   return state;
 }
 
@@ -143,19 +144,48 @@ export function ingestPoll(client: QueryClient, incoming: Poll, origin: PollOrig
   const current = state.polls.get(incoming.id) ?? cachedPoll(client, incoming.id);
   const allowLegacyBootstrap = (state.pollGenerations.get(incoming.id) ?? 0) <= startedGeneration;
   const result = mergePollSnapshot(current, incoming, origin, viewerId, allowLegacyBootstrap, allowLegacyViewerState);
-  if (result.needsReconcile && !state.reconciliationRequests.has(incoming.id)) {
-    state.reconciliationRequests.add(incoming.id);
-    const requestEpoch = state.epoch;
-    void getPoll(incoming.id).then((snapshot) => {
-      if (clientState(client).epoch === requestEpoch) ingestPoll(client, snapshot, 'http', viewerId, requestEpoch);
-    }).catch(() => undefined);
-  }
+  if (result.needsReconcile) void reconcilePoll(client, incoming.id, viewerId, expectedEpoch);
   state.polls.set(incoming.id, result.poll);
   for (const query of client.getQueryCache().findAll()) {
     const data = query.state.data;
     if (data !== undefined) client.setQueryData(query.queryKey, replacePollInQueryData(data, result.poll));
   }
   return result.poll;
+}
+
+// One bounded HTTP read per Poll. A failed read can be retried by the next
+// lifecycle event; neither reconciliation nor ambiguous writes retry themselves.
+export function reconcilePoll(client: QueryClient, pollId: string, viewerId: string | null, expectedEpoch = pollSessionEpoch(client)): Promise<void> {
+  const state = clientState(client);
+  if (state.epoch !== expectedEpoch || state.tombstones.has(pollId)) return Promise.resolve();
+  const existing = state.reconciliationRequests.get(pollId);
+  if (existing) return existing;
+  const startedGeneration = state.generation;
+  const request = Promise.resolve().then(async () => {
+    if (state.epoch !== expectedEpoch) return;
+    try {
+      const snapshot = await getPoll(pollId);
+      ingestPoll(client, snapshot, 'http', viewerId, expectedEpoch, startedGeneration);
+    } catch (error) {
+      if (state.epoch === expectedEpoch && error instanceof ApiError && error.status === 404) deleteCachedPoll(client, pollId);
+    }
+  }).finally(() => {
+    if (state.reconciliationRequests.get(pollId) === request) state.reconciliationRequests.delete(pollId);
+  });
+  state.reconciliationRequests.set(pollId, request);
+  return request;
+}
+
+export async function reconcileCachedPolls(client: QueryClient, viewerId: string | null): Promise<void> {
+  const epoch = pollSessionEpoch(client);
+  const ids = new Set(clientState(client).polls.keys());
+  const visit = (value: unknown): void => {
+    if (isPoll(value)) { ids.add(value.id); return; }
+    if (Array.isArray(value)) value.forEach(visit);
+    else if (value && typeof value === 'object') Object.values(value).forEach(visit);
+  };
+  for (const query of client.getQueryCache().findAll()) visit(query.state.data);
+  await Promise.all([...ids].map((id) => reconcilePoll(client, id, viewerId, epoch)));
 }
 export function reconcilePollQueryData<T>(client: QueryClient, data: T, viewerId: string | null, expectedEpoch = pollSessionEpoch(client), startedGeneration = clientState(client).generation, allowLegacyViewerState = true): T {
   const visit = (value: unknown): unknown => {
@@ -171,11 +201,11 @@ export function reconcilePollQueryData<T>(client: QueryClient, data: T, viewerId
   };
   return visit(data) as T;
 }
-export async function fetchPollQuery<T>(client: QueryClient, viewerId: string | null, fetcher: () => Promise<T>, allowLegacyViewerState = true): Promise<T> {
+export async function fetchPollQuery<T>(client: QueryClient, viewerId: string | null, fetcher: () => Promise<T>, allowLegacyViewerState = true, signal?: AbortSignal): Promise<T> {
   const epoch = pollSessionEpoch(client);
   const startedGeneration = clientState(client).generation;
   const data = await fetcher();
-  if (pollSessionEpoch(client) !== epoch) throw new CancelledError({ silent: true });
+  if (signal?.aborted || pollSessionEpoch(client) !== epoch) throw new CancelledError({ silent: true });
   return reconcilePollQueryData(client, data, viewerId, epoch, startedGeneration, allowLegacyViewerState);
 }
 export function beginPollOperation(client: QueryClient, pollId: string, action: 'vote' | 'like'): string | null {

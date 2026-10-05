@@ -26,8 +26,8 @@ export function FeedPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const mutations = usePollMutations();
-  const pollsQuery = useQuery({ queryKey: ['polls', sort], queryFn: () => fetchPollQuery(queryClient, user?.id ?? null, () => sort === 'trending' ? listPolls({ sort: 'popular' }) : listPolls()), enabled: status !== 'loading' });
-  const suggestedUsersQuery = useQuery({ queryKey: ['popular-users'], queryFn: () => listPopularUsers(), enabled: status === 'authenticated' });
+  const pollsQuery = useQuery({ queryKey: ['polls', sort], queryFn: ({ signal }) => fetchPollQuery(queryClient, user?.id ?? null, () => listPolls({ sort: sort === 'trending' ? 'popular' : 'newest' }, signal), true, signal), enabled: status !== 'loading' });
+  const suggestedUsersQuery = useQuery({ queryKey: ['popular-users'], queryFn: ({ signal }) => listPopularUsers(3, signal), enabled: status === 'authenticated' });
   const suggestedUsers = suggestedUsersQuery.data?.filter((person) => person.id !== user?.id && !person.viewerIsFollowing) ?? [];
   return <main id="main-content" className="feed-page">
     <section className="feed-main" aria-label="Poll feed">

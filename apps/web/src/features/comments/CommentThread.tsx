@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createComment, listCommentReplies } from '../../api/polls';
 import type { Poll, PollComment } from '../../api/models';
 import { mutationErrorMessage } from '../polls/usePollMutations';
 import { commentScrollBehavior } from './comment-scroll';
 import { CommentForm } from './CommentForm';
+import { pollSessionEpoch, reconcilePoll } from '../polls/poll-state';
+import { isAmbiguousMutationError } from '../polls/usePollMutations';
 
 interface CommentThreadProps {
   pollId: string;
@@ -31,21 +33,29 @@ export function CommentThread({
   const didFocusReply = useRef(false);
   const repliesQuery = useInfiniteQuery({
     queryKey,
-    queryFn: ({ pageParam }) => listCommentReplies(pollId, rootComment.id, { cursor: pageParam }),
+    queryFn: ({ pageParam, signal }) => listCommentReplies(pollId, rootComment.id, { cursor: pageParam }, signal),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: isExpanded,
   });
   const replyMutation = useMutation({
-    mutationFn: (body: string) => createComment(pollId, body, rootComment.id),
-    onSuccess: async ({ comment, poll }) => {
+    mutationFn: ({ body }: { body: string; epoch: number }) => createComment(pollId, body, rootComment.id),
+    onSuccess: async ({ comment, poll }, { epoch }) => {
+      if (pollSessionEpoch(queryClient) !== epoch) return;
       onReplyCreated?.(comment, poll);
       setIsReplying(false);
       setIsExpanded(true);
       await queryClient.invalidateQueries({ queryKey, exact: true });
     },
+    onError: (error, { epoch }) => {
+      if (pollSessionEpoch(queryClient) !== epoch || !isAmbiguousMutationError(error)) return;
+      void reconcilePoll(queryClient, pollId, currentUserId ?? null, epoch);
+      void queryClient.invalidateQueries({ queryKey });
+      void queryClient.invalidateQueries({ queryKey: ['comments', pollId] });
+    },
   });
-  const replies = repliesQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const replies = useMemo(() => repliesQuery.data?.pages.flatMap((page) => page.items) ?? [], [repliesQuery.data]);
+  const { isError, hasNextPage, isFetchingNextPage, fetchNextPage } = repliesQuery;
 
   useEffect(() => {
     if (autoExpand || focusedReplyId) setIsExpanded(true);
@@ -65,10 +75,10 @@ export function CommentThread({
       focusedReplyRef.current.scrollIntoView?.({ block: 'center', behavior: commentScrollBehavior(prefersReducedMotion) });
       return;
     }
-    if (!repliesQuery.isError && repliesQuery.hasNextPage && !repliesQuery.isFetchingNextPage) {
-      void repliesQuery.fetchNextPage();
+    if (!isError && hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage();
     }
-  }, [focusedReplyId, isExpanded, replies, repliesQuery.fetchNextPage, repliesQuery.hasNextPage, repliesQuery.isError, repliesQuery.isFetchingNextPage]);
+  }, [focusedReplyId, isExpanded, replies, fetchNextPage, hasNextPage, isError, isFetchingNextPage]);
 
   const authorLabel = rootComment.author.displayName || rootComment.author.username;
   const replyButtonName = `Reply to ${authorLabel}`;
@@ -91,7 +101,7 @@ export function CommentThread({
         submitLabel="Post reply"
         replyToLabel={authorLabel}
         onCancel={() => setIsReplying(false)}
-        onSubmit={async (body) => { await replyMutation.mutateAsync(body); }}
+        onSubmit={async (body) => { await replyMutation.mutateAsync({ body, epoch: pollSessionEpoch(queryClient) }); }}
       /> : null}
 
       {isExpanded ? <div className="comment-thread__replies" id={`replies-${rootComment.id}`}>

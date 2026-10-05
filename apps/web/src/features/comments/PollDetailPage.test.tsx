@@ -76,6 +76,39 @@ test('shows a poll and comments, then adds the returned comment and authoritativ
   expect(screen.getByRole('button', { name: 'Comments (3)' })).toBeInTheDocument();
 });
 
+test.each([false, true])('reconciles an ambiguous comment write (reply=%s) without repeating POST', async (reply) => {
+  let written = false; let writes = 0; let reads = 0;
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: currentUser })),
+    http.get('/polls/poll-1', () => { reads += 1; return HttpResponse.json({ poll: { ...poll, commentsCount: written ? 3 : 2 } }); }),
+    http.get('/polls/poll-1/comments', () => HttpResponse.json({ items: comments })),
+    http.get('/polls/poll-1/comments/comment-1/replies', () => HttpResponse.json({ items: [], nextCursor: null })),
+    http.post('/polls/poll-1/comments', () => { written = true; writes += 1; return HttpResponse.json({ error: 'server_error' }, { status: 500 }); }),
+  );
+  const user = userEvent.setup();
+  renderDetail();
+  await screen.findByRole('button', { name: 'Comments (2)' });
+  await screen.findByLabelText('Add a comment');
+  if (reply) await user.click(screen.getByRole('button', { name: 'Reply to Author' }));
+  await user.type(screen.getByLabelText(reply ? 'Write a reply' : 'Add a comment'), 'Possibly saved comment');
+  await user.click(screen.getByRole('button', { name: reply ? 'Post reply' : 'Post comment' }));
+  expect(await screen.findByRole('button', { name: 'Comments (3)' })).toBeInTheDocument();
+  expect(writes).toBe(1); expect(reads).toBe(2);
+});
+
+test('allows Retry after an initial comments read failure', async () => {
+  let reads = 0;
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: currentUser })),
+    http.get('/polls/poll-1', () => HttpResponse.json({ poll })),
+    http.get('/polls/poll-1/comments', () => ++reads === 1 ? HttpResponse.json({ error: 'server_error' }, { status: 503 }) : HttpResponse.json({ items: comments })),
+  );
+  renderDetail();
+  await userEvent.setup().click(await screen.findByRole('button', { name: 'Retry loading comments' }));
+  expect(await screen.findByText('First existing comment.')).toBeInTheDocument();
+  expect(reads).toBe(2);
+});
+
 test('shows a Login link instead of a comment text area for anonymous visitors', async () => {
   server.use(
     http.get('/polls/poll-1', () => HttpResponse.json({ poll })),

@@ -30,7 +30,7 @@ export function CommentList({
   onReplyCreated,
 }: CommentListProps) {
   const queryClient = useQueryClient();
-  const commentsQuery = useQuery({ queryKey: ['comments', pollId], queryFn: () => listComments(pollId) });
+  const commentsQuery = useQuery({ queryKey: ['comments', pollId], queryFn: ({ signal }) => listComments(pollId, signal) });
   const likeMutation = useMutation({
     mutationFn: (comment: PollComment) => comment.viewerHasLiked ? unlikeComment(pollId, comment.id) : likeComment(pollId, comment.id),
     onSuccess: (comment) => replaceComment(queryClient, pollId, comment),
@@ -55,7 +55,7 @@ export function CommentList({
   const writeError = likeMutation.error ?? deleteMutation.error;
 
   if (commentsQuery.isPending) return <p role="status">Loading comments…</p>;
-  if (commentsQuery.isError) return <p role="alert">{mutationErrorMessage(commentsQuery.error)}</p>;
+  if (commentsQuery.isError && !commentsQuery.data) return <div role="alert"><p>{mutationErrorMessage(commentsQuery.error)}</p><button type="button" onClick={() => void commentsQuery.refetch()}>Retry loading comments</button></div>;
 
   const comments = commentsQuery.data ?? [];
   const visibleComments = resolvedRootComment && !comments.some((comment) => comment.id === resolvedRootComment.id)

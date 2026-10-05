@@ -150,6 +150,7 @@ const NotificationContext = createContext<NotificationStoreContextValue | null>(
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const session = useSession();
+  const reconcileSessionPolls = session.reconcilePolls;
   const userId = session.user?.id;
   const [state, dispatch] = useReducer(notificationReducer, initialNotificationState);
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeConnectionStatus>('idle');
@@ -178,7 +179,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       }
     });
     return () => controller.abort();
-  }, [session.sessionEpoch, session.status, userId]);
+  }, [session.sessionEpoch, session.status, sessionIdentity, userId]);
 
   const reconcile = useCallback(async () => {
     const currentEpoch = epoch.current;
@@ -275,14 +276,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       onEvent: (event) => {
         if (sessionIdentityRef.current === currentSessionIdentity) applyRealtime(event);
       },
-      onConnectionReady: () => sessionIdentityRef.current === currentSessionIdentity ? reconcile() : undefined,
+      onConnectionReady: () => {
+        if (sessionIdentityRef.current !== currentSessionIdentity) return;
+        void reconcileSessionPolls?.();
+        return reconcile();
+      },
       reconcile,
       documentRef: typeof document === 'undefined' ? undefined : document,
       onStatusChange: setRealtimeStatus,
     });
     client.start();
     return () => client.stop();
-  }, [applyRealtime, reconcile, session.sessionEpoch, session.status, sessionIdentity, userId]);
+  }, [applyRealtime, reconcile, reconcileSessionPolls, session.sessionEpoch, session.status, sessionIdentity, userId]);
 
   const actions = useMemo<NotificationStoreActions>(() => ({ reconcile, loadMore, markRead, markAllRead, applyRealtime, clearPending }), [applyRealtime, clearPending, loadMore, markAllRead, markRead, reconcile]);
   return <NotificationContext.Provider value={{ ...state, actions, realtimeStatus }}>{children}</NotificationContext.Provider>;

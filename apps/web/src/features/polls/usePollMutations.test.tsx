@@ -32,6 +32,7 @@ function RefusalButtons() {
   return <>
     <button onClick={() => mutations.vote({ pollId: 'poll-1', optionId: 'option-1' })}>Closed vote</button>
     <button onClick={() => mutations.vote({ pollId: 'poll-1', optionId: 'invalid-option' })}>Invalid option</button>
+    <button onClick={() => mutations.deletePoll('poll-1')}>Delete</button>
     <output>{mutations.error}</output>
     <output>{mutations.isVoting('poll-1') ? 'Vote pending' : 'Vote idle'}</output>
   </>;
@@ -80,6 +81,40 @@ test('keeps confirmed poll state and releases pending after closed-poll and inva
   expect(await screen.findByText('Choose a valid poll option.')).toBeInTheDocument();
   expect(await screen.findByText('Vote idle')).toBeInTheDocument();
   expect(client.getQueryData<typeof poll[]>(['polls', 'newest'])?.[0]).toMatchObject(poll);
+  client.clear();
+});
+
+test('reconciles an ambiguous vote failure with HTTP and releases pending without retrying the write', async () => {
+  let writes = 0; let reads = 0;
+  server.use(
+    http.post('/polls/poll-1/votes', () => {
+      writes += 1;
+      return HttpResponse.json({ error: 'server_error' }, { status: 500 });
+    }),
+    http.get('/polls/poll-1', () => { reads += 1; return HttpResponse.json({ poll: votedPoll }); }),
+  );
+  const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+  client.setQueryData(['polls'], [poll]);
+  render(<QueryClientProvider client={client}><RefusalButtons /></QueryClientProvider>);
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Closed vote' }));
+  await waitFor(() => expect(client.getQueryData<Poll[]>(['polls'])?.[0].votesCount).toBe(4));
+  expect(screen.getByText('Vote idle')).toBeInTheDocument();
+  expect(writes).toBe(1); expect(reads).toBe(1);
+  client.clear();
+});
+
+test('confirms an ambiguous delete failure by HTTP without repeating the delete', async () => {
+  let writes = 0; let reads = 0;
+  server.use(
+    http.delete('/polls/poll-1', () => { writes += 1; return HttpResponse.json({ error: 'server_error' }, { status: 500 }); }),
+    http.get('/polls/poll-1', () => { reads += 1; return HttpResponse.json({ error: 'not_found' }, { status: 404 }); }),
+  );
+  const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+  client.setQueryData(['polls'], [poll]);
+  render(<QueryClientProvider client={client}><RefusalButtons /></QueryClientProvider>);
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Delete' }));
+  await waitFor(() => expect(client.getQueryData(['polls'])).toEqual([]));
+  expect(writes).toBe(1); expect(reads).toBe(1);
   client.clear();
 });
 

@@ -11,7 +11,7 @@
 **Spec:** [PRD: Плавные реакции, появление карточек и стабильная прокрутка](../../prd-motion-scroll-loading.md).
 
 **Дата:** 2 октября 2026 года.  
-**Статус:** M01 и M02 завершены 2 октября 2026 года; M03 и M05 завершены 3 октября 2026 года. Аудит, контракт, реализация и evidence сохранены в репозитории. Код M04 присутствует, обязательные DB verification/evidence остаются открытыми; M06–M27 не начаты.
+**Статус:** M01 и M02 завершены 2 октября 2026 года; M03 и M05 завершены 3 октября 2026 года; M07 завершена 5 октября 2026 года. Аудит, контракт, реализация и evidence сохранены в репозитории. Код M04 присутствует, обязательные DB verification/evidence остаются открытыми; состояние M06 отражено в checklist ниже, M08–M27 не начаты.
 **Нумерация:** M01–M27; исторические T01/T02 не переименовываются и не считаются закрытыми задачами этого плана.
 
 ## Global Constraints
@@ -196,11 +196,13 @@
 
 **Зависимости:** M05. **Файлы:** `api/client.ts`/test, API query callers, session provider, existing realtime/visibility integration.
 
-- [ ] Проверить `read_timeout_then_retry_ignores_old_response`: first request достигает 10 с, Retry succeeds, first response не заменяет second; logout/relogin не применяет старый ответ.
-- [ ] Ввести read deadline 10 с с корректной отменой/cleanup. Mutation deadlines не менять автоматически; неоднозначный mutation result сверять HTTP.
-- [ ] Защитить query/filter/session epoch; освободить pending после failure и не запускать infinite retry.
-- [ ] Подключить reconciliation затронутых Poll на foreground/reconnect там, где транспорт уже существует; notification transport не превращать в новый Poll канал.
-- [ ] Выполнить `client.test.ts`, session/mutation/query tests; typecheck; сохранить commit.
+- [x] Проверить `read_timeout_then_retry_ignores_old_response`: first request достигает 10 с, Retry succeeds, first response не заменяет second; logout/relogin не применяет старый ответ.
+- [x] Ввести read deadline 10 с с корректной отменой/cleanup. Mutation deadlines не менять автоматически; неоднозначный mutation result сверять HTTP.
+- [x] Защитить query/filter/session epoch; освободить pending после failure и не запускать infinite retry.
+- [x] Подключить reconciliation затронутых Poll на foreground/reconnect там, где транспорт уже существует; notification transport не превращать в новый Poll канал.
+- [x] Выполнить `client.test.ts`, session/mutation/query tests; typecheck; сохранить commit.
+
+**Выполнено 5 октября 2026 года:** [M07 verification](../../motion-scroll-loading-evidence/m07-verification.md), [полный web-suite](../../motion-scroll-loading-evidence/m07-web-tests.txt): 159/159; typecheck и lint проходят. RED→GREEN подтверждён для deadline/cancellation, session/search races, lifecycle HTTP reconciliation и ambiguous writes. Самостоятельный review; browser profiling и последующие scroll/layout проверки не измерены. G0 остаётся закрытым.
 
 **Готово:** нет бесконечного initial loading, late-response overwrite и cross-user update. **AC:** AC-03, AC-08, AC-13.
 

@@ -3,7 +3,7 @@ import { useCallback, useReducer } from 'react';
 import { cancelVote as cancelPollVote, deletePoll as deletePollRequest, likePoll, unlikePoll, vote as votePoll } from '../../api/polls';
 import type { Poll } from '../../api/models';
 import { ApiError } from '../../api/client';
-import { beginPollOperation, deleteCachedPoll, finishPollOperation, ingestPoll, isPollOperationPending, pollSessionEpoch } from './poll-state';
+import { beginPollOperation, deleteCachedPoll, finishPollOperation, ingestPoll, isPollOperationPending, pollSessionEpoch, reconcilePoll } from './poll-state';
 import { useOptionalSession } from '../../app/session-provider';
 
 export function replaceCachedPoll(queryClient: ReturnType<typeof useQueryClient>, poll: Poll, viewerId: string | null = null) {
@@ -23,6 +23,10 @@ export function mutationErrorMessage(error: unknown): string {
   return 'The request could not be completed.';
 }
 
+export function isAmbiguousMutationError(error: unknown): boolean {
+  return !(error instanceof ApiError) || error.status === 0 || error.status >= 500;
+}
+
 export function usePollMutations() {
   const queryClient = useQueryClient();
   const session = useOptionalSession();
@@ -33,6 +37,9 @@ export function usePollMutations() {
   const operationCallbacks = (action: 'vote' | 'like') => ({
     mutationFn: (request: OperationRequest) => request.run(),
     onSuccess: (poll: Poll, request: OperationRequest) => { if (pollSessionEpoch(queryClient) === request.epoch) ingestPoll(queryClient, poll, 'mutation', viewerId ?? '__mutation_viewer__', request.epoch); },
+    onError: (error: Error, request: OperationRequest) => {
+      if (isAmbiguousMutationError(error)) void reconcilePoll(queryClient, request.pollId, viewerId ?? '__mutation_viewer__', request.epoch);
+    },
     onSettled: (_data: Poll | undefined, _error: Error | null, request: OperationRequest) => { finishPollOperation(queryClient, request.pollId, action, request.token); rerender(); },
   });
   const voteMutation = useMutation(operationCallbacks('vote'));
@@ -40,8 +47,11 @@ export function usePollMutations() {
   const deleteMutation = useMutation({
     mutationFn: ({ pollId }: { pollId: string; epoch: number }) => deletePollRequest(pollId),
     onSuccess: (_, { pollId, epoch: requestEpoch }) => { if (pollSessionEpoch(queryClient) === requestEpoch) removeCachedPoll(queryClient, pollId); },
+    onError: (error, { pollId, epoch: requestEpoch }) => {
+      if (isAmbiguousMutationError(error)) void reconcilePoll(queryClient, pollId, viewerId, requestEpoch);
+    },
   });
-  const error = [voteMutation.error, likeMutation.error, deleteMutation.error].find(Boolean);
+  const error = [voteMutation, likeMutation, deleteMutation].find((mutation) => mutation.variables?.epoch === epoch && mutation.error)?.error;
 
   const runAction = useCallback((action: 'vote' | 'like', pollId: string, run: () => Promise<Poll>) => {
     const token = beginPollOperation(queryClient, pollId, action);
@@ -59,7 +69,7 @@ export function usePollMutations() {
     deletePoll: (pollId: string) => deleteMutation.mutate({ pollId, epoch }),
     isVoting: (pollId: string) => isPollOperationPending(queryClient, pollId, 'vote'),
     isLiking: (pollId: string) => isPollOperationPending(queryClient, pollId, 'like'),
-    isPending: voteMutation.isPending || likeMutation.isPending || deleteMutation.isPending,
+    isPending: [voteMutation, likeMutation, deleteMutation].some((mutation) => mutation.variables?.epoch === epoch && mutation.isPending),
     error: error ? mutationErrorMessage(error) : null,
   };
 }

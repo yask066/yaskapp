@@ -16,6 +16,18 @@ const snapshot = (changes: Partial<Poll>, revisions = poll.stateRevisions) =>
   ({ ...poll, ...changes, stateRevisions: revisions }) as Poll;
 
 describe('mergePollSnapshot', () => {
+  test('does not merge a late response from a cancelled query into other cached surfaces', async () => {
+    const client = new QueryClient();
+    const controller = new AbortController();
+    client.setQueryData(['poll', poll.id], poll);
+    let release!: (value: Poll[]) => void;
+    const pending = fetchPollQuery(client, 'viewer', () => new Promise<Poll[]>((resolve) => { release = resolve; }), true, controller.signal);
+    controller.abort();
+    release([snapshot({ likesCount: 10, viewerHasLiked: true }, { votes: '0', likes: '1', comments: '0' })]);
+    await expect(pending).rejects.toMatchObject({ silent: true });
+    expect(client.getQueryData<Poll>(['poll', poll.id])?.likesCount).toBe(9);
+    client.clear();
+  });
   test('keeps independently newer reaction groups regardless of response order', () => {
     const vote = snapshot({ votesCount: 10, options: [{ ...poll.options[0], votesCount: 6 }, poll.options[1]], viewerVoteOptionId: 'a' }, { votes: '1', likes: '0', comments: '0' });
     const like = snapshot({ likesCount: 10, viewerHasLiked: true }, { votes: '0', likes: '1', comments: '0' });

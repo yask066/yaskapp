@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { setupServer } from 'msw/node';
-import { apiClient } from './client';
+import { ApiClient, apiClient } from './client';
 import { vote } from './polls';
 
 const poll = {
@@ -25,10 +25,93 @@ const server = setupServer();
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   server.resetHandlers();
+  vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 afterAll(() => server.close());
 
 describe('API client', () => {
+  it('read_timeout_then_retry_ignores_old_response, including a late 401', async () => {
+    vi.useFakeTimers();
+    const client = new ApiClient();
+    const unauthorized = vi.fn();
+    const decode = vi.fn((body: unknown) => body);
+    client.setOnUnauthorized(unauthorized);
+    let release!: (response: Response) => void;
+    let signal: AbortSignal | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce((_url, init) => {
+      signal = init?.signal ?? undefined;
+      return new Promise((resolve) => { release = resolve; });
+    }).mockResolvedValueOnce(Response.json({ value: 'fresh' }));
+    const first = client.get('/polls', decode).catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(9999);
+    expect(signal?.aborted ?? false).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    // Observe the deadline before releasing a transport that ignores abort.
+    let error: unknown;
+    void first.then((value) => { error = value; });
+    await Promise.resolve();
+    expect(error).toMatchObject({ code: 'read_timeout' });
+    expect(signal?.aborted).toBe(true);
+    await expect(client.get('/polls', decode)).resolves.toEqual({ value: 'fresh' });
+    release(Response.json({ value: 'stale' }, { status: 401 }));
+    await first;
+    await vi.advanceTimersByTimeAsync(0);
+    expect(decode).toHaveBeenCalledTimes(1);
+    expect(unauthorized).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('bounds response body reading and cancels without decoding a late body', async () => {
+    vi.useFakeTimers();
+    const client = new ApiClient();
+    let release!: (value: unknown) => void;
+    const response = Response.json({});
+    vi.spyOn(response, 'json').mockImplementation(() => new Promise((resolve) => { release = resolve; }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(response);
+    const decode = vi.fn((body: unknown) => body);
+    let error: unknown;
+    const request = client.get('/polls', decode).catch((value: unknown) => { error = value; });
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(error).toMatchObject({ code: 'read_timeout' });
+    release({ stale: true });
+    await request;
+    await vi.advanceTimersByTimeAsync(0);
+    expect(decode).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('cleans up caller cancellation even when fetch ignores abort', async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise(() => undefined));
+    let error: unknown;
+    const request = apiClient.send('/polls', { method: 'GET', signal: controller.signal }, (value) => value)
+      .catch((value: unknown) => { error = value; });
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(error).toMatchObject({ code: 'request_cancelled' });
+    expect(vi.getTimerCount()).toBe(0);
+    // Only await after checking prompt cancellation; otherwise the regression hangs.
+    if (error) await request;
+  });
+
+  it('does not impose the read deadline on mutations', async () => {
+    vi.useFakeTimers();
+    let release!: (response: Response) => void;
+    let signal: AbortSignal | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation((_url, init) => {
+      signal = init?.signal ?? undefined;
+      return new Promise((resolve) => { release = resolve; });
+    });
+    const request = apiClient.send('/polls/poll-1/likes', { method: 'POST' }, (body) => body);
+    await vi.advanceTimersByTimeAsync(12000);
+    expect(signal?.aborted ?? false).toBe(false);
+    release(Response.json({ saved: true }));
+    await expect(request).resolves.toEqual({ saved: true });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('sends browser credentials and decodes a poll returned by a JSON request', async () => {
     server.use(
       http.post('/polls/poll-1/votes', async ({ request }) => {

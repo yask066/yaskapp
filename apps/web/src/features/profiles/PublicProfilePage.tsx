@@ -12,8 +12,8 @@ function replaceFollowState(profile: PublicProfile, relationship: FollowRelation
 
 export function PublicProfilePage() {
   const { userId = '' } = useParams(); const { status, user } = useSession(); const queryClient = useQueryClient(); const navigate = useNavigate();
-  const profileQuery = useQuery({ queryKey: ['profile', userId], queryFn: () => getPublicProfile(userId), enabled: Boolean(userId) && status !== 'loading' });
-  const pollsQuery = useQuery({ queryKey: ['user-polls', userId], queryFn: () => fetchPollQuery(queryClient, user?.id ?? null, () => listUserPolls(userId)), enabled: Boolean(userId) && status !== 'loading' });
+  const profileQuery = useQuery({ queryKey: ['profile', userId], queryFn: ({ signal }) => getPublicProfile(userId, signal), enabled: Boolean(userId) && status !== 'loading' });
+  const pollsQuery = useQuery({ queryKey: ['user-polls', userId], queryFn: ({ signal }) => fetchPollQuery(queryClient, user?.id ?? null, () => listUserPolls(userId, signal), true, signal), enabled: Boolean(userId) && status !== 'loading' });
   const followMutation = useMutation({ mutationFn: (following: boolean) => following ? unfollowUser(userId) : followUser(userId), onSuccess: (relationship) => queryClient.setQueryData<PublicProfile>(['profile', userId], (profile) => profile ? replaceFollowState(profile, relationship) : profile) });
   if (user?.id === userId) return <Navigate to="/me" replace />;
   if (profileQuery.isPending) return <main id="main-content"><AsyncState state="loading" /></main>;

@@ -9,8 +9,8 @@ export function register(input: { email: string; username: string; password: str
   return apiClient.send('/auth/register', { method: 'POST', headers: { 'content-type': 'application/json', 'x-auth-mode': 'cookie' }, body: JSON.stringify(input) }, (body) => responseField(body, 'user', decodeAuthUser));
 }
 
-export function getMe(): Promise<AuthUser> {
-  return apiClient.get('/auth/me', (body) => responseField(body, 'user', decodeAuthUser));
+export function getMe(signal?: AbortSignal): Promise<AuthUser> {
+  return apiClient.get('/auth/me', (body) => responseField(body, 'user', decodeAuthUser), signal);
 }
 
 export function logout(): Promise<void> {
