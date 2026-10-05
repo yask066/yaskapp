@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../core/config/api_config.dart';
+import '../../core/read_request_scope.dart';
 import 'notification_model.dart';
 
 class NotificationsApiException implements Exception {
@@ -31,7 +32,9 @@ class NotificationSummary {
     return NotificationSummary(
       id: json['id'] as String,
       type: json['type'] as String,
-      actor: actor == null || actor['username'] is! String || actor['displayName'] is! String
+      actor: actor == null ||
+              actor['username'] is! String ||
+              actor['displayName'] is! String
           ? null
           : NotificationActor(
               id: actor['id'] as String? ?? actor['username'] as String,
@@ -142,7 +145,11 @@ class NotificationsApiClient {
 
   final ApiConfig _config;
   final http.Client _httpClient;
-  void close() => _httpClient.close();
+  final ReadRequestScope _readRequests = ReadRequestScope();
+  void close() {
+    _readRequests.close();
+    _httpClient.close();
+  }
 
   Future<NotificationsPage> list(
       {required String accessToken,
@@ -154,13 +161,12 @@ class NotificationsApiClient {
       'unreadOnly': '$unreadOnly',
       if (cursor != null) 'cursor': cursor
     };
-    final response = await _httpClient
-        .get(
-          Uri.parse(_config.baseUrl)
-              .replace(path: '/notifications', queryParameters: query),
-          headers: {'authorization': 'Bearer $accessToken'},
-        )
-        .timeout(const Duration(seconds: 10));
+    final response = await _readRequests.get(
+      _httpClient,
+      Uri.parse(_config.baseUrl)
+          .replace(path: '/notifications', queryParameters: query),
+      headers: {'authorization': 'Bearer $accessToken'},
+    );
     final body = _decode(response);
     final items = body['items'];
     if (items is! List<dynamic>) {
@@ -188,17 +194,19 @@ class NotificationsApiClient {
       'unreadOnly': '$unreadOnly',
       if (cursor != null) 'cursor': cursor,
     };
-    final response = await _httpClient.get(
+    final response = await _readRequests.get(
+      _httpClient,
       Uri.parse(_config.baseUrl).replace(
         path: '/notifications',
         queryParameters: query,
       ),
       headers: {'authorization': 'Bearer $accessToken'},
-    ).timeout(const Duration(seconds: 10));
+    );
     final body = _decode(response);
     final rawItems = body['items'];
     if (rawItems is! List) {
-      throw const NotificationsApiException('Notifications response is invalid.');
+      throw const NotificationsApiException(
+          'Notifications response is invalid.');
     }
     final items = <NotificationItem>[];
     for (final raw in rawItems) {
@@ -214,14 +222,16 @@ class NotificationsApiClient {
   }
 
   Future<int> unreadCount({required String accessToken}) async {
-    final response = await _httpClient.get(
+    final response = await _readRequests.get(
+      _httpClient,
       Uri.parse(_config.baseUrl).replace(path: '/notifications/unread-count'),
       headers: {'authorization': 'Bearer $accessToken'},
-    ).timeout(const Duration(seconds: 10));
+    );
     final body = _decode(response);
     final count = body['unreadCount'];
     if (count is! int) {
-      throw const NotificationsApiException('Unread count response is invalid.');
+      throw const NotificationsApiException(
+          'Unread count response is invalid.');
     }
     return count;
   }

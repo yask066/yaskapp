@@ -53,8 +53,10 @@ class _YaskappAppState extends State<YaskappApp> {
         widget.authSessionStore ?? const SecureAuthSessionStore();
     _notificationDevicesApiClient = NotificationDevicesApiClient();
     _firebasePushService = FirebasePushService();
-    _realtimeSession = RealtimeSession();
     _pollStateStore = PollStateStore(viewerId: null);
+    _realtimeSession = RealtimeSession(
+      reconcilePolls: _pollStateStore.reconcileLoadedPolls,
+    );
     _initializePushRegistration();
     _bootstrapSession();
   }

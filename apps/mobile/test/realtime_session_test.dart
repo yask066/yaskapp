@@ -21,7 +21,8 @@ class _FakeRealtimeClient extends RealtimeClient {
   Future<void> close() async => closeCalls++;
 
   void ready() => emitConnectionEvent(RealtimeConnectionEvent.ready);
-  void disconnected() => emitConnectionEvent(RealtimeConnectionEvent.disconnected);
+  void disconnected() =>
+      emitConnectionEvent(RealtimeConnectionEvent.disconnected);
   void notificationRead(NotificationReadRealtimeEvent event) =>
       emitNotificationReadEvent(event);
   void emitReadAll(NotificationsReadAllRealtimeEvent event) =>
@@ -102,18 +103,23 @@ void main() {
     expect(clients.single.connectCalls, 2);
   });
 
-  test('resume reconciliation is single-flight and logout invalidates old callbacks', () async {
+  test(
+      'resume reconciliation is single-flight and logout invalidates old callbacks',
+      () async {
     final client = _FakeRealtimeClient();
     final store = _FakeStore();
+    var pollReconciliations = 0;
     final session = RealtimeSession(
       clientFactory: (_) => client,
       storeFactory: (_) => store,
+      reconcilePolls: () => pollReconciliations++,
     );
 
     await session.start(_session);
     session.onLifecycleStateChanged(AppLifecycleState.resumed);
     session.onLifecycleStateChanged(AppLifecycleState.resumed);
     expect(store.reconcileCalls, 1);
+    expect(pollReconciliations, 2);
 
     await session.stop();
     store.reconcileGate.complete();
@@ -122,9 +128,30 @@ void main() {
     expect(client.closeCalls, 1);
     expect(session.currentUserId, isNull);
     expect(store.reconcileCalls, 1);
+    expect(pollReconciliations, 2);
   });
 
-  test('applies remote read and read-all events to the active notification store', () async {
+  test('existing realtime ready event reconciles loaded Poll state', () async {
+    final client = _FakeRealtimeClient();
+    final store = _FakeStore()..reconcileGate.complete();
+    var pollReconciliations = 0;
+    final session = RealtimeSession(
+      clientFactory: (_) => client,
+      storeFactory: (_) => store,
+      reconcilePolls: () => pollReconciliations++,
+    );
+
+    await session.start(_session);
+    client.ready();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(pollReconciliations, 1);
+    await session.close();
+  });
+
+  test(
+      'applies remote read and read-all events to the active notification store',
+      () async {
     final client = _FakeRealtimeClient();
     final store = NotificationStore();
     final older = NotificationItem(

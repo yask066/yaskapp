@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../core/config/api_config.dart';
+import '../../core/read_request_scope.dart';
 import 'public_profile.dart';
 
 class ProfilesApiException implements Exception {
@@ -24,8 +25,10 @@ class ProfilesApiClient {
 
   final ApiConfig _config;
   final http.Client _httpClient;
+  final ReadRequestScope _readRequests = ReadRequestScope();
 
   void close() {
+    _readRequests.close();
     _httpClient.close();
   }
 
@@ -33,7 +36,8 @@ class ProfilesApiClient {
     required String userId,
     String? accessToken,
   }) async {
-    final response = await _httpClient.get(
+    final response = await _readRequests.get(
+      _httpClient,
       _config.uri('/users/$userId'),
       headers: _authHeaders(accessToken),
     );
@@ -76,7 +80,8 @@ class ProfilesApiClient {
     int limit = 50,
     String? accessToken,
   }) async {
-    final response = await _httpClient.get(
+    final response = await _readRequests.get(
+      _httpClient,
       _config.uri(
         '/users/$userId/followers',
         queryParameters: {'limit': limit.toString()},
@@ -91,7 +96,8 @@ class ProfilesApiClient {
     required String accessToken,
     int limit = 50,
   }) async {
-    final response = await _httpClient.get(
+    final response = await _readRequests.get(
+      _httpClient,
       _config.uri(
         '/profiles/me/following',
         queryParameters: {'limit': limit.toString()},
@@ -106,7 +112,8 @@ class ProfilesApiClient {
     String? accessToken,
     int limit = 3,
   }) async {
-    final response = await _httpClient.get(
+    final response = await _readRequests.get(
+      _httpClient,
       _config.uri(
         '/users',
         queryParameters: {'sort': 'popular', 'limit': limit.toString()},

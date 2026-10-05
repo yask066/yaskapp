@@ -210,11 +210,13 @@
 
 **Зависимости:** M06. **Файлы:** polls/search/profile/notifications API clients и tests, `realtime_session.dart`, store и affected screens.
 
-- [ ] Добавить Flutter equivalents M07, включая disposed screen и смену query во время read.
-- [ ] Унифицировать read deadline 10 с в охвате, игнорировать устаревшую completion по session/query epoch; `.timeout()` само по себе не отменяет late state application.
-- [ ] Сверять неоднозначную mutation и затронутые Poll при foreground/существующем reconnect; cleanup subscriptions сохраняет одного владельца.
-- [ ] Проверить Retry после offline/error, finally cleanup pending и отсутствие вызова `setState` после dispose.
-- [ ] Выполнить API/store/lifecycle/widget tests и analyze; сохранить commit.
+- [x] Добавить Flutter equivalents M07, включая disposed screen и смену query во время read.
+- [x] Унифицировать read deadline 10 с в охвате, игнорировать устаревшую completion по session/query epoch; `.timeout()` само по себе не отменяет late state application.
+- [x] Сверять неоднозначную mutation и затронутые Poll при foreground/существующем reconnect; cleanup subscriptions сохраняет одного владельца.
+- [x] Проверить Retry после offline/error, finally cleanup pending и отсутствие вызова `setState` после dispose.
+- [x] Выполнить API/store/lifecycle/widget tests и analyze; сохранить commit.
+
+**Выполнено 5 октября 2026 года:** общий abortable read scope задаёт 10 секунд для Polls/Search/Profiles/Notifications и закрывает активные чтения вместе с клиентом. Устаревшие Poll responses ограничены сохранённым session epoch, результаты Search — request identity. Неоднозначные Poll actions и изменение comments запускают существующую HTTP-сверку; foreground и realtime ready обновляют уже загруженные Poll. [Проверка M08](../../motion-scroll-loading-evidence/m08-verification.md): целевые API/store/lifecycle suites 62/62; изменённые Dart файлы анализируются без diagnostics. Полный suite: 194 passed, 15 прежних failures и 1 skipped; тот же набор из 15 failures воспроизведён на исходном commit. Browser/device profiling и AC-12 не измерялись.
 
 **Готово:** timeout завершает loading, старые ответы не возвращают состояние ушедшего экрана/пользователя. **AC:** AC-03, AC-08, AC-13.
 

@@ -12,12 +12,14 @@ import 'realtime_client.dart';
 typedef RealtimeClientFactory = RealtimeClient Function(String accessToken);
 typedef NotificationStoreFactory = NotificationStore Function(
     String accessToken);
+typedef PollReconcileCallback = void Function();
 typedef ReconnectJitter = Duration Function(Duration maxJitter);
 
 class RealtimeSession with WidgetsBindingObserver {
   RealtimeSession({
     RealtimeClientFactory? clientFactory,
     NotificationStoreFactory? storeFactory,
+    this.reconcilePolls,
     this.reconnectBaseDelay = const Duration(seconds: 1),
     this.reconnectMaxDelay = const Duration(seconds: 30),
     ReconnectJitter? jitter,
@@ -34,6 +36,7 @@ class RealtimeSession with WidgetsBindingObserver {
 
   final RealtimeClientFactory _clientFactory;
   final NotificationStoreFactory _storeFactory;
+  final PollReconcileCallback? reconcilePolls;
   final Duration reconnectBaseDelay;
   final Duration reconnectMaxDelay;
   final ReconnectJitter? _jitter;
@@ -43,8 +46,10 @@ class RealtimeSession with WidgetsBindingObserver {
   NotificationStore? _store;
   StreamSubscription<RealtimeConnectionEvent>? _connectionSubscription;
   StreamSubscription<NotificationRealtimeEvent>? _notificationSubscription;
-  StreamSubscription<NotificationReadRealtimeEvent>? _notificationReadSubscription;
-  StreamSubscription<NotificationsReadAllRealtimeEvent>? _notificationsReadAllSubscription;
+  StreamSubscription<NotificationReadRealtimeEvent>?
+      _notificationReadSubscription;
+  StreamSubscription<NotificationsReadAllRealtimeEvent>?
+      _notificationsReadAllSubscription;
   Timer? _reconnectTimer;
   Future<void>? _reconcileFuture;
   int _reconnectAttempt = 0;
@@ -76,6 +81,7 @@ class RealtimeSession with WidgetsBindingObserver {
       if (event == RealtimeConnectionEvent.ready) {
         _reconnectAttempt = 0;
         unawaited(_reconcile());
+        reconcilePolls?.call();
       } else {
         _scheduleReconnect(epoch);
       }
@@ -140,6 +146,7 @@ class RealtimeSession with WidgetsBindingObserver {
   void onLifecycleStateChanged(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _currentUserId != null) {
       unawaited(_reconcile());
+      reconcilePolls?.call();
     }
   }
 

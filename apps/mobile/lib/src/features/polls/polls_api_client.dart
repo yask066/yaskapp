@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
 import '../../core/config/api_config.dart';
+import '../../core/read_request_scope.dart';
 import 'poll_summary.dart';
 import 'poll_state_store.dart';
 
@@ -69,6 +70,7 @@ class PollsApiClient {
 
   final ApiConfig _config;
   final http.Client _httpClient;
+  final ReadRequestScope _readRequests = ReadRequestScope();
   PollStateStore? _pollStateStore;
   int _requestSequence = 0;
   String? _sessionAccessToken;
@@ -216,6 +218,7 @@ class PollsApiClient {
 
   void close() {
     _closed = true;
+    _readRequests.close();
     _httpClient.close();
     final store = _pollStateStore;
     if (store != null && store.onReconcileRequested == _queueReconciliation) {
@@ -237,7 +240,8 @@ class PollsApiClient {
         if (sort != 'newest') 'sort': sort,
       },
     );
-    final response = await _httpClient.get(
+    final response = await _readRequests.get(
+      _httpClient,
       uri,
       headers: {
         if (accessToken != null) 'authorization': 'Bearer $accessToken',
@@ -266,7 +270,8 @@ class PollsApiClient {
   }) async {
     final readContext = _captureRead(expectedPollId: pollId);
     final uri = Uri.parse(_config.baseUrl).replace(path: '/polls/$pollId');
-    final response = await _httpClient.get(
+    final response = await _readRequests.get(
+      _httpClient,
       uri,
       headers: {
         if (accessToken != null) 'authorization': 'Bearer $accessToken',
@@ -294,7 +299,8 @@ class PollsApiClient {
         'limit': limit.toString(),
       },
     );
-    final response = await _httpClient.get(
+    final response = await _readRequests.get(
+      _httpClient,
       uri,
       headers: {
         'authorization': 'Bearer $accessToken',
@@ -327,7 +333,8 @@ class PollsApiClient {
       path: '/users/$userId/polls',
       queryParameters: {'limit': limit.toString()},
     );
-    final response = await _httpClient.get(
+    final response = await _readRequests.get(
+      _httpClient,
       uri,
       headers: {
         if (accessToken != null) 'authorization': 'Bearer $accessToken',
@@ -358,7 +365,8 @@ class PollsApiClient {
         'limit': limit.toString(),
       },
     );
-    final response = await _httpClient.get(
+    final response = await _readRequests.get(
+      _httpClient,
       uri,
       headers: {
         'authorization': 'Bearer $accessToken',
@@ -498,7 +506,7 @@ class PollsApiClient {
       if (operation != null) {
         stateStore!.failOperation(
           operation,
-          ambiguous: error is! PollsApiException,
+          ambiguous: _isAmbiguousMutationError(error),
         );
       }
       rethrow;
@@ -537,7 +545,7 @@ class PollsApiClient {
       if (operation != null) {
         stateStore!.failOperation(
           operation,
-          ambiguous: error is! PollsApiException,
+          ambiguous: _isAmbiguousMutationError(error),
         );
       }
       rethrow;
@@ -548,18 +556,24 @@ class PollsApiClient {
     required String pollId,
     required String accessToken,
   }) async {
+    final mutationContext = _captureMutation(expectedPollId: pollId);
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls/$pollId',
     );
-    final response = await _httpClient.delete(
-      uri,
-      headers: {
-        'authorization': 'Bearer $accessToken',
-      },
-    );
+    try {
+      final response = await _httpClient.delete(
+        uri,
+        headers: {'authorization': 'Bearer $accessToken'},
+      );
 
-    if (response.statusCode != 204) {
-      _decodeObject(response);
+      if (response.statusCode != 204) {
+        _decodeObject(response);
+      }
+    } catch (error) {
+      if (_isAmbiguousMutationError(error)) {
+        _requestPollReconciliation(pollId, mutationContext);
+      }
+      rethrow;
     }
     final store = _pollStateStore;
     if (store != null) {
@@ -567,11 +581,11 @@ class PollsApiClient {
         pollId,
         PollIngress(
           origin: PollOrigin.mutation,
-          sessionEpoch: store.sessionEpoch,
-          viewerId: store.viewerId,
+          sessionEpoch: mutationContext.epoch,
+          viewerId: mutationContext.viewerId,
           expectedPollId: pollId,
-          requestId: 'delete-$pollId',
-          startedGeneration: store.generationFor(pollId),
+          requestId: mutationContext.requestId,
+          startedGeneration: mutationContext.startedGeneration,
         ),
       );
     }
@@ -609,7 +623,7 @@ class PollsApiClient {
       if (operation != null) {
         stateStore!.failOperation(
           operation,
-          ambiguous: error is! PollsApiException,
+          ambiguous: _isAmbiguousMutationError(error),
         );
       }
       rethrow;
@@ -648,7 +662,7 @@ class PollsApiClient {
       if (operation != null) {
         stateStore!.failOperation(
           operation,
-          ambiguous: error is! PollsApiException,
+          ambiguous: _isAmbiguousMutationError(error),
         );
       }
       rethrow;
@@ -666,7 +680,8 @@ class PollsApiClient {
         'limit': limit.toString(),
       },
     );
-    final response = await _httpClient.get(
+    final response = await _readRequests.get(
+      _httpClient,
       uri,
       headers: {
         if (accessToken != null) 'authorization': 'Bearer $accessToken',
@@ -701,7 +716,8 @@ class PollsApiClient {
         if (cursor != null) 'cursor': cursor,
       },
     );
-    final response = await _httpClient.get(
+    final response = await _readRequests.get(
+      _httpClient,
       uri,
       headers: {
         if (accessToken != null) 'authorization': 'Bearer $accessToken',
@@ -738,7 +754,8 @@ class PollsApiClient {
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls/$pollId/comments/$commentId',
     );
-    final response = await _httpClient.get(
+    final response = await _readRequests.get(
+      _httpClient,
       uri,
       headers: {'authorization': 'Bearer $accessToken'},
     );
@@ -788,16 +805,24 @@ class PollsApiClient {
     required String commentId,
     required String accessToken,
   }) async {
+    final mutationContext = _captureMutation(expectedPollId: pollId);
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls/$pollId/comments/$commentId',
     );
-    final response = await _httpClient.delete(
-      uri,
-      headers: {'authorization': 'Bearer $accessToken'},
-    );
+    try {
+      final response = await _httpClient.delete(
+        uri,
+        headers: {'authorization': 'Bearer $accessToken'},
+      );
 
-    if (response.statusCode != 204) {
-      _decodeObject(response);
+      if (response.statusCode != 204) {
+        _decodeObject(response);
+      }
+    } catch (error) {
+      if (_isAmbiguousMutationError(error)) {
+        _requestPollReconciliation(pollId, mutationContext);
+      }
+      rethrow;
     }
   }
 
@@ -811,29 +836,45 @@ class PollsApiClient {
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls/$pollId/comments',
     );
-    final response = await _httpClient.post(
-      uri,
-      headers: {
-        'authorization': 'Bearer $accessToken',
-        'content-type': 'application/json',
-      },
-      body: jsonEncode({
-        'body': body,
-        if (parentCommentId != null) 'parentCommentId': parentCommentId,
-      }),
-    );
-    final decoded = _decodeObject(response);
-    final comment = decoded['comment'];
-    final poll = decoded['poll'];
+    try {
+      final response = await _httpClient.post(
+        uri,
+        headers: {
+          'authorization': 'Bearer $accessToken',
+          'content-type': 'application/json',
+        },
+        body: jsonEncode({
+          'body': body,
+          if (parentCommentId != null) 'parentCommentId': parentCommentId,
+        }),
+      );
+      final decoded = _decodeObject(response);
+      final comment = decoded['comment'];
+      final poll = decoded['poll'];
 
-    if (comment is! Map<String, dynamic> || poll is! Map<String, dynamic>) {
-      throw const PollsApiException('Create comment response is invalid.');
+      if (comment is! Map<String, dynamic> || poll is! Map<String, dynamic>) {
+        throw const PollsApiException('Create comment response is invalid.');
+      }
+
+      return CreatePollCommentResult(
+        comment: PollCommentSummary.fromJson(comment),
+        poll: _ingestMutation(PollSummary.fromJson(poll), mutationContext),
+      );
+    } catch (error) {
+      if (_isAmbiguousMutationError(error)) {
+        _requestPollReconciliation(pollId, mutationContext);
+      }
+      rethrow;
     }
+  }
 
-    return CreatePollCommentResult(
-      comment: PollCommentSummary.fromJson(comment),
-      poll: _ingestMutation(PollSummary.fromJson(poll), mutationContext),
-    );
+  void _requestPollReconciliation(
+    String pollId,
+    _PollMutationContext context,
+  ) {
+    final store = context.store;
+    if (store == null || store.sessionEpoch != context.epoch) return;
+    store.onReconcileRequested?.call(pollId, context.epoch);
   }
 
   PollSummary _decodePollResponse(http.Response response, String errorMessage) {
@@ -860,6 +901,13 @@ class PollsApiClient {
 
     return PollCommentSummary.fromJson(comment);
   }
+
+  bool _isAmbiguousMutationError(Object error) =>
+      error is! PollsApiException ||
+      error.statusCode == null ||
+      error.statusCode == 200 ||
+      error.statusCode == 408 ||
+      error.statusCode != null && error.statusCode! >= 500;
 
   Map<String, dynamic> _decodeObject(http.Response response) {
     final decoded = jsonDecode(response.body);

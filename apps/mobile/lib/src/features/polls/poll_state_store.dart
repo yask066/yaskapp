@@ -393,8 +393,16 @@ class PollStateStore extends ChangeNotifier {
       final nextGeneration = generationFor(token.pollId) + 1;
       _generationByPollId[token.pollId] = nextGeneration;
       if (stored != null) stored.generation = nextGeneration;
+      _requestReconcile(token.pollId);
     }
     notifyListeners();
+  }
+
+  /// Re-fetches every Poll already present in this session after a reconnect.
+  void reconcileLoadedPolls() {
+    for (final pollId in _polls.keys.toList(growable: false)) {
+      _requestReconcile(pollId);
+    }
   }
 
   void markDeleted(String pollId, PollIngress ingress) {

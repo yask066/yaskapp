@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../core/config/api_config.dart';
+import '../../core/read_request_scope.dart';
 import 'search_result.dart';
 
 class SearchApiException implements Exception {
@@ -26,8 +27,10 @@ class SearchApiClient {
 
   final ApiConfig _config;
   final http.Client _httpClient;
+  final ReadRequestScope _readRequests = ReadRequestScope();
 
   void close() {
+    _readRequests.close();
     _httpClient.close();
   }
 
@@ -42,7 +45,8 @@ class SearchApiClient {
     final normalizedQuery = query.trim().replaceAll(RegExp(r'\s+'), ' ');
     late http.Response response;
     try {
-      response = await _httpClient.get(
+      response = await _readRequests.get(
+        _httpClient,
         _config.uri(
           '/search',
           queryParameters: {
