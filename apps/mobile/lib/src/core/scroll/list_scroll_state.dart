@@ -56,18 +56,30 @@ class ListScrollContext {
 
 @immutable
 class ListAnchor {
-  const ListAnchor({required this.id, required this.top});
+  const ListAnchor({
+    required this.id,
+    required this.top,
+    this.hasMeasuredTop = true,
+  });
 
   final String id;
   final double top;
 
+  /// False when this is a surviving fallback for which no prior viewport
+  /// coordinate was captured. Restoration must not pretend it shares the
+  /// deleted anchor's coordinate.
+  final bool hasMeasuredTop;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ListAnchor && id == other.id && top == other.top;
+      other is ListAnchor &&
+          id == other.id &&
+          top == other.top &&
+          hasMeasuredTop == other.hasMeasuredTop;
 
   @override
-  int get hashCode => Object.hash(id, top);
+  int get hashCode => Object.hash(id, top, hasMeasuredTop);
 }
 
 class _SavedListState {
@@ -75,17 +87,22 @@ class _SavedListState {
     required this.anchor,
     required this.visibleAnchors,
     required this.itemIds,
+    required this.revision,
   });
 
   final ListAnchor anchor;
   final List<ListAnchor> visibleAnchors;
   final List<String> itemIds;
+  final int revision;
 }
 
 /// In-memory anchor storage. It deliberately owns no scroll controllers;
 /// each screen owns and disposes the controller attached to its list.
 class ListScrollStateStore {
   final Map<ListScrollContext, _SavedListState> _states = {};
+  int _nextRevision = 0;
+
+  int? revisionFor(ListScrollContext context) => _states[context]?.revision;
 
   void capture(
     ListScrollContext context,
@@ -93,6 +110,7 @@ class ListScrollStateStore {
     Iterable<ListAnchor> visibleAnchors = const [],
     Iterable<String>? itemIds,
   }) {
+    _nextRevision++;
     final anchors = List<ListAnchor>.of(visibleAnchors);
     if (!anchors.any((candidate) => candidate.id == anchor.id)) {
       anchors.insert(0, anchor);
@@ -106,6 +124,7 @@ class ListScrollStateStore {
       anchor: anchor,
       visibleAnchors: List.unmodifiable(anchors),
       itemIds: List.unmodifiable(ids),
+      revision: _nextRevision,
     );
   }
 
@@ -142,8 +161,13 @@ class ListScrollStateStore {
     }
     final fallbackId = next ?? previous ?? currentItemIds.first;
     final visible = saved.visibleAnchors.where((item) => item.id == fallbackId);
-    final fallbackTop = visible.isEmpty ? saved.anchor.top : visible.first.top;
-    return ListAnchor(id: fallbackId, top: fallbackTop);
+    if (visible.isNotEmpty) return visible.first;
+
+    return ListAnchor(
+      id: fallbackId,
+      top: saved.anchor.top,
+      hasMeasuredTop: false,
+    );
   }
 
   void clearForUser(String userId) {
@@ -164,14 +188,23 @@ abstract final class ListScrollRestoration {
     required ScrollController controller,
     required double? Function(String id) anchorTop,
     bool hasExplicitTarget = false,
+    bool Function()? isExplicitTargetActive,
   }) async {
     if (hasExplicitTarget) return false;
 
+    final revision = store.revisionFor(context);
+    if (revision == null) return false;
     final anchor = store.read(context, currentItemIds: currentItemIds);
-    if (anchor == null) return false;
+    if (anchor == null || !anchor.hasMeasuredTop) return false;
 
     await WidgetsBinding.instance.endOfFrame;
-    if (!controller.hasClients) return false;
+    if (!controller.hasClients || store.revisionFor(context) != revision) {
+      return false;
+    }
+    if (isExplicitTargetActive?.call() ?? false) return false;
+
+    final currentAnchor = store.read(context, currentItemIds: currentItemIds);
+    if (currentAnchor == null || currentAnchor != anchor) return false;
 
     final currentTop = anchorTop(anchor.id);
     if (currentTop == null) return false;

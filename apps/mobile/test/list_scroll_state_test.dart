@@ -124,10 +124,28 @@ void main() {
 
       expect(
         store.read(context, currentItemIds: const ['poll-1', 'poll-2']),
-        const ListAnchor(id: 'poll-2', top: 80),
+        const ListAnchor(id: 'poll-2', top: 80, hasMeasuredTop: false),
       );
       expect(store.read(context, currentItemIds: const []), isNull);
       expect(store.read(context.copyWith(query: 'other')), isNull);
+    });
+
+    test('uses a surviving fallback item coordinate when it was captured', () {
+      final store = ListScrollStateStore();
+      store.capture(
+        context,
+        const ListAnchor(id: 'poll-3', top: 80),
+        visibleAnchors: const [
+          ListAnchor(id: 'poll-2', top: -96),
+          ListAnchor(id: 'poll-3', top: 80),
+        ],
+        itemIds: const ['poll-1', 'poll-2', 'poll-3'],
+      );
+
+      expect(
+        store.read(context, currentItemIds: const ['poll-2']),
+        const ListAnchor(id: 'poll-2', top: -96),
+      );
     });
   });
 
@@ -235,23 +253,180 @@ void main() {
     final explicitTargetOffset = controller.offset;
     var anchorWasRead = false;
 
+    var explicitTargetIsActive = false;
     final restored = ListScrollRestoration.restoreAfterLayout(
       store: store,
       context: context,
       currentItemIds: const ['poll-2'],
       controller: controller,
-      hasExplicitTarget: true,
+      isExplicitTargetActive: () => explicitTargetIsActive,
       anchorTop: (_) {
         anchorWasRead = true;
         final box = targetKey.currentContext!.findRenderObject()! as RenderBox;
         return box.localToGlobal(Offset.zero).dy;
       },
     );
+    explicitTargetIsActive = true;
     await tester.pump();
 
     expect(await restored, isFalse);
     expect(anchorWasRead, isFalse);
     expect(controller.offset, explicitTargetOffset);
+    controller.dispose();
+  });
+
+  testWidgets(
+      'does not jump to the start for an offscreen fallback after resize',
+      (tester) async {
+    tester.view.physicalSize = const Size(400, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final store = ListScrollStateStore();
+    final controller = ScrollController();
+    final previousKey = GlobalKey();
+    var hasAnchor = true;
+
+    Widget buildList() => MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              controller: controller,
+              child: Column(
+                children: [
+                  SizedBox(key: previousKey, height: 1200),
+                  if (hasAnchor) const SizedBox(height: 600),
+                ],
+              ),
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(buildList());
+    controller.jumpTo(1200);
+    await tester.pump();
+    store.capture(
+      context,
+      const ListAnchor(id: 'poll-b', top: 0),
+      itemIds: const ['poll-a', 'poll-b'],
+    );
+
+    tester.view.physicalSize = const Size(400, 500);
+    hasAnchor = false;
+    await tester.pumpWidget(buildList());
+    await tester.pump();
+    expect(controller.offset, controller.position.maxScrollExtent);
+
+    final restored = ListScrollRestoration.restoreAfterLayout(
+      store: store,
+      context: context,
+      currentItemIds: const ['poll-a'],
+      controller: controller,
+      anchorTop: (id) {
+        if (id != 'poll-a') return null;
+        final box =
+            previousKey.currentContext!.findRenderObject()! as RenderBox;
+        return box.localToGlobal(Offset.zero).dy;
+      },
+    );
+    await tester.pump();
+
+    expect(await restored, isFalse);
+    expect(controller.offset, controller.position.maxScrollExtent);
+    controller.dispose();
+  });
+
+  testWidgets('cancels a pending restore when its user context is cleared',
+      (tester) async {
+    final store = ListScrollStateStore();
+    final controller = ScrollController();
+    final targetKey = GlobalKey();
+    store.capture(context, const ListAnchor(id: 'poll-2', top: 40));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            controller: controller,
+            child: Column(
+              children: [
+                const SizedBox(height: 300),
+                SizedBox(key: targetKey, height: 100),
+                const SizedBox(height: 900),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    controller.jumpTo(180);
+    await tester.pump();
+    final offsetBeforeClear = controller.offset;
+    var anchorWasRead = false;
+
+    final restored = ListScrollRestoration.restoreAfterLayout(
+      store: store,
+      context: context,
+      currentItemIds: const ['poll-2'],
+      controller: controller,
+      anchorTop: (_) {
+        anchorWasRead = true;
+        final box = targetKey.currentContext!.findRenderObject()! as RenderBox;
+        return box.localToGlobal(Offset.zero).dy + 80;
+      },
+    );
+    store.clearForUser('user-1');
+    await tester.pump();
+
+    expect(await restored, isFalse);
+    expect(anchorWasRead, isFalse);
+    expect(controller.offset, offsetBeforeClear);
+    controller.dispose();
+  });
+
+  testWidgets('keeps a restore when an unrelated list context is captured',
+      (tester) async {
+    final store = ListScrollStateStore();
+    final controller = ScrollController();
+    final targetKey = GlobalKey();
+    store.capture(context, const ListAnchor(id: 'poll-2', top: 40));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            controller: controller,
+            child: Column(
+              children: [
+                const SizedBox(height: 300),
+                SizedBox(key: targetKey, height: 100),
+                const SizedBox(height: 900),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    controller.jumpTo(180);
+    await tester.pump();
+    final restore = ListScrollRestoration.restoreAfterLayout(
+      store: store,
+      context: context,
+      currentItemIds: const ['poll-2'],
+      controller: controller,
+      anchorTop: (_) {
+        final box = targetKey.currentContext!.findRenderObject()! as RenderBox;
+        return box.localToGlobal(Offset.zero).dy + 30;
+      },
+    );
+    store.capture(
+      context.copyWith(list: 'other'),
+      const ListAnchor(id: 'item-1', top: 10),
+    );
+    await tester.pump();
+
+    expect(await restore, isTrue);
+    expect(controller.offset, 290);
     controller.dispose();
   });
 }

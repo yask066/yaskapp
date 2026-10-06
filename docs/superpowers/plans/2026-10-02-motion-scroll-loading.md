@@ -274,7 +274,7 @@
 - [x] Проверить clamp, viewport/keyboard и explicit comment target; не запускать новое animated scroll для restore.
 - [x] Выполнить scroll tests и analyze; сохранить commit.
 
-**Выполнено 6 октября 2026 года:** [результаты и ограничения](../../motion-scroll-loading-evidence/m12-verification.md); scroll helper/PollCard focused analyze чистый. В полном Flutter suite 208 passed, 14 известных failures, 1 skipped.
+**Выполнено 6 октября 2026 года:** [результаты и ограничения](../../motion-scroll-loading-evidence/m12-verification.md); scroll helper/PollCard focused analyze чистый. В полном Flutter suite 212 passed, 14 известных baseline failures, 1 skipped; scroll-state/PollCard/Feed tests 35/35 passed.
 
 **Готово:** primitive пригоден для Sliver/List поверхностей без нового layout animation. **AC:** AC-05–AC-07.
 
