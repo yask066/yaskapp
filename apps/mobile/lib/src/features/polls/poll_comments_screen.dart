@@ -508,6 +508,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                           children: [
                             PollCard(
+                              key: ValueKey('poll-${_poll.id}'),
                               poll: _poll,
                               accessToken: widget.accessToken,
                               onToggleLike:
@@ -524,6 +525,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                           children: [
                             PollCard(
+                              key: ValueKey('poll-${_poll.id}'),
                               poll: _poll,
                               accessToken: widget.accessToken,
                               onToggleLike:
@@ -544,6 +546,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             PollCard(
+                              key: ValueKey('poll-${_poll.id}'),
                               poll: _poll,
                               accessToken: widget.accessToken,
                               onToggleLike:

@@ -61,6 +61,7 @@ class PollCard extends StatelessWidget {
           isVoting: isVoting || store.isVoting(poll.id),
           isLiking: isLiking || store.isLiking(poll.id),
           compact: compact,
+          key: key,
         )._buildCard(
           context,
           store.pollById(poll.id) ?? poll,
@@ -310,6 +311,8 @@ class PollCard extends StatelessWidget {
             SizedBox(height: compact ? 14 : 16),
             for (var index = 0; index < poll.options.length; index++) ...[
               _PollOptionButton(
+                key: ValueKey(
+                    'poll-option-${poll.id}-${poll.options[index].id}'),
                 option: poll.options[index],
                 totalVotes: poll.votesCount,
                 isSelected: poll.selectedOptionIndex == index,
@@ -426,6 +429,7 @@ class _PollOptionButton extends StatelessWidget {
     this.profileVariant = false,
     this.isLoading = false,
     this.onTap,
+    super.key,
   });
 
   final PollOptionSummary option;

@@ -372,7 +372,11 @@ class _PublicPollsList extends StatelessWidget {
         return Column(
           children: [
             for (var index = 0; index < polls.length; index++) ...[
-              PollCard(poll: polls[index], compact: true),
+              PollCard(
+                key: ValueKey('poll-${polls[index].id}'),
+                poll: polls[index],
+                compact: true,
+              ),
               if (index != polls.length - 1) const SizedBox(height: 12),
             ],
           ],

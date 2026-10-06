@@ -17,6 +17,20 @@ import 'package:yaskapp_mobile/src/features/search/search_screen.dart';
 import 'support/motion_scroll_fixture.dart';
 
 void main() {
+  testWidgets('M12 feed poll rows use stable poll IDs as keys', (tester) async {
+    final poll = motionRacePoll();
+    final api = _FakePollsApiClient(initialPolls: [poll]);
+    final realtime = _FakeRealtimeClient();
+    final store = _seedPollStore(poll);
+    addTearDown(realtime.close);
+    addTearDown(store.dispose);
+
+    await tester.pumpWidget(_feedWithStore(api, realtime, store));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(ValueKey('poll-${poll.id}')), findsOneWidget);
+  });
+
   test('M02 profiling uses the shared seed and creates 100 unique IDs', () {
     final polls = motionProfilingPolls();
     expect(polls, hasLength(100));

@@ -287,6 +287,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                     itemBuilder: (context, index) {
                       final poll = _polls[index];
                       return PollCard(
+                        key: ValueKey('poll-${poll.id}'),
                         poll: poll,
                         accessToken: widget.session.accessToken,
                         onVote: poll.isClosed ||

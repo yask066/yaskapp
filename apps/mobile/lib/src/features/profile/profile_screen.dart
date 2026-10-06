@@ -557,6 +557,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         for (final poll in polls) ...[
                           PollCard(
+                            key: ValueKey('poll-${poll.id}'),
                             poll: poll,
                             accessToken: widget.accessToken,
                             compact: true,

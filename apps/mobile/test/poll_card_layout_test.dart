@@ -4,6 +4,16 @@ import 'package:yaskapp_mobile/src/features/polls/poll_card.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
 
 void main() {
+  testWidgets('M12 option keys use stable poll and option IDs', (tester) async {
+    final poll = _poll();
+    await tester.pumpWidget(_card(poll));
+
+    expect(
+      find.byKey(ValueKey('poll-option-${poll.id}-${poll.options.first.id}')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('M10 media failure keeps its reserved 16:9 geometry', (
     tester,
   ) async {

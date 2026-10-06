@@ -581,6 +581,7 @@ class FeedScreenState extends State<FeedScreen> {
                         final poll = polls[index];
 
                         return PollCard(
+                          key: ValueKey('poll-${poll.id}'),
                           poll: poll,
                           accessToken: widget.session.accessToken,
                           onOpenAuthor: () => _openAuthorProfile(poll),

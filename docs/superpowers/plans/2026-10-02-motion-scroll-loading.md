@@ -268,11 +268,13 @@
 
 **Интерфейсы:** `ListScrollContext` содержит те же смысловые поля M11; `ListAnchor` содержит `String id`, `double top`; memory store предоставляет `capture`, `read`, `clearForUser`. Controller принадлежит экрану и dispose выполняется один раз.
 
-- [ ] Unit/widget tests для restore, context switch, удалённого anchor и последовательного удаления нескольких элементов.
-- [ ] Реализовать anchor correction после layout и сохранение загруженных страниц отдельно от controller; PageStorage offset сам по себе не заменяет ID-anchor.
-- [ ] Добавить стабильные ValueKey на Poll/option/item IDs; список не меняет identity из-за счётчика или индекса.
-- [ ] Проверить clamp, viewport/keyboard и explicit comment target; не запускать новое animated scroll для restore.
-- [ ] Выполнить scroll tests и analyze; сохранить commit.
+- [x] Unit/widget tests для restore, context switch, удалённого anchor и последовательного удаления нескольких элементов.
+- [x] Реализовать anchor correction после layout и сохранение загруженных страниц отдельно от controller; PageStorage offset сам по себе не заменяет ID-anchor.
+- [x] Добавить стабильные ValueKey на Poll/option/item IDs; список не меняет identity из-за счётчика или индекса.
+- [x] Проверить clamp, viewport/keyboard и explicit comment target; не запускать новое animated scroll для restore.
+- [x] Выполнить scroll tests и analyze; сохранить commit.
+
+**Выполнено 6 октября 2026 года:** [результаты и ограничения](../../motion-scroll-loading-evidence/m12-verification.md); scroll helper/PollCard focused analyze чистый. В полном Flutter suite 208 passed, 14 известных failures, 1 skipped.
 
 **Готово:** primitive пригоден для Sliver/List поверхностей без нового layout animation. **AC:** AC-05–AC-07.
 
