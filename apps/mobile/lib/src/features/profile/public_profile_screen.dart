@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/scroll/list_scroll_anchor_host.dart';
 import '../../core/scroll/list_scroll_state.dart';
+import '../../core/widgets/content_skeleton.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../auth/country_selector.dart';
 import '../polls/poll_card.dart';
@@ -178,11 +179,18 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       body: FutureBuilder<PublicProfile>(
         future: _profileFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              _profile == null) {
+            return const SingleChildScrollView(
+              padding: EdgeInsets.all(20),
+              child: DelayedContentSkeleton(
+                kind: ContentSkeletonKind.user,
+                rows: 1,
+              ),
+            );
           }
 
-          if (snapshot.hasError) {
+          if (snapshot.hasError && _profile == null) {
             return _ProfileErrorState(
               onRetry: () {
                 setState(() {
@@ -332,6 +340,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                     const SizedBox(height: 12),
                     _PublicPollsList(
                       future: _pollsFuture!,
+                      cachedPolls: _publicPolls,
                       onRetry: () {
                         setState(() {
                           _pollsFuture = _loadPolls();
@@ -350,9 +359,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
 }
 
 class _PublicPollsList extends StatelessWidget {
-  const _PublicPollsList({required this.future, required this.onRetry});
+  const _PublicPollsList({
+    required this.future,
+    required this.cachedPolls,
+    required this.onRetry,
+  });
 
   final Future<List<PollSummary>> future;
+  final List<PollSummary> cachedPolls;
   final VoidCallback onRetry;
 
   @override
@@ -360,14 +374,20 @@ class _PublicPollsList extends StatelessWidget {
     return FutureBuilder<List<PollSummary>>(
       future: future,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        final polls = snapshot.data ?? cachedPolls;
+
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            polls.isEmpty) {
           return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(child: CircularProgressIndicator()),
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: DelayedContentSkeleton(
+              kind: ContentSkeletonKind.poll,
+              rows: 1,
+            ),
           );
         }
 
-        if (snapshot.hasError) {
+        if (snapshot.hasError && polls.isEmpty) {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Column(
@@ -383,8 +403,6 @@ class _PublicPollsList extends StatelessWidget {
           );
         }
 
-        final polls = snapshot.data ?? const <PollSummary>[];
-
         if (polls.isEmpty) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
@@ -394,6 +412,13 @@ class _PublicPollsList extends StatelessWidget {
 
         return Column(
           children: [
+            if (snapshot.hasError)
+              Row(
+                children: [
+                  const Expanded(child: Text('Could not refresh polls.')),
+                  TextButton(onPressed: onRetry, child: const Text('Retry')),
+                ],
+              ),
             for (var index = 0; index < polls.length; index++) ...[
               ListScrollAnchorItem(
                 id: 'poll-${polls[index].id}',

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/scroll/list_scroll_anchor_host.dart';
 import '../../core/scroll/list_scroll_state.dart';
+import '../../core/widgets/content_skeleton.dart';
 import '../auth/auth_session.dart';
 import '../polls/poll_card.dart';
 import '../polls/poll_comments_screen.dart';
@@ -261,7 +262,13 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting &&
               !_hasLoaded) {
-            return const Center(child: CircularProgressIndicator());
+            return const SingleChildScrollView(
+              padding: EdgeInsets.all(16),
+              child: DelayedContentSkeleton(
+                kind: ContentSkeletonKind.poll,
+                rows: 2,
+              ),
+            );
           }
 
           if (snapshot.hasError && !_hasLoaded) {

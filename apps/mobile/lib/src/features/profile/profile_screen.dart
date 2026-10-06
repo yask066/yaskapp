@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../../core/scroll/list_scroll_anchor_host.dart';
 import '../../core/scroll/list_scroll_state.dart';
+import '../../core/widgets/content_skeleton.dart';
 import '../auth/auth_api_client.dart';
 import '../auth/auth_session.dart';
 import '../polls/poll_card.dart';
@@ -532,12 +533,10 @@ class ProfileScreenState extends State<ProfileScreen> {
                               ? !_hasLoadedMyPolls
                               : !_hasLoadedLikedPolls)) {
                         return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Center(
-                            child: SizedBox.square(
-                              dimension: 28,
-                              child: CircularProgressIndicator(strokeWidth: 3),
-                            ),
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: DelayedContentSkeleton(
+                            kind: ContentSkeletonKind.poll,
+                            rows: 1,
                           ),
                         );
                       }

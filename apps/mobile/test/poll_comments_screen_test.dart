@@ -22,7 +22,8 @@ void main() {
       ),
     );
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.bySemanticsLabel('Loading comments'), findsOneWidget);
   });
 
   testWidgets('shows comments empty state', (tester) async {

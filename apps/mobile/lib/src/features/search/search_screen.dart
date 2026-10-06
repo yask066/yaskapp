@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/analytics/search_analytics.dart';
 import '../../core/scroll/list_scroll_anchor_host.dart';
 import '../../core/scroll/list_scroll_state.dart';
+import '../../core/widgets/content_skeleton.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../auth/auth_session.dart';
 import '../polls/poll_card.dart';
@@ -153,6 +154,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _handleScroll() {
+    if (_error != null) return;
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 240) {
       _loadMore();
@@ -679,7 +681,13 @@ class _SearchScreenState extends State<SearchScreen> {
     final queryLength = _queryController.text.trim().length;
 
     if (_isLoading && _items.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 24),
+        child: DelayedContentSkeleton(
+          kind: ContentSkeletonKind.poll,
+          rows: 2,
+        ),
+      );
     }
 
     if (_error != null && _items.isEmpty) {
@@ -716,12 +724,19 @@ class _SearchScreenState extends State<SearchScreen> {
       controller: _scrollController,
       itemIds: _items.map(_searchResultId).toList(),
       child: ListView.separated(
+        key: const ValueKey('search-results-list'),
         controller: _scrollController,
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        itemCount: _items.length + (_isLoadingMore ? 1 : 0),
+        itemCount: _items.length +
+            (_isLoadingMore || _error != null && _items.isNotEmpty ? 1 : 0),
         separatorBuilder: (_, index) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           if (index == _items.length) {
+            if (_error != null && !_isLoadingMore) {
+              return _SearchLoadMoreError(
+                onRetry: () => unawaited(_loadMore()),
+              );
+            }
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(12),
@@ -856,9 +871,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildTopUsers() {
     if (_isLoadingTopUsers) {
-      return _discoveryCard(const Padding(
-        padding: EdgeInsets.all(24),
-        child: Center(child: CircularProgressIndicator()),
+      return _discoveryCard(const DelayedContentSkeleton(
+        kind: ContentSkeletonKind.user,
+        rows: 2,
       ));
     }
     if (_topUsersError != null) {
@@ -922,9 +937,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildTopPolls() {
     if (_isLoadingTopPolls) {
-      return _discoveryCard(const Padding(
-        padding: EdgeInsets.all(24),
-        child: Center(child: CircularProgressIndicator()),
+      return _discoveryCard(const DelayedContentSkeleton(
+        kind: ContentSkeletonKind.poll,
+        rows: 1,
       ));
     }
     if (_topPollsError != null) {
@@ -1303,4 +1318,21 @@ class _ErrorState extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SearchLoadMoreError extends StatelessWidget {
+  const _SearchLoadMoreError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(
+          children: [
+            const Text('Could not load more results.'),
+            TextButton(onPressed: onRetry, child: const Text('Retry')),
+          ],
+        ),
+      );
 }

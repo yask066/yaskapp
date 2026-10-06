@@ -60,9 +60,11 @@ void main() {
     addTearDown(store.close);
     store.mergePage(items: [_item('unread')], unreadCount: 1);
 
-    await tester.pumpWidget(MaterialApp(
-      home: NotificationsScreen(notificationStore: store, isActive: true),
-    ));
+    await tester.pumpWidget(
+        MaterialApp(
+          home: NotificationsScreen(notificationStore: store, isActive: true),
+        ),
+        duration: Duration.zero);
     await tester.pumpAndSettle();
 
     expect(
@@ -351,10 +353,12 @@ void main() {
     final store = NotificationStore(apiClient: client, accessToken: 'token');
     addTearDown(store.close);
 
-    await tester.pumpWidget(MaterialApp(
-      home: NotificationsScreen(notificationStore: store, isActive: true),
-    ));
-    await tester.pump();
+    await tester.pumpWidget(
+        MaterialApp(
+          home: NotificationsScreen(notificationStore: store, isActive: true),
+        ),
+        duration: Duration.zero);
+    await tester.pump(const Duration(milliseconds: 150));
     final loadingSemantics = tester.widget<Semantics>(
       find.byKey(const ValueKey('notifications-loading-semantics')),
     );

@@ -151,6 +151,33 @@ void main() {
     }
   });
 
+  testWidgets('keeps the loaded feed visible when refresh fails',
+      (tester) async {
+    final refetch = Completer<List<PollSummary>>();
+    final poll = motionRacePoll();
+    final api = _FakePollsApiClient(
+      initialPolls: [poll],
+      refreshResponse: refetch.future,
+    );
+    final realtime = _FakeRealtimeClient();
+    final store = _seedPollStore(poll);
+    addTearDown(realtime.close);
+    addTearDown(store.dispose);
+
+    await tester.pumpWidget(_feedWithStore(api, realtime, store));
+    await tester.pumpAndSettle();
+    final refresh = tester
+        .widget<RefreshIndicator>(find.byType(RefreshIndicator))
+        .onRefresh();
+    await tester.pump();
+    refetch.completeError(Exception('offline'));
+    await refresh;
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(ValueKey('poll-${poll.id}')), findsOneWidget);
+    expect(find.text('Could not refresh the feed.'), findsOneWidget);
+  });
+
   testWidgets(
       'M06 realtime_before_http preserves viewer fields and newer votes',
       (tester) async {

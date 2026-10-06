@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/scroll/list_scroll_anchor_host.dart';
 import '../../core/scroll/list_scroll_state.dart';
+import '../../core/widgets/content_skeleton.dart';
 import '../../core/widgets/user_avatar.dart';
 import 'poll_card.dart';
 import 'poll_summary.dart';
@@ -779,12 +780,10 @@ class _CommentsLoadingState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 24),
-      child: Center(
-        child: SizedBox.square(
-          dimension: 28,
-          child: CircularProgressIndicator(strokeWidth: 3),
-        ),
+      padding: EdgeInsets.symmetric(vertical: 16),
+      child: DelayedContentSkeleton(
+        kind: ContentSkeletonKind.comment,
+        rows: 2,
       ),
     );
   }
@@ -1106,8 +1105,11 @@ class _CommentThreadState extends State<_CommentThread> {
         if (_isExpanded) ...[
           if (_isLoading && _replies.isEmpty)
             const Padding(
-              padding: EdgeInsets.all(12),
-              child: Center(child: CircularProgressIndicator()),
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: DelayedContentSkeleton(
+                kind: ContentSkeletonKind.comment,
+                rows: 1,
+              ),
             ),
           if (_loadError != null)
             Padding(

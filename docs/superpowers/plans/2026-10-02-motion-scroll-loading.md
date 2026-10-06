@@ -11,7 +11,7 @@
 **Spec:** [PRD: Плавные реакции, появление карточек и стабильная прокрутка](../../prd-motion-scroll-loading.md).
 
 **Дата:** 2 октября 2026 года.  
-**Статус:** M01 и M02 завершены 2 октября 2026 года; M03 и M05 завершены 3 октября 2026 года; M07–M10 завершены 5 октября 2026 года; M11–M13 завершены 6 октября 2026 года. Реализация M14 и автоматические проверки завершены 6 октября; Android device smoke остаётся неизмеренным, поскольку Pixel 7 AVD не запускается из-за отсутствующего system image. Код M04 присутствует, обязательные DB verification/evidence остаются открытыми; M15–M27 не начаты.
+**Статус:** M01 и M02 завершены 2 октября 2026 года; M03 и M05 завершены 3 октября 2026 года; M07–M10 завершены 5 октября 2026 года; M11–M13 завершены 6 октября 2026 года. Реализация M14 и автоматические проверки завершены 6 октября; Android device smoke остаётся неизмеренным, поскольку Pixel 7 AVD не запускается из-за отсутствующего system image. M15–M16 завершены 6 октября. Код M04 присутствует, обязательные DB verification/evidence остаются открытыми; M17–M27 не начаты.
 **Нумерация:** M01–M27; исторические T01/T02 не переименовываются и не считаются закрытыми задачами этого плана.
 
 ## Global Constraints
@@ -327,11 +327,11 @@
 
 **Интерфейс:** `ContentSkeleton(kind: ContentSkeletonKind, rows: int)`; enum содержит `poll`, `user`, `comment`, `notification`.
 
-- [ ] Widget-clock tests для 149/150 мс, immediate-ready, cached-refetch и сохранённого списка после refresh/load-more error.
-- [ ] Реализовать шаблоны в используемых List/Sliver layouts, одним semantics loading label; shimmer/entry отсутствуют.
-- [ ] Подключить FR-06 на всех Flutter-поверхностях M01; минимальная длительность skeleton не вводится.
-- [ ] Проверить увеличенный текст, Retry и screen reader; media placeholder сохраняет слот из M10.
-- [ ] Выполнить skeleton/affected widget tests и analyze; сохранить commit.
+- [x] Widget-clock tests для 149/150 мс, immediate-ready, cached-refetch и сохранённого списка после refresh/load-more error.
+- [x] Реализовать шаблоны в используемых List/Sliver layouts, одним semantics loading label; shimmer/entry отсутствуют.
+- [x] Подключить FR-06 на всех Flutter-поверхностях M01; минимальная длительность skeleton не вводится.
+- [x] Проверить увеличенный текст, Retry и screen reader semantics; media placeholder сохраняет слот из M10.
+- [x] Выполнить skeleton/affected widget tests и analyze; сохранить commit. См. [M16 verification](../../motion-scroll-loading-evidence/m16-verification.md). Полный analyze сообщает существующие диагностики; screen reader semantics проверены в widget tests, TalkBack/VoiceOver smoke не измерен.
 
 **Готово:** загрузка не заменяет доступные данные и не создаёт overflow или новый scroll reset. **AC:** AC-08, статическая часть AC-11.
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/scroll/list_scroll_anchor_host.dart';
 import '../../core/scroll/list_scroll_state.dart';
+import '../../core/widgets/content_skeleton.dart';
 import '../../core/widgets/user_avatar.dart';
 import 'notification_model.dart';
 import 'notification_navigator.dart';
@@ -701,32 +702,11 @@ class _NotificationsLoading extends StatelessWidget {
   const _NotificationsLoading();
 
   @override
-  Widget build(BuildContext context) => Semantics(
-        key: const ValueKey('notifications-loading-semantics'),
-        container: true,
-        label: 'Loading notifications',
-        liveRegion: true,
-        child: const Column(
-          children: [
-            _NotificationSkeleton(),
-            SizedBox(height: 12),
-            _NotificationSkeleton(),
-          ],
-        ),
-      );
-}
-
-class _NotificationSkeleton extends StatelessWidget {
-  const _NotificationSkeleton();
-
-  @override
-  Widget build(BuildContext context) => Container(
-        height: 104,
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFE4E7EC),
-          borderRadius: BorderRadius.circular(14),
-        ),
+  Widget build(BuildContext context) => const DelayedContentSkeleton(
+        key: ValueKey('notifications-loading'),
+        semanticsKey: ValueKey('notifications-loading-semantics'),
+        kind: ContentSkeletonKind.notification,
+        rows: 2,
       );
 }
 

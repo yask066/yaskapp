@@ -102,7 +102,9 @@ void main() {
         SearchPage(items: [_pollResult(), _userResult()], nextCursor: null),
       ],
     );
-    await tester.pumpWidget(_app(client));
+    await tester.pumpWidget(
+      _app(client, searchHistory: MemorySearchHistoryStore()),
+    );
 
     await tester.enterText(find.byType(TextField), 'climate');
     await tester.pump(const Duration(milliseconds: 399));
@@ -269,6 +271,63 @@ void main() {
     await tester.pump();
 
     expect(find.text('Search service is unavailable.'), findsOneWidget);
+  });
+
+  testWidgets('keeps search results and offers retry after load-more error',
+      (tester) async {
+    tester.view.physicalSize = const Size(800, 320);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final client = _FakeSearchApiClient(
+      pages: [
+        SearchPage(
+          items: [
+            for (var index = 0; index < 10; index++)
+              PollSearchResult(
+                score: 0.9,
+                poll: _searchPoll('poll-$index'),
+              ),
+          ],
+          nextCursor: 'next',
+        ),
+        const SearchApiException('Page unavailable.'),
+        SearchPage(items: [_userResult()], nextCursor: null),
+      ],
+    );
+    await tester.pumpWidget(
+      _app(client, searchHistory: MemorySearchHistoryStore()),
+    );
+
+    await tester.enterText(find.byType(TextField), 'climate');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    final resultScrollable = find.byWidgetPredicate(
+      (widget) =>
+          widget is Scrollable && widget.axisDirection == AxisDirection.down,
+    );
+    final resultScroll = tester.state<ScrollableState>(resultScrollable);
+    expect(resultScroll.position.maxScrollExtent, greaterThan(0));
+    await tester.fling(
+      find.byType(ListView),
+      const Offset(0, -1200),
+      3000,
+    );
+    await tester.pumpAndSettle();
+
+    expect(client.calls, hasLength(2));
+    expect(find.text('Could not load more results.'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
+    expect(find.text('Climate?'), findsAtLeastNWidgets(1));
+
+    await tester.ensureVisible(find.text('Retry'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Retry'), findsNothing);
+    expect(find.text('Could not load more results.'), findsNothing);
+    expect(client.calls, hasLength(3));
   });
 
   testWidgets('ignores an in-flight response after the query is cleared',
@@ -485,6 +544,29 @@ PollSearchResult _pollResult() {
     poll: PollSummaryFixture.poll,
   );
 }
+
+PollSummary _searchPoll(String id) => PollSummary(
+      id: id,
+      author: const PollAuthorSummary(
+        id: 'user-1',
+        username: 'ada',
+        displayName: 'Ada Lovelace',
+      ),
+      question: 'Climate?',
+      options: [
+        PollOptionSummary(
+          id: 'option-$id',
+          text: 'Yes',
+          position: 0,
+          votesCount: 1,
+        ),
+      ],
+      votesCount: 1,
+      commentsCount: 0,
+      likesCount: 0,
+      viewerHasLiked: false,
+      createdAt: DateTime.utc(2026, 10, 2),
+    );
 
 UserSearchResult _userResult() {
   return const UserSearchResult(

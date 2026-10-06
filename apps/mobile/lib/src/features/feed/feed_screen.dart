@@ -18,6 +18,7 @@ import '../reports/reports_api_client.dart';
 import '../../core/analytics/search_analytics.dart';
 import '../../core/scroll/list_scroll_anchor_host.dart';
 import '../../core/scroll/list_scroll_state.dart';
+import '../../core/widgets/content_skeleton.dart';
 import '../search/search_api_client.dart';
 import '../search/search_screen.dart';
 
@@ -739,10 +740,11 @@ class _FeedLoadingState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: SizedBox.square(
-        dimension: 32,
-        child: CircularProgressIndicator(strokeWidth: 3),
+    return const SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 24),
+      child: DelayedContentSkeleton(
+        kind: ContentSkeletonKind.poll,
+        rows: 1,
       ),
     );
   }
