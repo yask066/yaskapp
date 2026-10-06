@@ -10,6 +10,11 @@ import { SearchPage } from '../features/search/SearchPage';
 import { NotificationsPage } from '../features/notifications/NotificationsPage';
 import { NotificationPreferencesPage } from '../features/notifications/NotificationPreferencesPage';
 import { useSession } from './session-provider';
+import { ScrollRestorationCoordinator } from '../core/scroll/ScrollRestorationCoordinator';
+
+function AppRouteRoot() {
+  return <><ScrollRestorationCoordinator /><AppLayout /></>;
+}
 
 function LoadingMain() {
   return <main id="main-content"><p role="status">Loading your session…</p></main>;
@@ -37,7 +42,7 @@ export function ProtectedRoute() {
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <AppLayout />,
+    element: <AppRouteRoot />,
     children: [
       { index: true, element: <FeedPage /> },
       { path: 'polls/:pollId', element: <PollDetailPage /> },

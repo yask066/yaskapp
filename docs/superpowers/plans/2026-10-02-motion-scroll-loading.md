@@ -254,11 +254,11 @@
 
 **Интерфейсы:** `ListContext = { userId: string | null; route: string; list: string; query: string; filter: string; sort: string }`; `ListAnchor = { id: string; top: number }`; storage в памяти имеет `capture(context, anchor)`, `read(context)`, `clearForUser(userId)`.
 
-- [ ] Unit tests для контекстов, logout cleanup, append, удалённого anchor, удаления нескольких элементов и fallback next/previous.
-- [ ] Реализовать сохранение ID + координаты, immediate restore без smooth-scroll, компенсацию удаления и clamp только у границ списка.
-- [ ] Определить единственного владельца restore: browser native restoration либо custom path по route; они не выполняют конкурирующие коррекции.
-- [ ] Учесть viewport resize и приоритет explicit target/new-items; actual 2 px проверяется browser integration в M13.
-- [ ] Выполнить scroll/hook/router tests, typecheck; сохранить commit.
+- [x] Unit tests для контекстов, logout cleanup, append, удалённого anchor, удаления нескольких элементов и fallback next/previous.
+- [x] Реализовать сохранение ID + координаты, immediate restore без smooth-scroll, компенсацию удаления и clamp только у границ списка.
+- [x] Определить единственного владельца restore: browser native restoration либо custom path по route; они не выполняют конкурирующие коррекции.
+- [x] Учесть viewport resize и приоритет explicit target/new-items; actual 2 px проверяется browser integration в M13.
+- [x] Выполнить scroll/hook/router tests, typecheck; сохранить commit.
 
 **Готово:** одинаковый контекст восстанавливается; новый query или пользователь не получает чужой anchor. **AC:** AC-05–AC-07.
 
