@@ -47,8 +47,8 @@ export function PollDetailPage() {
 
   return (
     <main id="main-content" className="detail-page">
-      {pollQuery.isPending ? <AsyncState state="loading" /> : null}
-      {pollQuery.isError ? <AsyncState state="error" error={pollQuery.error} onRetry={() => void pollQuery.refetch()} /> : null}
+      {pollQuery.isPending && !pollQuery.data ? <AsyncState state="loading" kind="poll" rows={1} /> : null}
+      {pollQuery.isError && !pollQuery.data ? <AsyncState state="error" error={pollQuery.error} onRetry={() => void pollQuery.refetch()} /> : null}
       {pollQuery.data ? <PollCard poll={pollQuery.data} viewerId={user?.id} isVoting={pollMutations.isVoting(pollId)} isLiking={pollMutations.isLiking(pollId)} onVote={user ? (id, optionId) => pollMutations.vote({ pollId: id, optionId }) : undefined} onCancelVote={user ? pollMutations.cancelVote : undefined} onLike={user ? (id, viewerHasLiked) => pollMutations.toggleLike({ pollId: id, viewerHasLiked }) : undefined} onDelete={user ? pollMutations.deletePoll : undefined} /> : null}
       <section className="comments-section" aria-labelledby="comments-heading">
         <header className="page-heading"><h1 id="comments-heading">Comments</h1></header>
@@ -63,6 +63,7 @@ export function PollDetailPage() {
           onReplyCreated={(poll) => replaceCachedPoll(queryClient, poll, user?.id ?? null)}
         /> : null}
       </section>
+      {pollQuery.isError && pollQuery.data ? <AsyncState state="error" error={pollQuery.error} onRetry={() => void pollQuery.refetch()} /> : null}{pollQuery.isFetching && pollQuery.data ? <AsyncState state="refreshing" kind="poll" /> : null}
     </main>
   );
 }

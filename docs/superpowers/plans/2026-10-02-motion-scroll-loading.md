@@ -311,11 +311,13 @@
 
 **Интерфейс:** `ContentSkeleton({ kind: 'poll' | 'user' | 'comment' | 'notification', rows: number })`; delay принадлежит загрузке, а не каждой строке.
 
-- [ ] Fake-clock tests: pending 149 мс — декоративный skeleton ещё скрыт, область зарезервирована; 150 мс — показан; ready — данные сразу; cached refetch — skeleton не появляется.
-- [ ] Реализовать статические templates, единый status/aria-busy и скрытые decorative части; никакого shimmer/crossfade на этом этапе.
-- [ ] Подключить initial/refresh/load-more/pending/empty/error/retry/media матрицу на всех web-поверхностях M01; локальная ошибка не заменяет существующий список.
+- [x] Fake-clock tests: pending 149 мс — декоративный skeleton ещё скрыт, область зарезервирована; 150 мс — показан; ready — данные сразу; cached refetch — skeleton не появляется.
+- [x] Реализовать статические templates, единый status/aria-busy и скрытые decorative части; никакого shimmer/crossfade на этом этапе.
+- [x] Подключить initial/refresh/load-more/pending/empty/error/retry/media матрицу на всех web-поверхностях M01; локальная ошибка не заменяет существующий список.
 - [ ] Keyboard/screen-reader check: focus не теряется, один status на область, Retry доступен после 10 с timeout.
 - [ ] Выполнить skeleton и affected page tests, browser geometry и typecheck; сохранить commit.
+
+**Выполнено 6 октября 2026 года:** automated suites/typecheck/lint/build прошли; браузерная геометрия и реальный screen reader не измерены, подробности в [M15 verification](../../motion-scroll-loading-evidence/m15-verification.md). Последние два пункта остаются открыты до ручной проверки.
 
 **Готово:** все 9 строк FR-06 покрыты, placeholder transition не сбрасывает scroll. **AC:** AC-08, статическая часть AC-11.
 

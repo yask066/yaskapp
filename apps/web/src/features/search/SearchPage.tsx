@@ -51,8 +51,10 @@ export function SearchPage() {
       <div className="segmented-tabs" role="tablist" aria-label="Search result type">
         {(['all', 'polls', 'users'] as const).map((value) => <button key={value} type="button" role="tab" aria-selected={type === value} aria-pressed={type === value} onClick={() => { if (value !== type) { setType(value); if (submitted) setSearchParams({}, { replace: true }); } }}>{value === 'all' ? 'All' : value === 'polls' ? 'Polls' : 'Users'}</button>)}
       </div>
-      {searchQuery.isError ? <AsyncState state="error" error={searchQuery.error} onRetry={() => void searchQuery.refetch()} /> : null}
-      <div className="search-results" ref={searchScroll.listRef}>
+      {searchQuery.isFetching && !searchQuery.data ? <AsyncState state="loading" kind={submittedType === 'users' ? 'user' : 'poll'} rows={2} /> : null}
+      {searchQuery.isError && !searchQuery.data ? <AsyncState state="error" error={searchQuery.error} onRetry={() => void searchQuery.refetch()} /> : null}
+      {searchQuery.data && searchQuery.data.items.length === 0 ? <AsyncState state="empty" emptyMessage="No matching results. Try a different search." /> : null}
+      <div className="search-results" ref={searchScroll.listRef} aria-busy={searchQuery.isFetching}>
         <section className="feed-list" aria-label="Poll results">
           {searchQuery.data?.items.filter((item) => item.type === 'poll').map((item) => <PollCard key={`poll-${item.poll.id}`} poll={item.poll} viewerId={user?.id} />)}
         </section>
@@ -60,6 +62,7 @@ export function SearchPage() {
           {searchQuery.data?.items.filter((item) => item.type === 'user').map((item) => <article className="profile-result" data-list-item-id={`user:${item.user.id}`} key={`user-${item.user.id}`} tabIndex={-1}><Avatar name={item.user.profile.displayName || item.user.username} src={item.user.profile.avatarUrl} /><div><Link to={`/users/${item.user.id}`}>{item.user.profile.displayName || item.user.username}</Link><p>@{item.user.username}</p></div></article>)}
         </section>
       </div>
+      {searchQuery.isError && searchQuery.data ? <AsyncState state="error" error={searchQuery.error} onRetry={() => void searchQuery.refetch()} /> : null}{searchQuery.isFetching && searchQuery.data ? <AsyncState state="refreshing" kind={submittedType === 'users' ? 'user' : 'poll'} /> : null}
     </main>
   );
 }

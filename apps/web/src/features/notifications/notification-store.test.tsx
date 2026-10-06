@@ -37,6 +37,19 @@ const stateWith = (items: NotificationItem[], extra: Partial<NotificationStoreSt
   notificationReducer(initialNotificationState, { type: 'merge', items, unreadCount: items.filter((entry) => !entry.readAt).length, nextCursor: null, ...extra });
 
 describe('notificationReducer', () => {
+  it('distinguishes a load-more request from a refresh and clears it after completion', () => {
+    const loadingMore = notificationReducer(initialNotificationState, { type: 'loading', value: true, loadingMore: true });
+    expect(loadingMore.loading).toBe(true);
+    expect(loadingMore.loadingMore).toBe(true);
+
+    const refreshed = notificationReducer(loadingMore, { type: 'loading', value: true });
+    expect(refreshed.loading).toBe(true);
+    expect(refreshed.loadingMore).toBe(false);
+
+    const complete = notificationReducer(loadingMore, { type: 'merge', items: [], unreadCount: 0, nextCursor: null });
+    expect(complete.loadingMore).toBe(false);
+  });
+
   it('merges duplicate items by id and keeps newest-first stable order', () => {
     const older = item({ id: 'a', createdAt: '2026-09-18T12:00:00.000Z' });
     const newer = item({ id: 'b', createdAt: '2026-09-19T12:00:00.000Z' });
@@ -126,7 +139,7 @@ describe('notificationReducer', () => {
 
 function ProviderProbe() {
   const notifications = useNotifications();
-  return <><output data-testid="unread-count">{notifications.unreadCount}</output><output data-testid="notification-error">{notifications.error}</output><output data-testid="notification-ids">{notifications.ids.join(',')}</output><output data-testid="pending-ids">{notifications.pendingIds.join(',')}</output><button onClick={() => { void notifications.actions.reconcile(); void notifications.actions.reconcile(); }}>reconcile</button><button onClick={() => { void notifications.actions.markRead('notification-1'); }}>read</button><button onClick={() => { void notifications.actions.markAllRead(); }}>read all</button><button onClick={() => notifications.actions.applyRealtime({ version: 1, type: 'notification.created', payload: { notification: item({ id: 'notification-new', createdAt: '2026-09-19T13:00:00.000Z' }), unreadCount: 4 } })}>new notification</button></>;
+  return <><output data-testid="unread-count">{notifications.unreadCount}</output><output data-testid="notification-error">{notifications.error}</output><output data-testid="notification-ids">{notifications.ids.join(',')}</output><output data-testid="pending-ids">{notifications.pendingIds.join(',')}</output><output data-testid="loading-more">{String(notifications.loadingMore)}</output><button onClick={() => { void notifications.actions.reconcile(); void notifications.actions.reconcile(); }}>reconcile</button><button onClick={() => void notifications.actions.loadMore()}>load more</button><button onClick={() => { void notifications.actions.markRead('notification-1'); }}>read</button><button onClick={() => { void notifications.actions.markAllRead(); }}>read all</button><button onClick={() => notifications.actions.applyRealtime({ version: 1, type: 'notification.created', payload: { notification: item({ id: 'notification-new', createdAt: '2026-09-19T13:00:00.000Z' }), unreadCount: 4 } })}>new notification</button></>;
 }
 
 describe('NotificationProvider session lifecycle', () => {
@@ -199,6 +212,24 @@ describe('NotificationProvider session lifecycle', () => {
     await waitFor(() => expect(listNotifications).toHaveBeenCalledOnce());
     resolve?.({ items: [], unreadCount: 0, nextCursor: null });
     await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('0'));
+  });
+
+  it('marks only the cursor request as load-more', async () => {
+    let finishLoadMore: ((value: { items: NotificationItem[]; unreadCount: number; nextCursor: null }) => void) | undefined;
+    listNotifications
+      .mockResolvedValueOnce({ items: [item()], unreadCount: 1, nextCursor: 'cursor' })
+      .mockImplementationOnce(() => new Promise((resolve) => { finishLoadMore = resolve; }));
+    render(<NotificationProvider><ProviderProbe /></NotificationProvider>);
+    await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('3'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'reconcile' }));
+    await waitFor(() => expect(screen.getByTestId('notification-ids')).toHaveTextContent('notification-1'));
+    expect(screen.getByTestId('loading-more')).toHaveTextContent('false');
+
+    fireEvent.click(screen.getByRole('button', { name: 'load more' }));
+    await waitFor(() => expect(screen.getByTestId('loading-more')).toHaveTextContent('true'));
+    finishLoadMore?.({ items: [], unreadCount: 1, nextCursor: null });
+    await waitFor(() => expect(screen.getByTestId('loading-more')).toHaveTextContent('false'));
   });
 
   it('reconciles and exposes a contextual error when marking read is ambiguous', async () => {

@@ -11,6 +11,7 @@ export interface NotificationStoreState {
   unreadCount: number;
   nextCursor: string | null;
   loading: boolean;
+  loadingMore: boolean;
   error: string | null;
   hasLoaded: boolean;
 }
@@ -18,7 +19,7 @@ export interface NotificationStoreState {
 // eslint-disable-next-line react-refresh/only-export-components
 export const initialNotificationState: NotificationStoreState = {
   itemsById: {}, ids: [], pendingIds: [], unreadCount: 0, nextCursor: null,
-  loading: false, error: null, hasLoaded: false,
+  loading: false, loadingMore: false, error: null, hasLoaded: false,
 };
 
 type NotificationAction =
@@ -33,7 +34,7 @@ type NotificationAction =
   | { type: 'optimisticReadAll'; readAt: string }
   | { type: 'clearPending' }
   | { type: 'rollback'; snapshot: NotificationStoreState }
-  | { type: 'loading'; value: boolean }
+  | { type: 'loading'; value: boolean; loadingMore?: boolean }
   | { type: 'error'; message: string | null };
 
 function timestamp(value: string | null): number {
@@ -75,13 +76,13 @@ function mergeItems(state: NotificationStoreState, items: NotificationItem[], au
 export function notificationReducer(state: NotificationStoreState, action: NotificationAction): NotificationStoreState {
   switch (action.type) {
     case 'reset': return initialNotificationState;
-    case 'loading': return { ...state, loading: action.value, error: action.value ? null : state.error };
-    case 'error': return { ...state, loading: false, error: action.message };
-    case 'unreadCount': return { ...state, unreadCount: action.unreadCount, loading: false, error: null };
+    case 'loading': return { ...state, loading: action.value, loadingMore: action.value && Boolean(action.loadingMore), error: action.value ? null : state.error };
+    case 'error': return { ...state, loading: false, loadingMore: false, error: action.message };
+    case 'unreadCount': return { ...state, unreadCount: action.unreadCount, loading: false, loadingMore: false, error: null };
     case 'rollback': return action.snapshot;
     case 'clearPending': return { ...state, pendingIds: [] };
-    case 'merge': return { ...mergeItems(state, action.items, false), unreadCount: action.unreadCount, nextCursor: action.nextCursor, loading: false, error: null };
-    case 'reconcile': return { ...mergeItems(state, action.items, true), unreadCount: action.unreadCount, nextCursor: action.nextCursor, loading: false, error: null };
+    case 'merge': return { ...mergeItems(state, action.items, false), unreadCount: action.unreadCount, nextCursor: action.nextCursor, loading: false, loadingMore: false, error: null };
+    case 'reconcile': return { ...mergeItems(state, action.items, true), unreadCount: action.unreadCount, nextCursor: action.nextCursor, loading: false, loadingMore: false, error: null };
     case 'createdEvent': {
       const existed = Boolean(state.itemsById[action.item.id]);
       const latestLoaded = state.ids[0] ? state.itemsById[state.ids[0]] : undefined;
@@ -209,7 +210,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (!cursor || stateRef.current.loading) return;
     const currentEpoch = epoch.current;
     const currentSessionIdentity = sessionIdentityRef.current;
-    dispatch({ type: 'loading', value: true });
+    dispatch({ type: 'loading', value: true, loadingMore: true });
     try {
       const response = await listNotifications({ limit: 25, cursor, unreadOnly: false });
       if (epoch.current === currentEpoch && sessionIdentityRef.current === currentSessionIdentity) {

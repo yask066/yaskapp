@@ -34,7 +34,17 @@ test('disables only the like action while that poll like is pending', () => {
   renderWithProviders(<PollCard poll={poll} viewerId="user-1" onVote={vi.fn()} onLike={vi.fn()} isLiking />);
 
   expect(screen.getByRole('button', { name: 'Like (2)' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Like (2)' })).toHaveAttribute('aria-busy', 'true');
+  expect(screen.getByRole('status', { name: 'Updating like' })).toBeInTheDocument();
   expect(screen.getByText('First').closest('button')).toBeEnabled();
+});
+
+test('announces a pending vote once when no previously selected option exists', () => {
+  renderWithProviders(<PollCard poll={poll} viewerId="user-1" onVote={vi.fn()} isVoting />);
+
+  const options = screen.getByRole('group', { name: 'Choose an option' });
+  expect(options).toHaveAttribute('aria-busy', 'true');
+  expect(screen.getAllByRole('status', { name: 'Submitting vote' })).toHaveLength(1);
 });
 
 test('does not render a separate vote button', () => {

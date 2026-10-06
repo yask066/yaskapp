@@ -4,6 +4,7 @@ import { NotificationCard } from './NotificationCard';
 import { useNotifications } from './notification-store';
 import { useListScrollState } from '../../core/scroll/useListScrollState';
 import { useOptionalSession } from '../../app/session-provider';
+import { AsyncState } from '../../components/AsyncState';
 
 type Filter = 'all' | 'unread';
 type Group = 'Today' | 'Yesterday' | 'Earlier';
@@ -47,7 +48,7 @@ export function NotificationsPage() {
   );
 
   if (notifications.loading && !notifications.hasLoaded) {
-    return <main id="main-content" className="notifications-page"><header className="page-heading"><div><p className="eyebrow">Inbox</p><h1>Notifications</h1></div></header><div className="notification-skeleton" aria-label="Loading notifications"><span /><span /><span /></div></main>;
+    return <main id="main-content" className="notifications-page"><header className="page-heading"><div><p className="eyebrow">Inbox</p><h1>Notifications</h1></div></header><AsyncState state="loading" kind="notification" rows={3} /></main>;
   }
 
   if (notifications.error && !notifications.hasLoaded) {
@@ -77,8 +78,9 @@ export function NotificationsPage() {
           return <section key={group} aria-labelledby={`notifications-${group}`}><h2 id={`notifications-${group}`}>{group}</h2><div className="notification-list">{groupItems.map((item) => <NotificationCard key={item.id} item={item} onRead={(id) => void notifications.actions.markRead(id)} />)}</div></section>;
         })}
       </div>}
-      {notifications.error && notifications.hasLoaded ? <section className="notifications-state" role="alert"><p>{notifications.error}</p><button className="button" type="button" onClick={() => void notifications.actions.reconcile()}>Retry</button></section> : null}
-      {notifications.nextCursor ? <button className="button notifications-load-more" type="button" disabled={notifications.loading} onClick={() => void notifications.actions.loadMore()}>{notifications.loading ? 'Loading…' : 'Load more'}</button> : null}
+      {notifications.error && notifications.hasLoaded ? <section className="notifications-state" role="alert"><p>{notifications.error}</p><button className="button" type="button" onClick={() => void (notifications.error === 'Unable to load more notifications.' ? notifications.actions.loadMore() : notifications.actions.reconcile())}>Retry</button></section> : null}
+      {notifications.nextCursor ? <button className="button notifications-load-more" type="button" disabled={notifications.loading} aria-busy={notifications.loadingMore || undefined} aria-label={notifications.loadingMore ? 'Loading more notifications' : undefined} onClick={() => void notifications.actions.loadMore()}>{notifications.loadingMore ? <><span>Loading…</span><span className="sr-only" role="status">Loading more notifications…</span></> : 'Load more'}</button> : null}
+      {notifications.loading && notifications.hasLoaded && !notifications.loadingMore ? <AsyncState state="refreshing" kind="notification" /> : null}
     </main>
   );
 }

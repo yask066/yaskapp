@@ -8,6 +8,7 @@ import { CommentForm } from './CommentForm';
 import { pollSessionEpoch, reconcilePoll } from '../polls/poll-state';
 import { isAmbiguousMutationError } from '../polls/usePollMutations';
 import { useListScrollState } from '../../core/scroll/useListScrollState';
+import { AsyncState } from '../../components/AsyncState';
 
 interface CommentThreadProps {
   pollId: string;
@@ -110,8 +111,8 @@ export function CommentThread({
       /> : null}
 
       {isExpanded ? <div className="comment-thread__replies" id={`replies-${rootComment.id}`} ref={repliesScroll.listRef}>
-        {repliesQuery.isPending ? <p role="status">Loading replies…</p> : null}
-        {repliesQuery.isError ? <div className="comment-thread__error">
+        {repliesQuery.isPending && !repliesQuery.data ? <AsyncState state="loading" kind="comment" rows={2} /> : null}
+        {repliesQuery.isError && !repliesQuery.data ? <div className="comment-thread__error">
           <p role="alert">{mutationErrorMessage(repliesQuery.error)}</p>
           <button className="button" type="button" onClick={() => void repliesQuery.refetch()}>Retry loading replies</button>
         </div> : null}
@@ -135,6 +136,8 @@ export function CommentThread({
           disabled={repliesQuery.isFetchingNextPage}
           onClick={() => void repliesQuery.fetchNextPage()}
         >{repliesQuery.isFetchingNextPage ? 'Loading more replies…' : 'Load more replies'}</button> : null}
+        {repliesQuery.isError && repliesQuery.data ? <div className="comment-thread__error"><p role="alert">{mutationErrorMessage(repliesQuery.error)}</p><button className="button" type="button" onClick={() => void repliesQuery.refetch()}>Retry loading replies</button></div> : null}
+        {repliesQuery.isFetching && !repliesQuery.isFetchingNextPage && repliesQuery.data ? <AsyncState state="refreshing" kind="comment" /> : null}
       </div> : null}
     </section>
   );

@@ -28,8 +28,7 @@ const poll = {
 
 const server = setupServer();
 
-function renderFeed() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+function renderFeed(queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } })) {
   return { queryClient, ...render(
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
@@ -68,11 +67,12 @@ test('read_timeout_then_retry_ignores_old_response in the feed UI without automa
   const view = renderFeed();
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });
   expect(requests).toBe(1);
-  expect(screen.getByRole('status')).toHaveTextContent('Loading');
+  await act(async () => { await vi.advanceTimersByTimeAsync(150); });
+  expect(document.querySelector('.feed-main [role="status"]')).toHaveTextContent('Loading polls');
   await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
   await act(async () => { await vi.advanceTimersByTimeAsync(1); });
   expect(screen.getByRole('alert')).toHaveTextContent('timed out');
-  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  expect(document.querySelector('.feed-main [role="status"]')).not.toBeInTheDocument();
   await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
   expect(requests).toBe(1);
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Retry' })); await vi.advanceTimersByTimeAsync(0); });
@@ -101,6 +101,57 @@ test('renders polls with immediately clickable answer options', async () => {
   expect(screen.getByRole('button', { name: 'First (3 votes)' })).toHaveAccessibleDescription('Sign in to vote on this poll.');
   expect(screen.getByRole('button', { name: 'Comments (0)' })).toBeEnabled();
   expect(screen.getByRole('button', { name: 'Comments (0)' })).not.toHaveAccessibleDescription('Comments are not available yet.');
+});
+
+test('does not show a suggested-users skeleton for an anonymous viewer', async () => {
+  renderFeed();
+
+  expect(await screen.findByRole('heading', { name: 'Your feed' })).toBeInTheDocument();
+  expect(screen.queryByText('Loading people…')).not.toBeInTheDocument();
+});
+
+test('keeps cached polls visible and skips the skeleton during a background refetch', async () => {
+  let release!: (response: Response) => void;
+  let requests = 0;
+  let holdNext = false;
+  server.use(http.get('/polls', () => {
+    requests += 1;
+    if (holdNext) return new Promise<Response>((resolve) => { release = resolve; });
+    return HttpResponse.json({ items: [poll] });
+  }));
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  const view = renderFeed(queryClient);
+
+  expect(await screen.findByText('Which option?')).toBeInTheDocument();
+  await waitFor(() => expect(requests).toBe(1));
+  holdNext = true;
+  void queryClient.invalidateQueries({ queryKey: ['polls', 'for-you'] });
+  await waitFor(() => expect(requests).toBe(2));
+  expect(document.querySelector('.feed-main [role="status"]')).toHaveTextContent('Refreshing polls');
+  expect(screen.getByText('Which option?')).toBeInTheDocument();
+  await act(async () => { release(Response.json({ items: [poll] })); });
+  view.unmount();
+  queryClient.clear();
+});
+
+test('preserves cached rows and shows a local retry after a background refresh error', async () => {
+  let requests = 0;
+  server.use(http.get('/polls', () => {
+    requests += 1;
+    if (requests === 1) return HttpResponse.json({ items: [poll] });
+    return HttpResponse.json({ error: 'unavailable', message: 'Refresh failed.' }, { status: 503 });
+  }));
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  const view = renderFeed(queryClient);
+
+  expect(await screen.findByText('Which option?')).toBeInTheDocument();
+  await waitFor(() => expect(requests).toBe(1));
+  void queryClient.invalidateQueries({ queryKey: ['polls', 'for-you'] });
+  expect(await screen.findByRole('alert')).toHaveTextContent('Refresh failed.');
+  expect(screen.getByText('Which option?')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
+  view.unmount();
+  queryClient.clear();
 });
 
 test('loads the shared T02 fixture with fixed count boundaries and cursor pages', async () => {

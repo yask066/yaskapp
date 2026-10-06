@@ -53,6 +53,8 @@ test('renders the shared search page structure', async () => {
   expect(await screen.findByRole('main')).toHaveClass('search-page');
   expect(screen.getByRole('search')).toHaveClass('search-panel');
   expect(screen.getByRole('tablist', { name: 'Search result type' })).toHaveClass('segmented-tabs');
+  expect(screen.queryByText('Loading polls…')).not.toBeInTheDocument();
+  expect(screen.queryByText('Loading people…')).not.toBeInTheDocument();
 });
 
 test('submits a validated poll search and keeps the entered query after a request error', async () => {

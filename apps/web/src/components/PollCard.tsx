@@ -44,8 +44,9 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
       <h2 className="poll-card__question" id={`poll-${poll.id}-question`}><Link to={`/polls/${poll.id}`}>{poll.question}</Link></h2>
       {poll.imageUrl ? <PollMedia key={poll.imageUrl} src={poll.imageUrl} /> : null}
       <section aria-label="Vote on this poll">
-        <fieldset className="poll-options poll-card__options">
+        <fieldset className="poll-options poll-card__options" aria-busy={isVoting}>
           <legend>Choose an option</legend>
+          <span className={`poll-options__pending${isVoting ? ' poll-options__pending--active' : ''}`} role={isVoting ? 'status' : undefined} aria-label={isVoting ? 'Submitting vote' : undefined} aria-hidden={!isVoting}>{isVoting ? 'Submitting vote…' : ''}</span>
           {poll.options.map((option) => (
             (() => {
               const percentage = poll.votesCount ? Math.min(100, Math.round((option.votesCount / poll.votesCount) * 100)) : 0;
@@ -56,7 +57,7 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
                 <span className="poll-option-votes">{formatVotes(option.votesCount, true)}</span>
                 <span className="poll-option-percent">{percentage}%</span>
                 <span className="poll-result-bar" role="progressbar" aria-label={option.text} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage}><span style={{ width: `${percentage}%` }} /></span>
-                <span className="poll-option-loading" role={isPendingOption ? 'status' : undefined} aria-hidden={!isPendingOption} aria-label={isPendingOption ? 'Submitting vote' : undefined}>{isPendingOption ? '…' : ''}</span>
+                <span className="poll-option-loading" aria-hidden="true">{isPendingOption ? '…' : ''}</span>
               </button>;
             })()
           ))}
@@ -64,8 +65,8 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
         {!onVote ? <p id={`poll-${poll.id}-vote-help`}>{voteHelp}</p> : null}
       </section>
       <footer className="poll-actions poll-card__actions">
-        <button className="poll-action-button" type="button" disabled={!onLike || isLiking} onClick={() => onLike?.(poll.id, poll.viewerHasLiked)} aria-label={`Like (${formatFullCount(poll.likesCount)})`} aria-pressed={poll.viewerHasLiked} aria-describedby={onLike ? undefined : `poll-${poll.id}-like-help`}>
-          <MaterialIcon className="poll-action-icon" name={poll.viewerHasLiked ? 'favorite' : 'favorite_border'} /><span className="poll-action-label">Like</span> <span className="poll-action-count">{formatCompactCount(poll.likesCount)}</span>
+        <button className="poll-action-button" type="button" disabled={!onLike || isLiking} onClick={() => onLike?.(poll.id, poll.viewerHasLiked)} aria-label={`Like (${formatFullCount(poll.likesCount)})`} aria-pressed={poll.viewerHasLiked} aria-busy={isLiking || undefined} aria-describedby={onLike ? undefined : `poll-${poll.id}-like-help`}>
+          <MaterialIcon className="poll-action-icon" name={poll.viewerHasLiked ? 'favorite' : 'favorite_border'} /><span className="poll-action-label">Like</span> <span className="poll-action-count">{formatCompactCount(poll.likesCount)}</span>{isLiking ? <span className="sr-only" role="status" aria-label="Updating like">Updating like…</span> : null}
         </button>
         {!onLike ? <p id={`poll-${poll.id}-like-help`}>{likeHelp}</p> : null}
         <button className="poll-action-button" type="button" disabled={!onOpenComments} onClick={() => onOpenComments?.(poll)} aria-label={`Comments (${formatFullCount(poll.commentsCount)})`} aria-describedby={onOpenComments ? undefined : `poll-${poll.id}-comments-help`}>

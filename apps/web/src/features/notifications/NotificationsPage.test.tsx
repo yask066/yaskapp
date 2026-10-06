@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
-import { beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { NotificationItem } from '@yaskapp/shared';
 import { NotificationsPage } from './NotificationsPage';
 
@@ -12,13 +12,14 @@ const mocks = vi.hoisted(() => ({
   markRead: vi.fn().mockResolvedValue(undefined),
   clearPending: vi.fn(),
   pendingIds: [] as string[],
+  load: { loading: false, loadingMore: false, hasLoaded: true, error: null as string | null },
 }));
 
 vi.mock('./notification-store', () => ({
   useNotifications: () => ({
     itemsById: Object.fromEntries(items.map((item) => [item.id, item])),
     ids: items.map((item) => item.id), pendingIds: mocks.pendingIds, unreadCount: 1,
-    nextCursor: 'next-page', loading: false, error: null, hasLoaded: true,
+    nextCursor: 'next-page', ...mocks.load,
     actions: mocks, realtimeStatus: 'connected',
   }),
 }));
@@ -28,7 +29,8 @@ const items: NotificationItem[] = [
   { id: 'n-yesterday', type: 'follow', actor: { id: 'u-2', username: 'bob', displayName: 'Bob', avatarUrl: null }, targetType: 'profile', pollId: null, commentId: null, payload: {}, readAt: '2026-09-18T10:00:00.000Z', createdAt: '2026-09-18T10:00:00.000Z', isTargetAvailable: true },
 ];
 
-beforeEach(() => { vi.clearAllMocks(); mocks.pendingIds = []; });
+beforeEach(() => { vi.useRealTimers(); vi.clearAllMocks(); mocks.pendingIds = []; mocks.load = { loading: false, loadingMore: false, hasLoaded: true, error: null }; });
+afterEach(() => vi.useRealTimers());
 
 function CurrentLocation() {
   const location = useLocation();
@@ -52,6 +54,43 @@ test('renders notification filters, date groups and canonical card links without
   expect(screen.getByRole('link', { name: /Alice/ })).toHaveAttribute('href', '/polls/p-1?comment=c-1');
   expect(mocks.markRead).not.toHaveBeenCalled();
   vi.useRealTimers();
+});
+
+test('reserves one accessible notification loading area and reveals rows at 150 ms', async () => {
+  vi.useFakeTimers();
+  mocks.load = { loading: true, loadingMore: false, hasLoaded: false, error: null };
+  renderPage();
+
+  const status = document.querySelector<HTMLElement>('#main-content [role="status"]')!;
+  const skeleton = status.querySelector('.content-skeleton');
+  expect(status).toHaveAttribute('aria-busy', 'true');
+  expect(skeleton).toBeInTheDocument();
+  expect(status).not.toHaveClass('async-state--skeleton-visible');
+
+  await act(async () => { await vi.advanceTimersByTimeAsync(149); });
+  expect(status).not.toHaveClass('async-state--skeleton-visible');
+  await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+  expect(status).toHaveClass('async-state--skeleton-visible');
+  expect(document.querySelectorAll('#main-content [role="status"]')).toHaveLength(1);
+});
+
+test('keeps notification rows and announces load-more in its existing footer slot', () => {
+  mocks.load = { loading: true, loadingMore: true, hasLoaded: true, error: null };
+  renderPage();
+
+  expect(screen.getByRole('link', { name: /Alice/ })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Loading more notifications' })).toBeDisabled();
+  expect(document.querySelectorAll('#main-content [role="status"]')).toHaveLength(1);
+  expect(document.querySelector('#main-content [role="status"]')).toHaveTextContent('Loading more notifications');
+});
+
+test('retries a failed notification load-more instead of refreshing the first page', async () => {
+  mocks.load = { loading: false, loadingMore: false, hasLoaded: true, error: 'Unable to load more notifications.' };
+  renderPage();
+
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Retry' }));
+  expect(mocks.loadMore).toHaveBeenCalledOnce();
+  expect(mocks.reconcile).not.toHaveBeenCalled();
 });
 
 test('filters unread notifications and marks all read only after explicit action', async () => {
