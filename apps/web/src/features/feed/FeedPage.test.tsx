@@ -3,9 +3,10 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest';
 import { SessionProvider } from '../../app/session-provider';
+import { listScrollState } from '../../core/scroll/list-scroll-state';
 import { t02MotionScrollCursorPages, t02MotionScrollPolls } from '../../test-utils/t02-motion-scroll-fixture';
 import { FeedPage } from './FeedPage';
 
@@ -49,6 +50,7 @@ beforeEach(() => server.use(
 afterEach(() => {
   server.resetHandlers();
   sessionStorage.clear();
+  listScrollState.clear();
   vi.restoreAllMocks();
   vi.useRealTimers();
 });
@@ -146,6 +148,52 @@ test('opens the selected poll comments route from the feed card', async () => {
 
   await user.click(await screen.findByRole('button', { name: 'Comments (0)' }));
   expect(await screen.findByText('Comments for selected poll')).toBeInTheDocument();
+});
+
+test('restores the feed poll anchor after opening comments and returning', async () => {
+  const polls = [poll, { ...poll, id: 'poll-2', question: 'Second poll?' }];
+  server.use(http.get('/polls', () => HttpResponse.json({ items: polls })));
+  let anchorTop = 120;
+  const originalRect = HTMLElement.prototype.getBoundingClientRect;
+  vi.spyOn(document.documentElement, 'scrollHeight', 'get').mockReturnValue(2000);
+  vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(600);
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    if (this.dataset.listItemId === 'poll-2') {
+      return { x: 0, y: anchorTop, top: anchorTop, left: 0, right: 640, bottom: anchorTop + 240, width: 640, height: 240, toJSON: () => ({}) };
+    }
+    return originalRect.call(this);
+  });
+  const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  const user = userEvent.setup();
+  function BackToFeed() {
+    const navigate = useNavigate();
+    return <button type="button" onClick={() => navigate(-1)}>Back to feed</button>;
+  }
+  render(
+    <QueryClientProvider client={queryClient}>
+      <SessionProvider>
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route path="/" element={<FeedPage />} />
+            <Route path="/polls/:pollId" element={<BackToFeed />} />
+          </Routes>
+        </MemoryRouter>
+      </SessionProvider>
+    </QueryClientProvider>,
+  );
+
+  await screen.findByText('Second poll?');
+  window.dispatchEvent(new Event('scroll'));
+  expect(listScrollState.read({ userId: null, route: '/', list: 'feed', query: '', filter: '', sort: 'for-you' }))
+    .toEqual({ id: 'poll-2', top: 120 });
+  await user.click(screen.getAllByRole('button', { name: 'Comments (0)' })[1]);
+  expect(await screen.findByRole('button', { name: 'Back to feed' })).toBeInTheDocument();
+  anchorTop = 270;
+  await user.click(screen.getByRole('button', { name: 'Back to feed' }));
+  await screen.findByText('Second poll?');
+  expect(scrollTo).toHaveBeenCalledWith({ top: 150, behavior: 'auto' });
+  expect(document.activeElement).toBe(screen.getByText('Second poll?').closest('[data-list-item-id]'));
 });
 
 test('renders a discovery rail alongside the feed', async () => {

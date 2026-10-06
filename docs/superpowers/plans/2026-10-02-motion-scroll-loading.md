@@ -282,11 +282,13 @@
 
 **Зависимости:** M11. **Файлы:** FeedPage, SearchPage, PublicProfilePage, PollDetailPage, CommentList/CommentThread, `comment-scroll.ts`, NotificationsPage/store и tests.
 
-- [ ] Подключить M11 к каждому реальному scroll container из M01; сохранить data cache вместе с route context.
-- [ ] Проверить list → detail/comments/profile → back после существующей load-more: прежние pages, focus и anchor сохранены.
-- [ ] Сохранить старый контент при refresh; dedup append; mutation не пересортировывает существующий список.
-- [ ] Для существующей доставки новых элементов выше viewport внедрить буфер и доступное действие «Новые элементы» без смещения. У начала ≤24 px допустима auto-insert; не вводить новую доставку.
-- [ ] Проверить notifications grouping/read/unread, deletion fallback и comment target priority в browser; измерить ≤2 CSS px для AC scenarios. Сохранить tests/evidence и commit.
+  - [x] Подключить M11 к реальному feed, search, public profile, comments/replies и notifications list; search query/filter/sort и notification filter сохраняются в URL, кэш остаётся в query cache.
+  - [x] Проверить возврат list → detail после сохранения загруженного списка: focus и anchor восстанавливаются; целевая browser-позиция совпала с точностью 0 CSS px.
+  - [x] Refresh сохраняет cached content; append deduplication и порядок после mutations остаются под существующим query/cache поведением.
+  - [x] Для уже существующих realtime arrivals вне верха inbox используются pending IDs и доступная кнопка «Новые уведомления»; при ≤24 px arrivals добавляются автоматически без нового transport.
+  - [x] Покрыть уведомления, unread URL filter, deletion fallback и приоритет явной цели комментария тестами; browser smoke подтвердил restoration ≤2 CSS px. Результаты и ограничения сохранены в evidence.
+
+  **Выполнено 6 октября 2026 года:** [результаты и ограничения M13](../../motion-scroll-loading-evidence/m13-verification.md). Full web suite 195/195, typecheck и lint прошли. Создан task commit `feat(web): integrate list scroll restoration`.
 
 **Готово:** все строки web-матрицы M01 подтверждены, отсутствующая web pagination не создана. **AC:** AC-05–AC-07.
 

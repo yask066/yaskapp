@@ -255,8 +255,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, [reconcile]);
 
-  const applyRealtime = useCallback((event: NotificationRealtimeEventV1, atTop = true) => {
-    if (event.type === 'notification.created') dispatch({ type: 'createdEvent', item: event.payload.notification, unreadCount: event.payload.unreadCount, atTop });
+  const applyRealtime = useCallback((event: NotificationRealtimeEventV1, atTop?: boolean) => {
+    const isInboxAtTop = atTop ?? (
+      !document.querySelector('.notifications-page') ||
+      (window.scrollY || document.documentElement.scrollTop) <= 24
+    );
+    if (event.type === 'notification.created') dispatch({ type: 'createdEvent', item: event.payload.notification, unreadCount: event.payload.unreadCount, atTop: isInboxAtTop });
     if (event.type === 'notification.read') dispatch({ type: 'readEvent', ...event.payload });
     if (event.type === 'notifications.read_all') dispatch({ type: 'readAllEvent', readAt: event.payload.readAt });
   }, []);

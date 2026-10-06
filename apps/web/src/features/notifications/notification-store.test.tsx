@@ -126,7 +126,7 @@ describe('notificationReducer', () => {
 
 function ProviderProbe() {
   const notifications = useNotifications();
-  return <><output data-testid="unread-count">{notifications.unreadCount}</output><output data-testid="notification-error">{notifications.error}</output><output data-testid="notification-ids">{notifications.ids.join(',')}</output><button onClick={() => { void notifications.actions.reconcile(); void notifications.actions.reconcile(); }}>reconcile</button><button onClick={() => { void notifications.actions.markRead('notification-1'); }}>read</button><button onClick={() => { void notifications.actions.markAllRead(); }}>read all</button></>;
+  return <><output data-testid="unread-count">{notifications.unreadCount}</output><output data-testid="notification-error">{notifications.error}</output><output data-testid="notification-ids">{notifications.ids.join(',')}</output><output data-testid="pending-ids">{notifications.pendingIds.join(',')}</output><button onClick={() => { void notifications.actions.reconcile(); void notifications.actions.reconcile(); }}>reconcile</button><button onClick={() => { void notifications.actions.markRead('notification-1'); }}>read</button><button onClick={() => { void notifications.actions.markAllRead(); }}>read all</button><button onClick={() => notifications.actions.applyRealtime({ version: 1, type: 'notification.created', payload: { notification: item({ id: 'notification-new', createdAt: '2026-09-19T13:00:00.000Z' }), unreadCount: 4 } })}>new notification</button></>;
 }
 
 describe('NotificationProvider session lifecycle', () => {
@@ -144,6 +144,30 @@ describe('NotificationProvider session lifecycle', () => {
     await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('3'));
     expect(getUnreadCount).toHaveBeenCalledOnce();
     expect(listNotifications).not.toHaveBeenCalled();
+  });
+
+  it('buffers realtime arrivals while the open inbox is scrolled beyond the top threshold', async () => {
+    const scrollTop = vi.spyOn(document.documentElement, 'scrollTop', 'get').mockReturnValue(40);
+    render(<NotificationProvider><main className="notifications-page"><ProviderProbe /></main></NotificationProvider>);
+    await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('3'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'new notification' }));
+
+    expect(screen.getByTestId('notification-ids')).toHaveTextContent('notification-new');
+    expect(screen.getByTestId('pending-ids')).toHaveTextContent('notification-new');
+    scrollTop.mockRestore();
+  });
+
+  it('auto-inserts a realtime arrival at the 24-pixel inbox threshold', async () => {
+    const scrollTop = vi.spyOn(document.documentElement, 'scrollTop', 'get').mockReturnValue(24);
+    render(<NotificationProvider><main className="notifications-page"><ProviderProbe /></main></NotificationProvider>);
+    await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('3'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'new notification' }));
+
+    expect(screen.getByTestId('notification-ids')).toHaveTextContent('notification-new');
+    expect(screen.getByTestId('pending-ids')).toBeEmptyDOMElement();
+    scrollTop.mockRestore();
   });
 
   it('registers browser visibility reconciliation for the active notification session', async () => {

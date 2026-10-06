@@ -7,6 +7,7 @@ import { commentScrollBehavior } from './comment-scroll';
 import { CommentForm } from './CommentForm';
 import { pollSessionEpoch, reconcilePoll } from '../polls/poll-state';
 import { isAmbiguousMutationError } from '../polls/usePollMutations';
+import { useListScrollState } from '../../core/scroll/useListScrollState';
 
 interface CommentThreadProps {
   pollId: string;
@@ -55,6 +56,10 @@ export function CommentThread({
     },
   });
   const replies = useMemo(() => repliesQuery.data?.pages.flatMap((page) => page.items) ?? [], [repliesQuery.data]);
+  const repliesScroll = useListScrollState(
+    { userId: currentUserId ?? null, route: `/polls/${pollId}`, list: `replies:${rootComment.id}`, query: focusedReplyId ?? '', filter: '', sort: '' },
+    { itemIds: isExpanded ? replies.map((reply) => reply.id) : [], priority: focusedReplyId ? 'explicit-target' : null },
+  );
   const { isError, hasNextPage, isFetchingNextPage, fetchNextPage } = repliesQuery;
 
   useEffect(() => {
@@ -104,7 +109,7 @@ export function CommentThread({
         onSubmit={async (body) => { await replyMutation.mutateAsync({ body, epoch: pollSessionEpoch(queryClient) }); }}
       /> : null}
 
-      {isExpanded ? <div className="comment-thread__replies" id={`replies-${rootComment.id}`}>
+      {isExpanded ? <div className="comment-thread__replies" id={`replies-${rootComment.id}`} ref={repliesScroll.listRef}>
         {repliesQuery.isPending ? <p role="status">Loading replies…</p> : null}
         {repliesQuery.isError ? <div className="comment-thread__error">
           <p role="alert">{mutationErrorMessage(repliesQuery.error)}</p>
@@ -114,9 +119,10 @@ export function CommentThread({
         {replies.length ? <ul className="comment-thread__list">
           {replies.map((reply) => <li
             className={`comment-card comment-thread__reply${reply.id === focusedReplyId ? ' comment-card--focused' : ''}`}
+            data-list-item-id={reply.id}
             key={reply.id}
             ref={reply.id === focusedReplyId ? focusedReplyRef : undefined}
-            tabIndex={reply.id === focusedReplyId ? -1 : undefined}
+            tabIndex={-1}
             aria-current={reply.id === focusedReplyId ? 'location' : undefined}
           >
             <p className="comment-card__author"><strong>{reply.author.displayName || reply.author.username}</strong> <span>@{reply.author.username}</span></p>

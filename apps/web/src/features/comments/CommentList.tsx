@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
+import { useNavigationType } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteComment, likeComment, listComments, unlikeComment } from '../../api/polls';
 import type { Poll, PollComment } from '../../api/models';
 import { mutationErrorMessage } from '../polls/usePollMutations';
 import { commentScrollBehavior } from './comment-scroll';
 import { CommentThread } from './CommentThread';
+import { useListScrollState } from '../../core/scroll/useListScrollState';
 
 interface CommentListProps {
   pollId: string;
@@ -43,7 +45,16 @@ export function CommentList({
     },
   });
   const focusedCommentRef = useRef<HTMLLIElement | null>(null);
+  const navigationType = useNavigationType();
   const focusRootId = focusedReplyId ? forcedExpandedRootId : focusedCommentId;
+  const comments = commentsQuery.data ?? [];
+  const visibleComments = resolvedRootComment && !comments.some((comment) => comment.id === resolvedRootComment.id)
+    ? [resolvedRootComment, ...comments]
+    : comments;
+  const commentScroll = useListScrollState(
+    { userId: currentUserId ?? null, route: `/polls/${pollId}`, list: 'comments', query: focusedCommentId ?? focusedReplyId ?? '', filter: '', sort: '' },
+    { itemIds: visibleComments.map((comment) => comment.id), priority: focusedCommentId || focusedReplyId ? 'explicit-target' : null, restoreFocusOnPop: navigationType === 'POP' },
+  );
   useEffect(() => {
     if (!focusRootId || !commentsQuery.data) return;
     const target = focusedCommentRef.current;
@@ -56,11 +67,6 @@ export function CommentList({
 
   if (commentsQuery.isPending) return <p role="status">Loading comments…</p>;
   if (commentsQuery.isError && !commentsQuery.data) return <div role="alert"><p>{mutationErrorMessage(commentsQuery.error)}</p><button type="button" onClick={() => void commentsQuery.refetch()}>Retry loading comments</button></div>;
-
-  const comments = commentsQuery.data ?? [];
-  const visibleComments = resolvedRootComment && !comments.some((comment) => comment.id === resolvedRootComment.id)
-    ? [resolvedRootComment, ...comments]
-    : comments;
 
   function handleReplyCreated(rootComment: PollComment, _reply: PollComment, poll: Poll) {
     queryClient.setQueryData<PollComment[]>(['comments', pollId], (cached = []) => {
@@ -75,10 +81,10 @@ export function CommentList({
   }
 
   return (
-    <div className="comment-list">
+    <div className="comment-list" ref={commentScroll.listRef}>
       {writeError ? <p role="alert">{mutationErrorMessage(writeError)}</p> : null}
       {visibleComments.length ? <ul>
-        {visibleComments.map((comment) => <li className={`comment-card${comment.id === focusRootId && !focusedReplyId ? ' comment-card--focused' : ''}`} key={comment.id} ref={comment.id === focusRootId ? focusedCommentRef : undefined} tabIndex={comment.id === focusRootId ? -1 : undefined} aria-current={comment.id === focusRootId && !focusedReplyId ? 'location' : undefined}>
+        {visibleComments.map((comment) => <li className={`comment-card${comment.id === focusRootId && !focusedReplyId ? ' comment-card--focused' : ''}`} data-list-item-id={comment.id} key={comment.id} ref={comment.id === focusRootId ? focusedCommentRef : undefined} tabIndex={-1} aria-current={comment.id === focusRootId && !focusedReplyId ? 'location' : undefined}>
           <p className="comment-card__author"><strong>{comment.author.displayName || comment.author.username}</strong> <span>@{comment.author.username}</span></p>
           <p className="comment-card__body">{comment.body}</p>
           <div className="comment-card__actions">{currentUserId ? <button className="button" type="button" aria-pressed={comment.viewerHasLiked} onClick={() => likeMutation.mutate(comment)}>Like ({comment.likesCount})</button> : null}{comment.author.id === currentUserId ? <button className="button" type="button" onClick={() => { if (window.confirm('Delete this comment?')) deleteMutation.mutate(comment.id); }}>Delete</button> : null}</div>

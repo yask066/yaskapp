@@ -6,6 +6,7 @@ export type ListScrollPriority = 'explicit-target' | 'new-items' | null;
 export interface UseListScrollStateOptions {
   itemIds: string[];
   priority?: ListScrollPriority;
+  restoreFocusOnPop?: boolean;
   store?: ListScrollStateStore;
 }
 
@@ -20,17 +21,19 @@ function clampToDocument(top: number): number {
 }
 
 export function useListScrollState(context: ListContext, options: UseListScrollStateOptions) {
-  const { itemIds, priority = null, store = listScrollState } = options;
+  const { itemIds, priority = null, restoreFocusOnPop = false, store = listScrollState } = options;
   const { filter, list, query, route, sort, userId } = context;
   const stableContext = useMemo(() => ({ filter, list, query, route, sort, userId }), [filter, list, query, route, sort, userId]);
-  const listRef = useRef<HTMLElement>(null);
+  const listElement = useRef<HTMLElement | null>(null);
+  const listRef = useCallback((element: HTMLElement | null) => { listElement.current = element; }, []);
   const itemIdsRef = useRef(itemIds);
   itemIdsRef.current = itemIds;
   const contextKey = keyFor(stableContext);
   const itemIdsKey = useMemo(() => JSON.stringify(itemIds), [itemIds]);
+  const restoredFocus = useRef(false);
 
   const capture = useCallback(() => {
-    const root = listRef.current;
+    const root = listElement.current;
     if (!root) return;
     const visibleAnchors: ListAnchor[] = [...root.querySelectorAll<HTMLElement>('[data-list-item-id]')]
       .map((element) => ({ element, rect: element.getBoundingClientRect() }))
@@ -45,7 +48,7 @@ export function useListScrollState(context: ListContext, options: UseListScrollS
     if (restorePriority) return false;
     const anchor = store.read(stableContext, ids);
     if (!anchor) return false;
-    const root = listRef.current;
+    const root = listElement.current;
     if (!root) return false;
     const element = [...root.querySelectorAll<HTMLElement>('[data-list-item-id]')]
       .find((item) => item.dataset.listItemId === anchor.id);
@@ -54,13 +57,19 @@ export function useListScrollState(context: ListContext, options: UseListScrollS
     const currentScrollTop = window.scrollY || document.documentElement.scrollTop;
     const requestedTop = currentScrollTop + element.getBoundingClientRect().top - anchor.top;
     window.scrollTo({ top: clampToDocument(requestedTop), behavior: 'auto' });
+    if (restoreFocusOnPop && !restoredFocus.current) {
+      element.focus({ preventScroll: true });
+      restoredFocus.current = true;
+    }
     return true;
-  }, [stableContext, priority, store]);
+  }, [stableContext, priority, store, restoreFocusOnPop]);
 
   useLayoutEffect(() => {
     const ids = itemIdsRef.current;
     if (ids.length === 0 || priority) return;
-    if (!restore(ids, priority)) window.scrollTo({ top: 0, behavior: 'auto' });
+    if (!restore(ids, priority) && (window.scrollY || document.documentElement.scrollTop) > 0) {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
   }, [contextKey, itemIdsKey, priority, restore]);
 
   useLayoutEffect(() => {

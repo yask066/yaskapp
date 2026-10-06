@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, expect, test, vi } from 'vitest';
 import type { NotificationItem } from '@yaskapp/shared';
 import { NotificationsPage } from './NotificationsPage';
@@ -30,8 +30,13 @@ const items: NotificationItem[] = [
 
 beforeEach(() => { vi.clearAllMocks(); mocks.pendingIds = []; });
 
-function renderPage() {
-  return render(<MemoryRouter><NotificationsPage /></MemoryRouter>);
+function CurrentLocation() {
+  const location = useLocation();
+  return <output data-testid="current-location">{location.pathname}{location.search}</output>;
+}
+
+function renderPage(initialEntry = '/notifications') {
+  return render(<MemoryRouter initialEntries={[initialEntry]}><NotificationsPage /><CurrentLocation /></MemoryRouter>);
 }
 
 test('renders notification filters, date groups and canonical card links without reading on open', () => {
@@ -72,4 +77,14 @@ test('shows pending realtime notifications as a top banner', () => {
   mocks.pendingIds = ['pending-1', 'pending-2'];
   renderPage();
   expect(screen.getByRole('button', { name: 'New notifications (2)' })).toBeInTheDocument();
+});
+
+test('keeps the unread filter in the route context so returning restores the selected list', async () => {
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(screen.getByRole('tab', { name: 'Unread' }));
+
+  expect(screen.getByTestId('current-location')).toHaveTextContent('/notifications?filter=unread');
+  expect(screen.getByRole('tab', { name: 'Unread' })).toHaveAttribute('aria-selected', 'true');
 });

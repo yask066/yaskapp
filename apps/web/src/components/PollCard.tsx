@@ -27,7 +27,7 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
   const likeHelp = viewerId ? 'Liking is not available for this poll.' : 'Sign in to like this poll.';
   const createdLabel = formatPollDate(poll.createdAt);
   return (
-    <article className="poll-card" aria-labelledby={`poll-${poll.id}-question`}>
+    <article className="poll-card" data-list-item-id={poll.id} tabIndex={-1} aria-labelledby={`poll-${poll.id}-question`}>
       <header className="poll-card-header poll-card__meta">
         <Avatar name={authorName} src={poll.author.avatarUrl} />
         <div className="poll-author-meta">

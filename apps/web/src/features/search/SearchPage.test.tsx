@@ -3,7 +3,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest';
 import { SessionProvider } from '../../app/session-provider';
 import { SearchPage } from './SearchPage';
@@ -78,4 +78,48 @@ test('submits a validated poll search and keeps the entered query after a reques
   await user.click(screen.getByRole('button', { name: 'Search' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Search terms are not allowed.');
   expect(screen.getByLabelText('Search')).toHaveValue('climate');
+});
+
+test('restores the submitted search context and cached results after opening a poll and returning', async () => {
+  let requests = 0;
+  let releaseRefresh!: (response: Response) => void;
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: currentUser })),
+    http.get('/search', () => {
+      requests += 1;
+      if (requests > 1) return new Promise<Response>((resolve) => { releaseRefresh = resolve; });
+      return HttpResponse.json({ items: [{ type: 'poll', score: 1, poll }], nextCursor: null });
+    }),
+  );
+  function BackToSearch() {
+    const navigate = useNavigate();
+    return <button type="button" onClick={() => navigate(-1)}>Back to search</button>;
+  }
+  const user = userEvent.setup();
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <SessionProvider>
+        <MemoryRouter initialEntries={['/search']}>
+          <Routes>
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/polls/:pollId" element={<BackToSearch />} />
+          </Routes>
+        </MemoryRouter>
+      </SessionProvider>
+    </QueryClientProvider>,
+  );
+
+  await user.type(await screen.findByLabelText('Search'), 'climate');
+  await user.click(screen.getByRole('button', { name: 'Search' }));
+  await user.click(await screen.findByRole('link', { name: 'Climate action?' }));
+  expect(await screen.findByRole('button', { name: 'Back to search' })).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Back to search' }));
+
+  expect(await screen.findByRole('link', { name: 'Climate action?' })).toBeInTheDocument();
+  expect(screen.getByLabelText('Search')).toHaveValue('climate');
+  expect(screen.getByLabelText('Result type')).toHaveValue('all');
+  await waitFor(() => expect(requests).toBe(2));
+  expect(screen.getByRole('link', { name: 'Climate action?' })).toBeInTheDocument();
+  await act(async () => releaseRefresh(Response.json({ items: [{ type: 'poll', score: 1, poll }], nextCursor: null })));
 });

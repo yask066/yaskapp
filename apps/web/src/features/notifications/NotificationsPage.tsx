@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigationType, useSearchParams } from 'react-router-dom';
 import { NotificationCard } from './NotificationCard';
 import { useNotifications } from './notification-store';
+import { useListScrollState } from '../../core/scroll/useListScrollState';
+import { useOptionalSession } from '../../app/session-provider';
 
 type Filter = 'all' | 'unread';
 type Group = 'Today' | 'Yesterday' | 'Earlier';
@@ -18,7 +20,10 @@ function groupFor(createdAt: string, now: Date): Group {
 
 export function NotificationsPage() {
   const notifications = useNotifications();
-  const [filter, setFilter] = useState<Filter>('all');
+  const session = useOptionalSession();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filter: Filter = searchParams.get('filter') === 'unread' ? 'unread' : 'all';
+  const navigationType = useNavigationType();
   const [now] = useState(() => new Date());
 
   useEffect(() => {
@@ -36,6 +41,10 @@ export function NotificationsPage() {
     }
     return result;
   }, [items, now]);
+  const notificationScroll = useListScrollState(
+    { userId: session?.user?.id ?? null, route: '/notifications', list: 'notifications', query: '', filter, sort: '' },
+    { itemIds: items.map((item) => item.id), restoreFocusOnPop: navigationType === 'POP' },
+  );
 
   if (notifications.loading && !notifications.hasLoaded) {
     return <main id="main-content" className="notifications-page"><header className="page-heading"><div><p className="eyebrow">Inbox</p><h1>Notifications</h1></div></header><div className="notification-skeleton" aria-label="Loading notifications"><span /><span /><span /></div></main>;
@@ -56,12 +65,12 @@ export function NotificationsPage() {
       </header>
       <div className="notifications-toolbar">
         <div className="segmented-tabs" role="tablist" aria-label="Notification filters">
-          <button type="button" role="tab" aria-selected={filter === 'all'} onClick={() => setFilter('all')}>All</button>
-          <button type="button" role="tab" aria-selected={filter === 'unread'} onClick={() => setFilter('unread')}>Unread</button>
+          <button type="button" role="tab" aria-selected={filter === 'all'} onClick={() => setSearchParams({}, { replace: true })}>All</button>
+          <button type="button" role="tab" aria-selected={filter === 'unread'} onClick={() => setSearchParams({ filter: 'unread' }, { replace: true })}>Unread</button>
         </div>
       </div>
       {notifications.pendingIds.length > 0 ? <button className="notifications-pending" type="button" onClick={() => { notifications.actions.clearPending(); window.scrollTo({ top: 0, behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); }}>New notifications ({notifications.pendingIds.length})</button> : null}
-      {items.length === 0 ? <p className="notifications-state">{filter === 'unread' ? 'You are all caught up.' : 'No notifications yet.'}</p> : <div className="notification-groups">
+      {items.length === 0 ? <p className="notifications-state">{filter === 'unread' ? 'You are all caught up.' : 'No notifications yet.'}</p> : <div className="notification-groups" ref={notificationScroll.listRef}>
         {(['Today', 'Yesterday', 'Earlier'] as Group[]).map((group) => {
           const groupItems = groups.get(group);
           if (!groupItems?.length) return null;
