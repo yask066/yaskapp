@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/scroll/list_scroll_state.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../auth/auth_api_client.dart';
 import '../auth/auth_session.dart';
@@ -52,6 +53,14 @@ class _HomeScreenState extends State<HomeScreen> {
   StreamSubscription<PollDeletedRealtimeEvent>? _pollDeletedSubscription;
   final _feedKey = GlobalKey<FeedScreenState>();
   final _profileKey = GlobalKey<ProfileScreenState>();
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.session.user.id != widget.session.user.id) {
+      listScrollStateStore.clearForUser(oldWidget.session.user.id);
+    }
+  }
 
   @override
   void initState() {
@@ -153,6 +162,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: NotificationsScreen(
                 isActive: _selectedIndex == 2,
                 notificationStore: _notificationStore,
+                userId: widget.session.user.id,
               ),
             ),
             ProfileScreen(
@@ -162,7 +172,10 @@ class _HomeScreenState extends State<HomeScreen> {
               authApiClient: widget.authApiClient,
               pollsApiClient: _pollsApiClient,
               realtimeClient: widget.realtimeSession.realtimeClient,
-              onLogout: widget.onLogout,
+              onLogout: () {
+                listScrollStateStore.clearForUser(widget.session.user.id);
+                widget.onLogout();
+              },
               onUserUpdated: widget.onUserUpdated,
             ),
           ],

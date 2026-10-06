@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/scroll/list_scroll_anchor_host.dart';
+import '../../core/scroll/list_scroll_state.dart';
 import '../../core/widgets/user_avatar.dart';
 import 'poll_card.dart';
 import 'poll_summary.dart';
@@ -40,6 +42,7 @@ class PollCommentsScreen extends StatefulWidget {
 
 class _PollCommentsScreenState extends State<PollCommentsScreen> {
   final _commentController = TextEditingController();
+  final _scrollController = ScrollController();
   final _targetCommentKey = GlobalKey();
   final _targetReplyKey = GlobalKey();
   late Future<List<PollCommentSummary>> _commentsFuture;
@@ -92,6 +95,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
   void dispose() {
     _pollStateStore?.removeListener(_handlePollStateChanged);
     _commentController.dispose();
+    _scrollController.dispose();
     if (_ownsReportsApiClient) _reportsApiClient.close();
     super.dispose();
   }
@@ -540,105 +544,129 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                       final comments = _comments ?? snapshot.data ?? [];
                       _scheduleTargetCommentFocus(comments);
 
-                      return SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            PollCard(
-                              key: ValueKey('poll-${_poll.id}'),
-                              poll: _poll,
-                              accessToken: widget.accessToken,
-                              onToggleLike:
-                                  _isLikingPoll ? null : _togglePollLike,
-                              isLiking: _isLikingPoll,
-                            ),
-                            const SizedBox(height: 26),
-                            Row(
-                              children: [
-                                Text(
-                                  '${_poll.commentsCount} comments',
-                                  style: const TextStyle(
-                                    color: _commentsSecondaryText,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const Spacer(),
-                                const Text(
-                                  'Newest',
-                                  style: TextStyle(
-                                    color: _commentsSecondaryText,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                                const Icon(
-                                  Icons.keyboard_arrow_down,
-                                  color: _commentsSecondaryText,
-                                  size: 18,
-                                ),
-                              ],
-                            ),
-                            const Divider(
-                              height: 32,
-                              color: _commentsDivider,
-                            ),
-                            if (comments.isEmpty)
-                              const _CommentsEmptyState()
-                            else
-                              ...comments.expand((comment) {
-                                final isReplyTargetRoot =
-                                    comment.id == _targetRootCommentId &&
-                                        _targetReplyId != null;
-                                final isRootTarget =
-                                    comment.id == _targetRootCommentId &&
-                                        _targetReplyId == null;
-                                return <Widget>[
-                                  KeyedSubtree(
-                                    key: isRootTarget
-                                        ? ValueKey(
-                                            'notification-target-comment-${comment.id}')
-                                        : null,
-                                    child: _CommentTile(
-                                      key: isRootTarget
-                                          ? _targetCommentKey
-                                          : ValueKey(
-                                              'comment-tile-${comment.id}'),
-                                      comment: comment,
-                                      isNotificationTarget: isRootTarget,
-                                      pollId: _poll.id,
-                                      accessToken: widget.accessToken,
-                                      pollsApiClient: widget.pollsApiClient,
-                                      canReply: widget.currentUserId != null,
-                                      focusedReplyId: isReplyTargetRoot
-                                          ? _targetReplyId
-                                          : null,
-                                      targetReplyKey: isReplyTargetRoot
-                                          ? _targetReplyKey
-                                          : null,
-                                      onReplyCreated: (updatedPoll) =>
-                                          _onReplyCreated(
-                                              comment.id, updatedPoll),
-                                      onDelete: widget.currentUserId ==
-                                              comment.author.id
-                                          ? () => _deleteComment(comment)
-                                          : null,
-                                      onReport: widget.currentUserId != null &&
-                                              widget.currentUserId !=
-                                                  comment.author.id
-                                          ? () => _reportComment(comment)
-                                          : null,
-                                      onToggleLike: _toggleCommentLike,
+                      final commentIds = comments
+                          .map((comment) => 'comment-${comment.id}')
+                          .toList();
+                      return ListScrollAnchorHost(
+                        context: ListScrollContext(
+                          userId: widget.currentUserId,
+                          route: '/polls/${_poll.id}/comments',
+                          list: 'comments',
+                          query: '',
+                          filter: '',
+                          sort: 'newest',
+                        ),
+                        store: listScrollStateStore,
+                        controller: _scrollController,
+                        itemIds: commentIds,
+                        hasExplicitTarget: widget.initialCommentId != null ||
+                            _targetRootCommentId != null,
+                        child: SingleChildScrollView(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              PollCard(
+                                key: ValueKey('poll-${_poll.id}'),
+                                poll: _poll,
+                                accessToken: widget.accessToken,
+                                onToggleLike:
+                                    _isLikingPoll ? null : _togglePollLike,
+                                isLiking: _isLikingPoll,
+                              ),
+                              const SizedBox(height: 26),
+                              Row(
+                                children: [
+                                  Text(
+                                    '${_poll.commentsCount} comments',
+                                    style: const TextStyle(
+                                      color: _commentsSecondaryText,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w500,
                                     ),
                                   ),
-                                  const Divider(
-                                    height: 1,
-                                    indent: 76,
-                                    color: _commentsDivider,
+                                  const Spacer(),
+                                  const Text(
+                                    'Newest',
+                                    style: TextStyle(
+                                      color: _commentsSecondaryText,
+                                      fontSize: 15,
+                                    ),
                                   ),
-                                ];
-                              }),
-                          ],
+                                  const Icon(
+                                    Icons.keyboard_arrow_down,
+                                    color: _commentsSecondaryText,
+                                    size: 18,
+                                  ),
+                                ],
+                              ),
+                              const Divider(
+                                height: 32,
+                                color: _commentsDivider,
+                              ),
+                              if (comments.isEmpty)
+                                const _CommentsEmptyState()
+                              else
+                                ...comments.expand((comment) {
+                                  final isReplyTargetRoot =
+                                      comment.id == _targetRootCommentId &&
+                                          _targetReplyId != null;
+                                  final isRootTarget =
+                                      comment.id == _targetRootCommentId &&
+                                          _targetReplyId == null;
+                                  return <Widget>[
+                                    ListScrollAnchorItem(
+                                      id: 'comment-${comment.id}',
+                                      child: KeyedSubtree(
+                                        key: isRootTarget
+                                            ? ValueKey(
+                                                'notification-target-comment-${comment.id}')
+                                            : null,
+                                        child: _CommentTile(
+                                          key: isRootTarget
+                                              ? _targetCommentKey
+                                              : ValueKey(
+                                                  'comment-tile-${comment.id}'),
+                                          comment: comment,
+                                          isNotificationTarget: isRootTarget,
+                                          pollId: _poll.id,
+                                          accessToken: widget.accessToken,
+                                          pollsApiClient: widget.pollsApiClient,
+                                          canReply:
+                                              widget.currentUserId != null,
+                                          focusedReplyId: isReplyTargetRoot
+                                              ? _targetReplyId
+                                              : null,
+                                          targetReplyKey: isReplyTargetRoot
+                                              ? _targetReplyKey
+                                              : null,
+                                          onReplyCreated: (updatedPoll) =>
+                                              _onReplyCreated(
+                                                  comment.id, updatedPoll),
+                                          onDelete: widget.currentUserId ==
+                                                  comment.author.id
+                                              ? () => _deleteComment(comment)
+                                              : null,
+                                          onReport: widget.currentUserId !=
+                                                      null &&
+                                                  widget.currentUserId !=
+                                                      comment.author.id
+                                              ? () => _reportComment(comment)
+                                              : null,
+                                          onToggleLike: _toggleCommentLike,
+                                        ),
+                                      ),
+                                    ),
+                                    const Divider(
+                                      height: 1,
+                                      indent: 76,
+                                      color: _commentsDivider,
+                                    ),
+                                  ];
+                                }),
+                            ],
+                          ),
                         ),
                       );
                     },

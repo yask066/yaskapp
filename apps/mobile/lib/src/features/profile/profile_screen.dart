@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/user_avatar.dart';
+import '../../core/scroll/list_scroll_anchor_host.dart';
+import '../../core/scroll/list_scroll_state.dart';
 import '../auth/auth_api_client.dart';
 import '../auth/auth_session.dart';
 import '../polls/poll_card.dart';
@@ -53,6 +55,7 @@ class ProfileScreenState extends State<ProfileScreen> {
   var _selectedTab = 0;
   Future<List<PollSummary>>? _likedPollsFuture;
   final Set<String> _likingPollIds = {};
+  final _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -77,6 +80,7 @@ class ProfileScreenState extends State<ProfileScreen> {
     if (_ownsPollsApiClient) {
       _pollsApiClient.close();
     }
+    _scrollController.dispose();
 
     super.dispose();
   }
@@ -315,271 +319,291 @@ class ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FC),
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverAppBar(
-              toolbarHeight: 64,
-              backgroundColor: Colors.white,
-              surfaceTintColor: Colors.transparent,
-              elevation: 0,
-              titleSpacing: 20,
-              title: const Text(
-                'Profile',
-                style: TextStyle(
-                  color: Color(0xFF10142D),
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  height: 34 / 22,
+        child: ListScrollAnchorHost(
+          context: ListScrollContext(
+            userId: widget.user.id,
+            route: '/profile',
+            list: 'polls',
+            query: '',
+            filter: _selectedTab == 0 ? 'own' : 'liked',
+            sort: '',
+          ),
+          store: listScrollStateStore,
+          controller: _scrollController,
+          itemIds: (_selectedTab == 0 ? _myPolls : _likedPolls)
+              .map((poll) => 'poll-${poll.id}')
+              .toList(),
+          child: CustomScrollView(
+            controller: _scrollController,
+            slivers: [
+              SliverAppBar(
+                toolbarHeight: 64,
+                backgroundColor: Colors.white,
+                surfaceTintColor: Colors.transparent,
+                elevation: 0,
+                titleSpacing: 20,
+                title: const Text(
+                  'Profile',
+                  style: TextStyle(
+                    color: Color(0xFF10142D),
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    height: 34 / 22,
+                  ),
                 ),
-              ),
-              actions: [
-                IconButton(
-                  tooltip: 'Settings',
-                  icon: const Icon(Icons.settings_outlined, size: 24),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => SettingsScreen(
-                          accessToken: widget.accessToken,
-                          onLogout: widget.onLogout,
+                actions: [
+                  IconButton(
+                    tooltip: 'Settings',
+                    icon: const Icon(Icons.settings_outlined, size: 24),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => SettingsScreen(
+                            accessToken: widget.accessToken,
+                            onLogout: widget.onLogout,
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(width: 20),
-              ],
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 20),
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Column(
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              UserAvatar(
-                                displayName: displayName,
-                                username: widget.user.username,
-                                imageUrl: widget.user.profile.avatarUrl,
-                                radius: 40,
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      displayName,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Color(0xFF10142D),
-                                        fontSize: 22,
-                                        height: 26 / 22,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '@${widget.user.username}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Color(0xFF667085),
-                                        fontSize: 14,
-                                        height: 18 / 14,
-                                      ),
-                                    ),
-                                    if (bio != null &&
-                                        bio.trim().isNotEmpty) ...[
-                                      const SizedBox(height: 8),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 20),
+                ],
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 20),
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Column(
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                UserAvatar(
+                                  displayName: displayName,
+                                  username: widget.user.username,
+                                  imageUrl: widget.user.profile.avatarUrl,
+                                  radius: 40,
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
                                       Text(
-                                        bio,
-                                        maxLines: 3,
+                                        displayName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Color(0xFF10142D),
+                                          fontSize: 22,
+                                          height: 26 / 22,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '@${widget.user.username}',
+                                        maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           color: Color(0xFF667085),
                                           fontSize: 14,
-                                          height: 20 / 14,
+                                          height: 18 / 14,
                                         ),
                                       ),
+                                      if (bio != null &&
+                                          bio.trim().isNotEmpty) ...[
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          bio,
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Color(0xFF667085),
+                                            fontSize: 14,
+                                            height: 20 / 14,
+                                          ),
+                                        ),
+                                      ],
                                     ],
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
-                          SizedBox(
-                            height: 56,
-                            child: Row(
-                              children: [
-                                _ProfileMetric(
-                                  label: 'Polls',
-                                  value:
-                                      widget.user.profile.pollsCount.toString(),
-                                ),
-                                const _ProfileDivider(),
-                                _ProfileMetric(
-                                  label: 'Followers',
-                                  value: widget.user.profile.followersCount
-                                      .toString(),
-                                ),
-                                const _ProfileDivider(),
-                                _ProfileMetric(
-                                  label: 'Following',
-                                  value: widget.user.profile.followingCount
-                                      .toString(),
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-                          const SizedBox(height: 20),
-                          SizedBox(
-                            height: 48,
-                            width: double.infinity,
-                            child: OutlinedButton(
-                              onPressed: () => _openEditProfile(context),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              height: 56,
+                              child: Row(
                                 children: [
-                                  Icon(Icons.person_outline, size: 20),
-                                  SizedBox(width: 8),
-                                  Text('Edit profile'),
+                                  _ProfileMetric(
+                                    label: 'Polls',
+                                    value: widget.user.profile.pollsCount
+                                        .toString(),
+                                  ),
+                                  const _ProfileDivider(),
+                                  _ProfileMetric(
+                                    label: 'Followers',
+                                    value: widget.user.profile.followersCount
+                                        .toString(),
+                                  ),
+                                  const _ProfileDivider(),
+                                  _ProfileMetric(
+                                    label: 'Following',
+                                    value: widget.user.profile.followingCount
+                                        .toString(),
+                                  ),
                                 ],
                               ),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: navy,
-                                side: const BorderSide(color: navy),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 16),
-                                textStyle: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: SizedBox(
-                        height: 52,
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _ProfileTab(
-                                label: 'My polls',
-                                selected: _selectedTab == 0,
-                                onTap: () => _selectTab(0),
-                              ),
-                            ),
-                            Expanded(
-                              child: _ProfileTab(
-                                label: 'Liked polls',
-                                selected: _selectedTab == 1,
-                                onTap: () => _selectTab(1),
+                            const SizedBox(height: 20),
+                            SizedBox(
+                              height: 48,
+                              width: double.infinity,
+                              child: OutlinedButton(
+                                onPressed: () => _openEditProfile(context),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.person_outline, size: 20),
+                                    SizedBox(width: 8),
+                                    Text('Edit profile'),
+                                  ],
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: navy,
+                                  side: const BorderSide(color: navy),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16),
+                                  textStyle: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                child: FutureBuilder<List<PollSummary>>(
-                  future:
-                      _selectedTab == 0 ? _myPollsFuture : _likedPollsFuture!,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting &&
-                        (_selectedTab == 0
-                            ? !_hasLoadedMyPolls
-                            : !_hasLoadedLikedPolls)) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24),
-                        child: Center(
-                          child: SizedBox.square(
-                            dimension: 28,
-                            child: CircularProgressIndicator(strokeWidth: 3),
+                      const SizedBox(height: 24),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: SizedBox(
+                          height: 52,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _ProfileTab(
+                                  label: 'My polls',
+                                  selected: _selectedTab == 0,
+                                  onTap: () => _selectTab(0),
+                                ),
+                              ),
+                              Expanded(
+                                child: _ProfileTab(
+                                  label: 'Liked polls',
+                                  selected: _selectedTab == 1,
+                                  onTap: () => _selectTab(1),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      );
-                    }
-
-                    if (snapshot.hasError &&
-                        (_selectedTab == 0
-                            ? !_hasLoadedMyPolls
-                            : !_hasLoadedLikedPolls)) {
-                      return _MyPollsErrorState(
-                        onRetry: _selectedTab == 0
-                            ? _retryMyPolls
-                            : () {
-                                setState(() {
-                                  _likedPollsFuture = _loadLikedPolls();
-                                });
-                              },
-                      );
-                    }
-
-                    if (snapshot.hasData) {
-                      if (_selectedTab == 0) {
-                        _myPolls = snapshot.data ?? [];
-                        _hasLoadedMyPolls = true;
-                      } else {
-                        _likedPolls = snapshot.data ?? [];
-                        _hasLoadedLikedPolls = true;
-                      }
-                    }
-
-                    final polls = _selectedTab == 0 ? _myPolls : _likedPolls;
-
-                    if (polls.isEmpty) {
-                      return const _MyPollsEmptyState();
-                    }
-
-                    return Column(
-                      children: [
-                        for (final poll in polls) ...[
-                          PollCard(
-                            key: ValueKey('poll-${poll.id}'),
-                            poll: poll,
-                            accessToken: widget.accessToken,
-                            compact: true,
-                            onDeletePoll: _selectedTab == 0 &&
-                                    poll.author.id == widget.user.id
-                                ? () => _deletePoll(poll)
-                                : null,
-                            onOpenComments: () => _openComments(poll),
-                            onToggleLike: _likingPollIds.contains(poll.id)
-                                ? null
-                                : () => _toggleLike(poll),
-                            isLiking: _likingPollIds.contains(poll.id),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                      ],
-                    );
-                  },
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  child: FutureBuilder<List<PollSummary>>(
+                    future:
+                        _selectedTab == 0 ? _myPollsFuture : _likedPollsFuture!,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting &&
+                          (_selectedTab == 0
+                              ? !_hasLoadedMyPolls
+                              : !_hasLoadedLikedPolls)) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Center(
+                            child: SizedBox.square(
+                              dimension: 28,
+                              child: CircularProgressIndicator(strokeWidth: 3),
+                            ),
+                          ),
+                        );
+                      }
+
+                      if (snapshot.hasError &&
+                          (_selectedTab == 0
+                              ? !_hasLoadedMyPolls
+                              : !_hasLoadedLikedPolls)) {
+                        return _MyPollsErrorState(
+                          onRetry: _selectedTab == 0
+                              ? _retryMyPolls
+                              : () {
+                                  setState(() {
+                                    _likedPollsFuture = _loadLikedPolls();
+                                  });
+                                },
+                        );
+                      }
+
+                      if (snapshot.hasData) {
+                        if (_selectedTab == 0) {
+                          _myPolls = snapshot.data ?? [];
+                          _hasLoadedMyPolls = true;
+                        } else {
+                          _likedPolls = snapshot.data ?? [];
+                          _hasLoadedLikedPolls = true;
+                        }
+                      }
+
+                      final polls = _selectedTab == 0 ? _myPolls : _likedPolls;
+
+                      if (polls.isEmpty) {
+                        return const _MyPollsEmptyState();
+                      }
+
+                      return Column(
+                        children: [
+                          for (final poll in polls) ...[
+                            ListScrollAnchorItem(
+                              id: 'poll-${poll.id}',
+                              child: PollCard(
+                                key: ValueKey('poll-${poll.id}'),
+                                poll: poll,
+                                accessToken: widget.accessToken,
+                                compact: true,
+                                onDeletePoll: _selectedTab == 0 &&
+                                        poll.author.id == widget.user.id
+                                    ? () => _deletePoll(poll)
+                                    : null,
+                                onOpenComments: () => _openComments(poll),
+                                onToggleLike: _likingPollIds.contains(poll.id)
+                                    ? null
+                                    : () => _toggleLike(poll),
+                                isLiking: _likingPollIds.contains(poll.id),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/analytics/search_analytics.dart';
+import '../../core/scroll/list_scroll_anchor_host.dart';
+import '../../core/scroll/list_scroll_state.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../auth/auth_session.dart';
 import '../polls/poll_card.dart';
@@ -701,24 +703,45 @@ class _SearchScreenState extends State<SearchScreen> {
       return const Center(child: Text('No results found.'));
     }
 
-    return ListView.separated(
+    return ListScrollAnchorHost(
+      context: ListScrollContext(
+        userId: widget.session.user.id,
+        route: '/search',
+        list: 'results',
+        query: _queryController.text.trim(),
+        filter: _type.name,
+        sort: _sort.name,
+      ),
+      store: listScrollStateStore,
       controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      itemCount: _items.length + (_isLoadingMore ? 1 : 0),
-      separatorBuilder: (_, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        if (index == _items.length) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(12),
-              child: CircularProgressIndicator(),
-            ),
+      itemIds: _items.map(_searchResultId).toList(),
+      child: ListView.separated(
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        itemCount: _items.length + (_isLoadingMore ? 1 : 0),
+        separatorBuilder: (_, index) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          if (index == _items.length) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+          final result = _items[index];
+          return ListScrollAnchorItem(
+            id: _searchResultId(result),
+            child: _buildResult(result),
           );
-        }
-        return _buildResult(_items[index]);
-      },
+        },
+      ),
     );
   }
+
+  String _searchResultId(SearchResult result) => result is PollSearchResult
+      ? 'poll-${result.poll.id}'
+      : 'user-${(result as UserSearchResult).user.id}';
 
   Widget _buildDiscoveryContent() {
     return SingleChildScrollView(

@@ -177,6 +177,9 @@ class ListScrollStateStore {
   void clear() => _states.clear();
 }
 
+/// Shared in-memory positions for the app's existing lists.
+final ListScrollStateStore listScrollStateStore = ListScrollStateStore();
+
 /// Applies a saved anchor after the next layout using a screen-owned
 /// [ScrollController]. The [anchorTop] callback must return the item's top in
 /// viewport coordinates, or null when that item is not mounted.

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/scroll/list_scroll_anchor_host.dart';
+import '../../core/scroll/list_scroll_state.dart';
 import '../../core/widgets/user_avatar.dart';
 import 'notification_model.dart';
 import 'notification_navigator.dart';
@@ -11,11 +13,13 @@ class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({
     required this.notificationStore,
     this.isActive = false,
+    this.userId,
     super.key,
   });
 
   final NotificationStore notificationStore;
   final bool isActive;
+  final String? userId;
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -253,36 +257,52 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () => _loadFirstPage(refresh: true),
-                child: ListView(
+                child: ListScrollAnchorHost(
+                  context: ListScrollContext(
+                    userId: widget.userId,
+                    route: '/notifications',
+                    list: 'inbox',
+                    query: '',
+                    filter: _unreadOnly ? 'unread' : 'all',
+                    sort: 'createdAt-desc',
+                  ),
+                  store: listScrollStateStore,
                   controller: _scrollController,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
-                  children: [
-                    if (isInitialLoading)
-                      const _NotificationsLoading()
-                    else if (isInitialError)
-                      _ErrorState(onRetry: () => _loadFirstPage(refresh: true))
-                    else if (state.ids.isEmpty)
-                      const _EmptyState()
-                    else if (visibleItems.isEmpty &&
-                        _unreadOnly &&
-                        state.unreadCount > 0 &&
-                        state.nextCursor != null)
-                      _UnreadSearchState(isError: state.error != null)
-                    else if (visibleItems.isEmpty)
-                      const _FilteredEmptyState()
-                    else
-                      for (final section in sections) ...[
-                        _NotificationSection(
-                          title: section.$1,
-                          items: section.$2,
-                          onTap: _openNotification,
-                        ),
-                        const SizedBox(height: 24),
-                      ],
-                    if (state.error != null && state.ids.isNotEmpty)
-                      _PageError(onRetry: _retryData),
-                  ],
+                  itemIds: visibleItems
+                      .map((item) => 'notification-${item.id}')
+                      .toList(),
+                  child: ListView(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
+                    children: [
+                      if (isInitialLoading)
+                        const _NotificationsLoading()
+                      else if (isInitialError)
+                        _ErrorState(
+                            onRetry: () => _loadFirstPage(refresh: true))
+                      else if (state.ids.isEmpty)
+                        const _EmptyState()
+                      else if (visibleItems.isEmpty &&
+                          _unreadOnly &&
+                          state.unreadCount > 0 &&
+                          state.nextCursor != null)
+                        _UnreadSearchState(isError: state.error != null)
+                      else if (visibleItems.isEmpty)
+                        const _FilteredEmptyState()
+                      else
+                        for (final section in sections) ...[
+                          _NotificationSection(
+                            title: section.$1,
+                            items: section.$2,
+                            onTap: _openNotification,
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                      if (state.error != null && state.ids.isNotEmpty)
+                        _PageError(onRetry: _retryData),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -382,9 +402,12 @@ class _NotificationSection extends StatelessWidget {
           child: Column(
             children: [
               for (var index = 0; index < items.length; index++) ...[
-                _NotificationTile(
-                  item: items[index],
-                  onTap: () => onTap(items[index]),
+                ListScrollAnchorItem(
+                  id: 'notification-${items[index].id}',
+                  child: _NotificationTile(
+                    item: items[index],
+                    onTap: () => onTap(items[index]),
+                  ),
                 ),
                 if (index < items.length - 1)
                   const Divider(height: 1, indent: 84, endIndent: 16),

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/scroll/list_scroll_anchor_host.dart';
+import '../../core/scroll/list_scroll_state.dart';
 import '../auth/auth_session.dart';
 import '../polls/poll_card.dart';
 import '../polls/poll_comments_screen.dart';
@@ -43,6 +45,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   StreamSubscription<PollVoteRealtimeEvent>? _voteSubscription;
   StreamSubscription<PollDeletedRealtimeEvent>? _pollDeletedSubscription;
   List<PollSummary> _polls = [];
+  final _scrollController = ScrollController();
   var _hasLoaded = false;
   final Set<String> _votingPollIds = {};
   final Set<String> _likingPollIds = {};
@@ -77,6 +80,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     if (_ownsReportsApiClient) {
       _reportsApiClient.close();
     }
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -271,49 +275,68 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
 
           return RefreshIndicator(
             onRefresh: _refresh,
-            child: _polls.isEmpty
-                ? ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    children: const [
-                      SizedBox(height: 180),
-                      _SubscriptionsEmpty(),
-                    ],
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: _polls.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final poll = _polls[index];
-                      return PollCard(
-                        key: ValueKey('poll-${poll.id}'),
-                        poll: poll,
-                        accessToken: widget.session.accessToken,
-                        onVote: poll.isClosed ||
-                                poll.selectedOptionIndex != null ||
-                                _votingPollIds.contains(poll.id)
-                            ? null
-                            : (option) => _vote(poll, option),
-                        onCancelVote:
-                            poll.isClosed || _votingPollIds.contains(poll.id)
+            child: ListScrollAnchorHost(
+              context: ListScrollContext(
+                userId: widget.session.user.id,
+                route: '/subscriptions',
+                list: 'polls',
+                query: '',
+                filter: '',
+                sort: '',
+              ),
+              store: listScrollStateStore,
+              controller: _scrollController,
+              itemIds: _polls.map((poll) => 'poll-${poll.id}').toList(),
+              child: _polls.isEmpty
+                  ? ListView(
+                      controller: _scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(height: 180),
+                        _SubscriptionsEmpty(),
+                      ],
+                    )
+                  : ListView.separated(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: _polls.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final poll = _polls[index];
+                        return ListScrollAnchorItem(
+                          id: 'poll-${poll.id}',
+                          child: PollCard(
+                            key: ValueKey('poll-${poll.id}'),
+                            poll: poll,
+                            accessToken: widget.session.accessToken,
+                            onVote: poll.isClosed ||
+                                    poll.selectedOptionIndex != null ||
+                                    _votingPollIds.contains(poll.id)
+                                ? null
+                                : (option) => _vote(poll, option),
+                            onCancelVote: poll.isClosed ||
+                                    _votingPollIds.contains(poll.id)
                                 ? null
                                 : () => _cancelVote(poll),
-                        onDeletePoll: poll.author.id == widget.session.user.id
-                            ? () => _deletePoll(poll)
-                            : null,
-                        onReport: poll.author.id == widget.session.user.id
-                            ? null
-                            : () => _reportPoll(poll),
-                        isVoting: _votingPollIds.contains(poll.id),
-                        onOpenComments: () => _openComments(poll),
-                        onToggleLike: _likingPollIds.contains(poll.id)
-                            ? null
-                            : () => _toggleLike(poll),
-                        isLiking: _likingPollIds.contains(poll.id),
-                      );
-                    },
-                  ),
+                            onDeletePoll:
+                                poll.author.id == widget.session.user.id
+                                    ? () => _deletePoll(poll)
+                                    : null,
+                            onReport: poll.author.id == widget.session.user.id
+                                ? null
+                                : () => _reportPoll(poll),
+                            isVoting: _votingPollIds.contains(poll.id),
+                            onOpenComments: () => _openComments(poll),
+                            onToggleLike: _likingPollIds.contains(poll.id)
+                                ? null
+                                : () => _toggleLike(poll),
+                            isLiking: _likingPollIds.contains(poll.id),
+                          ),
+                        );
+                      },
+                    ),
+            ),
           );
         },
       ),

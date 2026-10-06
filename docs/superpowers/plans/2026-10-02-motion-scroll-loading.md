@@ -11,7 +11,7 @@
 **Spec:** [PRD: Плавные реакции, появление карточек и стабильная прокрутка](../../prd-motion-scroll-loading.md).
 
 **Дата:** 2 октября 2026 года.  
-**Статус:** M01 и M02 завершены 2 октября 2026 года; M03 и M05 завершены 3 октября 2026 года; M07–M10 завершены 5 октября 2026 года. Аудит, контракт, реализации и evidence сохранены в репозитории. Код M04 присутствует, обязательные DB verification/evidence остаются открытыми; M11–M27 не начаты.
+**Статус:** M01 и M02 завершены 2 октября 2026 года; M03 и M05 завершены 3 октября 2026 года; M07–M10 завершены 5 октября 2026 года; M11–M13 завершены 6 октября 2026 года. Реализация M14 и автоматические проверки завершены 6 октября; Android device smoke остаётся неизмеренным, поскольку Pixel 7 AVD не запускается из-за отсутствующего system image. Код M04 присутствует, обязательные DB verification/evidence остаются открытыми; M15–M27 не начаты.
 **Нумерация:** M01–M27; исторические T01/T02 не переименовываются и не считаются закрытыми задачами этого плана.
 
 ## Global Constraints
@@ -296,11 +296,12 @@
 
 **Зависимости:** M12. **Файлы:** FeedScreen, SearchScreen, profile/public profile, SubscriptionsScreen, PollCommentsScreen, NotificationsScreen и соответствующие widget tests.
 
-- [ ] Подключить anchor/context к существующим List/Sliver containers; сохранить pages и параметры поиска при возврате.
-- [ ] Tests: refresh/append/deletion above anchor и deleted anchor; после load-more → дочерний экран → back прежние ID остаются, смещение ≤2 logical px.
-- [ ] Проверить header/group changes notifications и unread filter без новых read-side effects; существующие arrivals вне начала буферизуются.
-- [ ] Проверить composer/keyboard show-hide, expanded replies и target-comment переход; нет неожиданного reset к началу.
-- [ ] Выполнить affected widget/navigation tests, device smoke и analyze; сохранить commit/evidence.
+- [x] Подключить anchor/context к существующим List/Sliver containers; сохранить pages и параметры поиска при возврате.
+- [x] Tests: refresh/append/deletion above anchor и deleted anchor; после load-more → дочерний экран → back прежние ID остаются, смещение ≤2 logical px.
+- [x] Проверить header/group changes notifications и unread filter без новых read-side effects; существующие arrivals вне начала буферизуются.
+- [x] Проверить composer/keyboard show-hide, expanded replies и target-comment переход; нет неожиданного reset к началу.
+- [x] Выполнить affected widget/navigation tests и analyze; сохранить commit/evidence.
+- [ ] Device smoke остаётся неизмеренным: Pixel 7 AVD не запускается без Android system image. См. [M14 verification](../../motion-scroll-loading-evidence/m14-verification.md).
 
 **Готово:** вся Flutter-матрица имеет пройденные scroll сценарии и явные исключения viewport. **AC:** AC-05–AC-07.
 

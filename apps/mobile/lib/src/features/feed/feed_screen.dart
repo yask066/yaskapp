@@ -16,6 +16,8 @@ import '../realtime/realtime_client.dart';
 import '../reports/report_dialog.dart';
 import '../reports/reports_api_client.dart';
 import '../../core/analytics/search_analytics.dart';
+import '../../core/scroll/list_scroll_anchor_host.dart';
+import '../../core/scroll/list_scroll_state.dart';
 import '../search/search_api_client.dart';
 import '../search/search_screen.dart';
 
@@ -63,6 +65,7 @@ class FeedScreenState extends State<FeedScreen> {
   StreamSubscription<PollVoteRealtimeEvent>? _pollVoteSubscription;
   StreamSubscription<PollDeletedRealtimeEvent>? _pollDeletedSubscription;
   List<PollSummary> _polls = [];
+  final _scrollController = ScrollController();
   int _pollRequestSequence = 0;
   var _hasLoadedPolls = false;
   final Set<String> _votingPollIds = {};
@@ -107,6 +110,7 @@ class FeedScreenState extends State<FeedScreen> {
     if (_ownsReportsApiClient) {
       _reportsApiClient.close();
     }
+    _scrollController.dispose();
 
     super.dispose();
   }
@@ -489,133 +493,151 @@ class FeedScreenState extends State<FeedScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _refreshPolls,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverAppBar(
-                pinned: true,
-                backgroundColor: Colors.white,
-                surfaceTintColor: Colors.transparent,
-                elevation: 0,
-                toolbarHeight: 72,
-                titleSpacing: 20,
-                title: Semantics(
-                  label: 'Yaskapp',
-                  image: true,
-                  child: Image.asset(
-                    'assets/branding/yaskapp_logo.png',
-                    width: 72,
-                    height: 40,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-                centerTitle: false,
-                actions: [
-                  SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: IconButton(
-                      tooltip: 'Search',
-                      onPressed: _openSearch,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints.tightFor(
-                        width: 40,
-                        height: 40,
-                      ),
-                      icon: Image.asset(
-                        'assets/branding/search_icon.png',
-                        width: 28,
-                        height: 28,
-                        fit: BoxFit.contain,
-                      ),
+          child: ListScrollAnchorHost(
+            context: ListScrollContext(
+              userId: widget.session.user.id,
+              route: '/feed',
+              list: 'polls',
+              query: '',
+              filter: '',
+              sort: '',
+            ),
+            store: listScrollStateStore,
+            controller: _scrollController,
+            itemIds: _polls.map((poll) => 'poll-${poll.id}').toList(),
+            child: CustomScrollView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverAppBar(
+                  pinned: true,
+                  backgroundColor: Colors.white,
+                  surfaceTintColor: Colors.transparent,
+                  elevation: 0,
+                  toolbarHeight: 72,
+                  titleSpacing: 20,
+                  title: Semantics(
+                    label: 'Yaskapp',
+                    image: true,
+                    child: Image.asset(
+                      'assets/branding/yaskapp_logo.png',
+                      width: 72,
+                      height: 40,
+                      fit: BoxFit.contain,
                     ),
                   ),
-                  const SizedBox(width: 20),
-                ],
-              ),
-              SliverToBoxAdapter(
-                child: _HomeHeader(onCreatePoll: _openCreatePoll),
-              ),
-              FutureBuilder<List<PollSummary>>(
-                future: _pollsFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting &&
-                      !_hasLoadedPolls) {
-                    return const SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: _FeedLoadingState(),
-                    );
-                  }
-
-                  if (snapshot.hasError && !_hasLoadedPolls) {
-                    return SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: _FeedErrorState(
-                        onRetry: () {
-                          setState(() {
-                            _pollsFuture = _loadPolls();
-                          });
-                        },
+                  centerTitle: false,
+                  actions: [
+                    SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: IconButton(
+                        tooltip: 'Search',
+                        onPressed: _openSearch,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 40,
+                          height: 40,
+                        ),
+                        icon: Image.asset(
+                          'assets/branding/search_icon.png',
+                          width: 28,
+                          height: 28,
+                          fit: BoxFit.contain,
+                        ),
                       ),
-                    );
-                  }
+                    ),
+                    const SizedBox(width: 20),
+                  ],
+                ),
+                SliverToBoxAdapter(
+                  child: _HomeHeader(onCreatePoll: _openCreatePoll),
+                ),
+                FutureBuilder<List<PollSummary>>(
+                  future: _pollsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting &&
+                        !_hasLoadedPolls) {
+                      return const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _FeedLoadingState(),
+                      );
+                    }
 
-                  if (!_hasLoadedPolls && snapshot.hasData) {
-                    _polls = snapshot.data ?? [];
-                    _hasLoadedPolls = true;
-                  }
+                    if (snapshot.hasError && !_hasLoadedPolls) {
+                      return SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _FeedErrorState(
+                          onRetry: () {
+                            setState(() {
+                              _pollsFuture = _loadPolls();
+                            });
+                          },
+                        ),
+                      );
+                    }
 
-                  final polls = _polls;
+                    if (!_hasLoadedPolls && snapshot.hasData) {
+                      _polls = snapshot.data ?? [];
+                      _hasLoadedPolls = true;
+                    }
 
-                  if (polls.isEmpty) {
-                    return const SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: _FeedEmptyState(),
-                    );
-                  }
+                    final polls = _polls;
 
-                  return SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                    sliver: SliverList.separated(
-                      itemBuilder: (context, index) {
-                        final poll = polls[index];
+                    if (polls.isEmpty) {
+                      return const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _FeedEmptyState(),
+                      );
+                    }
 
-                        return PollCard(
-                          key: ValueKey('poll-${poll.id}'),
-                          poll: poll,
-                          accessToken: widget.session.accessToken,
-                          onOpenAuthor: () => _openAuthorProfile(poll),
-                          onVote: poll.isClosed ||
-                                  poll.selectedOptionIndex != null ||
-                                  _votingPollIds.contains(poll.id)
-                              ? null
-                              : (option) => _vote(poll, option),
-                          onCancelVote:
-                              poll.isClosed || _votingPollIds.contains(poll.id)
+                    return SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                      sliver: SliverList.separated(
+                        itemBuilder: (context, index) {
+                          final poll = polls[index];
+
+                          return ListScrollAnchorItem(
+                            id: 'poll-${poll.id}',
+                            child: PollCard(
+                              key: ValueKey('poll-${poll.id}'),
+                              poll: poll,
+                              accessToken: widget.session.accessToken,
+                              onOpenAuthor: () => _openAuthorProfile(poll),
+                              onVote: poll.isClosed ||
+                                      poll.selectedOptionIndex != null ||
+                                      _votingPollIds.contains(poll.id)
+                                  ? null
+                                  : (option) => _vote(poll, option),
+                              onCancelVote: poll.isClosed ||
+                                      _votingPollIds.contains(poll.id)
                                   ? null
                                   : () => _cancelVote(poll),
-                          onDeletePoll: poll.author.id == widget.session.user.id
-                              ? () => _deletePoll(poll)
-                              : null,
-                          onReport: poll.author.id == widget.session.user.id
-                              ? null
-                              : () => _reportPoll(poll),
-                          isVoting: _votingPollIds.contains(poll.id),
-                          onOpenComments: () => _openComments(poll),
-                          onToggleLike: _likingPollIds.contains(poll.id)
-                              ? null
-                              : () => _toggleLike(poll),
-                          isLiking: _likingPollIds.contains(poll.id),
-                        );
-                      },
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: 12),
-                      itemCount: polls.length,
-                    ),
-                  );
-                },
-              ),
-            ],
+                              onDeletePoll:
+                                  poll.author.id == widget.session.user.id
+                                      ? () => _deletePoll(poll)
+                                      : null,
+                              onReport: poll.author.id == widget.session.user.id
+                                  ? null
+                                  : () => _reportPoll(poll),
+                              isVoting: _votingPollIds.contains(poll.id),
+                              onOpenComments: () => _openComments(poll),
+                              onToggleLike: _likingPollIds.contains(poll.id)
+                                  ? null
+                                  : () => _toggleLike(poll),
+                              isLiking: _likingPollIds.contains(poll.id),
+                            ),
+                          );
+                        },
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 12),
+                        itemCount: polls.length,
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),
