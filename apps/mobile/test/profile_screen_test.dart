@@ -7,10 +7,10 @@ import 'package:yaskapp_mobile/src/features/auth/auth_session.dart';
 import 'package:yaskapp_mobile/src/features/profile/profile_screen.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
 import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
+import 'package:yaskapp_mobile/src/features/realtime/realtime_client.dart';
 
 void main() {
-  testWidgets('profile opens a dedicated settings page',
-      (tester) async {
+  testWidgets('profile opens a dedicated settings page', (tester) async {
     var loggedOut = false;
 
     await tester.pumpWidget(
@@ -22,6 +22,7 @@ void main() {
           onLogout: () => loggedOut = true,
           onUserUpdated: (_) {},
           pollsApiClient: _FakePollsApiClient(initialPolls: const []),
+          realtimeClient: _FakeRealtimeClient(),
         ),
       ),
     );
@@ -49,6 +50,7 @@ void main() {
       (tester) async {
     final poll = _poll(commentsCount: 0, likesCount: 5, votesCount: 8);
     final newPoll = _poll(
+      id: 'poll-2',
       commentsCount: 0,
       likesCount: 1,
       votesCount: 2,
@@ -67,6 +69,7 @@ void main() {
           onLogout: () {},
           onUserUpdated: (_) {},
           pollsApiClient: pollsApiClient,
+          realtimeClient: _FakeRealtimeClient(),
         ),
       ),
     );
@@ -104,6 +107,7 @@ void main() {
           onLogout: () {},
           onUserUpdated: (_) {},
           pollsApiClient: pollsApiClient,
+          realtimeClient: _FakeRealtimeClient(),
         ),
       ),
     );
@@ -153,6 +157,7 @@ void main() {
           onLogout: () {},
           onUserUpdated: (_) {},
           pollsApiClient: pollsApiClient,
+          realtimeClient: _FakeRealtimeClient(),
         ),
       ),
     );
@@ -202,6 +207,7 @@ void main() {
             onLogout: () {},
             onUserUpdated: (_) {},
             pollsApiClient: pollsApiClient,
+            realtimeClient: _FakeRealtimeClient(),
           ),
         ),
       );
@@ -250,13 +256,14 @@ const _user = AuthUser(
 );
 
 PollSummary _poll({
+  String id = 'poll-1',
   required int commentsCount,
   required int likesCount,
   required int votesCount,
   String question = 'Which feature should we build next?',
 }) {
   return PollSummary(
-    id: 'poll-1',
+    id: id,
     author: const PollAuthorSummary(
       id: 'author-1',
       username: 'author',
@@ -283,6 +290,13 @@ PollSummary _poll({
     viewerHasLiked: false,
     createdAt: DateTime(2026, 7, 17, 12),
   );
+}
+
+class _FakeRealtimeClient extends RealtimeClient {
+  _FakeRealtimeClient() : super(accessToken: 'token');
+
+  @override
+  void connect() {}
 }
 
 PollCommentSummary _comment() {

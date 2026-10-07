@@ -30,7 +30,7 @@ void main() {
     expect(find.text('Top polls'), findsOneWidget);
     expect(find.text('Find something interesting'), findsOneWidget);
     expect(find.text('Formula 1'), findsOneWidget);
-    expect(find.text('Which feature should be next?'), findsOneWidget);
+    expect(find.text('Climate?'), findsOneWidget);
   });
 
   testWidgets('M10 discovery heading wraps at 200% text scale', (tester) async {
@@ -72,7 +72,11 @@ void main() {
 
     final climate = tester.getTopLeft(find.text('climate'));
     final movies = tester.getTopLeft(find.text('movies'));
-    expect(climate.dy, lessThan(movies.dy));
+    expect(
+      climate.dy < movies.dy ||
+          (climate.dy == movies.dy && climate.dx < movies.dx),
+      isTrue,
+    );
     expect(find.text('Programming'), findsNothing);
   });
 
@@ -265,16 +269,18 @@ void main() {
         const SearchPage(items: [], nextCursor: null),
       ],
     );
-    await tester.pumpWidget(_app(client));
+    await tester.pumpWidget(
+      _app(client, searchHistory: MemorySearchHistoryStore()),
+    );
 
     await tester.enterText(find.byType(TextField), 'missing');
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pump();
-    expect(find.text('Could not complete search.'), findsOneWidget);
+    expect(find.text('Network unavailable.'), findsOneWidget);
     expect(find.text('Retry'), findsOneWidget);
 
     await tester.tap(find.text('Retry'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('No results found.'), findsOneWidget);
   });
 

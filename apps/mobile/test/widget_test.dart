@@ -7,6 +7,11 @@ import 'package:yaskapp_mobile/src/features/home/home_screen.dart';
 
 void main() {
   testWidgets('shows auth entry point', (tester) async {
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await tester.pumpWidget(
       YaskappApp(authSessionStore: MemoryAuthSessionStore()),
     );
@@ -16,6 +21,7 @@ void main() {
     expect(find.text('LOGIN'), findsNWidgets(2));
     expect(find.text('Sign Up'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Sign Up'));
     await tester.tap(find.text('Sign Up'));
     await tester.pumpAndSettle();
 
@@ -26,6 +32,7 @@ void main() {
     expect(find.text('Password'), findsOneWidget);
     expect(find.text('Back to Login'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Back to Login'));
     await tester.tap(find.text('Back to Login'));
     await tester.pumpAndSettle();
 

@@ -11,15 +11,16 @@ void main() {
   const config = ApiConfig(baseUrl: 'http://api.test');
 
   test('uploads avatar as multipart field avatar', () async {
-    late http.BaseRequest request;
+    late http.Request request;
     final client = AuthApiClient(
       config: config,
       httpClient: MockClient((incoming) async {
         request = incoming;
-        final body = await incoming.finalize().bytesToString();
+        final body = latin1.decode(request.bodyBytes);
         expect(body, contains('name="avatar"'));
         expect(body, contains('filename="avatar.png"'));
-        return http.Response(jsonEncode({'user': _userJson('/media/avatars/user-1')}), 200);
+        return http.Response(
+            jsonEncode({'user': _userJson('/media/avatars/user-1')}), 200);
       }),
     );
 

@@ -607,14 +607,17 @@ class _SearchScreenState extends State<SearchScreen> {
                   prefixIcon: const Icon(Icons.search, size: 30),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 17),
-                  suffixIcon: _queryController.text.isEmpty
-                      ? null
-                      : IconButton(
-                          tooltip: 'Clear',
-                          icon: const Icon(Icons.cancel,
-                              color: Color(0xFFB6B8C0)),
-                          onPressed: _clearQuery,
-                        ),
+                  suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _queryController,
+                    builder: (context, value, _) => value.text.isEmpty
+                        ? const SizedBox.shrink()
+                        : IconButton(
+                            tooltip: 'Clear',
+                            icon: const Icon(Icons.cancel,
+                                color: Color(0xFFB6B8C0)),
+                            onPressed: _clearQuery,
+                          ),
+                  ),
                 ),
               ),
             ),

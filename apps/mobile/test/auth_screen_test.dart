@@ -6,10 +6,16 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:yaskapp_mobile/src/core/config/api_config.dart';
 import 'package:yaskapp_mobile/src/features/auth/auth_api_client.dart';
+import 'package:yaskapp_mobile/src/features/auth/country_selector.dart';
 import 'package:yaskapp_mobile/src/features/auth/auth_screen.dart';
 
 void main() {
   testWidgets('does not select a country by default', (tester) async {
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await tester.pumpWidget(
       MaterialApp(
         home: AuthScreen(
@@ -26,11 +32,18 @@ void main() {
     await tester.tap(find.text('Sign Up'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Select your country'), findsOneWidget);
     expect(
-      tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, 'REGISTER'),
-      ).onPressed,
+      tester
+          .widget<CountrySelectorField>(find.byType(CountrySelectorField))
+          .value,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'REGISTER'),
+          )
+          .onPressed,
       isNull,
     );
   });
@@ -67,6 +80,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('Sign Up'));
     await tester.tap(find.text('Sign Up'));
     await tester.pumpAndSettle();
 
@@ -75,7 +89,12 @@ void main() {
       const Offset(0, -400),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Select your country').first);
+    final countrySelector = find.descendant(
+      of: find.byType(CountrySelectorField),
+      matching: find.byType(InkWell),
+    );
+    await tester.ensureVisible(countrySelector);
+    await tester.tap(countrySelector);
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(ListTile, 'Belarus'));
     await tester.pumpAndSettle();
@@ -85,7 +104,9 @@ void main() {
     await tester.enterText(fields.at(1), 'user_123');
     await tester.enterText(fields.at(2), 'Test User');
     await tester.enterText(fields.at(3), 'password123');
-    await tester.tap(find.widgetWithText(FilledButton, 'REGISTER'));
+    final registerButton = find.widgetWithText(FilledButton, 'REGISTER');
+    await tester.ensureVisible(registerButton);
+    await tester.tap(registerButton);
     await tester.pumpAndSettle();
 
     expect(find.text('Email or username is already taken.'), findsOneWidget);
