@@ -1,0 +1,6 @@
+Analyzing feed_screen.dart, poll_card.dart, search_screen.dart, home_screen.dart, feed_screen_test.dart, poll_card_layout_test.dart, search_screen_test.dart, home_navigation_test.dart...
+
+warning - lib\src\features\home\home_screen.dart:401:7 - The declaration '_SimplePlaceholderScreen' isn't referenced. Try removing the declaration of '_SimplePlaceholderScreen'. - unused_element
+warning - test\feed_screen_test.dart:412:11 - The value of the local variable 'navy' isn't used. Try removing the variable or using it. - unused_local_variable
+
+2 issues found.

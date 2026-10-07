@@ -154,11 +154,47 @@ void main() {
     expect(card.left, greaterThanOrEqualTo(0));
     expect(card.right, lessThanOrEqualTo(320));
   });
+
+  testWidgets('M10 200% scale keeps poll actions visible and labels author', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final semantics = tester.ensureSemantics();
+
+    await tester.pumpWidget(_card(
+      _poll(votes: 1000),
+      textScaler: const TextScaler.linear(2),
+      onOpenAuthor: () {},
+    ));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byTooltip('Share'), findsOneWidget);
+    expect(
+      tester.getRect(find.byTooltip('Share')).right,
+      lessThanOrEqualTo(tester.getRect(find.byType(PollCard)).right),
+    );
+    expect(find.bySemanticsLabel('Open Author profile'), findsOneWidget);
+    semantics.dispose();
+  });
 }
 
-Widget _card(PollSummary poll) => MaterialApp(
-      home: Scaffold(
-        body: SingleChildScrollView(child: PollCard(poll: poll)),
+Widget _card(
+  PollSummary poll, {
+  TextScaler? textScaler,
+  VoidCallback? onOpenAuthor,
+}) =>
+    MaterialApp(
+      home: MediaQuery(
+        data: MediaQueryData(textScaler: textScaler ?? TextScaler.noScaling),
+        child: Scaffold(
+          body: SingleChildScrollView(
+            child: PollCard(poll: poll, onOpenAuthor: onOpenAuthor),
+          ),
+        ),
       ),
     );
 

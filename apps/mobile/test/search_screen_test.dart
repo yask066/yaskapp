@@ -33,6 +33,27 @@ void main() {
     expect(find.text('Which feature should be next?'), findsOneWidget);
   });
 
+  testWidgets('M10 discovery heading wraps at 200% text scale', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      _app(
+        _FakeSearchApiClient(),
+        pollsApiClient: _FakePollsApiClient(PollSummaryFixture.poll),
+        textScaler: const TextScaler.linear(2),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    final heading = tester.getRect(find.text('Explore popular searches'));
+    expect(heading.left, greaterThanOrEqualTo(0));
+    expect(heading.right, lessThanOrEqualTo(390));
+  });
+
   testWidgets(
       'shows the latest successful searches in reverse chronological order',
       (tester) async {
@@ -490,8 +511,15 @@ Widget _app(
   SearchAnalytics? analytics,
   PollsApiClient? pollsApiClient,
   SearchHistoryStore? searchHistory,
+  TextScaler? textScaler,
 }) {
   return MaterialApp(
+    builder: (context, child) => textScaler == null
+        ? child!
+        : MediaQuery(
+            data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+            child: child!,
+          ),
     home: SearchScreen(
       session: _session(),
       searchApiClient: client,

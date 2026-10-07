@@ -245,9 +245,15 @@ class MainBottomNavigation extends StatelessWidget {
               onTap: () => onSelected(1),
             ),
             Expanded(
-              child: InkWell(
-                onTap: onCreate,
-                child: const Center(child: _CreateNavigationIcon()),
+              child: Semantics(
+                button: true,
+                label: 'Create poll',
+                child: InkWell(
+                  onTap: onCreate,
+                  child: const Center(
+                    child: ExcludeSemantics(child: _CreateNavigationIcon()),
+                  ),
+                ),
               ),
             ),
             _NavItem(

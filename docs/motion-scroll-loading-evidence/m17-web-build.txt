@@ -1,0 +1,13 @@
+
+> @yaskapp/web@0.1.0 build
+> tsc -b && vite build
+
+vite v6.3.5 building for production...
+transforming...
+✓ 125 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.40 kB │ gzip:   0.27 kB
+dist/assets/index-S4k-xfpY.css   21.54 kB │ gzip:   4.89 kB
+dist/assets/index-VWIczfda.js   424.90 kB │ gzip: 131.57 kB
+✓ built in 2.08s

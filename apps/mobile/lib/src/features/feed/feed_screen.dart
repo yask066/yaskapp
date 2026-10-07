@@ -672,6 +672,7 @@ class _CreatePrompt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final largeText = MediaQuery.textScalerOf(context).scale(13) >= 24;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -684,55 +685,88 @@ class _CreatePrompt extends StatelessWidget {
           ),
         ],
       ),
-      constraints: const BoxConstraints.tightFor(height: 64),
+      constraints: const BoxConstraints(minHeight: 64),
       padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-      clipBehavior: Clip.antiAlias,
-      child: Row(
-        children: [
-          const Icon(
-            Icons.chat_bubble_outline_rounded,
-            color: Color(0xFF566078),
-            size: 24,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: const Text(
-                "What's on your mind?",
-                maxLines: 1,
-                style: TextStyle(
-                  color: Color(0xFF667085),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
+      child: largeText
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Row(
+                  children: [
+                    Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      color: Color(0xFF566078),
+                      size: 24,
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        "What's on your mind?",
+                        style: TextStyle(
+                          color: Color(0xFF667085),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: _createPollButton(largeText: true),
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                const Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  color: Color(0xFF566078),
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      "What's on your mind?",
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: Color(0xFF667085),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                _createPollButton(largeText: false),
+              ],
             ),
-          ),
-          const SizedBox(width: 6),
-          FilledButton.icon(
-            onPressed: onCreatePoll,
-            icon: const Icon(Icons.add, size: 21),
-            label: const Text('Create poll'),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFFA7F2D),
-              foregroundColor: Colors.white,
-              fixedSize: const Size(127, 38),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(28),
-              ),
-              textStyle: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
+
+  Widget _createPollButton({required bool largeText}) => FilledButton.icon(
+        onPressed: onCreatePoll,
+        icon: const Icon(Icons.add, size: 21),
+        label: const Text('Create poll'),
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xFFFA7F2D),
+          foregroundColor: Colors.white,
+          fixedSize: largeText ? null : const Size(127, 38),
+          minimumSize: largeText ? const Size(0, 48) : null,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
 }
 
 class _FeedLoadingState extends StatelessWidget {

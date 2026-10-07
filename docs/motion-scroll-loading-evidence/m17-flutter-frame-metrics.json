@@ -1,0 +1,70 @@
+{
+  "date": "2026-10-07",
+  "device": "Samsung SM-A325F",
+  "android": "13/API 33",
+  "display_hz": 90,
+  "threshold_ms": 11.111111,
+  "definition": "Flutter Frame slice duration is UI-thread frame work; over_90hz counts durations > 1/90 s. SceneDisplayLag is emitted by Flutter engine when raster_finish_time > frame_target_time; missed_vsync_p95/max use debug.vsync_transitions_missed. SceneDisplayLag event count is reported separately and is not treated as a one-to-one late-frame percentage.",
+  "window": "Each run scoped to [Android gfxinfo Stats since, Stats since + measured stopwatch duration), timestamps in ns.",
+  "percentile": "Flutter findPercentile convention: sorted index round((n-1)*0.95), p95; durations are Perfetto slice dur in ms.",
+  "trace_health": "Each trace reports clock_sync_unrelatable_clock_domains=1 and drops TrackEvent packets with invalid negative timestamps: run1 248234, run2 269534, run3 234076. Counts may be incomplete.",
+  "runs": [
+    {
+      "missed_vsync_max": 3,
+      "frames_over_90hz": 4,
+      "frame_p95_ms": 5.723,
+      "swipes": 75,
+      "seconds": 30.36,
+      "frames": 1460,
+      "ui_over_90hz_pct": 0.274,
+      "run": 1,
+      "frame_max_ms": 14.929,
+      "scene_events_per_ui_frame_pct": 97.466,
+      "missed_vsync_p95": 2,
+      "scene_display_lag_events": 1423,
+      "window_start_ns": "586185374274322",
+      "window_end_ns": "586215734274322"
+    },
+    {
+      "missed_vsync_max": 3,
+      "frames_over_90hz": 1,
+      "frame_p95_ms": 4.032,
+      "swipes": 76,
+      "seconds": 30.23,
+      "frames": 2053,
+      "ui_over_90hz_pct": 0.049,
+      "run": 2,
+      "frame_max_ms": 16.575,
+      "scene_events_per_ui_frame_pct": 97.955,
+      "missed_vsync_p95": 2,
+      "scene_display_lag_events": 2011,
+      "window_start_ns": "585627423665366",
+      "window_end_ns": "585657653665366"
+    },
+    {
+      "missed_vsync_max": 4,
+      "frames_over_90hz": 13,
+      "frame_p95_ms": 5.416,
+      "swipes": 74,
+      "seconds": 30.38,
+      "frames": 2161,
+      "ui_over_90hz_pct": 0.601,
+      "run": 3,
+      "frame_max_ms": 25.55,
+      "scene_events_per_ui_frame_pct": 83.804,
+      "missed_vsync_p95": 2,
+      "scene_display_lag_events": 1811,
+      "window_start_ns": "585705498040447",
+      "window_end_ns": "585735878040447"
+    }
+  ],
+  "aggregate": {
+    "frames": 5674,
+    "frames_over_90hz": 18,
+    "ui_over_90hz_pct": 0.317,
+    "scene_display_lag_events": 5245,
+    "scene_events_per_ui_frame_pct": 92.439,
+    "frame_max_ms": 25.55,
+    "note": "Aggregated UI-over-budget count and event-count ratio only; p95 is reported per run."
+  }
+}

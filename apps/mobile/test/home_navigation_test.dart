@@ -109,4 +109,36 @@ void main() {
     expect(badgeSemantics.properties.label, '99+ unread notifications');
     expect(find.text('100'), findsNothing);
   });
+
+  testWidgets('labels the central create action for screen readers', (
+    tester,
+  ) async {
+    const user = AuthUser(
+      id: 'user-1',
+      email: 'user@example.com',
+      username: 'user',
+      status: 'active',
+      profile: AuthUserProfile(
+        displayName: 'User',
+        pollsCount: 0,
+        followersCount: 0,
+        followingCount: 0,
+      ),
+    );
+    final semantics = tester.ensureSemantics();
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: MainBottomNavigation(
+          user: user,
+          selectedIndex: 0,
+          onCreate: () {},
+          onSelected: (_) {},
+        ),
+      ),
+    ));
+
+    expect(find.bySemanticsLabel('Create poll'), findsOneWidget);
+    semantics.dispose();
+  });
 }

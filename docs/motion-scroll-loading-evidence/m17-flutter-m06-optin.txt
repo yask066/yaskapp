@@ -1,0 +1,8 @@
+00:00 +0: loading D:/yaskapp/apps/mobile/test/feed_screen_test.dart
+00:00 +0: M06 race_preserves_independent_fields
+00:01 +1: M06 race_preserves_independent_fields_reverse
+00:01 +2: M06 stale_refetch preserves completed vote and like
+00:01 +3: M06 realtime_before_http preserves viewer fields and newer votes
+00:01 +4: M06 stale refresh cannot restore a tombstoned poll
+00:01 +5: M06 realtime vote cannot restore a tombstoned poll
+00:01 +6: All tests passed!

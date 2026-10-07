@@ -1,0 +1,120 @@
+{
+  "capturedAt": "2026-10-07",
+  "build": "@yaskapp/web production build",
+  "sourceCommit": "9f57952de060cbd33897c2c31cfde4885eb4296f",
+  "fixture": {
+    "source": "test/fixtures/t02-motion-scroll-loading-polls.json",
+    "seed": 20261002,
+    "uniquePolls": 100
+  },
+  "browser": {
+    "userAgent": "HeadlessChrome/155.0.8059.39",
+    "platform": "Windows x64",
+    "displayRefreshRateHz": null,
+    "note": "Headless Chrome; physical monitor refresh and GPU presentation path were not measured."
+  },
+  "workload": {
+    "durationMs": 30014,
+    "scrollStepCssPxPerAnimationFrame": 32,
+    "scrollBehavior": "instant",
+    "traceCategories": [
+      "disabled-by-default-devtools.timeline.frame",
+      "viz"
+    ],
+    "observedBeginFrameCadenceHz": 60.0,
+    "notes": "Trace files retain frame-related events. DrawFrame counts and BeginFrame subtype/intervals are not CPU/GPU frame execution durations."
+  },
+  "runs": [
+    {
+      "viewport": [1440, 900],
+      "deviceScaleFactor": 1,
+      "run": 1,
+      "drawFrames": 1802,
+      "beginFrames": 1803,
+      "missedBeginFrames": 0,
+      "beginFrameIntervalP95Ms": 16.693,
+      "beginFrameIntervalMaxMs": 17.338,
+      "trace": "m17-chromium-desktop-1.trace.json.gz"
+    },
+    {
+      "viewport": [1440, 900],
+      "deviceScaleFactor": 1,
+      "run": 2,
+      "drawFrames": 1802,
+      "beginFrames": 1803,
+      "missedBeginFrames": 0,
+      "beginFrameIntervalP95Ms": 16.695,
+      "beginFrameIntervalMaxMs": 17.371,
+      "trace": "m17-chromium-desktop-2.trace.json.gz"
+    },
+    {
+      "viewport": [1440, 900],
+      "deviceScaleFactor": 1,
+      "run": 3,
+      "drawFrames": 1802,
+      "beginFrames": 1804,
+      "missedBeginFrames": 1,
+      "beginFrameIntervalP95Ms": 16.695,
+      "beginFrameIntervalMaxMs": 17.13,
+      "trace": "m17-chromium-desktop-3.trace.json.gz"
+    },
+    {
+      "viewport": [390, 844],
+      "deviceScaleFactor": 3,
+      "run": 1,
+      "drawFrames": 1802,
+      "beginFrames": 1803,
+      "missedBeginFrames": 0,
+      "beginFrameIntervalP95Ms": 16.697,
+      "beginFrameIntervalMaxMs": 16.762,
+      "horizontalOverflowCssPx": 0,
+      "trace": "m17-chromium-responsive-1.trace.json.gz"
+    },
+    {
+      "viewport": [390, 844],
+      "deviceScaleFactor": 3,
+      "run": 2,
+      "drawFrames": 1802,
+      "beginFrames": 1804,
+      "missedBeginFrames": 1,
+      "beginFrameIntervalP95Ms": 16.692,
+      "beginFrameIntervalMaxMs": 17.347,
+      "horizontalOverflowCssPx": 0,
+      "trace": "m17-chromium-responsive-2.trace.json.gz"
+    },
+    {
+      "viewport": [390, 844],
+      "deviceScaleFactor": 3,
+      "run": 3,
+      "drawFrames": 1802,
+      "beginFrames": 1804,
+      "missedBeginFrames": 1,
+      "beginFrameIntervalP95Ms": 16.697,
+      "beginFrameIntervalMaxMs": 17.215,
+      "horizontalOverflowCssPx": 0,
+      "trace": "m17-chromium-responsive-3.trace.json.gz"
+    }
+  ],
+  "initialLoad": {
+    "trace": "m17-chromium-initial-load.trace.json.gz",
+    "rawTraceEvents": 13428,
+    "firstContentfulPaintMsAfterNavigationStart": 60.529,
+    "note": "Local fixture server and local bundle; warm-host result, not a network SLA."
+  },
+  "navigationAndAccessibility": {
+    "productionListDetailBackCycles": 20,
+    "detailRoutes": 20,
+    "backNavigations": 20,
+    "maxAnchorDeltaCssPx": 0,
+    "finalAnchorDeltaCssPx": 0,
+    "keyboardTabSequenceReached": "More poll actions",
+    "axTreeNodeCount": 7745,
+    "namedButtonLinkHeadingCount": 723,
+    "realScreenReaderVerified": false,
+    "manual200PercentTextScaleVerified": false
+  },
+  "acceptance": {
+    "AC12Passed": false,
+    "reason": "Headless Chromium frame cadence is supplementary evidence. Physical Chrome display/GPU frame execution durations, Android and iOS profile-device traces, and real display refresh rates were not measured."
+  }
+}

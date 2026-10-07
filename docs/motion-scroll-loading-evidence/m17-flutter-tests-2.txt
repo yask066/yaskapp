@@ -1,0 +1,1928 @@
+00:00 +0: loading D:/yaskapp/apps/mobile/test/api_config_test.dart
+00:00 +0: D:/yaskapp/apps/mobile/test/api_config_test.dart: uses the staging VPS endpoints when no deployment overrides are provided
+00:00 +1: D:/yaskapp/apps/mobile/test/auth_api_client_avatar_test.dart: uploads avatar as multipart field avatar
+00:00 +1 -1: D:/yaskapp/apps/mobile/test/auth_api_client_avatar_test.dart: uploads avatar as multipart field avatar [E]
+  Bad state: Can't finalize a finalized Request.
+  package:http/src/base_request.dart 129:20    BaseRequest.finalize
+  package:http/src/request.dart 186:11         Request.finalize
+  test\auth_api_client_avatar_test.dart 19:37  main.<fn>.<fn>
+  package:http/src/mock_client.dart 54:36      new MockClient.<fn>
+  
+00:00 +1 -1: D:/yaskapp/apps/mobile/test/auth_api_client_avatar_test.dart: deletes avatar with authorization
+00:01 +2 -1: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+00:01 +3 -1: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+00:01 +4 -1: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+00:02 +5 -1: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+
+Warning: A call to tap() with finder "Found 1 widget with text "Sign Up": [
+  Text("Sign Up", inherit: true, size: 18.0, dependencies: [DefaultSelectionStyle, DefaultTextStyle, MediaQuery]),
+]" derived an Offset (Offset(400.0, 656.0)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+Indeed, Offset(400.0, 656.0) is outside the bounds of the root of the render tree, Size(800.0, 600.0).
+The finder corresponds to this RenderBox: RenderParagraph#82f47 relayoutBoundary=up33
+The hit test result at that offset is: HitTestResult(HitTestEntry<HitTestTarget>#de407(_ReusableRenderView#ef9a1), HitTestEntry<HitTestTarget>#8f30f(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/auth_screen_test.dart:26:18)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#6      StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "tap()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "Select your country": []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/auth_screen_test.dart:29:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///D:/yaskapp/apps/mobile/test/auth_screen_test.dart line 29
+The test description was:
+  does not select a country by default
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:02 +5 -2: D:/yaskapp/apps/mobile/test/create_poll_screen_test.dart: create poll screen shows an add image action
+00:02 +5 -2: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default [E]
+  Test failed. See exception logs above.
+  The test description was: does not select a country by default
+  
+00:02 +6 -2: D:/yaskapp/apps/mobile/test/create_poll_screen_test.dart: create poll screen shows an add image action
+00:02 +7 -2: D:/yaskapp/apps/mobile/test/create_poll_screen_test.dart: create poll screen shows an add image action
+00:03 +7 -2: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: keeps selected country after registration error
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following StateError was thrown running a test:
+Bad state: No element
+
+When the exception was thrown, this was the stack:
+#0      Iterable.first (dart:core/iterable.dart:663:7)
+#1      _FirstFinderMixin.filter (package:flutter_test/src/finders.dart:1383:28)
+#3      _AncestorFinderMixin.allCandidates (package:flutter_test/src/finders.dart:1857:49)
+#4      FinderBase.evaluate (package:flutter_test/src/finders.dart:1030:76)
+#5      WidgetController.widgetList (package:flutter_test/src/controller.dart:848:19)
+#6      WidgetController._maybeViewOf (package:flutter_test/src/controller.dart:795:34)
+#7      WidgetController.tap (package:flutter_test/src/controller.dart:1078:31)
+#8      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/auth_screen_test.dart:78:18)
+<asynchronous suspension>
+#9      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#10     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 2 frames from dart:async-patch and package:stack_trace)
+
+The test description was:
+  keeps selected country after registration error
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:03 +7 -3: D:/yaskapp/apps/mobile/test/create_poll_screen_test.dart: create poll screen shows an add image action
+00:03 +7 -3: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: keeps selected country after registration error [E]
+  Test failed. See exception logs above.
+  The test description was: keeps selected country after registration error
+  
+00:03 +8 -3: D:/yaskapp/apps/mobile/test/create_poll_screen_test.dart: create poll fields use a visible matching outline
+00:05 +9 -3: D:/yaskapp/apps/mobile/test/edit_profile_screen_test.dart: does not show Log out on the edit profile screen
+00:06 +10 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M12 feed poll rows use stable poll IDs as keys
+00:06 +11 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M12 feed poll rows use stable poll IDs as keys
+00:07 +12 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M12 feed poll rows use stable poll IDs as keys
+00:07 +13 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M12 feed poll rows use stable poll IDs as keys
+00:07 +14 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M12 feed poll rows use stable poll IDs as keys
+00:07 +15 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M12 feed poll rows use stable poll IDs as keys
+00:07 +16 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M12 feed poll rows use stable poll IDs as keys
+00:07 +17 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M12 feed poll rows use stable poll IDs as keys
+00:07 +18 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M12 feed poll rows use stable poll IDs as keys
+00:07 +19 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:07 +20 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:07 +21 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +22 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +23 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +24 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +25 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +26 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +27 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +28 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +29 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +30 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +31 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +32 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +33 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +34 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +35 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +36 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +37 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +38 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +39 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +40 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +41 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +42 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +43 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +44 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +45 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +46 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +47 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +48 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +49 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +50 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +51 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +52 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +53 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +54 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +55 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +56 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +57 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +58 -3: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:08 +59 -3: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:08 +60 -3: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:09 +61 -3: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:09 +62 -3: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:09 +63 -3: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:09 +64 -3: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:09 +65 -3: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:09 +66 -3: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:09 +67 -3: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:09 +68 -3: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:09 +69 -3: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:09 +70 -3: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:09 +71 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:09 +72 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:09 +73 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:09 +74 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:09 +75 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:09 +76 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:09 +77 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:09 +78 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +79 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +80 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +81 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +82 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +83 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +84 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +85 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +86 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +87 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +88 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +89 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +90 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +91 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +92 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +93 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +94 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +95 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +96 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +97 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +98 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +99 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +100 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +101 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +102 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +103 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +104 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +105 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +106 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +107 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +108 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +109 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +110 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +111 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +112 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +113 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +114 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +115 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +116 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +117 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +118 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +119 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +120 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +121 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +122 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +123 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +124 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +125 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +126 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +127 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +128 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +129 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +130 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +131 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +132 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:13 +133 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:13 +134 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:13 +135 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:13 +136 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:13 +137 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:13 +138 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:13 +139 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:13 +140 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: updates comments count after returning from comments
+00:13 +141 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: updates comments count after returning from comments
+00:13 +142 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: updates comments count after returning from comments
+00:13 +143 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: updates comments count after returning from comments
+00:13 +144 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: updates comments count after returning from comments
+00:13 +145 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: updates comments count after returning from comments
+00:13 +146 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: updates comments count after returning from comments
+00:13 +147 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: updates comments count after returning from comments
+00:13 +148 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: updates comments count after returning from comments
+00:13 +149 -3: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: updates comments count after returning from comments
+00:13 +150 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: scrolls the target comment into view and highlights it
+00:13 +151 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: scrolls the target comment into view and highlights it
+00:13 +152 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: scrolls the target comment into view and highlights it
+00:14 +153 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: scrolls the target comment into view and highlights it
+00:14 +154 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: scrolls the target comment into view and highlights it
+00:14 +155 -3: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: read-all failure rolls back and can be retried
+00:14 +156 -3: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: disables repeated comment submissions while in flight
+00:14 +157 -3: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: disables repeated comment submissions while in flight
+00:14 +158 -3: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: disables repeated comment submissions while in flight
+00:14 +159 -3: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: disables repeated comment submissions while in flight
+00:14 +160 -3: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: disables repeated comment submissions while in flight
+00:14 +161 -3: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: disables repeated comment submissions while in flight
+00:14 +162 -3: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: disables repeated comment submissions while in flight
+00:14 +163 -3: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: disables repeated comment submissions while in flight
+00:15 +164 -3: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: missing comment targets keep the poll open and show a fallback
+00:15 +165 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:15 +166 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:15 +167 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:15 +168 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:15 +169 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:15 +170 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:16 +171 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:16 +172 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:16 +173 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:16 +174 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:16 +175 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:16 +176 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:16 +177 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:16 +178 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:16 +179 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:16 +180 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:16 +181 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:16 +182 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+Pending timers:
+Timer (duration: 0:00:20.000000, periodic: true), created:
+00:17 +183 -3: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+#0      new FakeTimer._ (package:fake_async/fake_async.dart:342:62)
+#1      FakeAsync._createTimer (package:fake_async/fake_async.dart:260:29)
+#2      FakeAsync.run.<anonymous closure> (package:fake_async/fake_async.dart:187:15)
+#5      RealtimeClient._startHeartbeat (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:247:29)
+#6      RealtimeClient.connect (package:yaskapp_mobile/src/features/realtime/realtime_client.dart:180:5)
+#7      ProfileScreenState.initState (package:yaskapp_mobile/src/features/profile/profile_screen.dart:71:29)
+#8      StatefulElement._firstBuild (package:flutter/src/widgets/framework.dart:5950:55)
+#9      ComponentElement.mount (package:flutter/src/widgets/framework.dart:5793:5)
+...     Normal element mounting (260 frames)
+#269    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#270    MultiChildRenderObjectElement.inflateWidget (package:flutter/src/widgets/framework.dart:7264:36)
+#271    MultiChildRenderObjectElement.mount (package:flutter/src/widgets/framework.dart:7279:32)
+...     Normal element mounting (467 frames)
+#738    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)
+#739    Element.updateChild (package:flutter/src/widgets/framework.dart:4053:20)
+#740    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#741    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#742    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#743    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#744    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#745    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#746    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#747    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#748    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#749    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#750    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#751    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#752    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#753    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#754    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#755    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#756    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#757    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#758    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#759    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#760    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#761    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#762    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#763    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#764    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#765    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#766    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#767    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#768    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#769    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#770    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#771    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#772    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#773    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#774    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#775    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#776    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#777    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#778    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#779    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#780    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#781    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#782    _RawViewElement._updateChild (package:flutter/src/widgets/view.dart:481:16)
+#783    _RawViewElement.update (package:flutter/src/widgets/view.dart:568:5)
+#784    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#785    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#786    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#787    StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#788    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#789    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#790    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#791    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#792    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#793    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#794    RootElement._rebuild (package:flutter/src/widgets/binding.dart:2091:16)
+#795    RootElement.update (package:flutter/src/widgets/binding.dart:2069:5)
+#796    RootElement.performRebuild (package:flutter/src/widgets/binding.dart:2083:7)
+#797    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#798    BuildScope._tryRebuild (package:flutter/src/widgets/framework.dart:2750:15)
+#799    BuildScope._flushDirtyElements (package:flutter/src/widgets/framework.dart:2807:11)
+#800    BuildOwner.buildScope (package:flutter/src/widgets/framework.dart:3111:18)
+#801    AutomatedTestWidgetsFlutterBinding.drawFrame (package:flutter_test/src/binding.dart:2431:19)
+#802    RendererBinding._handlePersistentFrameCallback (package:flutter/src/rendering/binding.dart:509:5)
+#803    SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1430:15)
+#804    SchedulerBinding.handleDrawFrame (package:flutter/src/scheduler/binding.dart:1345:9)
+#805    AutomatedTestWidgetsFlutterBinding.pump.<anonymous closure> (package:flutter_test/src/binding.dart:2260:9)
+#808    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#809    AutomatedTestWidgetsFlutterBinding.pump (package:flutter_test/src/binding.dart:2249:27)
+#810    WidgetTester.pumpWidget.<anonymous closure> (package:flutter_test/src/widget_tester.dart:598:22)
+#813    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#814    WidgetTester.pumpWidget (package:flutter_test/src/widget_tester.dart:595:27)
+#815    main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:16:18)
+#816    testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:29)
+<asynchronous suspension>
+#817    TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 7 frames from dart:async and package:stack_trace)
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+A Timer is still pending even after the widget tree was disposed.
+'package:flutter_test/src/binding.dart':
+Failed assertion: line 2542 pos 12: '!timersPending'
+
+When the exception was thrown, this was the stack:
+#2      AutomatedTestWidgetsFlutterBinding._verifyInvariants (package:flutter_test/src/binding.dart:2542:12)
+#3      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1973:7)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from class _AssertionError and package:stack_trace)
+
+The test description was:
+  profile opens a dedicated settings page
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:17 +183 -4: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:17 +183 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page [E]
+  Test failed. See exception logs above.
+  The test description was: profile opens a dedicated settings page
+  
+00:17 +184 -4: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:17 +185 -4: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:17 +186 -4: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:17 +187 -4: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:17 +188 -4: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:17 +189 -4: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:17 +190 -4: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:17 +191 -4: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:17 +191 -4: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: refreshes my polls when requested after a new poll is created
+══╡ EXCEPTION CAUGHT BY WIDGETS LIBRARY ╞═══════════════════════════════════════════════════════════
+The following assertion was thrown building FutureBuilder<List<PollSummary>>(state:
+_FutureBuilderState<List<PollSummary>>#b18f7):
+Duplicate keys found.
+If multiple keyed widgets exist as children of another widget, they must have unique keys.
+Column(direction: vertical, mainAxisAlignment: start, crossAxisAlignment: center) has multiple
+children with key [<'list-scroll-poll-poll-1'>].
+
+The relevant error-causing widget was:
+  FutureBuilder<List<PollSummary>>
+  FutureBuilder:file:///D:/yaskapp/apps/mobile/lib/src/features/profile/profile_screen.dart:527:26
+
+When the exception was thrown, this was the stack:
+#0      debugChildrenHaveDuplicateKeys.<anonymous closure> (package:flutter/src/widgets/debug.dart:218:7)
+#1      debugChildrenHaveDuplicateKeys (package:flutter/src/widgets/debug.dart:225:4)
+#2      MultiChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7294:13)
+#3      Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#4      ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#5      StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#6      Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#7      StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#8      Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#9      SingleChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7122:14)
+#10     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#11     SingleChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7122:14)
+#12     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#13     Element.updateChildren (package:flutter/src/widgets/framework.dart:4191:32)
+#14     MultiChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7295:17)
+#15     _ViewportElement.update (package:flutter/src/widgets/viewport.dart:293:11)
+#16     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#17     SingleChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7122:14)
+#18     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#19     SingleChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7122:14)
+#20     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#21     SingleChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7122:14)
+#22     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#23     SingleChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7122:14)
+#24     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#25     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#26     StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#27     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#28     StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#29     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#30     SingleChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7122:14)
+#31     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#32     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#33     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#34     ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#35     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#36     SingleChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7122:14)
+#37     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#38     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#39     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#40     ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#41     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#42     SingleChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7122:14)
+#43     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#44     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#45     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#46     StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#47     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#48     SingleChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7122:14)
+#49     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#50     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#51     StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#52     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#53     StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#54     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#55     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#56     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#57     ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#58     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#59     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#60     StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#61     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#62     StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#63     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#64     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#65     StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#66     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#67     StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#68     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#69     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#70     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#71     StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#72     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#73     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#74     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#75     ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#76     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#77     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#78     StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#79     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#80     StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#81     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#82     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#83     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#84     ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#85     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#86     SingleChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7122:14)
+#87     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#88     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#89     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#90     StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#91     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#92     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#93     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#94     StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#95     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#96     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#97     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#98     StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#99     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#100    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#101    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#102    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#103    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#104    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#105    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#106    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#107    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#108    Element.updateChildren (package:flutter/src/widgets/framework.dart:4191:32)
+#109    MultiChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7295:17)
+#110    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#111    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#112    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#113    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#114    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#115    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#116    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#117    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#118    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#119    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#120    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#121    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#122    StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#123    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#124    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#125    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#126    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#127    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#128    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#129    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#130    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#131    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#132    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#133    SingleChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7122:14)
+#134    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#135    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#136    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#137    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#138    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#139    SingleChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7122:14)
+#140    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#141    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#142    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#143    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#144    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#145    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#146    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#147    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#148    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#149    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#150    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#151    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#152    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#153    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#154    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#155    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#156    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#157    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#158    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#159    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#160    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#161    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#162    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#163    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#164    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#165    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#166    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#167    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#168    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#169    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#170    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#171    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#172    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#173    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#174    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#175    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#176    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#177    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#178    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#179    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#180    BuildScope._tryRebuild (package:flutter/src/widgets/framework.dart:2750:15)
+#181    BuildScope._flushDirtyElements (package:flutter/src/widgets/framework.dart:2807:11)
+#182    BuildOwner.buildScope (package:flutter/src/widgets/framework.dart:3111:18)
+#183    AutomatedTestWidgetsFlutterBinding.drawFrame (package:flutter_test/src/binding.dart:2431:19)
+#184    RendererBinding._handlePersistentFrameCallback (package:flutter/src/rendering/binding.dart:509:5)
+#185    SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1430:15)
+#186    SchedulerBinding.handleDrawFrame (package:flutter/src/scheduler/binding.dart:1345:9)
+#187    AutomatedTestWidgetsFlutterBinding.pump.<anonymous closure> (package:flutter_test/src/binding.dart:2260:9)
+#190    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#191    AutomatedTestWidgetsFlutterBinding.pump (package:flutter_test/src/binding.dart:2249:27)
+#192    WidgetTester.pumpAndSettle.<anonymous closure> (package:flutter_test/src/widget_tester.dart:719:23)
+#195    TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#196    WidgetTester.pumpAndSettle (package:flutter_test/src/widget_tester.dart:712:27)
+#197    main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:77:18)
+<asynchronous suspension>
+#198    testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#199    TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 5 frames from dart:async and package:stack_trace)
+
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY WIDGETS LIBRARY ╞═══════════════════════════════════════════════════════════
+The following assertion was thrown building FutureBuilder<List<PollSummary>>(state:
+_FutureBuilderState<List<PollSummary>>#b18f7):
+Duplicate keys found.
+If multiple keyed widgets exist as children of another widget, they must have unique keys.
+Column(direction: vertical, mainAxisAlignment: start, crossAxisAlignment: center) has multiple
+children with key [<'list-scroll-poll-poll-1'>].
+
+The relevant error-causing widget was:
+  FutureBuilder<List<PollSummary>>
+  FutureBuilder:file:///D:/yaskapp/apps/mobile/lib/src/features/profile/profile_screen.dart:527:26
+
+When the exception was thrown, this was the stack:
+#0      debugChildrenHaveDuplicateKeys.<anonymous closure> (package:flutter/src/widgets/debug.dart:218:7)
+#1      debugChildrenHaveDuplicateKeys (package:flutter/src/widgets/debug.dart:225:4)
+#2      new MultiChildRenderObjectElement (package:flutter/src/widgets/framework.dart:7165:15)
+#3      MultiChildRenderObjectWidget.createElement (package:flutter/src/widgets/framework.dart:2051:52)
+#4      Element.inflateWidget (package:flutter/src/widgets/framework.dart:4574:59)
+#5      Element.updateChild (package:flutter/src/widgets/framework.dart:4053:20)
+#6      ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#7      StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#8      Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#9      BuildScope._tryRebuild (package:flutter/src/widgets/framework.dart:2750:15)
+#10     BuildScope._flushDirtyElements (package:flutter/src/widgets/framework.dart:2807:11)
+#11     BuildOwner.buildScope (package:flutter/src/widgets/framework.dart:3111:18)
+#12     AutomatedTestWidgetsFlutterBinding.drawFrame (package:flutter_test/src/binding.dart:2431:19)
+#13     RendererBinding._handlePersistentFrameCallback (package:flutter/src/rendering/binding.dart:509:5)
+#14     SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1430:15)
+#15     SchedulerBinding.handleDrawFrame (package:flutter/src/scheduler/binding.dart:1345:9)
+#16     AutomatedTestWidgetsFlutterBinding.pump.<anonymous closure> (package:flutter_test/src/binding.dart:2260:9)
+#19     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#20     AutomatedTestWidgetsFlutterBinding.pump (package:flutter_test/src/binding.dart:2249:27)
+#21     WidgetTester.pumpAndSettle.<anonymous closure> (package:flutter_test/src/widget_tester.dart:719:23)
+<asynchronous suspension>
+#22     TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#23     main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:77:5)
+<asynchronous suspension>
+#24     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#25     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "A newly created poll": []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:79:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart line 79
+The test description was:
+  refreshes my polls when requested after a new poll is created
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following message was thrown:
+Multiple exceptions (3) were detected during the running of the current test, and at least one was
+unexpected.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:17 +191 -5: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:17 +191 -5: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: refreshes my polls when requested after a new poll is created [E]
+  Test failed. See exception logs above.
+  The test description was: refreshes my polls when requested after a new poll is created
+  
+00:17 +192 -5: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:18 +193 -5: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:18 +193 -5: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: updates my poll after like response
+══╡ EXCEPTION CAUGHT BY WIDGETS LIBRARY ╞═══════════════════════════════════════════════════════════
+The following assertion was thrown building _FocusInheritedScope:
+'package:flutter/src/widgets/framework.dart': Failed assertion: line 6268 pos 12:
+'_dependents.isEmpty': is not true.
+
+Either the assertion indicates an error in the framework itself, or we should provide substantially
+more information in this error message to help you determine and fix the underlying cause.
+In either case, please report this assertion by filing a bug on GitHub:
+  https://github.com/flutter/flutter/issues/new?template=02_bug.yml
+
+When the exception was thrown, this was the stack:
+#2      InheritedElement.debugDeactivated (package:flutter/src/widgets/framework.dart:6268:12)
+#3      _InactiveElements._deactivateRecursively.<anonymous closure> (package:flutter/src/widgets/framework.dart:2143:15)
+#4      _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2145:6)
+#5      SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#6      _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#7      ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#8      _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#9      ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#10     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#11     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#12     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#13     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#14     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#15     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#16     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#17     MultiChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7223:16)
+#18     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#19     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#20     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#21     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#22     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#23     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#24     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#25     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#26     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#27     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#28     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#29     SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#30     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#31     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#32     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#33     SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#34     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#35     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#36     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#37     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#38     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#39     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#40     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#41     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#42     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#43     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#44     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#45     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#46     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#47     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#48     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#49     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#50     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#51     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#52     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#53     SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#54     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#55     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#56     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#57     SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#58     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#59     SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#60     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#61     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#62     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#63     SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#64     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#65     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#66     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#67     SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#68     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#69     SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#70     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#71     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#72     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#73     SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#74     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#75     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#76     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#77     SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#78     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#79     SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#80     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#81     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#82     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#83     SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#84     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#85     SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#86     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#87     SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#88     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#89     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#90     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#91     SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#92     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#93     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#94     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#95     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#96     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#97     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#98     _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#99     ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#100    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#101    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#102    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#103    SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#104    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#105    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#106    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#107    SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#108    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#109    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#110    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#111    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#112    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#113    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#114    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#115    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#116    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#117    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#118    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#119    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#120    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#121    SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#122    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#123    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#124    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#125    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#126    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#127    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#128    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#129    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#130    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#131    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#132    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#133    SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#134    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#135    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#136    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#137    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#138    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#139    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#140    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#141    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#142    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#143    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#144    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#145    MultiChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7223:16)
+#146    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#147    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#148    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#149    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#150    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#151    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#152    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#153    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#154    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#155    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#156    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#157    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#158    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#159    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#160    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#161    SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#162    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#163    SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#164    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#165    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#166    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#167    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#168    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#169    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#170    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#171    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#172    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#173    SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#174    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#175    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#176    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#177    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#178    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#179    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#180    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#181    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#182    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#183    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#184    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#185    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#186    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#187    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#188    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#189    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#190    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#191    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#192    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#193    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#194    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#195    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#196    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#197    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#198    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#199    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#200    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#201    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#202    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#203    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#204    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#205    SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#206    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#207    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#208    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#209    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#210    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#211    SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#212    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#213    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#214    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#215    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#216    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#217    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#218    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#219    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#220    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#221    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#222    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#223    SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#224    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#225    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#226    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#227    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#228    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#229    SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#230    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#231    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#232    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#233    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#234    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#235    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#236    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#237    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#238    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#239    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#240    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#241    SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#242    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#243    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#244    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#245    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#246    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#247    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#248    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#249    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#250    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#251    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#252    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#253    SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#254    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#255    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#256    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#257    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#258    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#259    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#260    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#261    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#262    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#263    SingleChildRenderObjectElement.visitChildren (package:flutter/src/widgets/framework.dart:7101:14)
+#264    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#265    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#266    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#267    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#268    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#269    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#270    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#271    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#272    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#273    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#274    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#275    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#276    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#277    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#278    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#279    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#280    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#281    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#282    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#283    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#284    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#285    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#286    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#287    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#288    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#289    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#290    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#291    ComponentElement.visitChildren (package:flutter/src/widgets/framework.dart:5871:14)
+#292    _InactiveElements._deactivateRecursively (package:flutter/src/widgets/framework.dart:2141:13)
+#293    _InactiveElements.add (package:flutter/src/widgets/framework.dart:2155:9)
+#294    Element.deactivateChild (package:flutter/src/widgets/framework.dart:4636:30)
+#295    Element.updateChild (package:flutter/src/widgets/framework.dart:4048:9)
+#296    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#297    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#298    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#299    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#300    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#301    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#302    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#303    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#304    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#305    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#306    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#307    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#308    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#309    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#310    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#311    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#312    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#313    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#314    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#315    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#316    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#317    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#318    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#319    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#320    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#321    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#322    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#323    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#324    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#325    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#326    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#327    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#328    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#329    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#330    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#331    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#332    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#333    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#334    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#335    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#336    ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#337    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#338    _RawViewElement._updateChild (package:flutter/src/widgets/view.dart:481:16)
+#339    _RawViewElement.update (package:flutter/src/widgets/view.dart:568:5)
+#340    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#341    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#342    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#343    StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#344    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#345    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#346    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#347    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#348    StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#349    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#350    RootElement._rebuild (package:flutter/src/widgets/binding.dart:2091:16)
+#351    RootElement.update (package:flutter/src/widgets/binding.dart:2069:5)
+#352    RootElement.performRebuild (package:flutter/src/widgets/binding.dart:2083:7)
+#353    Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#354    BuildScope._tryRebuild (package:flutter/src/widgets/framework.dart:2750:15)
+#355    BuildScope._flushDirtyElements (package:flutter/src/widgets/framework.dart:2807:11)
+#356    BuildOwner.buildScope (package:flutter/src/widgets/framework.dart:3111:18)
+#357    AutomatedTestWidgetsFlutterBinding.drawFrame (package:flutter_test/src/binding.dart:2431:19)
+#358    RendererBinding._handlePersistentFrameCallback (package:flutter/src/rendering/binding.dart:509:5)
+#359    SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1430:15)
+#360    SchedulerBinding.handleDrawFrame (package:flutter/src/scheduler/binding.dart:1345:9)
+#361    AutomatedTestWidgetsFlutterBinding.scheduleWarmUpFrame (package:flutter_test/src/binding.dart:2357:5)
+#362    _runWidget (package:flutter/src/widgets/binding.dart:1952:7)
+#363    runApp (package:flutter/src/widgets/binding.dart:1885:3)
+#364    TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1940:5)
+#367    TestWidgetsFlutterBinding._runTest (package:flutter_test/src/binding.dart:1926:10)
+#368    AutomatedTestWidgetsFlutterBinding.runTest.<anonymous closure> (package:flutter_test/src/binding.dart:2489:24)
+#369    FakeAsync.run.<anonymous closure>.<anonymous closure> (package:fake_async/fake_async.dart:182:47)
+#374    withClock (package:clock/src/default.dart:52:10)
+#375    FakeAsync.run.<anonymous closure> (package:fake_async/fake_async.dart:182:15)
+#380    FakeAsync.run (package:fake_async/fake_async.dart:181:52)
+#381    AutomatedTestWidgetsFlutterBinding.runTest (package:flutter_test/src/binding.dart:2486:15)
+#382    testWidgets.<anonymous closure> (package:flutter_test/src/widget_tester.dart:184:24)
+#383    Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:253:25)
+<asynchronous suspension>
+#384    Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#385    Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+(elided 12 frames from class _AssertionError and dart:async)
+
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY GESTURE LIBRARY ╞═══════════════════════════════════════════════════════════
+The following assertion was thrown while routing a pointer event:
+Looking up a deactivated widget's ancestor is unsafe.
+At this point the state of the widget's element tree is no longer stable.
+To safely refer to a widget's ancestor in its dispose() method, save a reference to the ancestor by
+calling dependOnInheritedWidgetOfExactType() in the widget's didChangeDependencies() method.
+
+When the exception was thrown, this was the stack:
+#0      Element._debugCheckStateIsActiveForAncestorLookup.<anonymous closure> (package:flutter/src/widgets/framework.dart:5049:9)
+#1      Element._debugCheckStateIsActiveForAncestorLookup (package:flutter/src/widgets/framework.dart:5063:6)
+#2      Element.getElementForInheritedWidgetOfExactType (package:flutter/src/widgets/framework.dart:5098:12)
+#3      Element.getInheritedWidgetOfExactType (package:flutter/src/widgets/framework.dart:5093:12)
+#4      TickerMode.getValuesNotifier (package:flutter/src/widgets/ticker_provider.dart:177:10)
+#5      SingleTickerProviderStateMixin._updateTickerModeNotifier (package:flutter/src/widgets/ticker_provider.dart:395:68)
+#6      SingleTickerProviderStateMixin.createTicker (package:flutter/src/widgets/ticker_provider.dart:345:5)
+#7      new AnimationController (package:flutter/src/animation/animation_controller.dart:257:21)
+#8      RawTooltipState._controller (package:flutter/src/widgets/raw_tooltip.dart:544:35)
+#9      RawTooltipState._handleGlobalPointerEvent (package:flutter/src/widgets/raw_tooltip.dart:680:28)
+#10     PointerRouter._dispatch (package:flutter/src/gestures/pointer_router.dart:97:12)
+#11     PointerRouter._dispatchEventToRoutes.<anonymous closure> (package:flutter/src/gestures/pointer_router.dart:140:9)
+#12     _LinkedHashMapMixin.forEach (dart:_compact_hash:772:13)
+#13     PointerRouter._dispatchEventToRoutes (package:flutter/src/gestures/pointer_router.dart:138:18)
+#14     PointerRouter.route (package:flutter/src/gestures/pointer_router.dart:130:5)
+#15     GestureBinding.handleEvent (package:flutter/src/gestures/binding.dart:528:19)
+#16     GestureBinding.dispatchEvent (package:flutter/src/gestures/binding.dart:498:22)
+#17     RendererBinding.dispatchEvent (package:flutter/src/rendering/binding.dart:473:11)
+#18     GestureBinding._handlePointerEventImmediately (package:flutter/src/gestures/binding.dart:437:7)
+#19     GestureBinding.handlePointerEvent (package:flutter/src/gestures/binding.dart:394:5)
+#20     TestWidgetsFlutterBinding.handlePointerEventForSource.<anonymous closure> (package:flutter_test/src/binding.dart:1570:42)
+#21     TestWidgetsFlutterBinding.withPointerEventSource (package:flutter_test/src/binding.dart:1580:11)
+#22     TestWidgetsFlutterBinding.handlePointerEventForSource (package:flutter_test/src/binding.dart:1570:5)
+#23     WidgetTester.sendEventToBinding.<anonymous closure> (package:flutter_test/src/widget_tester.dart:869:15)
+#26     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#27     WidgetTester.sendEventToBinding (package:flutter_test/src/widget_tester.dart:868:27)
+#28     TestGesture.down.<anonymous closure> (package:flutter_test/src/test_pointer.dart:485:25)
+#31     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#32     TestGesture.down (package:flutter_test/src/test_pointer.dart:484:27)
+#33     WidgetController.startGesture (package:flutter_test/src/controller.dart:1897:20)
+#34     WidgetController.tapAt.<anonymous closure> (package:flutter_test/src/controller.dart:1148:41)
+#37     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#38     WidgetController.tapAt (package:flutter_test/src/controller.dart:1147:27)
+#39     WidgetController.tap (package:flutter_test/src/controller.dart:1079:12)
+#40     main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:122:18)
+<asynchronous suspension>
+#41     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#42     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 7 frames from dart:async and package:stack_trace)
+
+router: Instance of 'PointerRouter'
+route: Closure: (PointerEvent) => void from Function '_handleGlobalPointerEvent@1155258657':.
+event: PointerDownEvent#47420(position: Offset(551.2, 533.0))
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY GESTURE LIBRARY ╞═══════════════════════════════════════════════════════════
+The following assertion was thrown while routing a pointer event:
+RawTooltipState is a SingleTickerProviderStateMixin but multiple tickers were created.
+A SingleTickerProviderStateMixin can only be used as a TickerProvider once.
+If a State is used for multiple AnimationController objects, or if it is passed to other objects and
+those objects might use it more than one time in total, then instead of mixing in a
+SingleTickerProviderStateMixin, use a regular TickerProviderStateMixin.
+
+When the exception was thrown, this was the stack:
+#0      SingleTickerProviderStateMixin.createTicker.<anonymous closure> (package:flutter/src/widgets/ticker_provider.dart:327:7)
+#1      SingleTickerProviderStateMixin.createTicker (package:flutter/src/widgets/ticker_provider.dart:340:6)
+#2      new AnimationController (package:flutter/src/animation/animation_controller.dart:257:21)
+#3      RawTooltipState._controller (package:flutter/src/widgets/raw_tooltip.dart:544:35)
+#4      RawTooltipState._handleGlobalPointerEvent (package:flutter/src/widgets/raw_tooltip.dart:680:28)
+#5      PointerRouter._dispatch (package:flutter/src/gestures/pointer_router.dart:97:12)
+#6      PointerRouter._dispatchEventToRoutes.<anonymous closure> (package:flutter/src/gestures/pointer_router.dart:140:9)
+#7      _LinkedHashMapMixin.forEach (dart:_compact_hash:772:13)
+#8      PointerRouter._dispatchEventToRoutes (package:flutter/src/gestures/pointer_router.dart:138:18)
+#9      PointerRouter.route (package:flutter/src/gestures/pointer_router.dart:130:5)
+#10     GestureBinding.handleEvent (package:flutter/src/gestures/binding.dart:528:19)
+#11     GestureBinding.dispatchEvent (package:flutter/src/gestures/binding.dart:498:22)
+#12     RendererBinding.dispatchEvent (package:flutter/src/rendering/binding.dart:473:11)
+#13     GestureBinding._handlePointerEventImmediately (package:flutter/src/gestures/binding.dart:437:7)
+#14     GestureBinding.handlePointerEvent (package:flutter/src/gestures/binding.dart:394:5)
+#15     TestWidgetsFlutterBinding.handlePointerEventForSource.<anonymous closure> (package:flutter_test/src/binding.dart:1570:42)
+#16     TestWidgetsFlutterBinding.withPointerEventSource (package:flutter_test/src/binding.dart:1580:11)
+#17     TestWidgetsFlutterBinding.handlePointerEventForSource (package:flutter_test/src/binding.dart:1570:5)
+#18     WidgetTester.sendEventToBinding.<anonymous closure> (package:flutter_test/src/widget_tester.dart:869:15)
+#21     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#22     WidgetTester.sendEventToBinding (package:flutter_test/src/widget_tester.dart:868:27)
+#23     TestGesture.up.<anonymous closure> (package:flutter_test/src/test_pointer.dart:587:26)
+#26     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#27     TestGesture.up (package:flutter_test/src/test_pointer.dart:580:27)
+#28     WidgetController.tapAt.<anonymous closure> (package:flutter_test/src/controller.dart:1155:21)
+<asynchronous suspension>
+#29     TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#30     main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:122:5)
+<asynchronous suspension>
+#31     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#32     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 5 frames from dart:async and package:stack_trace)
+
+router: Instance of 'PointerRouter'
+route: Closure: (PointerEvent) => void from Function '_handleGlobalPointerEvent@1155258657':.
+event: PointerUpEvent#8c080(position: Offset(551.2, 533.0))
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following message was thrown:
+Multiple exceptions (3) were detected during the running of the current test, and at least one was
+unexpected.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:18 +193 -6: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:18 +193 -6: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: updates my poll after like response [E]
+  Test failed. See exception logs above.
+  The test description was: updates my poll after like response
+  
+00:18 +194 -6: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:18 +195 -6: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:18 +195 -6: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: removes a poll after unliking it from liked polls
+══╡ EXCEPTION CAUGHT BY GESTURE LIBRARY ╞═══════════════════════════════════════════════════════════
+The following assertion was thrown while routing a pointer event:
+RawTooltipState is a SingleTickerProviderStateMixin but multiple tickers were created.
+A SingleTickerProviderStateMixin can only be used as a TickerProvider once.
+If a State is used for multiple AnimationController objects, or if it is passed to other objects and
+those objects might use it more than one time in total, then instead of mixing in a
+SingleTickerProviderStateMixin, use a regular TickerProviderStateMixin.
+
+When the exception was thrown, this was the stack:
+#0      SingleTickerProviderStateMixin.createTicker.<anonymous closure> (package:flutter/src/widgets/ticker_provider.dart:327:7)
+#1      SingleTickerProviderStateMixin.createTicker (package:flutter/src/widgets/ticker_provider.dart:340:6)
+#2      new AnimationController (package:flutter/src/animation/animation_controller.dart:257:21)
+#3      RawTooltipState._controller (package:flutter/src/widgets/raw_tooltip.dart:544:35)
+#4      RawTooltipState._handleGlobalPointerEvent (package:flutter/src/widgets/raw_tooltip.dart:680:28)
+#5      PointerRouter._dispatch (package:flutter/src/gestures/pointer_router.dart:97:12)
+#6      PointerRouter._dispatchEventToRoutes.<anonymous closure> (package:flutter/src/gestures/pointer_router.dart:140:9)
+#7      _LinkedHashMapMixin.forEach (dart:_compact_hash:772:13)
+#8      PointerRouter._dispatchEventToRoutes (package:flutter/src/gestures/pointer_router.dart:138:18)
+#9      PointerRouter.route (package:flutter/src/gestures/pointer_router.dart:130:5)
+#10     GestureBinding.handleEvent (package:flutter/src/gestures/binding.dart:528:19)
+#11     GestureBinding.dispatchEvent (package:flutter/src/gestures/binding.dart:498:22)
+#12     RendererBinding.dispatchEvent (package:flutter/src/rendering/binding.dart:473:11)
+#13     GestureBinding._handlePointerEventImmediately (package:flutter/src/gestures/binding.dart:437:7)
+#14     GestureBinding.handlePointerEvent (package:flutter/src/gestures/binding.dart:394:5)
+#15     TestWidgetsFlutterBinding.handlePointerEventForSource.<anonymous closure> (package:flutter_test/src/binding.dart:1570:42)
+#16     TestWidgetsFlutterBinding.withPointerEventSource (package:flutter_test/src/binding.dart:1580:11)
+#17     TestWidgetsFlutterBinding.handlePointerEventForSource (package:flutter_test/src/binding.dart:1570:5)
+#18     WidgetTester.sendEventToBinding.<anonymous closure> (package:flutter_test/src/widget_tester.dart:869:15)
+#21     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#22     WidgetTester.sendEventToBinding (package:flutter_test/src/widget_tester.dart:868:27)
+#23     TestGesture.down.<anonymous closure> (package:flutter_test/src/test_pointer.dart:485:25)
+#26     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#27     TestGesture.down (package:flutter_test/src/test_pointer.dart:484:27)
+#28     WidgetController.startGesture (package:flutter_test/src/controller.dart:1897:20)
+#29     WidgetController.tapAt.<anonymous closure> (package:flutter_test/src/controller.dart:1148:41)
+#32     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#33     WidgetController.tapAt (package:flutter_test/src/controller.dart:1147:27)
+#34     WidgetController.tap (package:flutter_test/src/controller.dart:1079:12)
+#35     main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:161:18)
+<asynchronous suspension>
+#36     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#37     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 7 frames from dart:async and package:stack_trace)
+
+router: Instance of 'PointerRouter'
+route: Closure: (PointerEvent) => void from Function '_handleGlobalPointerEvent@1155258657':.
+event: PointerDownEvent#fc8ad(position: Offset(590.0, 346.5))
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY GESTURE LIBRARY ╞═══════════════════════════════════════════════════════════
+The following assertion was thrown while routing a pointer event:
+RawTooltipState is a SingleTickerProviderStateMixin but multiple tickers were created.
+A SingleTickerProviderStateMixin can only be used as a TickerProvider once.
+If a State is used for multiple AnimationController objects, or if it is passed to other objects and
+those objects might use it more than one time in total, then instead of mixing in a
+SingleTickerProviderStateMixin, use a regular TickerProviderStateMixin.
+
+When the exception was thrown, this was the stack:
+#0      SingleTickerProviderStateMixin.createTicker.<anonymous closure> (package:flutter/src/widgets/ticker_provider.dart:327:7)
+#1      SingleTickerProviderStateMixin.createTicker (package:flutter/src/widgets/ticker_provider.dart:340:6)
+#2      new AnimationController (package:flutter/src/animation/animation_controller.dart:257:21)
+#3      RawTooltipState._controller (package:flutter/src/widgets/raw_tooltip.dart:544:35)
+#4      RawTooltipState._handleGlobalPointerEvent (package:flutter/src/widgets/raw_tooltip.dart:680:28)
+#5      PointerRouter._dispatch (package:flutter/src/gestures/pointer_router.dart:97:12)
+#6      PointerRouter._dispatchEventToRoutes.<anonymous closure> (package:flutter/src/gestures/pointer_router.dart:140:9)
+#7      _LinkedHashMapMixin.forEach (dart:_compact_hash:772:13)
+#8      PointerRouter._dispatchEventToRoutes (package:flutter/src/gestures/pointer_router.dart:138:18)
+#9      PointerRouter.route (package:flutter/src/gestures/pointer_router.dart:130:5)
+#10     GestureBinding.handleEvent (package:flutter/src/gestures/binding.dart:528:19)
+#11     GestureBinding.dispatchEvent (package:flutter/src/gestures/binding.dart:498:22)
+#12     RendererBinding.dispatchEvent (package:flutter/src/rendering/binding.dart:473:11)
+#13     GestureBinding._handlePointerEventImmediately (package:flutter/src/gestures/binding.dart:437:7)
+#14     GestureBinding.handlePointerEvent (package:flutter/src/gestures/binding.dart:394:5)
+#15     TestWidgetsFlutterBinding.handlePointerEventForSource.<anonymous closure> (package:flutter_test/src/binding.dart:1570:42)
+#16     TestWidgetsFlutterBinding.withPointerEventSource (package:flutter_test/src/binding.dart:1580:11)
+#17     TestWidgetsFlutterBinding.handlePointerEventForSource (package:flutter_test/src/binding.dart:1570:5)
+#18     WidgetTester.sendEventToBinding.<anonymous closure> (package:flutter_test/src/widget_tester.dart:869:15)
+#21     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#22     WidgetTester.sendEventToBinding (package:flutter_test/src/widget_tester.dart:868:27)
+#23     TestGesture.up.<anonymous closure> (package:flutter_test/src/test_pointer.dart:587:26)
+#26     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#27     TestGesture.up (package:flutter_test/src/test_pointer.dart:580:27)
+#28     WidgetController.tapAt.<anonymous closure> (package:flutter_test/src/controller.dart:1155:21)
+<asynchronous suspension>
+#29     TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#30     main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:161:5)
+<asynchronous suspension>
+#31     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#32     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 5 frames from dart:async and package:stack_trace)
+
+router: Instance of 'PointerRouter'
+route: Closure: (PointerEvent) => void from Function '_handleGlobalPointerEvent@1155258657':.
+event: PointerUpEvent#2059a(position: Offset(590.0, 346.5))
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY GESTURE LIBRARY ╞═══════════════════════════════════════════════════════════
+The following assertion was thrown while routing a pointer event:
+RawTooltipState is a SingleTickerProviderStateMixin but multiple tickers were created.
+A SingleTickerProviderStateMixin can only be used as a TickerProvider once.
+If a State is used for multiple AnimationController objects, or if it is passed to other objects and
+those objects might use it more than one time in total, then instead of mixing in a
+SingleTickerProviderStateMixin, use a regular TickerProviderStateMixin.
+
+When the exception was thrown, this was the stack:
+#0      SingleTickerProviderStateMixin.createTicker.<anonymous closure> (package:flutter/src/widgets/ticker_provider.dart:327:7)
+#1      SingleTickerProviderStateMixin.createTicker (package:flutter/src/widgets/ticker_provider.dart:340:6)
+#2      new AnimationController (package:flutter/src/animation/animation_controller.dart:257:21)
+#3      RawTooltipState._controller (package:flutter/src/widgets/raw_tooltip.dart:544:35)
+#4      RawTooltipState._handleGlobalPointerEvent (package:flutter/src/widgets/raw_tooltip.dart:680:28)
+#5      PointerRouter._dispatch (package:flutter/src/gestures/pointer_router.dart:97:12)
+#6      PointerRouter._dispatchEventToRoutes.<anonymous closure> (package:flutter/src/gestures/pointer_router.dart:140:9)
+#7      _LinkedHashMapMixin.forEach (dart:_compact_hash:772:13)
+#8      PointerRouter._dispatchEventToRoutes (package:flutter/src/gestures/pointer_router.dart:138:18)
+#9      PointerRouter.route (package:flutter/src/gestures/pointer_router.dart:130:5)
+#10     GestureBinding.handleEvent (package:flutter/src/gestures/binding.dart:528:19)
+#11     GestureBinding.dispatchEvent (package:flutter/src/gestures/binding.dart:498:22)
+#12     RendererBinding.dispatchEvent (package:flutter/src/rendering/binding.dart:473:11)
+#13     GestureBinding._handlePointerEventImmediately (package:flutter/src/gestures/binding.dart:437:7)
+#14     GestureBinding.handlePointerEvent (package:flutter/src/gestures/binding.dart:394:5)
+#15     TestWidgetsFlutterBinding.handlePointerEventForSource.<anonymous closure> (package:flutter_test/src/binding.dart:1570:42)
+#16     TestWidgetsFlutterBinding.withPointerEventSource (package:flutter_test/src/binding.dart:1580:11)
+#17     TestWidgetsFlutterBinding.handlePointerEventForSource (package:flutter_test/src/binding.dart:1570:5)
+#18     WidgetTester.sendEventToBinding.<anonymous closure> (package:flutter_test/src/widget_tester.dart:869:15)
+#21     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#22     WidgetTester.sendEventToBinding (package:flutter_test/src/widget_tester.dart:868:27)
+#23     TestGesture.down.<anonymous closure> (package:flutter_test/src/test_pointer.dart:485:25)
+#26     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#27     TestGesture.down (package:flutter_test/src/test_pointer.dart:484:27)
+#28     WidgetController.startGesture (package:flutter_test/src/controller.dart:1897:20)
+#29     WidgetController.tapAt.<anonymous closure> (package:flutter_test/src/controller.dart:1148:41)
+#32     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#33     WidgetController.tapAt (package:flutter_test/src/controller.dart:1147:27)
+#34     WidgetController.tap (package:flutter_test/src/controller.dart:1079:12)
+#35     main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:170:18)
+<asynchronous suspension>
+#36     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#37     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 7 frames from dart:async and package:stack_trace)
+
+router: Instance of 'PointerRouter'
+route: Closure: (PointerEvent) => void from Function '_handleGlobalPointerEvent@1155258657':.
+event: PointerDownEvent#be6c1(position: Offset(551.2, 533.0))
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY GESTURE LIBRARY ╞═══════════════════════════════════════════════════════════
+The following assertion was thrown while routing a pointer event:
+RawTooltipState is a SingleTickerProviderStateMixin but multiple tickers were created.
+A SingleTickerProviderStateMixin can only be used as a TickerProvider once.
+If a State is used for multiple AnimationController objects, or if it is passed to other objects and
+those objects might use it more than one time in total, then instead of mixing in a
+SingleTickerProviderStateMixin, use a regular TickerProviderStateMixin.
+
+When the exception was thrown, this was the stack:
+#0      SingleTickerProviderStateMixin.createTicker.<anonymous closure> (package:flutter/src/widgets/ticker_provider.dart:327:7)
+#1      SingleTickerProviderStateMixin.createTicker (package:flutter/src/widgets/ticker_provider.dart:340:6)
+#2      new AnimationController (package:flutter/src/animation/animation_controller.dart:257:21)
+#3      RawTooltipState._controller (package:flutter/src/widgets/raw_tooltip.dart:544:35)
+#4      RawTooltipState._handleGlobalPointerEvent (package:flutter/src/widgets/raw_tooltip.dart:680:28)
+#5      PointerRouter._dispatch (package:flutter/src/gestures/pointer_router.dart:97:12)
+#6      PointerRouter._dispatchEventToRoutes.<anonymous closure> (package:flutter/src/gestures/pointer_router.dart:140:9)
+#7      _LinkedHashMapMixin.forEach (dart:_compact_hash:772:13)
+#8      PointerRouter._dispatchEventToRoutes (package:flutter/src/gestures/pointer_router.dart:138:18)
+#9      PointerRouter.route (package:flutter/src/gestures/pointer_router.dart:130:5)
+#10     GestureBinding.handleEvent (package:flutter/src/gestures/binding.dart:528:19)
+#11     GestureBinding.dispatchEvent (package:flutter/src/gestures/binding.dart:498:22)
+#12     RendererBinding.dispatchEvent (package:flutter/src/rendering/binding.dart:473:11)
+#13     GestureBinding._handlePointerEventImmediately (package:flutter/src/gestures/binding.dart:437:7)
+#14     GestureBinding.handlePointerEvent (package:flutter/src/gestures/binding.dart:394:5)
+#15     TestWidgetsFlutterBinding.handlePointerEventForSource.<anonymous closure> (package:flutter_test/src/binding.dart:1570:42)
+#16     TestWidgetsFlutterBinding.withPointerEventSource (package:flutter_test/src/binding.dart:1580:11)
+#17     TestWidgetsFlutterBinding.handlePointerEventForSource (package:flutter_test/src/binding.dart:1570:5)
+#18     WidgetTester.sendEventToBinding.<anonymous closure> (package:flutter_test/src/widget_tester.dart:869:15)
+#21     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#22     WidgetTester.sendEventToBinding (package:flutter_test/src/widget_tester.dart:868:27)
+#23     TestGesture.up.<anonymous closure> (package:flutter_test/src/test_pointer.dart:587:26)
+#26     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#27     TestGesture.up (package:flutter_test/src/test_pointer.dart:580:27)
+#28     WidgetController.tapAt.<anonymous closure> (package:flutter_test/src/controller.dart:1155:21)
+<asynchronous suspension>
+#29     TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#30     main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:170:5)
+<asynchronous suspension>
+#31     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#32     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 5 frames from dart:async and package:stack_trace)
+
+router: Instance of 'PointerRouter'
+route: Closure: (PointerEvent) => void from Function '_handleGlobalPointerEvent@1155258657':.
+event: PointerUpEvent#bbf3f(position: Offset(551.2, 533.0))
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following message was thrown:
+Multiple exceptions (4) were detected during the running of the current test, and at least one was
+unexpected.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:18 +195 -7: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:18 +195 -7: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: removes a poll after unliking it from liked polls [E]
+  Test failed. See exception logs above.
+  The test description was: removes a poll after unliking it from liked polls
+  
+00:18 +196 -7: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:18 +197 -7: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:18 +198 -7: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:18 +199 -7: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:19 +200 -7: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:19 +200 -7: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: updates my polls comments count after returning from comments
+══╡ EXCEPTION CAUGHT BY GESTURE LIBRARY ╞═══════════════════════════════════════════════════════════
+The following assertion was thrown while routing a pointer event:
+RawTooltipState is a SingleTickerProviderStateMixin but multiple tickers were created.
+A SingleTickerProviderStateMixin can only be used as a TickerProvider once.
+If a State is used for multiple AnimationController objects, or if it is passed to other objects and
+those objects might use it more than one time in total, then instead of mixing in a
+SingleTickerProviderStateMixin, use a regular TickerProviderStateMixin.
+
+When the exception was thrown, this was the stack:
+#0      SingleTickerProviderStateMixin.createTicker.<anonymous closure> (package:flutter/src/widgets/ticker_provider.dart:327:7)
+#1      SingleTickerProviderStateMixin.createTicker (package:flutter/src/widgets/ticker_provider.dart:340:6)
+#2      new AnimationController (package:flutter/src/animation/animation_controller.dart:257:21)
+#3      RawTooltipState._controller (package:flutter/src/widgets/raw_tooltip.dart:544:35)
+#4      RawTooltipState._handleGlobalPointerEvent (package:flutter/src/widgets/raw_tooltip.dart:680:28)
+#5      PointerRouter._dispatch (package:flutter/src/gestures/pointer_router.dart:97:12)
+#6      PointerRouter._dispatchEventToRoutes.<anonymous closure> (package:flutter/src/gestures/pointer_router.dart:140:9)
+#7      _LinkedHashMapMixin.forEach (dart:_compact_hash:772:13)
+#8      PointerRouter._dispatchEventToRoutes (package:flutter/src/gestures/pointer_router.dart:138:18)
+#9      PointerRouter.route (package:flutter/src/gestures/pointer_router.dart:130:5)
+#10     GestureBinding.handleEvent (package:flutter/src/gestures/binding.dart:528:19)
+#11     GestureBinding.dispatchEvent (package:flutter/src/gestures/binding.dart:498:22)
+#12     RendererBinding.dispatchEvent (package:flutter/src/rendering/binding.dart:473:11)
+#13     GestureBinding._handlePointerEventImmediately (package:flutter/src/gestures/binding.dart:437:7)
+#14     GestureBinding.handlePointerEvent (package:flutter/src/gestures/binding.dart:394:5)
+#15     TestWidgetsFlutterBinding.handlePointerEventForSource.<anonymous closure> (package:flutter_test/src/binding.dart:1570:42)
+#16     TestWidgetsFlutterBinding.withPointerEventSource (package:flutter_test/src/binding.dart:1580:11)
+#17     TestWidgetsFlutterBinding.handlePointerEventForSource (package:flutter_test/src/binding.dart:1570:5)
+#18     WidgetTester.sendEventToBinding.<anonymous closure> (package:flutter_test/src/widget_tester.dart:869:15)
+#21     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#22     WidgetTester.sendEventToBinding (package:flutter_test/src/widget_tester.dart:868:27)
+#23     TestGesture.down.<anonymous closure> (package:flutter_test/src/test_pointer.dart:485:25)
+#26     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#27     TestGesture.down (package:flutter_test/src/test_pointer.dart:484:27)
+#28     WidgetController.startGesture (package:flutter_test/src/controller.dart:1897:20)
+#29     WidgetController.tapAt.<anonymous closure> (package:flutter_test/src/controller.dart:1148:41)
+#32     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#33     WidgetController.tapAt (package:flutter_test/src/controller.dart:1147:27)
+#34     WidgetController.tap (package:flutter_test/src/controller.dart:1079:12)
+#35     main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:220:20)
+<asynchronous suspension>
+#36     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#37     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 7 frames from dart:async and package:stack_trace)
+
+router: Instance of 'PointerRouter'
+route: Closure: (PointerEvent) => void from Function '_handleGlobalPointerEvent@1155258657':.
+event: PointerDownEvent#778ba(position: Offset(306.6, 533.0))
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY GESTURE LIBRARY ╞═══════════════════════════════════════════════════════════
+The following assertion was thrown while routing a pointer event:
+RawTooltipState is a SingleTickerProviderStateMixin but multiple tickers were created.
+A SingleTickerProviderStateMixin can only be used as a TickerProvider once.
+If a State is used for multiple AnimationController objects, or if it is passed to other objects and
+those objects might use it more than one time in total, then instead of mixing in a
+SingleTickerProviderStateMixin, use a regular TickerProviderStateMixin.
+
+When the exception was thrown, this was the stack:
+#0      SingleTickerProviderStateMixin.createTicker.<anonymous closure> (package:flutter/src/widgets/ticker_provider.dart:327:7)
+#1      SingleTickerProviderStateMixin.createTicker (package:flutter/src/widgets/ticker_provider.dart:340:6)
+#2      new AnimationController (package:flutter/src/animation/animation_controller.dart:257:21)
+#3      RawTooltipState._controller (package:flutter/src/widgets/raw_tooltip.dart:544:35)
+#4      RawTooltipState._handleGlobalPointerEvent (package:flutter/src/widgets/raw_tooltip.dart:680:28)
+#5      PointerRouter._dispatch (package:flutter/src/gestures/pointer_router.dart:97:12)
+#6      PointerRouter._dispatchEventToRoutes.<anonymous closure> (package:flutter/src/gestures/pointer_router.dart:140:9)
+#7      _LinkedHashMapMixin.forEach (dart:_compact_hash:772:13)
+#8      PointerRouter._dispatchEventToRoutes (package:flutter/src/gestures/pointer_router.dart:138:18)
+#9      PointerRouter.route (package:flutter/src/gestures/pointer_router.dart:130:5)
+#10     GestureBinding.handleEvent (package:flutter/src/gestures/binding.dart:528:19)
+#11     GestureBinding.dispatchEvent (package:flutter/src/gestures/binding.dart:498:22)
+#12     RendererBinding.dispatchEvent (package:flutter/src/rendering/binding.dart:473:11)
+#13     GestureBinding._handlePointerEventImmediately (package:flutter/src/gestures/binding.dart:437:7)
+#14     GestureBinding.handlePointerEvent (package:flutter/src/gestures/binding.dart:394:5)
+#15     TestWidgetsFlutterBinding.handlePointerEventForSource.<anonymous closure> (package:flutter_test/src/binding.dart:1570:42)
+#16     TestWidgetsFlutterBinding.withPointerEventSource (package:flutter_test/src/binding.dart:1580:11)
+#17     TestWidgetsFlutterBinding.handlePointerEventForSource (package:flutter_test/src/binding.dart:1570:5)
+#18     WidgetTester.sendEventToBinding.<anonymous closure> (package:flutter_test/src/widget_tester.dart:869:15)
+#21     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#22     WidgetTester.sendEventToBinding (package:flutter_test/src/widget_tester.dart:868:27)
+#23     TestGesture.up.<anonymous closure> (package:flutter_test/src/test_pointer.dart:587:26)
+#26     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#27     TestGesture.up (package:flutter_test/src/test_pointer.dart:580:27)
+#28     WidgetController.tapAt.<anonymous closure> (package:flutter_test/src/controller.dart:1155:21)
+<asynchronous suspension>
+#29     TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#30     main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:220:7)
+<asynchronous suspension>
+#31     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#32     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 5 frames from dart:async and package:stack_trace)
+
+router: Instance of 'PointerRouter'
+route: Closure: (PointerEvent) => void from Function '_handleGlobalPointerEvent@1155258657':.
+event: PointerUpEvent#751b1(position: Offset(306.6, 533.0))
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY GESTURE LIBRARY ╞═══════════════════════════════════════════════════════════
+The following assertion was thrown while routing a pointer event:
+RawTooltipState is a SingleTickerProviderStateMixin but multiple tickers were created.
+A SingleTickerProviderStateMixin can only be used as a TickerProvider once.
+If a State is used for multiple AnimationController objects, or if it is passed to other objects and
+those objects might use it more than one time in total, then instead of mixing in a
+SingleTickerProviderStateMixin, use a regular TickerProviderStateMixin.
+
+When the exception was thrown, this was the stack:
+#0      SingleTickerProviderStateMixin.createTicker.<anonymous closure> (package:flutter/src/widgets/ticker_provider.dart:327:7)
+#1      SingleTickerProviderStateMixin.createTicker (package:flutter/src/widgets/ticker_provider.dart:340:6)
+#2      new AnimationController (package:flutter/src/animation/animation_controller.dart:257:21)
+#3      RawTooltipState._controller (package:flutter/src/widgets/raw_tooltip.dart:544:35)
+#4      RawTooltipState._handleGlobalPointerEvent (package:flutter/src/widgets/raw_tooltip.dart:680:28)
+#5      PointerRouter._dispatch (package:flutter/src/gestures/pointer_router.dart:97:12)
+#6      PointerRouter._dispatchEventToRoutes.<anonymous closure> (package:flutter/src/gestures/pointer_router.dart:140:9)
+#7      _LinkedHashMapMixin.forEach (dart:_compact_hash:772:13)
+#8      PointerRouter._dispatchEventToRoutes (package:flutter/src/gestures/pointer_router.dart:138:18)
+#9      PointerRouter.route (package:flutter/src/gestures/pointer_router.dart:130:5)
+#10     GestureBinding.handleEvent (package:flutter/src/gestures/binding.dart:528:19)
+#11     GestureBinding.dispatchEvent (package:flutter/src/gestures/binding.dart:498:22)
+#12     RendererBinding.dispatchEvent (package:flutter/src/rendering/binding.dart:473:11)
+#13     GestureBinding._handlePointerEventImmediately (package:flutter/src/gestures/binding.dart:437:7)
+#14     GestureBinding.handlePointerEvent (package:flutter/src/gestures/binding.dart:394:5)
+#15     TestWidgetsFlutterBinding.handlePointerEventForSource.<anonymous closure> (package:flutter_test/src/binding.dart:1570:42)
+#16     TestWidgetsFlutterBinding.withPointerEventSource (package:flutter_test/src/binding.dart:1580:11)
+#17     TestWidgetsFlutterBinding.handlePointerEventForSource (package:flutter_test/src/binding.dart:1570:5)
+#18     WidgetTester.sendEventToBinding.<anonymous closure> (package:flutter_test/src/widget_tester.dart:869:15)
+#21     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#22     WidgetTester.sendEventToBinding (package:flutter_test/src/widget_tester.dart:868:27)
+#23     TestGesture.down.<anonymous closure> (package:flutter_test/src/test_pointer.dart:485:25)
+#26     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#27     TestGesture.down (package:flutter_test/src/test_pointer.dart:484:27)
+#28     WidgetController.startGesture (package:flutter_test/src/controller.dart:1897:20)
+#29     WidgetController.tapAt.<anonymous closure> (package:flutter_test/src/controller.dart:1148:41)
+#32     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#33     WidgetController.tapAt (package:flutter_test/src/controller.dart:1147:27)
+#34     WidgetController.tap (package:flutter_test/src/controller.dart:1079:12)
+#35     main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:229:20)
+<asynchronous suspension>
+#36     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#37     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 7 frames from dart:async and package:stack_trace)
+
+router: Instance of 'PointerRouter'
+route: Closure: (PointerEvent) => void from Function '_handleGlobalPointerEvent@1155258657':.
+event: PointerDownEvent#8264a(position: Offset(756.0, 564.0))
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY GESTURE LIBRARY ╞═══════════════════════════════════════════════════════════
+The following assertion was thrown while routing a pointer event:
+RawTooltipState is a SingleTickerProviderStateMixin but multiple tickers were created.
+A SingleTickerProviderStateMixin can only be used as a TickerProvider once.
+If a State is used for multiple AnimationController objects, or if it is passed to other objects and
+those objects might use it more than one time in total, then instead of mixing in a
+SingleTickerProviderStateMixin, use a regular TickerProviderStateMixin.
+
+When the exception was thrown, this was the stack:
+#0      SingleTickerProviderStateMixin.createTicker.<anonymous closure> (package:flutter/src/widgets/ticker_provider.dart:327:7)
+#1      SingleTickerProviderStateMixin.createTicker (package:flutter/src/widgets/ticker_provider.dart:340:6)
+#2      new AnimationController (package:flutter/src/animation/animation_controller.dart:257:21)
+#3      RawTooltipState._controller (package:flutter/src/widgets/raw_tooltip.dart:544:35)
+#4      RawTooltipState._handleGlobalPointerEvent (package:flutter/src/widgets/raw_tooltip.dart:680:28)
+#5      PointerRouter._dispatch (package:flutter/src/gestures/pointer_router.dart:97:12)
+#6      PointerRouter._dispatchEventToRoutes.<anonymous closure> (package:flutter/src/gestures/pointer_router.dart:140:9)
+#7      _LinkedHashMapMixin.forEach (dart:_compact_hash:772:13)
+#8      PointerRouter._dispatchEventToRoutes (package:flutter/src/gestures/pointer_router.dart:138:18)
+#9      PointerRouter.route (package:flutter/src/gestures/pointer_router.dart:130:5)
+#10     GestureBinding.handleEvent (package:flutter/src/gestures/binding.dart:528:19)
+#11     GestureBinding.dispatchEvent (package:flutter/src/gestures/binding.dart:498:22)
+#12     RendererBinding.dispatchEvent (package:flutter/src/rendering/binding.dart:473:11)
+#13     GestureBinding._handlePointerEventImmediately (package:flutter/src/gestures/binding.dart:437:7)
+#14     GestureBinding.handlePointerEvent (package:flutter/src/gestures/binding.dart:394:5)
+#15     TestWidgetsFlutterBinding.handlePointerEventForSource.<anonymous closure> (package:flutter_test/src/binding.dart:1570:42)
+#16     TestWidgetsFlutterBinding.withPointerEventSource (package:flutter_test/src/binding.dart:1580:11)
+#17     TestWidgetsFlutterBinding.handlePointerEventForSource (package:flutter_test/src/binding.dart:1570:5)
+#18     WidgetTester.sendEventToBinding.<anonymous closure> (package:flutter_test/src/widget_tester.dart:869:15)
+#21     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#22     WidgetTester.sendEventToBinding (package:flutter_test/src/widget_tester.dart:868:27)
+#23     TestGesture.up.<anonymous closure> (package:flutter_test/src/test_pointer.dart:587:26)
+#26     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#27     TestGesture.up (package:flutter_test/src/test_pointer.dart:580:27)
+#28     WidgetController.tapAt.<anonymous closure> (package:flutter_test/src/controller.dart:1155:21)
+<asynchronous suspension>
+#29     TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#30     main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:229:7)
+<asynchronous suspension>
+#31     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#32     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 5 frames from dart:async and package:stack_trace)
+
+router: Instance of 'PointerRouter'
+route: Closure: (PointerEvent) => void from Function '_handleGlobalPointerEvent@1155258657':.
+event: PointerUpEvent#dfdaf(position: Offset(756.0, 564.0))
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY GESTURE LIBRARY ╞═══════════════════════════════════════════════════════════
+The following assertion was thrown while routing a pointer event:
+RawTooltipState is a SingleTickerProviderStateMixin but multiple tickers were created.
+A SingleTickerProviderStateMixin can only be used as a TickerProvider once.
+If a State is used for multiple AnimationController objects, or if it is passed to other objects and
+those objects might use it more than one time in total, then instead of mixing in a
+SingleTickerProviderStateMixin, use a regular TickerProviderStateMixin.
+
+When the exception was thrown, this was the stack:
+#0      SingleTickerProviderStateMixin.createTicker.<anonymous closure> (package:flutter/src/widgets/ticker_provider.dart:327:7)
+#1      SingleTickerProviderStateMixin.createTicker (package:flutter/src/widgets/ticker_provider.dart:340:6)
+#2      new AnimationController (package:flutter/src/animation/animation_controller.dart:257:21)
+#3      RawTooltipState._controller (package:flutter/src/widgets/raw_tooltip.dart:544:35)
+#4      RawTooltipState._handleGlobalPointerEvent (package:flutter/src/widgets/raw_tooltip.dart:680:28)
+#5      PointerRouter._dispatch (package:flutter/src/gestures/pointer_router.dart:97:12)
+#6      PointerRouter._dispatchEventToRoutes.<anonymous closure> (package:flutter/src/gestures/pointer_router.dart:140:9)
+#7      _LinkedHashMapMixin.forEach (dart:_compact_hash:772:13)
+#8      PointerRouter._dispatchEventToRoutes (package:flutter/src/gestures/pointer_router.dart:138:18)
+#9      PointerRouter.route (package:flutter/src/gestures/pointer_router.dart:130:5)
+#10     GestureBinding.handleEvent (package:flutter/src/gestures/binding.dart:528:19)
+#11     GestureBinding.dispatchEvent (package:flutter/src/gestures/binding.dart:498:22)
+#12     RendererBinding.dispatchEvent (package:flutter/src/rendering/binding.dart:473:11)
+#13     GestureBinding._handlePointerEventImmediately (package:flutter/src/gestures/binding.dart:437:7)
+#14     GestureBinding.handlePointerEvent (package:flutter/src/gestures/binding.dart:394:5)
+#15     TestWidgetsFlutterBinding.handlePointerEventForSource.<anonymous closure> (package:flutter_test/src/binding.dart:1570:42)
+#16     TestWidgetsFlutterBinding.withPointerEventSource (package:flutter_test/src/binding.dart:1580:11)
+#17     TestWidgetsFlutterBinding.handlePointerEventForSource (package:flutter_test/src/binding.dart:1570:5)
+#18     WidgetTester.sendEventToBinding.<anonymous closure> (package:flutter_test/src/widget_tester.dart:869:15)
+#21     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#22     WidgetTester.sendEventToBinding (package:flutter_test/src/widget_tester.dart:868:27)
+#23     TestGesture.down.<anonymous closure> (package:flutter_test/src/test_pointer.dart:485:25)
+#26     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#27     TestGesture.down (package:flutter_test/src/test_pointer.dart:484:27)
+#28     WidgetController.startGesture (package:flutter_test/src/controller.dart:1897:20)
+#29     WidgetController.tapAt.<anonymous closure> (package:flutter_test/src/controller.dart:1148:41)
+#32     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#33     WidgetController.tapAt (package:flutter_test/src/controller.dart:1147:27)
+#34     WidgetController.tap (package:flutter_test/src/controller.dart:1079:12)
+#35     main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:231:20)
+<asynchronous suspension>
+#36     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#37     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 7 frames from dart:async and package:stack_trace)
+
+router: Instance of 'PointerRouter'
+route: Closure: (PointerEvent) => void from Function '_handleGlobalPointerEvent@1155258657':.
+event: PointerDownEvent#84d84(position: Offset(44.0, 32.0))
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY GESTURE LIBRARY ╞═══════════════════════════════════════════════════════════
+The following assertion was thrown while routing a pointer event:
+RawTooltipState is a SingleTickerProviderStateMixin but multiple tickers were created.
+A SingleTickerProviderStateMixin can only be used as a TickerProvider once.
+If a State is used for multiple AnimationController objects, or if it is passed to other objects and
+those objects might use it more than one time in total, then instead of mixing in a
+SingleTickerProviderStateMixin, use a regular TickerProviderStateMixin.
+
+When the exception was thrown, this was the stack:
+#0      SingleTickerProviderStateMixin.createTicker.<anonymous closure> (package:flutter/src/widgets/ticker_provider.dart:327:7)
+#1      SingleTickerProviderStateMixin.createTicker (package:flutter/src/widgets/ticker_provider.dart:340:6)
+#2      new AnimationController (package:flutter/src/animation/animation_controller.dart:257:21)
+#3      RawTooltipState._controller (package:flutter/src/widgets/raw_tooltip.dart:544:35)
+#4      RawTooltipState._handleGlobalPointerEvent (package:flutter/src/widgets/raw_tooltip.dart:680:28)
+#5      PointerRouter._dispatch (package:flutter/src/gestures/pointer_router.dart:97:12)
+#6      PointerRouter._dispatchEventToRoutes.<anonymous closure> (package:flutter/src/gestures/pointer_router.dart:140:9)
+#7      _LinkedHashMapMixin.forEach (dart:_compact_hash:772:13)
+#8      PointerRouter._dispatchEventToRoutes (package:flutter/src/gestures/pointer_router.dart:138:18)
+#9      PointerRouter.route (package:flutter/src/gestures/pointer_router.dart:130:5)
+#10     GestureBinding.handleEvent (package:flutter/src/gestures/binding.dart:528:19)
+#11     GestureBinding.dispatchEvent (package:flutter/src/gestures/binding.dart:498:22)
+#12     RendererBinding.dispatchEvent (package:flutter/src/rendering/binding.dart:473:11)
+#13     GestureBinding._handlePointerEventImmediately (package:flutter/src/gestures/binding.dart:437:7)
+#14     GestureBinding.handlePointerEvent (package:flutter/src/gestures/binding.dart:394:5)
+#15     TestWidgetsFlutterBinding.handlePointerEventForSource.<anonymous closure> (package:flutter_test/src/binding.dart:1570:42)
+#16     TestWidgetsFlutterBinding.withPointerEventSource (package:flutter_test/src/binding.dart:1580:11)
+#17     TestWidgetsFlutterBinding.handlePointerEventForSource (package:flutter_test/src/binding.dart:1570:5)
+#18     WidgetTester.sendEventToBinding.<anonymous closure> (package:flutter_test/src/widget_tester.dart:869:15)
+#21     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#22     WidgetTester.sendEventToBinding (package:flutter_test/src/widget_tester.dart:868:27)
+#23     TestGesture.up.<anonymous closure> (package:flutter_test/src/test_pointer.dart:587:26)
+#26     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#27     TestGesture.up (package:flutter_test/src/test_pointer.dart:580:27)
+#28     WidgetController.tapAt.<anonymous closure> (package:flutter_test/src/controller.dart:1155:21)
+<asynchronous suspension>
+#29     TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#30     main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/profile_screen_test.dart:231:7)
+<asynchronous suspension>
+#31     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#32     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 5 frames from dart:async and package:stack_trace)
+
+router: Instance of 'PointerRouter'
+route: Closure: (PointerEvent) => void from Function '_handleGlobalPointerEvent@1155258657':.
+event: PointerUpEvent#c7e28(position: Offset(44.0, 32.0))
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following message was thrown:
+Multiple exceptions (6) were detected during the running of the current test, and at least one was
+unexpected.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:19 +200 -8: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:19 +200 -8: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: updates my polls comments count after returning from comments [E]
+  Test failed. See exception logs above.
+  The test description was: updates my polls comments count after returning from comments
+  
+Warning: At least one test in this suite creates an HttpClient. When running a test suite that uses
+TestWidgetsFlutterBinding, all HTTP requests will return status code 400, and no network request
+will actually be made. Any test expecting a real network connection and status code will fail.
+To test code that needs an HttpClient, provide your own HttpClient implementation to the code under
+test, so that your test can consistently provide a testable response to the code under test.
+00:19 +201 -8: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:19 +202 -8: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:19 +203 -8: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "Which feature should be next?": []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/search_screen_test.dart:33:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///D:/yaskapp/apps/mobile/test/search_screen_test.dart line 33
+The test description was:
+  shows discovery sections before a query is entered
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:19 +203 -9: D:/yaskapp/apps/mobile/test/widget_test.dart: shows auth entry point
+00:19 +203 -9: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered [E]
+  Test failed. See exception logs above.
+  The test description was: shows discovery sections before a query is entered
+  
+Warning: At least one test in this suite creates an HttpClient. When running a test suite that uses
+TestWidgetsFlutterBinding, all HTTP requests will return status code 400, and no network request
+will actually be made. Any test expecting a real network connection and status code will fail.
+To test code that needs an HttpClient, provide your own HttpClient implementation to the code under
+test, so that your test can consistently provide a testable response to the code under test.
+00:20 +203 -9: D:/yaskapp/apps/mobile/test/widget_test.dart: shows auth entry point
+
+Warning: A call to tap() with finder "Found 1 widget with text "Sign Up": [
+  Text("Sign Up", inherit: true, size: 18.0, dependencies: [DefaultSelectionStyle, DefaultTextStyle, MediaQuery]),
+]" derived an Offset (Offset(400.0, 656.0)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+Indeed, Offset(400.0, 656.0) is outside the bounds of the root of the render tree, Size(800.0, 600.0).
+The finder corresponds to this RenderBox: RenderParagraph#1e326 relayoutBoundary=up33
+The hit test result at that offset is: HitTestResult(HitTestEntry<HitTestTarget>#aa7cf(_ReusableRenderView#a6c6e), HitTestEntry<HitTestTarget>#a09ac(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/widget_test.dart:19:18)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#6      StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "tap()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly 2 matching candidates
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "REGISTER": []>
+   Which: means none were found but some were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/widget_test.dart:22:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///D:/yaskapp/apps/mobile/test/widget_test.dart line 22
+The test description was:
+  shows auth entry point
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:20 +203 -10: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows the latest successful searches in reverse chronological order
+00:20 +203 -10: D:/yaskapp/apps/mobile/test/widget_test.dart: shows auth entry point [E]
+  Test failed. See exception logs above.
+  The test description was: shows auth entry point
+  
+Warning: At least one test in this suite creates an HttpClient. When running a test suite that uses
+TestWidgetsFlutterBinding, all HTTP requests will return status code 400, and no network request
+will actually be made. Any test expecting a real network connection and status code will fail.
+To test code that needs an HttpClient, provide your own HttpClient implementation to the code under
+test, so that your test can consistently provide a testable response to the code under test.
+00:20 +204 -10: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows the latest successful searches in reverse chronological order
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: a value less than <226.0>
+  Actual: <226.0>
+   Which: is not a value less than <226.0>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/search_screen_test.dart:54:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///D:/yaskapp/apps/mobile/test/search_screen_test.dart line 54
+The test description was:
+  shows the latest successful searches in reverse chronological order
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:20 +204 -11: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows the latest successful searches in reverse chronological order [E]
+  Test failed. See exception logs above.
+  The test description was: shows the latest successful searches in reverse chronological order
+  
+00:20 +204 -11: D:/yaskapp/apps/mobile/test/search_screen_test.dart: persists and clears recent searches
+00:20 +205 -11: D:/yaskapp/apps/mobile/test/search_screen_test.dart: clears the query from the search bar
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+The finder "Found 0 widgets with widget matching predicate: []" (used in a call to "tap()") could
+not find any matching widgets.
+
+When the exception was thrown, this was the stack:
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2095:7)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/search_screen_test.dart:75:18)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  clears the query from the search bar
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:21 +205 -12: D:/yaskapp/apps/mobile/test/search_screen_test.dart: clears the query from the search bar [E]
+  Test failed. See exception logs above.
+  The test description was: clears the query from the search bar
+  
+00:21 +205 -12: D:/yaskapp/apps/mobile/test/search_screen_test.dart: focuses search input and does not request for a short query
+00:21 +206 -12: D:/yaskapp/apps/mobile/test/search_screen_test.dart: debounces valid input and renders mixed results
+00:21 +207 -12: D:/yaskapp/apps/mobile/test/search_screen_test.dart: does not run a second search after submitting debounced input
+00:21 +208 -12: D:/yaskapp/apps/mobile/test/search_screen_test.dart: records result click only after tapping a result
+00:21 +209 -12: D:/yaskapp/apps/mobile/test/search_screen_test.dart: wires poll voting actions from search results
+00:22 +210 -12: D:/yaskapp/apps/mobile/test/search_screen_test.dart: opens the full poll card in a modal when tapping a poll result
+00:22 +211 -12: D:/yaskapp/apps/mobile/test/search_screen_test.dart: allows voting from the poll preview modal
+00:22 +212 -12: D:/yaskapp/apps/mobile/test/search_screen_test.dart: opens the preview when tapping a top poll
+00:22 +213 -12: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows empty and retryable error states
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "Could not complete search.": []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///D:/yaskapp/apps/mobile/test/search_screen_test.dart:252:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///D:/yaskapp/apps/mobile/test/search_screen_test.dart line 252
+The test description was:
+  shows empty and retryable error states
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:22 +213 -13: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows empty and retryable error states [E]
+  Test failed. See exception logs above.
+  The test description was: shows empty and retryable error states
+  
+00:22 +213 -13: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows a useful API error message when search fails
+00:23 +214 -13: D:/yaskapp/apps/mobile/test/search_screen_test.dart: keeps search results and offers retry after load-more error
+00:23 +215 -13: D:/yaskapp/apps/mobile/test/search_screen_test.dart: ignores an in-flight response after the query is cleared
+00:23 +216 -13: D:/yaskapp/apps/mobile/test/search_screen_test.dart: filter changes preserve query and reset pagination
+00:23 +217 -13: D:/yaskapp/apps/mobile/test/search_screen_test.dart: loads both T02 cursor-search pages and keeps their results
+00:24 +218 -13: D:/yaskapp/apps/mobile/test/search_screen_test.dart: M14 page_dedup keeps one row per poll ID
+00:24 +218 ~1 -13: D:/yaskapp/apps/mobile/test/search_screen_test.dart: places sort menu in the top-right search header button
+00:24 +219 ~1 -13: Some tests failed.
+
+Failing tests:
+  D:/yaskapp/apps/mobile/test/auth_api_client_avatar_test.dart: uploads avatar as multipart field avatar
+  D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+  D:/yaskapp/apps/mobile/test/auth_screen_test.dart: keeps selected country after registration error
+  D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+  ... and 9 more

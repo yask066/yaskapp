@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -120,6 +121,71 @@ const server = createServer(async (request, response) => {
   }
   if (url.pathname === '/media/missing.svg') return json(response, 404, { error: 'fixture image intentionally missing' });
   return json(response, 404, { error: 'not_found', path: url.pathname });
+});
+
+server.on('upgrade', (request, socket) => {
+  const url = new URL(request.url ?? '/', 'http://' + (request.headers.host ?? 'localhost'));
+  const key = request.headers['sec-websocket-key'];
+  if (url.pathname !== '/realtime' || typeof key !== 'string') {
+    socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
+    return;
+  }
+
+  const accept = createHash('sha1')
+    .update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11')
+    .digest('base64');
+  socket.write(
+    'HTTP/1.1 101 Switching Protocols\r\n' +
+    'Upgrade: websocket\r\n' +
+    'Connection: Upgrade\r\n' +
+    `Sec-WebSocket-Accept: ${accept}\r\n\r\n`,
+  );
+
+  let buffered = Buffer.alloc(0);
+  socket.on('data', (chunk) => {
+    buffered = Buffer.concat([buffered, chunk]);
+    while (buffered.length >= 2) {
+      const first = buffered[0];
+      const second = buffered[1];
+      const opcode = first & 0x0f;
+      const masked = (second & 0x80) !== 0;
+      let length = second & 0x7f;
+      let offset = 2;
+      if (length === 126) {
+        if (buffered.length < 4) return;
+        length = buffered.readUInt16BE(2);
+        offset = 4;
+      } else if (length === 127) {
+        if (buffered.length < 10) return;
+        const longLength = buffered.readBigUInt64BE(2);
+        if (longLength > BigInt(Number.MAX_SAFE_INTEGER)) return socket.destroy();
+        length = Number(longLength);
+        offset = 10;
+      }
+      let mask = null;
+      if (masked) {
+        if (buffered.length < offset + 4) return;
+        mask = Buffer.from(buffered.subarray(offset, offset + 4));
+        offset += 4;
+      }
+      if (buffered.length < offset + length) return;
+      const payload = Buffer.from(buffered.subarray(offset, offset + length));
+      buffered = buffered.subarray(offset + length);
+      if (mask) for (let index = 0; index < payload.length; index += 1) payload[index] ^= mask[index % 4];
+      if (opcode === 8) return socket.end();
+      if (opcode === 9) {
+        socket.write(Buffer.concat([Buffer.from([0x8a, payload.length]), payload]));
+      } else if (opcode === 1) {
+        try {
+          const message = JSON.parse(payload.toString('utf8'));
+          if (message.type === 'ping') {
+            const response = Buffer.from(JSON.stringify({ type: 'pong' }));
+            socket.write(Buffer.concat([Buffer.from([0x81, response.length]), response]));
+          }
+        } catch {}
+      }
+    }
+  });
 });
 
 server.listen(port, process.env.T02_HOST ?? '0.0.0.0', () => {

@@ -132,14 +132,20 @@ class PollCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                InkWell(
-                  onTap: onOpenAuthor,
-                  borderRadius: BorderRadius.circular(24),
-                  child: UserAvatar(
-                    displayName: poll.author.displayName,
-                    username: poll.author.username,
-                    imageUrl: poll.author.avatarUrl,
-                    radius: compact ? 22 : 22,
+                Semantics(
+                  button: onOpenAuthor != null,
+                  label: 'Open ${poll.author.displayName} profile',
+                  child: InkWell(
+                    onTap: onOpenAuthor,
+                    borderRadius: BorderRadius.circular(24),
+                    child: ExcludeSemantics(
+                      child: UserAvatar(
+                        displayName: poll.author.displayName,
+                        username: poll.author.username,
+                        imageUrl: poll.author.avatarUrl,
+                        radius: compact ? 22 : 22,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -327,7 +333,7 @@ class PollCard extends StatelessWidget {
             ],
             SizedBox(height: compact ? 16 : 18),
             LayoutBuilder(
-              builder: (context, constraints) {
+              builder: (context, _) {
                 final metrics = [
                   _Metric(
                     icon: Icons.people_outline,
@@ -362,17 +368,10 @@ class PollCard extends StatelessWidget {
                   ),
                 ];
 
-                if (constraints.maxWidth < 340) {
-                  return Wrap(
-                    spacing: 16,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.spaceBetween,
-                    children: metrics,
-                  );
-                }
-
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                return Wrap(
+                  spacing: 16,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.spaceBetween,
                   children: metrics,
                 );
               },
@@ -711,7 +710,9 @@ class _Metric extends StatelessWidget {
     );
 
     if (onTap == null) {
-      return content;
+      return tooltip == 'Share'
+          ? Tooltip(message: tooltip!, child: content)
+          : content;
     }
 
     return Tooltip(

@@ -232,8 +232,17 @@ class _SearchScreenState extends State<SearchScreen> {
             ? item
             : PollSearchResult(score: item.score, poll: poll);
       }).toList();
+      final mergedItems = <String, SearchResult>{};
+      if (!reset) {
+        for (final item in _items) {
+          mergedItems[_searchResultId(item)] = item;
+        }
+      }
+      for (final item in items) {
+        mergedItems[_searchResultId(item)] = item;
+      }
       setState(() {
-        _items = reset ? items : [..._items, ...items];
+        _items = mergedItems.values.toList(growable: false);
         _nextCursor = page.nextCursor;
         _hasSearched = true;
         if (page.items.isEmpty && reset) {
@@ -828,11 +837,16 @@ class _SearchScreenState extends State<SearchScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title,
-              style:
-                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
           if (action != null)
             TextButton(
               onPressed: onAction,

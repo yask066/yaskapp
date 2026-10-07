@@ -1,0 +1,17 @@
+Analyzing mobile...                                             
+
+   info - Use a function declaration rather than a variable assignment to bind a function to a name. Try rewriting the closure assignment as a function declaration - lib\src\features\auth\auth_screen.dart:443:11 - prefer_function_declarations_over_variables
+   info - Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation - lib\src\features\feed\feed_screen.dart:698:11 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation - lib\src\features\feed\feed_screen.dart:699:20 - prefer_const_constructors
+warning - The declaration '_SimplePlaceholderScreen' isn't referenced. Try removing the declaration of '_SimplePlaceholderScreen' - lib\src\features\home\home_screen.dart:395:7 - unused_element
+   info - Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation - lib\src\features\polls\create_poll_screen.dart:298:15 - prefer_const_constructors
+   info - The 'child' argument should be last in widget constructor invocations. Try moving the argument to the end of the argument list - lib\src\features\profile\profile_screen.dart:469:33 - sort_child_properties_last
+warning - The declaration '_ProfileSection' isn't referenced. Try removing the declaration of '_ProfileSection' - lib\src\features\profile\profile_screen.dart:612:7 - unused_element
+warning - The declaration '_ProfileRow' isn't referenced. Try removing the declaration of '_ProfileRow' - lib\src\features\profile\profile_screen.dart:637:7 - unused_element
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement - lib\src\features\profile\settings_screen.dart:95:56 - deprecated_member_use
+   info - Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation - lib\src\features\reports\my_reports_screen.dart:75:19 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation - lib\src\features\reports\my_reports_screen.dart:75:33 - prefer_const_constructors
+warning - The value of the local variable 'navy' isn't used. Try removing the variable or using it - test\feed_screen_test.dart:377:11 - unused_local_variable
+   info - Unnecessary braces in a string interpolation. Try removing the braces - test\list_scroll_anchor_host_test.dart:71:65 - unnecessary_brace_in_string_interps
+
+13 issues found. (ran in 33.6s)

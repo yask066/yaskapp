@@ -31,6 +31,41 @@ void main() {
     expect(find.byKey(ValueKey('poll-${poll.id}')), findsOneWidget);
   });
 
+  testWidgets('M10 create prompt keeps its action readable at 200%', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final poll = motionRacePoll();
+    final api = _FakePollsApiClient(initialPolls: [poll]);
+    final realtime = _FakeRealtimeClient();
+    final store = _seedPollStore(poll);
+    addTearDown(realtime.close);
+    addTearDown(store.dispose);
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+        child: _feedWithStore(api, realtime, store,
+            textScaler: const TextScaler.linear(2)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    final label = tester.getRect(find.text('Create poll'));
+    final button = tester.getRect(find.ancestor(
+      of: find.text('Create poll'),
+      matching: find.byType(FilledButton),
+    ));
+    expect(label.left, greaterThanOrEqualTo(button.left));
+    expect(label.right, lessThanOrEqualTo(button.right));
+    expect(label.top, greaterThanOrEqualTo(button.top));
+    expect(label.bottom, lessThanOrEqualTo(button.bottom));
+  });
+
   test('M02 profiling uses the shared seed and creates 100 unique IDs', () {
     final polls = motionProfilingPolls();
     expect(polls, hasLength(100));
@@ -698,9 +733,16 @@ PollStateStore _seedPollStore(PollSummary poll) {
 Widget _feedWithStore(
   PollsApiClient api,
   RealtimeClient realtime,
-  PollStateStore store,
-) =>
+  PollStateStore store, {
+  TextScaler? textScaler,
+}) =>
     MaterialApp(
+      builder: (context, child) => textScaler == null
+          ? child!
+          : MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+              child: child!,
+            ),
       home: PollStateScope(
         store: store,
         child: FeedScreen(
