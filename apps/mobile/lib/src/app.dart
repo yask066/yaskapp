@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'core/motion/motion_settings.dart';
 import 'features/auth/auth_api_client.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/auth/auth_session.dart';
@@ -21,11 +22,15 @@ class YaskappApp extends StatefulWidget {
     this.authApiClient,
     this.authSessionStore,
     this.pollsApiClient,
+    this.reactionsMotion = false,
+    this.entryMotion = false,
   });
 
   final AuthApiClient? authApiClient;
   final AuthSessionStore? authSessionStore;
   final PollsApiClient? pollsApiClient;
+  final bool reactionsMotion;
+  final bool entryMotion;
 
   @override
   State<YaskappApp> createState() => _YaskappAppState();
@@ -239,9 +244,13 @@ class _YaskappAppState extends State<YaskappApp> {
         useMaterial3: true,
       ),
       debugShowCheckedModeBanner: false,
-      builder: (context, child) => PollStateScope(
-        store: _pollStateStore,
-        child: child ?? const SizedBox.shrink(),
+      builder: (context, child) => MotionSettingsScope(
+        reactionsMotion: widget.reactionsMotion,
+        entryMotion: widget.entryMotion,
+        child: PollStateScope(
+          store: _pollStateStore,
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
       home: _isBootstrapping
           ? const _AuthBootstrapScreen()
