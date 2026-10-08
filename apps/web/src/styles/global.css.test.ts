@@ -26,4 +26,16 @@ describe('global responsive polish', () => {
   it('does not retain legacy decorative treatments', () => {
     expect(styles).not.toMatch(/gradient|people-art|showcase-card|branding\/(?!yaskapp_logo)/);
   });
+
+  it('defines the motion values from the PRD as CSS tokens', () => {
+    expect(styles).toContain('--motion-count-duration: 180ms;');
+    expect(styles).toContain('--motion-bar-duration: 240ms;');
+    expect(styles).toContain('--motion-reaction-duration: 160ms;');
+    expect(styles).toContain('--motion-entry-duration: 200ms;');
+    expect(styles).toContain('--motion-entry-offset: 8px;');
+    expect(styles).toContain('--motion-stagger-duration: 35ms;');
+    expect(styles).toContain('--motion-max-staggered-items: 6;');
+    expect(styles).toContain('--motion-max-stagger-duration: 400ms;');
+    expect(styles).toContain('--motion-skeleton-crossfade-duration: 120ms;');
+  });
 });

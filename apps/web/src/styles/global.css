@@ -13,6 +13,15 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   --focus: 0 0 0 3px rgb(52 81 178 / 24%);
+  --motion-count-duration: 180ms;
+  --motion-bar-duration: 240ms;
+  --motion-reaction-duration: 160ms;
+  --motion-entry-duration: 200ms;
+  --motion-entry-offset: 8px;
+  --motion-stagger-duration: 35ms;
+  --motion-max-staggered-items: 6;
+  --motion-max-stagger-duration: 400ms;
+  --motion-skeleton-crossfade-duration: 120ms;
 }
 * { box-sizing: border-box; }
 html { min-height: 100%; scroll-behavior: smooth; }
