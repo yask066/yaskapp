@@ -26,6 +26,20 @@
 
 Flutter `--trace-startup` штатно собрал отдельный [startup summary](m17-flutter-initial-load-startup.json) и [timeline JSON](m17-flutter-initial-load-timeline.json). VM timeline измерил `timeToFirstFrameMicros=788768` (789 ms) и `timeToFirstFrameRasterizedMicros=899350` (899 ms); Flutter CLI также напечатал `Time to first frame: 788ms`.
 
+## SurfaceFlinger profile update: 8 October 2026
+
+The original Flutter `--trace-to-file` traces do not provide a trustworthy presentation denominator. A system Perfetto probe was added using `android.surfaceflinger.frametimeline`, `linux.process_stats` and app-scoped atrace categories. All three traces have `clock_sync_unrelatable_clock_domains=0` and `track_event_invalid_timestamp=0`, but Trace Processor reports zero app rows in both FrameTimeline tables. The app renders through `SurfaceView[...](BLAST)`; Perfetto's FrameTimeline documentation explicitly notes that SurfaceViews are not supported. A representative 43.8 MB system trace and its [capture config](m17-android-frametimeline.pbtxt) are retained. This source therefore cannot classify Flutter's app frames on this Samsung.
+
+For a per-layer counter, the follow-up uses SurfaceFlinger's `TimeStats` on the Flutter BLAST layer, excluding SystemUI and SurfaceFlinger display frames. The [capture/analyzer script](m17-android-timestats-profile.ps1) clears the stats, performs 75 alternating ADB swipes, and reads the app layer's `totalFrames` and `present2present` histogram. The first histogram period is 11,111,111 ns (90 Hz). Results:
+
+| Run | Scroll duration | SurfaceView presents | Present intervals >11.111 ms | Share | Interval p95 / max |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 30.04 s | 2,040 | 648 / 2,040 | 31.7647% | 22 / 44 ms |
+| 2 | 30.33 s | 2,067 | 674 / 2,067 | 32.6076% | 22 / 33 ms |
+| 3 | 30.24 s | 2,058 | 675 / 2,058 | 32.7988% | 22 / 33 ms |
+
+Machine-readable values and nonzero cadence bins are in [TimeStats summary](m17-android-timestats-summary.json); raw per-run dumps and stopwatch measurements are adjacent. The per-layer TimeStats payload reports `totalTimelineFrames=0`, so its `jankyFrames=0` is not evidence of a passing jank classifier. The interval histogram is an actual-present cadence measure, not an app-versus-expected FrameTimeline classification. Its 22 ms p95 and roughly 32% of intervals exceeding one 90 Hz period are a strong warning that the current scrolling cadence does not meet the target; AC-12 remains unconfirmed until we have supported per-app expected/actual frame classification or equivalent Flutter timing evidence that distinguishes active scrolling from idle gaps.
+
 ## Ограничения интерпретации
 
 `dumpsys gfxinfo` для всех трёх Flutter surface возвращает `Total frames rendered: 0`, поэтому Android ViewRoot frame table не годится для frame statistics. Flutter Perfetto traces разобраны Perfetto Trace Processor v58.2; сбор и расчёты сохранены в [машиночитаемом summary](m17-flutter-frame-metrics.json).

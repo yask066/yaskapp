@@ -1,0 +1,239 @@
+00:00 +0: loading D:/yaskapp/apps/mobile/test/api_config_test.dart
+00:00 +0: D:/yaskapp/apps/mobile/test/api_config_test.dart: uses the staging VPS endpoints when no deployment overrides are provided
+00:00 +1: D:/yaskapp/apps/mobile/test/auth_api_client_avatar_test.dart: uploads avatar as multipart field avatar
+00:00 +2: D:/yaskapp/apps/mobile/test/auth_api_client_avatar_test.dart: deletes avatar with authorization
+00:00 +3: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+00:01 +4: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+00:01 +5: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+00:02 +6: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+00:03 +7: D:/yaskapp/apps/mobile/test/auth_screen_test.dart: does not select a country by default
+00:03 +8: D:/yaskapp/apps/mobile/test/create_poll_screen_test.dart: create poll screen shows an add image action
+00:03 +9: D:/yaskapp/apps/mobile/test/create_poll_screen_test.dart: create poll screen shows an add image action
+00:04 +10: D:/yaskapp/apps/mobile/test/edit_profile_screen_test.dart: does not show Log out on the edit profile screen
+00:04 +11: D:/yaskapp/apps/mobile/test/edit_profile_screen_test.dart: does not show Log out on the edit profile screen
+00:04 +12: D:/yaskapp/apps/mobile/test/edit_profile_screen_test.dart: does not show Log out on the edit profile screen
+00:04 +13: D:/yaskapp/apps/mobile/test/edit_profile_screen_test.dart: does not show Log out on the edit profile screen
+00:04 +14: D:/yaskapp/apps/mobile/test/edit_profile_screen_test.dart: does not show Log out on the edit profile screen
+00:04 +15: D:/yaskapp/apps/mobile/test/edit_profile_screen_test.dart: does not show Log out on the edit profile screen
+00:04 +16: D:/yaskapp/apps/mobile/test/edit_profile_screen_test.dart: does not show Log out on the edit profile screen
+00:04 +17: D:/yaskapp/apps/mobile/test/edit_profile_screen_test.dart: does not show Log out on the edit profile screen
+00:04 +18: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M12 feed poll rows use stable poll IDs as keys
+00:04 +19: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M12 feed poll rows use stable poll IDs as keys
+00:04 +20: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M12 feed poll rows use stable poll IDs as keys
+00:04 +21: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M12 feed poll rows use stable poll IDs as keys
+00:05 +22: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +23: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +24: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +25: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +26: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +27: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +28: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +29: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +30: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +31: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +32: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +33: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +34: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +35: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +36: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +37: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +38: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +39: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +40: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +41: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +42: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +43: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +44: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:05 +45: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:06 +46: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:06 +47: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:06 +48: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:06 +49: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:06 +50: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:06 +51: D:/yaskapp/apps/mobile/test/list_scroll_anchor_host_test.dart: keeps the visible item anchored when earlier items are removed
+00:06 +52: D:/yaskapp/apps/mobile/test/list_scroll_state_test.dart: keeps a restore when an unrelated list context is captured
+00:06 +53: D:/yaskapp/apps/mobile/test/list_scroll_state_test.dart: keeps a restore when an unrelated list context is captured
+00:06 +54: D:/yaskapp/apps/mobile/test/list_scroll_state_test.dart: keeps a restore when an unrelated list context is captured
+00:06 +55: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M06 race_preserves_independent_fields_reverse
+00:06 +56: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M06 race_preserves_independent_fields_reverse
+00:06 +57: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M06 race_preserves_independent_fields_reverse
+00:06 +58: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M06 race_preserves_independent_fields_reverse
+00:06 +59: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M06 race_preserves_independent_fields_reverse
+00:06 +60: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M06 race_preserves_independent_fields_reverse
+00:06 +61: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M06 race_preserves_independent_fields_reverse
+00:06 +62: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M06 race_preserves_independent_fields_reverse
+00:06 +63: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M06 race_preserves_independent_fields_reverse
+00:06 +64: D:/yaskapp/apps/mobile/test/feed_screen_test.dart: M06 race_preserves_independent_fields_reverse
+00:06 +65: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:06 +66: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:07 +67: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:07 +68: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:07 +69: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:07 +70: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:07 +71: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:07 +72: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:07 +73: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:07 +74: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:07 +75: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:07 +76: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:07 +77: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:07 +78: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:07 +79: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:07 +80: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:07 +81: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:07 +82: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: opening inbox preserves unread state and performs no read mutation
+00:07 +83: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +84: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +85: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +86: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +87: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +88: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +89: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +90: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +91: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +92: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +93: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +94: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +95: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +96: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +97: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +98: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +99: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +100: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +101: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +102: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +103: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +104: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +105: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:08 +106: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:09 +107: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:09 +108: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:09 +109: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:09 +110: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:09 +111: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:09 +112: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:09 +113: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +114: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +115: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +116: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +117: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +118: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +119: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +120: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +121: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +122: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:10 +123: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +124: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +125: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +126: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +127: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +128: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +129: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +130: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +131: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +132: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +133: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +134: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +135: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +136: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +137: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +138: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +139: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:11 +140: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +141: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +142: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +143: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +144: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +145: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +146: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: opens poll, comment, reply, both like targets and the followed profile
+00:12 +147: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: pending banner materializes new items once and returns to top
+00:12 +148: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: pending banner materializes new items once and returns to top
+00:12 +149: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: pending banner materializes new items once and returns to top
+00:12 +150: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: pending banner materializes new items once and returns to top
+00:12 +151: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: pending banner materializes new items once and returns to top
+00:12 +152: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: pending banner materializes new items once and returns to top
+00:12 +153: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: pending banner materializes new items once and returns to top
+00:12 +154: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: pending banner materializes new items once and returns to top
+00:12 +155: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: pending banner materializes new items once and returns to top
+00:12 +156: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: scrolls the target comment into view and highlights it
+00:12 +157: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: scrolls the target comment into view and highlights it
+00:13 +158: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: scrolls the target comment into view and highlights it
+00:13 +159: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: scrolls the target comment into view and highlights it
+00:13 +160: D:/yaskapp/apps/mobile/test/notification_navigation_test.dart: scrolls the target comment into view and highlights it
+00:13 +161: D:/yaskapp/apps/mobile/test/notifications_screen_test.dart: read-all failure rolls back and can be retried
+00:13 +162: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: disables repeated comment submissions while in flight
+00:13 +163: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: disables repeated comment submissions while in flight
+00:13 +164: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: disables repeated comment submissions while in flight
+00:13 +165: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: disables repeated comment submissions while in flight
+00:13 +166: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: disables repeated comment submissions while in flight
+00:13 +167: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: disables repeated comment submissions while in flight
+00:13 +168: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: disables repeated comment submissions while in flight
+00:14 +169: D:/yaskapp/apps/mobile/test/poll_comments_screen_test.dart: disables repeated comment submissions while in flight
+00:14 +170: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:14 +171: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:14 +172: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:14 +173: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:14 +174: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:14 +175: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:15 +176: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:15 +177: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:15 +178: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:15 +179: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:15 +180: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:15 +181: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:15 +182: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:15 +183: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:15 +184: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:15 +185: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:16 +186: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:16 +187: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:16 +188: D:/yaskapp/apps/mobile/test/profile_screen_test.dart: profile opens a dedicated settings page
+00:16 +189: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:16 +190: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:16 +191: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:16 +192: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:16 +193: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:16 +194: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:16 +195: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:16 +196: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:17 +197: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:17 +198: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:17 +199: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:17 +200: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:17 +201: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:17 +202: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:18 +203: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:18 +204: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:18 +205: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:18 +206: D:/yaskapp/apps/mobile/test/report_dialog_test.dart: renders the reference-style report dialog
+00:18 +207: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:18 +208: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:19 +209: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:19 +210: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:19 +211: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:19 +212: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows discovery sections before a query is entered
+00:19 +213: D:/yaskapp/apps/mobile/test/widget_test.dart: shows auth entry point
+00:19 +214: D:/yaskapp/apps/mobile/test/widget_test.dart: shows auth entry point
+00:19 +215: D:/yaskapp/apps/mobile/test/widget_test.dart: shows auth entry point
+00:20 +216: D:/yaskapp/apps/mobile/test/widget_test.dart: shows auth entry point
+00:20 +217: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows the latest successful searches in reverse chronological order
+00:20 +218: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows the latest successful searches in reverse chronological order
+00:20 +219: D:/yaskapp/apps/mobile/test/search_screen_test.dart: persists and clears recent searches
+00:20 +220: D:/yaskapp/apps/mobile/test/search_screen_test.dart: clears the query from the search bar
+00:21 +221: D:/yaskapp/apps/mobile/test/search_screen_test.dart: focuses search input and does not request for a short query
+00:21 +222: D:/yaskapp/apps/mobile/test/search_screen_test.dart: debounces valid input and renders mixed results
+00:21 +223: D:/yaskapp/apps/mobile/test/search_screen_test.dart: does not run a second search after submitting debounced input
+00:22 +224: D:/yaskapp/apps/mobile/test/search_screen_test.dart: records result click only after tapping a result
+00:22 +225: D:/yaskapp/apps/mobile/test/search_screen_test.dart: wires poll voting actions from search results
+00:22 +226: D:/yaskapp/apps/mobile/test/search_screen_test.dart: opens the full poll card in a modal when tapping a poll result
+00:23 +227: D:/yaskapp/apps/mobile/test/search_screen_test.dart: allows voting from the poll preview modal
+00:23 +228: D:/yaskapp/apps/mobile/test/search_screen_test.dart: opens the preview when tapping a top poll
+00:23 +229: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows empty and retryable error states
+00:24 +230: D:/yaskapp/apps/mobile/test/search_screen_test.dart: shows a useful API error message when search fails
+00:24 +231: D:/yaskapp/apps/mobile/test/search_screen_test.dart: keeps search results and offers retry after load-more error
+00:25 +232: D:/yaskapp/apps/mobile/test/search_screen_test.dart: ignores an in-flight response after the query is cleared
+00:25 +233: D:/yaskapp/apps/mobile/test/search_screen_test.dart: filter changes preserve query and reset pagination
+00:25 +234: D:/yaskapp/apps/mobile/test/search_screen_test.dart: loads both T02 cursor-search pages and keeps their results
+00:26 +235: D:/yaskapp/apps/mobile/test/search_screen_test.dart: M14 page_dedup keeps one row per poll ID
+00:26 +235 ~1: D:/yaskapp/apps/mobile/test/search_screen_test.dart: places sort menu in the top-right search header button
+00:26 +236 ~1: All tests passed!

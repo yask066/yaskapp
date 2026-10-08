@@ -21,7 +21,7 @@ Initial command: `flutter run --profile --no-pub -d RF8R321M9LJ` from `apps/mobi
 
 ## Full Flutter suite
 
-Fresh command after the M10 repair: `flutter test --no-pub --reporter expanded` from `apps/mobile`; exit code 1, 223 passed, 13 failed, 1 skipped. All four added M10 Feed/PollCard/Search/navigation regressions pass. The full suite still has the previously classified auth/profile/search test-harness, UI and lifecycle mismatches. Detailed output is in [m17-flutter-tests-after-m10.txt](m17-flutter-tests-after-m10.txt).
+Fresh command on 8 October after the Flutter suite fixes: `flutter test --no-pub --reporter expanded` from `apps/mobile`; exit code 0, 236 passed, 1 skipped. Detailed output is in [m17-flutter-tests-2026-10-08.txt](m17-flutter-tests-2026-10-08.txt). The earlier 223/13-failure log is historical and predates the latest repairs.
 
 ## Flutter frame profile
 
@@ -29,4 +29,4 @@ On 7 October, three 30-second profile traces were captured on the unlocked Samsu
 
 ## Remaining work
 
-The scoped M10 200% layout and accessible-name issues are resolved and rechecked on-device. The physical Flutter traces have been parsed for UI `Frame` p95/max and engine `SceneDisplayLag`; trace health and the missing end-to-end frame denominator prevent those Android results from proving AC-12. The reference physical Chrome/monitor profile has now been captured separately: Chrome 155 on a 1680×1050/60 Hz display, three 30-second runs, active page-source `MISSED` 0–0.0555%. See [physical Chrome evidence](m17-verification.md#physical-chrome--monitor-profile). iOS coverage and the Android AC-12 denominator remain open; M17 and G0 are not closed.
+The scoped M10 200% layout and accessible-name issues are resolved and rechecked on-device. On 8 October, three 30-second scroll profiles were captured on the Samsung A32 with SurfaceFlinger TimeStats on the Flutter `SurfaceView` BLAST layer: 2,040/2,067/2,058 actual presents; 31.7647%/32.6076%/32.7988% of `present2present` intervals exceed the active 90 Hz budget, and p95 interval is 22 ms in each run. This is cadence evidence, not a jank classification: the layer reports `totalTimelineFrames=0`, and FrameTimeline omits this SurfaceView. See [profile details and limitations](m17-flutter-android-profile.md#surfaceflinger-profile-update-8-october-2026). The reference physical Chrome/monitor profile has now been captured separately: Chrome 155 on a 1680×1050/60 Hz display, three 30-second runs, active page-source `MISSED` 0–0.0555%. See [physical Chrome evidence](m17-verification.md#physical-chrome--monitor-profile). iOS coverage, TalkBack spoken output, and a supported per-app Android late-frame classifier remain open; M17 and G0 are not closed.

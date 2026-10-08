@@ -1,0 +1,88 @@
+{
+  "date": "2026-10-08",
+  "device": "Samsung SM-A325F / Android 13 API 33",
+  "displayPeriodNs": 11111111,
+  "frameSource": "SurfaceFlinger TimeStats on Flutter SurfaceView BLAST layer",
+  "lateCadenceDefinition": "present2present histogram intervals greater than the active 90 Hz display period; this is presentation-cadence evidence, not FrameTimeline jank classification",
+  "runs": [
+    {
+      "run": 1,
+      "elapsedSeconds": 30.04,
+      "swipes": 75,
+      "frameLayer": "SurfaceView[com.example.yaskapp_mobile/com.example.yaskapp_mobile.MainActivity]@0(BLAST)#142476",
+      "displayPeriodNs": 11111111,
+      "totalFrames": 2040,
+      "surfaceFlingerJankyFrames": 0,
+      "frameTimelineClassifiedFrames": 0,
+      "presentIntervalSamples": 2040.0,
+      "intervalsOver90HzBudget": 648,
+      "overBudgetPercent": 31.7647,
+      "presentIntervalP95HistogramMs": 22,
+      "presentIntervalAverageMs": 14.487,
+      "presentIntervalMaxHistogramMs": 44,
+      "presentIntervalMinHistogramMs": 10,
+      "histogram": {
+        "33": 2,
+        "11": 1345,
+        "22": 643,
+        "12": 1,
+        "21": 1,
+        "44": 1,
+        "10": 47
+      },
+      "sourceFile": "m17-android-timestats-run-1.txt"
+    },
+    {
+      "run": 2,
+      "elapsedSeconds": 30.33,
+      "swipes": 75,
+      "frameLayer": "SurfaceView[com.example.yaskapp_mobile/com.example.yaskapp_mobile.MainActivity]@0(BLAST)#142476",
+      "displayPeriodNs": 11111111,
+      "totalFrames": 2067,
+      "surfaceFlingerJankyFrames": 0,
+      "frameTimelineClassifiedFrames": 0,
+      "presentIntervalSamples": 2067.0,
+      "intervalsOver90HzBudget": 674,
+      "overBudgetPercent": 32.6076,
+      "presentIntervalP95HistogramMs": 22,
+      "presentIntervalAverageMs": 14.564,
+      "presentIntervalMaxHistogramMs": 33,
+      "presentIntervalMinHistogramMs": 10,
+      "histogram": {
+        "33": 1,
+        "11": 1347,
+        "22": 669,
+        "12": 1,
+        "21": 3,
+        "10": 46
+      },
+      "sourceFile": "m17-android-timestats-run-2.txt"
+    },
+    {
+      "run": 3,
+      "elapsedSeconds": 30.24,
+      "swipes": 75,
+      "frameLayer": "SurfaceView[com.example.yaskapp_mobile/com.example.yaskapp_mobile.MainActivity]@0(BLAST)#142476",
+      "displayPeriodNs": 11111111,
+      "totalFrames": 2058,
+      "surfaceFlingerJankyFrames": 0,
+      "frameTimelineClassifiedFrames": 0,
+      "presentIntervalSamples": 2058.0,
+      "intervalsOver90HzBudget": 675,
+      "overBudgetPercent": 32.7988,
+      "presentIntervalP95HistogramMs": 22,
+      "presentIntervalAverageMs": 14.588,
+      "presentIntervalMaxHistogramMs": 33,
+      "presentIntervalMinHistogramMs": 9,
+      "histogram": {
+        "33": 2,
+        "11": 1331,
+        "22": 672,
+        "12": 1,
+        "10": 51,
+        "9": 1
+      },
+      "sourceFile": "m17-android-timestats-run-3.txt"
+    }
+  ]
+}

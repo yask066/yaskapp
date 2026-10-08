@@ -1,0 +1,1 @@
+elapsed_seconds=30.24 swipes=75 frames=2058 over_budget=675/2058
