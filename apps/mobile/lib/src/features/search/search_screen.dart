@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/analytics/search_analytics.dart';
+import '../../core/motion/entry_motion.dart';
 import '../../core/scroll/list_scroll_anchor_host.dart';
 import '../../core/scroll/list_scroll_state.dart';
 import '../../core/widgets/content_skeleton.dart';
@@ -723,45 +724,57 @@ class _SearchScreenState extends State<SearchScreen> {
       return const Center(child: Text('No results found.'));
     }
 
-    return ListScrollAnchorHost(
-      context: ListScrollContext(
-        userId: widget.session.user.id,
-        route: '/search',
-        list: 'results',
-        query: _queryController.text.trim(),
-        filter: _type.name,
-        sort: _sort.name,
-      ),
-      store: listScrollStateStore,
-      controller: _scrollController,
-      itemIds: _items.map(_searchResultId).toList(),
-      child: ListView.separated(
-        key: const ValueKey('search-results-list'),
+    final entryContextKey =
+        'search:${widget.session.user.id}:${_queryController.text.trim()}:${_type.name}:${_sort.name}';
+    return EntryMotionRegistryScope(
+      contextKey: entryContextKey,
+      child: ListScrollAnchorHost(
+        context: ListScrollContext(
+          userId: widget.session.user.id,
+          route: '/search',
+          list: 'results',
+          query: _queryController.text.trim(),
+          filter: _type.name,
+          sort: _sort.name,
+        ),
+        store: listScrollStateStore,
         controller: _scrollController,
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        itemCount: _items.length +
-            (_isLoadingMore || _error != null && _items.isNotEmpty ? 1 : 0),
-        separatorBuilder: (_, index) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          if (index == _items.length) {
-            if (_error != null && !_isLoadingMore) {
-              return _SearchLoadMoreError(
-                onRetry: () => unawaited(_loadMore()),
+        itemIds: _items.map(_searchResultId).toList(),
+        child: ListView.separated(
+          key: const ValueKey('search-results-list'),
+          controller: _scrollController,
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          itemCount: _items.length +
+              (_isLoadingMore || _error != null && _items.isNotEmpty ? 1 : 0),
+          separatorBuilder: (_, index) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            if (index == _items.length) {
+              if (_error != null && !_isLoadingMore) {
+                return _SearchLoadMoreError(
+                  onRetry: () => unawaited(_loadMore()),
+                );
+              }
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(12),
+                  child: CircularProgressIndicator(),
+                ),
               );
             }
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(12),
-                child: CircularProgressIndicator(),
+            final result = _items[index];
+            return ListScrollAnchorItem(
+              id: _searchResultId(result),
+              child: EntryMotion(
+                key: ValueKey('entry-${_searchResultId(result)}'),
+                contextKey: entryContextKey,
+                itemId: _searchResultId(result),
+                visible: true,
+                indexInBatch: index,
+                child: _buildResult(result),
               ),
             );
-          }
-          final result = _items[index];
-          return ListScrollAnchorItem(
-            id: _searchResultId(result),
-            child: _buildResult(result),
-          );
-        },
+          },
+        ),
       ),
     );
   }
@@ -888,30 +901,27 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildTopUsers() {
     if (_isLoadingTopUsers) {
-      return _discoveryCard(const DelayedContentSkeleton(
-        kind: ContentSkeletonKind.user,
-        rows: 2,
-      ));
+      return _topUsersTransition(const SizedBox.shrink());
     }
     if (_topUsersError != null) {
       final error = _topUsersError;
       final message = error is ProfilesApiException
           ? '${error.message}${error.statusCode == null ? '' : ' (${error.statusCode})'}'
           : 'Could not load users.';
-      return _discoveryCard(ListTile(
+      return _topUsersTransition(_discoveryCard(ListTile(
         leading: const Icon(Icons.cloud_off_outlined),
         title: Text(message),
         trailing:
             TextButton(onPressed: _loadTopUsers, child: const Text('Retry')),
-      ));
+      )));
     }
     if (_topUsers.isEmpty) {
-      return _discoveryCard(const Padding(
+      return _topUsersTransition(_discoveryCard(const Padding(
         padding: EdgeInsets.all(20),
         child: Text('No users to show yet.'),
-      ));
+      )));
     }
-    return _discoveryCard(
+    return _topUsersTransition(_discoveryCard(
       Column(
         children: _topUsers
             .map((user) => Padding(
@@ -949,31 +959,38 @@ class _SearchScreenState extends State<SearchScreen> {
                 ))
             .toList(),
       ),
-    );
+    ));
   }
+
+  Widget _topUsersTransition(Widget child) => ContentEntryTransition(
+        loading: _isLoadingTopUsers && _topUsers.isEmpty,
+        skeleton: _discoveryCard(const DelayedContentSkeleton(
+          kind: ContentSkeletonKind.user,
+          rows: 2,
+        )),
+        contentKey: ValueKey('top-users-${_topUsers.length}'),
+        child: child,
+      );
 
   Widget _buildTopPolls() {
     if (_isLoadingTopPolls) {
-      return _discoveryCard(const DelayedContentSkeleton(
-        kind: ContentSkeletonKind.poll,
-        rows: 1,
-      ));
+      return _topPollsTransition(const SizedBox.shrink());
     }
     if (_topPollsError != null) {
-      return _discoveryCard(ListTile(
+      return _topPollsTransition(_discoveryCard(ListTile(
         leading: const Icon(Icons.cloud_off_outlined),
         title: const Text('Could not load polls.'),
         trailing:
             TextButton(onPressed: _loadTopPolls, child: const Text('Retry')),
-      ));
+      )));
     }
     if (_topPolls.isEmpty) {
-      return _discoveryCard(const Padding(
+      return _topPollsTransition(_discoveryCard(const Padding(
         padding: EdgeInsets.all(20),
         child: Text('No polls to show yet.'),
-      ));
+      )));
     }
-    return Column(
+    return _topPollsTransition(Column(
       children: _topPolls
           .map((poll) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
@@ -1013,8 +1030,18 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ))
           .toList(),
-    );
+    ));
   }
+
+  Widget _topPollsTransition(Widget child) => ContentEntryTransition(
+        loading: _isLoadingTopPolls && _topPolls.isEmpty,
+        skeleton: _discoveryCard(const DelayedContentSkeleton(
+          kind: ContentSkeletonKind.poll,
+          rows: 1,
+        )),
+        contentKey: ValueKey('top-polls-${_topPolls.length}'),
+        child: child,
+      );
 
   Future<void> _loadTopPolls() async {
     if (mounted) {

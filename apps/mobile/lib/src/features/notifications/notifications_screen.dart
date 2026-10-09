@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/motion/entry_motion.dart';
 import '../../core/scroll/list_scroll_anchor_host.dart';
 import '../../core/scroll/list_scroll_state.dart';
 import '../../core/widgets/content_skeleton.dart';
@@ -272,37 +273,51 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   itemIds: visibleItems
                       .map((item) => 'notification-${item.id}')
                       .toList(),
-                  child: ListView(
-                    controller: _scrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
-                    children: [
-                      if (isInitialLoading)
-                        const _NotificationsLoading()
-                      else if (isInitialError)
-                        _ErrorState(
-                            onRetry: () => _loadFirstPage(refresh: true))
-                      else if (state.ids.isEmpty)
-                        const _EmptyState()
-                      else if (visibleItems.isEmpty &&
-                          _unreadOnly &&
-                          state.unreadCount > 0 &&
-                          state.nextCursor != null)
-                        _UnreadSearchState(isError: state.error != null)
-                      else if (visibleItems.isEmpty)
-                        const _FilteredEmptyState()
-                      else
-                        for (final section in sections) ...[
-                          _NotificationSection(
-                            title: section.$1,
-                            items: section.$2,
-                            onTap: _openNotification,
-                          ),
-                          const SizedBox(height: 24),
-                        ],
-                      if (state.error != null && state.ids.isNotEmpty)
-                        _PageError(onRetry: _retryData),
-                    ],
+                  child: EntryMotionRegistryScope(
+                    contextKey:
+                        'notifications:${widget.userId ?? 'anonymous'}:${_unreadOnly ? 'unread' : 'all'}',
+                    child: ListView(
+                      controller: _scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
+                      children: [
+                        if (isInitialLoading)
+                          const _NotificationsLoading()
+                        else if (isInitialError)
+                          _ErrorState(
+                              onRetry: () => _loadFirstPage(refresh: true))
+                        else if (state.ids.isEmpty)
+                          const _EmptyState()
+                        else if (visibleItems.isEmpty &&
+                            _unreadOnly &&
+                            state.unreadCount > 0 &&
+                            state.nextCursor != null)
+                          _UnreadSearchState(isError: state.error != null)
+                        else if (visibleItems.isEmpty)
+                          const _FilteredEmptyState()
+                        else
+                          for (var sectionIndex = 0;
+                              sectionIndex < sections.length;
+                              sectionIndex++) ...[
+                            _NotificationSection(
+                              title: sections[sectionIndex].$1,
+                              items: sections[sectionIndex].$2,
+                              contextKey:
+                                  'notifications:${widget.userId ?? 'anonymous'}:${_unreadOnly ? 'unread' : 'all'}',
+                              indexOffset: sections
+                                  .take(sectionIndex)
+                                  .fold<int>(
+                                      0,
+                                      (total, section) =>
+                                          total + section.$2.length),
+                              onTap: _openNotification,
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                        if (state.error != null && state.ids.isNotEmpty)
+                          _PageError(onRetry: _retryData),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -372,11 +387,15 @@ class _NotificationSection extends StatelessWidget {
   const _NotificationSection({
     required this.title,
     required this.items,
+    required this.contextKey,
+    required this.indexOffset,
     required this.onTap,
   });
 
   final String title;
   final List<NotificationItem> items;
+  final String contextKey;
+  final int indexOffset;
   final ValueChanged<NotificationItem> onTap;
 
   @override
@@ -405,9 +424,16 @@ class _NotificationSection extends StatelessWidget {
               for (var index = 0; index < items.length; index++) ...[
                 ListScrollAnchorItem(
                   id: 'notification-${items[index].id}',
-                  child: _NotificationTile(
-                    item: items[index],
-                    onTap: () => onTap(items[index]),
+                  child: EntryMotion(
+                    key: ValueKey('entry-notification-${items[index].id}'),
+                    contextKey: contextKey,
+                    itemId: items[index].id,
+                    visible: true,
+                    indexInBatch: indexOffset + index,
+                    child: _NotificationTile(
+                      item: items[index],
+                      onTap: () => onTap(items[index]),
+                    ),
                   ),
                 ),
                 if (index < items.length - 1)

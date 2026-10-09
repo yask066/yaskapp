@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/motion/entry_motion.dart';
 import '../../core/scroll/list_scroll_anchor_host.dart';
 import '../../core/scroll/list_scroll_state.dart';
 import '../../core/widgets/content_skeleton.dart';
@@ -233,122 +234,126 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
               store: listScrollStateStore,
               controller: _scrollController,
               itemIds: _publicPolls.map((poll) => 'poll-${poll.id}').toList(),
-              child: ListView(
-                controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      UserAvatar(
-                        displayName: profile.displayName,
-                        username: profile.username,
-                        imageUrl: profile.avatarUrl,
-                        radius: 40,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              profile.username,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF10142D),
-                              ),
-                            ),
-                            Text(
-                              '@${profile.username}',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF667085),
-                              ),
-                            ),
-                            if (countryName != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  countryName,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Color(0xFF667085),
-                                  ),
-                                ),
-                              ),
-                            if (profile.bio?.isNotEmpty == true) ...[
-                              const SizedBox(height: 8),
+              child: EntryMotionRegistryScope(
+                contextKey: 'public-profile:${widget.userId}',
+                child: ListView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        UserAvatar(
+                          displayName: profile.displayName,
+                          username: profile.username,
+                          imageUrl: profile.avatarUrl,
+                          radius: 40,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text(
-                                profile.bio!,
-                                maxLines: 3,
+                                profile.username,
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  fontSize: 14,
-                                  height: 20 / 14,
-                                  color: Color(0xFF475467),
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF10142D),
                                 ),
                               ),
+                              Text(
+                                '@${profile.username}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF667085),
+                                ),
+                              ),
+                              if (countryName != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    countryName,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Color(0xFF667085),
+                                    ),
+                                  ),
+                                ),
+                              if (profile.bio?.isNotEmpty == true) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  profile.bio!,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    height: 20 / 14,
+                                    color: Color(0xFF475467),
+                                  ),
+                                ),
+                              ],
                             ],
-                          ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _Metric(label: 'Polls', value: profile.pollsCount),
+                        _Metric(
+                            label: 'Followers', value: profile.followersCount),
+                        _Metric(
+                            label: 'Following', value: profile.followingCount),
+                      ],
+                    ),
+                    if (!_isSelf) ...[
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        height: 48,
+                        child: _isFollowing
+                            ? OutlinedButton.icon(
+                                onPressed:
+                                    _isFollowSubmitting ? null : _toggleFollow,
+                                icon: const Icon(Icons.person_remove_outlined),
+                                label: const Text('Following'),
+                              )
+                            : FilledButton.icon(
+                                onPressed:
+                                    _isFollowSubmitting ? null : _toggleFollow,
+                                icon: const Icon(Icons.person_add_outlined),
+                                label: const Text('Follow'),
+                              ),
+                      ),
+                    ],
+                    if (_pollsFuture != null) ...[
+                      const SizedBox(height: 28),
+                      const Text(
+                        'Polls',
+                        style: TextStyle(
+                          color: Color(0xFF10142D),
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _Metric(label: 'Polls', value: profile.pollsCount),
-                      _Metric(
-                          label: 'Followers', value: profile.followersCount),
-                      _Metric(
-                          label: 'Following', value: profile.followingCount),
-                    ],
-                  ),
-                  if (!_isSelf) ...[
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      height: 48,
-                      child: _isFollowing
-                          ? OutlinedButton.icon(
-                              onPressed:
-                                  _isFollowSubmitting ? null : _toggleFollow,
-                              icon: const Icon(Icons.person_remove_outlined),
-                              label: const Text('Following'),
-                            )
-                          : FilledButton.icon(
-                              onPressed:
-                                  _isFollowSubmitting ? null : _toggleFollow,
-                              icon: const Icon(Icons.person_add_outlined),
-                              label: const Text('Follow'),
-                            ),
-                    ),
-                  ],
-                  if (_pollsFuture != null) ...[
-                    const SizedBox(height: 28),
-                    const Text(
-                      'Polls',
-                      style: TextStyle(
-                        color: Color(0xFF10142D),
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                      const SizedBox(height: 12),
+                      _PublicPollsList(
+                        contextKey: 'public-profile:${widget.userId}',
+                        future: _pollsFuture!,
+                        cachedPolls: _publicPolls,
+                        onRetry: () {
+                          setState(() {
+                            _pollsFuture = _loadPolls();
+                          });
+                        },
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    _PublicPollsList(
-                      future: _pollsFuture!,
-                      cachedPolls: _publicPolls,
-                      onRetry: () {
-                        setState(() {
-                          _pollsFuture = _loadPolls();
-                        });
-                      },
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           );
@@ -360,12 +365,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
 
 class _PublicPollsList extends StatelessWidget {
   const _PublicPollsList({
+    required this.contextKey,
     required this.future,
     required this.cachedPolls,
     required this.onRetry,
   });
 
   final Future<List<PollSummary>> future;
+  final String contextKey;
   final List<PollSummary> cachedPolls;
   final VoidCallback onRetry;
 
@@ -422,10 +429,17 @@ class _PublicPollsList extends StatelessWidget {
             for (var index = 0; index < polls.length; index++) ...[
               ListScrollAnchorItem(
                 id: 'poll-${polls[index].id}',
-                child: PollCard(
-                  key: ValueKey('poll-${polls[index].id}'),
-                  poll: polls[index],
-                  compact: true,
+                child: EntryMotion(
+                  key: ValueKey('entry-poll-${polls[index].id}'),
+                  contextKey: contextKey,
+                  itemId: polls[index].id,
+                  visible: true,
+                  indexInBatch: index,
+                  child: PollCard(
+                    key: ValueKey('poll-${polls[index].id}'),
+                    poll: polls[index],
+                    compact: true,
+                  ),
                 ),
               ),
               if (index != polls.length - 1) const SizedBox(height: 12),

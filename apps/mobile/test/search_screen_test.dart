@@ -6,6 +6,7 @@ import 'support/motion_scroll_fixture.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yaskapp_mobile/src/core/analytics/search_analytics.dart';
+import 'package:yaskapp_mobile/src/core/motion/motion_settings.dart';
 import 'package:yaskapp_mobile/src/features/auth/auth_session.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_card.dart';
@@ -435,7 +436,12 @@ void main() {
       );
 
       await tester.pumpWidget(
-        _app(client, searchHistory: MemorySearchHistoryStore()),
+        _app(
+          client,
+          searchHistory: MemorySearchHistoryStore(),
+          entryMotion: !verifyDedup,
+          pollsApiClient: _FakePollsApiClient(PollSummaryFixture.poll),
+        ),
       );
       await tester.enterText(find.byType(TextField), 'motion');
       await tester.pump(const Duration(milliseconds: 400));
@@ -480,6 +486,34 @@ void main() {
         find.byKey(const ValueKey('search-poll-result-motion-long-text')),
         findsOneWidget,
       );
+
+      if (!verifyDedup) {
+        final commentsAction = find.byTooltip('Comments').first;
+        await tester.ensureVisible(commentsAction);
+        await tester.pumpAndSettle();
+        await tester.tap(commentsAction);
+        await tester.pumpAndSettle();
+        expect(find.text('Comments'), findsOneWidget);
+        await tester.tap(find.byTooltip('Back'));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('search-poll-result-motion-long-text')),
+          findsOneWidget,
+        );
+        expect(
+          tester
+              .widget<Opacity>(find
+                  .ancestor(
+                    of: find.byKey(
+                      const ValueKey('search-poll-result-motion-long-text'),
+                    ),
+                    matching: find.byType(Opacity),
+                  )
+                  .first)
+              .opacity,
+          1,
+        );
+      }
     }, skip: verifyDedup && !runMotionKnownFailures);
   }
 
@@ -518,6 +552,7 @@ Widget _app(
   PollsApiClient? pollsApiClient,
   SearchHistoryStore? searchHistory,
   TextScaler? textScaler,
+  bool entryMotion = false,
 }) {
   return MaterialApp(
     builder: (context, child) => textScaler == null
@@ -526,13 +561,16 @@ Widget _app(
             data: MediaQuery.of(context).copyWith(textScaler: textScaler),
             child: child!,
           ),
-    home: SearchScreen(
-      session: _session(),
-      searchApiClient: client,
-      pollsApiClient: pollsApiClient,
-      profilesApiClient: _FakeProfilesApiClient(),
-      analytics: analytics,
-      searchHistory: searchHistory,
+    home: MotionSettingsScope(
+      entryMotion: entryMotion,
+      child: SearchScreen(
+        session: _session(),
+        searchApiClient: client,
+        pollsApiClient: pollsApiClient,
+        profilesApiClient: _FakeProfilesApiClient(),
+        analytics: analytics,
+        searchHistory: searchHistory,
+      ),
     ),
   );
 }
@@ -694,6 +732,14 @@ class _FakePollsApiClient extends PollsApiClient {
   }) async {
     return [poll];
   }
+
+  @override
+  Future<List<PollCommentSummary>> listComments({
+    required String pollId,
+    int limit = 50,
+    String? accessToken,
+  }) async =>
+      [];
 
   @override
   Future<PollSummary> vote({

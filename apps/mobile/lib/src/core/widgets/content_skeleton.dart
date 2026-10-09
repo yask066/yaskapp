@@ -2,6 +2,57 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../motion/motion_settings.dart';
+import '../motion/motion_tokens.dart';
+
+/// Crossfades one loading skeleton into its content without animating size.
+class ContentEntryTransition extends StatelessWidget {
+  const ContentEntryTransition({
+    required this.loading,
+    required this.skeleton,
+    required this.child,
+    this.contentKey,
+    super.key,
+  });
+
+  final bool loading;
+  final Widget skeleton;
+  final Widget child;
+  final Key? contentKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = MotionSettings.of(context).entryEnabled
+        ? MotionTokens.skeletonCrossfadeDuration
+        : Duration.zero;
+    return AnimatedSwitcher(
+      key: ValueKey(duration),
+      duration: duration,
+      reverseDuration: duration,
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: child,
+      ),
+      layoutBuilder: (currentChild, previousChildren) => Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          ...previousChildren,
+          if (currentChild != null) currentChild,
+        ],
+      ),
+      child: loading
+          ? KeyedSubtree(
+              key: const ValueKey('content-entry-skeleton'),
+              child: skeleton,
+            )
+          : KeyedSubtree(
+              key: contentKey ?? const ValueKey('content-entry-loaded'),
+              child: child,
+            ),
+    );
+  }
+}
+
 enum ContentSkeletonKind { poll, user, comment, notification }
 
 class ContentSkeleton extends StatelessWidget {
