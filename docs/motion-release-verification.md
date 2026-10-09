@@ -1,0 +1,32 @@
+# Motion release verification
+
+## M25 — shimmer decision
+
+**Decision (9 October 2026): do not add shimmer.** Keep poll, user, comment, and notification skeletons static. This is the completed optional outcome for M25; it does not pass AC-12 or open G0.
+
+### Evidence reviewed
+
+| Profile | Result | Relevance to shimmer |
+|---|---|---|
+| Physical Samsung SM-A325F, Android 13, Flutter profile build, T02 fixture, 60/90 Hz | On scroll, late frames were 98.875–99.957% at 90 Hz and 0.542–1.474% at 60 Hz. On reaction/count updates, all runs exceeded 1%: 97.600–99.749% at 90 Hz and 3.588–3.883% at 60 Hz. | The absolute AC-12 limit is already exceeded in the Android workload. There is no measured evidence to spend additional frame time on a skeleton effect. The profile identifies raster as the leading scroll bottleneck at 90 Hz, but does not isolate its cause. |
+| Android first Feed load with five-second fixture delay | The existing static skeleton was visible in all six samples. These short first-load samples are not a sustained-rendering rate. | Static loading feedback already works; shimmer is not needed to make loading visible. |
+| Physical Chrome 155, Windows display at 60 Hz | Three production-build runs recorded 0–1 missed active-page BeginFrames out of 1,801 (0–0.0555%). | This is a favorable web scroll baseline, but it does not establish Android headroom or measure a shimmer-on comparison. |
+| Web entry-motion preview and Flutter entry-motion verification | Existing skeleton-to-content transition is bounded to 120 ms; reduced motion switches to static content. `entryMotion` is off by default. | The optional skeleton effect can remain absent without changing loading behavior or introducing another setting. |
+
+### Interpretation and limits
+
+The Android captures do not provide the paired shimmer-off/shimmer-on comparison required to quantify a `+0.5` percentage-point regression. They do show that the absolute 1% threshold already fails in the measured Android scroll/reaction workloads, so there is no affirmative profiling evidence for adding shimmer. The web result cannot stand in for the Android measurement. Accordingly, M25 takes the allowed no-shimmer outcome and leaves the comparative AC-12 and G0 gates open.
+
+No product code or animation timers were added. Existing static skeletons remain the loading presentation; cached content behavior is unchanged. Existing reduced-motion behavior and the default-off `entryMotion` flags remain in force.
+
+### Source evidence
+
+- [Android AC-12 profile and raw captures](motion-scroll-loading-evidence/android-ac12-2026-10-08/README.md)
+- [M17 stabilization and web profile report](motion-scroll-loading-evidence/m17-verification.md)
+- [M23 web entry-motion verification](motion-scroll-loading-evidence/m23-web-verification.md)
+- [M24 Flutter entry-motion verification](motion-scroll-loading-evidence/m24-flutter-verification.md)
+- [PRD AC-12 protocol and loading requirements](prd-motion-scroll-loading.md)
+
+### Reconsideration criteria
+
+Reconsider shimmer only after a same-device, same-fixture, same-build-policy profile records paired shimmer-off/on runs, including first load, with the effect limited to visible skeletons and stopped in background. Every run must meet the absolute AC-12 limit (≤1% late frames), and the shimmer-on increase must remain ≤0.5 percentage points. Until then, keep shimmer out of scope and retain static skeletons.

@@ -452,11 +452,11 @@
 
 **Зависимости:** M23, M24. **Файлы:** только уже созданные skeleton/settings/styles и tests; решение в release report.
 
-- [ ] По первичному profiling определить, есть ли запас AC-12; отказ от shimmer — допустимый законченный результат задачи.
-- [ ] Если добавляется: использовать `entryMotion` как разрешение skeleton presentation motion, не создавать третий обязательный flag; reduced motion всегда static.
-- [ ] Ограничить работу видимыми skeleton, останавливать в фоне; cached data не заменять skeleton.
-- [ ] Проверить timers/cleanup, flags off и сравнение кадров с/без shimmer на тех же fixtures.
-- [ ] Сохранить решение/evidence; добавленный shimmer, не проходящий budget, убрать до M26. **AC:** AC-08, AC-11–AC-14.
+- [x] По первичному profiling определить, есть ли запас AC-12; отказ от shimmer — допустимый законченный результат задачи. Профиль Samsung SM-A325F показывает превышение абсолютного порога AC-12 в Android scroll/reaction сценариях; парного shimmer-off/on сравнения нет, поэтому запас не подтверждён.
+- [x] Если добавляется: использовать `entryMotion` как разрешение skeleton presentation motion, не создавать третий обязательный flag; reduced motion всегда static. **N/A:** shimmer не добавляется.
+- [x] Ограничить работу видимыми skeleton, останавливать в фоне; cached data не заменять skeleton. **N/A:** продуктовый код не менялся; текущие skeleton остаются статическими.
+- [x] Проверить timers/cleanup, flags off и сравнение кадров с/без shimmer на тех же fixtures. **N/A:** новых timers/effects и shimmer comparison нет; существующие flags по умолчанию выключены, ограничения сравнения записаны в отчёте.
+- [x] Сохранить решение/evidence; добавленный shimmer, не проходящий budget, убрать до M26. **AC:** AC-08, AC-11–AC-14. Итог: [M25 decision and evidence](../motion-release-verification.md).
 
 ## 5. Этап C — проверка и выпуск
 
