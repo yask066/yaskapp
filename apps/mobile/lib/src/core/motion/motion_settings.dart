@@ -31,7 +31,7 @@ class MotionSettings {
   static MotionSettings of(BuildContext context) {
     final scope =
         context.dependOnInheritedWidgetOfExactType<_MotionSettingsData>();
-    assert(scope != null, 'MotionSettingsScope is missing above this context.');
+    // Missing injection fails closed: standalone widgets stay static.
     final disableAnimations =
         MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 

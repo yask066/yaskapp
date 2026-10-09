@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../core/config/api_config.dart';
+import '../../core/motion/animated_count.dart';
+import '../../core/motion/motion_settings.dart';
+import '../../core/motion/motion_tokens.dart';
 import '../../core/widgets/user_avatar.dart';
 import 'poll_summary.dart';
 import 'poll_state_scope.dart';
@@ -326,6 +329,7 @@ class PollCard extends StatelessWidget {
                 compact: compact,
                 profileVariant: compact,
                 isLoading: isVoting,
+                animateTap: onVote != null,
                 onTap:
                     onVote == null ? null : () => onVote!(poll.options[index]),
               ),
@@ -356,6 +360,7 @@ class PollCard extends StatelessWidget {
                     animatedValue: poll.likesCount,
                     isActive: poll.viewerHasLiked,
                     isLoading: isLiking,
+                    animateTap: onToggleLike != null,
                     tooltip: poll.viewerHasLiked ? 'Unlike' : 'Like',
                     onTap: onToggleLike,
                     dense: compact,
@@ -427,6 +432,7 @@ class _PollOptionButton extends StatelessWidget {
     this.compact = false,
     this.profileVariant = false,
     this.isLoading = false,
+    this.animateTap = false,
     this.onTap,
     super.key,
   });
@@ -438,6 +444,7 @@ class _PollOptionButton extends StatelessWidget {
   final bool compact;
   final bool profileVariant;
   final bool isLoading;
+  final bool animateTap;
   final VoidCallback? onTap;
 
   @override
@@ -465,68 +472,71 @@ class _PollOptionButton extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: numericOption
-                ? Row(
-                    children: [
-                      SizedBox(
-                        width: numericOption ? 20.0 : 68.0,
-                        child: _OptionLabel(
-                          text: option.text,
-                          compact: compact,
-                          color: accentColor,
-                        ),
-                      ),
-                      SizedBox(width: compact ? 8 : 12),
-                      Expanded(
-                        child: _OptionProgress(
-                          percent: percent,
-                          color: accentColor,
-                          height: progressHeight,
-                        ),
-                      ),
-                      SizedBox(width: compact ? 8 : 12),
-                      SizedBox(
-                        width: 42,
-                        child: _OptionPercentage(
-                          percent: percent,
-                          compact: compact,
-                          color: accentColor,
-                        ),
-                      ),
-                      _OptionLoadingSlot(isLoading: isLoading),
-                    ],
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _OptionLabel(
-                              text: option.text,
-                              compact: compact,
-                              color: accentColor,
-                            ),
+          child: _LocalReactionScale(
+            enabled: animateTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: numericOption
+                  ? Row(
+                      children: [
+                        SizedBox(
+                          width: numericOption ? 20.0 : 68.0,
+                          child: _OptionLabel(
+                            text: option.text,
+                            compact: compact,
+                            color: accentColor,
                           ),
-                          const SizedBox(width: 8),
-                          _OptionPercentage(
+                        ),
+                        SizedBox(width: compact ? 8 : 12),
+                        Expanded(
+                          child: _OptionProgress(
+                            percent: percent,
+                            color: accentColor,
+                            height: progressHeight,
+                          ),
+                        ),
+                        SizedBox(width: compact ? 8 : 12),
+                        SizedBox(
+                          width: 42,
+                          child: _OptionPercentage(
                             percent: percent,
                             compact: compact,
                             color: accentColor,
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      _OptionProgress(
-                        percent: percent,
-                        color: accentColor,
-                        height: progressHeight,
-                      ),
-                      _OptionLoadingSlot(isLoading: isLoading),
-                    ],
-                  ),
+                        ),
+                        _OptionLoadingSlot(isLoading: isLoading),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _OptionLabel(
+                                text: option.text,
+                                compact: compact,
+                                color: accentColor,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _OptionPercentage(
+                              percent: percent,
+                              compact: compact,
+                              color: accentColor,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        _OptionProgress(
+                          percent: percent,
+                          color: accentColor,
+                          height: progressHeight,
+                        ),
+                        _OptionLoadingSlot(isLoading: isLoading),
+                      ],
+                    ),
+            ),
           ),
         ),
       ),
@@ -573,9 +583,12 @@ class _OptionProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final shouldAnimate = MotionSettings.of(context).reactionsEnabled;
+    final safePercent =
+        percent.isFinite ? percent.clamp(0.0, 1.0).toDouble() : 0.0;
     return TweenAnimationBuilder<double>(
-      tween: Tween<double>(end: percent.clamp(0, 1)),
-      duration: const Duration(milliseconds: 350),
+      tween: Tween<double>(end: safePercent),
+      duration: shouldAnimate ? MotionTokens.barDuration : Duration.zero,
       curve: Curves.easeOutCubic,
       builder: (context, animatedPercent, child) {
         return ClipRRect(
@@ -605,20 +618,29 @@ class _OptionPercentage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(end: percent * 100),
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOutCubic,
-      builder: (context, animatedPercent, child) {
-        return Text(
-          '${animatedPercent.round()}%',
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.w600,
-            fontSize: compact ? 14 : 15,
-          ),
-        );
-      },
+    final shouldAnimate = MotionSettings.of(context).reactionsEnabled;
+    final targetPercent = percent.isFinite
+        ? (percent.clamp(0.0, 1.0).toDouble() * 100).round()
+        : 0;
+    return Semantics(
+      label: '$targetPercent%',
+      child: ExcludeSemantics(
+        child: TweenAnimationBuilder<double>(
+          tween: Tween<double>(end: targetPercent.toDouble()),
+          duration: shouldAnimate ? MotionTokens.countDuration : Duration.zero,
+          curve: Curves.easeOutCubic,
+          builder: (context, animatedPercent, child) {
+            return Text(
+              '${animatedPercent.round()}%',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w600,
+                fontSize: compact ? 14 : 15,
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 }
@@ -656,6 +678,7 @@ class _Metric extends StatelessWidget {
     required this.label,
     this.isActive = false,
     this.isLoading = false,
+    this.animateTap = false,
     this.animatedValue,
     this.tooltip,
     this.onTap,
@@ -666,6 +689,7 @@ class _Metric extends StatelessWidget {
   final String label;
   final bool isActive;
   final bool isLoading;
+  final bool animateTap;
   final int? animatedValue;
   final String? tooltip;
   final VoidCallback? onTap;
@@ -701,10 +725,10 @@ class _Metric extends StatelessWidget {
                 ),
           )
         else
-          _MetricCount(
+          AnimatedCount(
             value: animatedValue ?? int.parse(label),
             suffix: label.endsWith(' votes') ? ' votes' : '',
-            animate: animatedValue != null,
+            enabled: animatedValue != null,
           ),
       ],
     );
@@ -720,68 +744,91 @@ class _Metric extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          child: content,
+        child: _LocalReactionScale(
+          enabled: animateTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: content,
+          ),
         ),
       ),
     );
   }
 }
 
-class _MetricCount extends StatelessWidget {
-  const _MetricCount({
-    required this.value,
-    required this.suffix,
-    required this.animate,
+class _LocalReactionScale extends StatefulWidget {
+  const _LocalReactionScale({
+    required this.child,
+    this.enabled = true,
   });
 
-  final int value;
-  final String suffix;
-  final bool animate;
+  final Widget child;
+  final bool enabled;
 
   @override
-  Widget build(BuildContext context) {
-    final textStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
-      color: const Color(0xFF10142D),
-      fontSize: 14,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
-    final fontSize = textStyle?.fontSize ?? 14;
-    final scaledFontSize = MediaQuery.textScalerOf(context).scale(fontSize);
-    final reservedCharacters = suffix.isEmpty ? 4 : 9;
-    final slotWidth = reservedCharacters * scaledFontSize * 0.62;
-
-    Widget render(int currentValue) => Semantics(
-          label: '$currentValue$suffix',
-          child: ExcludeSemantics(
-            child: SizedBox(
-              width: slotWidth,
-              child: Text(
-                '${_compactCount(currentValue)}$suffix',
-                maxLines: 1,
-                softWrap: false,
-                overflow: TextOverflow.clip,
-                style: textStyle,
-              ),
-            ),
-          ),
-        );
-
-    if (!animate) return render(value);
-
-    return TweenAnimationBuilder<int>(
-      tween: IntTween(end: value),
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOutCubic,
-      builder: (context, currentValue, child) => render(currentValue),
-    );
-  }
+  State<_LocalReactionScale> createState() => _LocalReactionScaleState();
 }
 
-String _compactCount(int count) {
-  if (count < 1000) return '$count';
-  if (count < 1000000) return '${count ~/ 1000}K';
-  if (count < 1000000000) return '${count ~/ 1000000}M';
-  return '${count ~/ 1000000000}B';
+class _LocalReactionScaleState extends State<_LocalReactionScale>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: MotionTokens.likeDuration ~/ 2,
+    reverseDuration: MotionTokens.likeDuration ~/ 2,
+  );
+  late MotionSettings _settings;
+  var _canAnimate = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _settings = MotionSettings.of(context);
+    _syncMotion();
+  }
+
+  @override
+  void didUpdateWidget(_LocalReactionScale oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.enabled != widget.enabled) _syncMotion();
+  }
+
+  void _syncMotion() {
+    _canAnimate = widget.enabled && _settings.reactionsEnabled;
+    if (!_canAnimate) {
+      _controller.stop();
+      _controller.value = 0;
+    }
+  }
+
+  void _handlePointerDown(PointerDownEvent event) {
+    if (_canAnimate) _controller.forward(from: 0);
+  }
+
+  void _handlePointerUp(PointerEvent event) {
+    if (_canAnimate && _controller.status != AnimationStatus.dismissed) {
+      _controller.reverse();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+        onPointerDown: _handlePointerDown,
+        onPointerUp: _handlePointerUp,
+        onPointerCancel: _handlePointerUp,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) => Transform.scale(
+            scale: 1 + (MotionTokens.maxLikeScale - 1) * _controller.value,
+            transformHitTests: false,
+            child: child,
+          ),
+          child: widget.child,
+        ),
+      );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 }
