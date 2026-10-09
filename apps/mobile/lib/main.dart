@@ -3,8 +3,11 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'src/app.dart';
+import 'src/core/motion/motion_flags.dart';
 import 'src/features/notifications/firebase_push_service.dart';
 import 'src/performance/ac12_frame_timing_probe.dart';
+
+const _motionFlags = MotionFlags.fromEnvironment();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,5 +16,8 @@ Future<void> main() async {
   }
   await Firebase.initializeApp();
   await FirebasePushService().initialize();
-  runApp(const YaskappApp());
+  runApp(YaskappApp(
+    reactionsMotion: _motionFlags.reactionsMotion,
+    entryMotion: _motionFlags.entryMotion,
+  ));
 }
