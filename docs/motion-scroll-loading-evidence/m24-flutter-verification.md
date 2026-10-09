@@ -23,6 +23,15 @@
 - `flutter build apk --debug --no-pub`: **passed** (`assembleDebug`).
 - `git diff --check`: clean.
 
+### Fresh M24 re-check — 9 October 2026
+
+- Focused entry/feed/search/profile/public-profile suites: **61 passed, 1 skipped** (`flutter test --no-pub test/entry_motion_test.dart test/feed_screen_test.dart test/search_screen_test.dart test/profile_screen_test.dart test/public_profile_screen_test.dart`).
+- Full Flutter suite: **266 passed, 1 skipped** (`flutter test --no-pub`).
+- `flutter analyze lib/src/core/motion/entry_motion.dart test/entry_motion_test.dart`: **no issues found**.
+- Full `flutter analyze`: exit 1 with **11 diagnostics** in existing auth, home, polls, profile, reports, and test files; none are in the two `entry_motion` files. The current count is one fewer than the earlier recorded run.
+
 ## Device smoke
 
-Not completed. `flutter devices` found Windows, Chrome, and Edge only; `adb devices -l` found no Android device. The configured Pixel 7 AVD exited with code 1 at startup. Its configuration targets Android 37 but the corresponding system-image directory is empty, so there is no installed image for the AVD to boot. The debug APK build does not substitute for physical/emulator smoke; this acceptance check remains open.
+Completed on physical Samsung SM-A325F (`RF8R321M9LJ`), Android 13 / API 33, 1080×2400 at 420 dpi. A profile build with `YASKAPP_REACTIONS_MOTION=false` and `YASKAPP_ENTRY_MOTION=true` installed and launched. Signed into the local T02 fixture, confirmed entry-bearing cards on Feed, scrolled the list, ran a Search query and saw poll result cards, opened the Profile tab and saw its fixture polls, then logged out to the login screen. The completed run had no fatal exception; captured Android accessibility trees are in [device smoke evidence](m24-device-smoke-2026-10-09/README.md).
+
+The smoke used `adb reverse` to a local T02 fixture, not production or staging. A temporary copy of the fixture server preserved base search cards and returned the profile-polls route because the stock `profiling` preset clears those base cards and does not implement that route. The temporary server stayed under the ignored `.tmp` directory; no application or fixture source was changed for the smoke. This is a functional UI smoke only: it does not measure AC-12 frame performance or compare motion on/off. The Samsung supports 60/90 Hz and does not provide the 120 Hz AC-12 mode; those profiling results and limitations remain in the [M17 Android profile](android-ac12-2026-10-09/README.md).
