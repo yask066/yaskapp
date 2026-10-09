@@ -30,3 +30,16 @@ No product code or animation timers were added. Existing static skeletons remain
 ### Reconsideration criteria
 
 Reconsider shimmer only after a same-device, same-fixture, same-build-policy profile records paired shimmer-off/on runs, including first load, with the effect limited to visible skeletons and stopped in background. Every run must meet the absolute AC-12 limit (≤1% late frames), and the shimmer-on increase must remain ≤0.5 percentage points. Until then, keep shimmer out of scope and retain static skeletons.
+
+## M26 — Final motion verification
+
+**Date:** 9 October 2026
+**Result: PARTIAL — M26 remains open; AC-12 and G0 are not passed.**
+
+Current automated checks passed on checkout `116b3a8c3893c1fd9bba55733b37fd8b4bc661c8`: Web 236/236 plus typecheck, lint and production build; Flutter 263 passed/1 skipped; focused motion widget tests 24/24. Focused Flutter analyze found one info diagnostic in `test/motion_settings_test.dart:23` (`prefer_const_constructors`). Full results and methods are in [M26 automated verification](motion-scroll-loading-evidence/m26-automated-verification.md).
+
+ADB detected the physical Samsung SM-A325F, Android 13/API 33. The root app entry currently constructs `const YaskappApp()` and its two motion flags default off; no supported app/build configuration can set reactions-only or both-on for a live profile. This leaves the required end-to-end flag matrix and paired device measurements unavailable in the current code. The prior Android baseline already exceeds AC-12's absolute threshold in all 90 Hz scroll runs, one 60 Hz scroll run, and every reaction run; that evidence is from 8 October and is not a substitute for the M26 off/on pair. Twenty-cycle runtime-resource comparison and post-M24 physical accessibility smoke also remain unmeasured.
+
+**Ruling:** Treat the missing root-level motion flag configuration as a prerequisite to the live paired profile and leave M26 open — M26 is a verification task and M27 owns release configuration; adding a new runtime/build control here would exceed the approved M26 scope — cost if wrong: the release matrix remains blocked until that configuration is implemented and verified.
+
+The earlier M17 keyboard, text-scale and web navigation evidence, plus M21–M24 automated results, remain useful historical evidence but do not close these M26 checks. Do not change the G0 decision: **G0 remains NOT PASSED**.
