@@ -303,9 +303,11 @@
 - [x] Проверить header/group changes notifications и unread filter без новых read-side effects; существующие arrivals вне начала буферизуются.
 - [x] Проверить composer/keyboard show-hide, expanded replies и target-comment переход; нет неожиданного reset к началу.
 - [x] Выполнить affected widget/navigation tests и analyze; сохранить commit/evidence.
-- [ ] Device smoke остаётся неизмеренным: Pixel 7 AVD не запускается без Android system image. См. [M14 verification](../../motion-scroll-loading-evidence/m14-verification.md).
+- [x] Device smoke пройден 9 октября на Samsung SM-A325F: Feed → Comments → replies, keyboard show/hide → Back; bounds видимого Feed элемента до/после совпали (`0 physical/logical px`). См. [M14 verification](../../motion-scroll-loading-evidence/m14-verification.md).
 
 **Готово:** вся Flutter-матрица имеет пройденные scroll сценарии и явные исключения viewport. **AC:** AC-05–AC-07.
+
+**M14 закрыта 9 октября 2026 года:** повторные Flutter suites — 109 passed/1 skipped; физический Android smoke на Samsung SM-A325F прошёл с возвратом к точным bounds. Известные lint/info diagnostics совпадают с M17 baseline и записаны в evidence.
 
 ### M15. Web: static skeleton/loading
 
