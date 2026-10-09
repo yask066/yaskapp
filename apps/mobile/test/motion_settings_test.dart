@@ -20,8 +20,8 @@ void main() {
     expect(settings!.reactionsMotion, isFalse);
     expect(settings!.entryMotion, isFalse);
 
-    await tester.pumpWidget(MaterialApp(
-      home: const MotionSettingsScope(
+    await tester.pumpWidget(const MaterialApp(
+      home: MotionSettingsScope(
         reactionsMotion: true,
         entryMotion: false,
         child: _SettingsProbe(),
