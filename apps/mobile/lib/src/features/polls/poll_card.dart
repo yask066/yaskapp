@@ -587,6 +587,7 @@ class _OptionProgress extends StatelessWidget {
     final safePercent =
         percent.isFinite ? percent.clamp(0.0, 1.0).toDouble() : 0.0;
     return TweenAnimationBuilder<double>(
+      key: ValueKey<bool>(shouldAnimate),
       tween: Tween<double>(end: safePercent),
       duration: shouldAnimate ? MotionTokens.barDuration : Duration.zero,
       curve: Curves.easeOutCubic,
@@ -626,6 +627,7 @@ class _OptionPercentage extends StatelessWidget {
       label: '$targetPercent%',
       child: ExcludeSemantics(
         child: TweenAnimationBuilder<double>(
+          key: ValueKey<bool>(shouldAnimate),
           tween: Tween<double>(end: targetPercent.toDouble()),
           duration: shouldAnimate ? MotionTokens.countDuration : Duration.zero,
           curve: Curves.easeOutCubic,

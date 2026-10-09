@@ -48,6 +48,27 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('reduced motion finishes active result transitions immediately', (
+    tester,
+  ) async {
+    final key = GlobalKey<_PollCardMotionHarnessState>();
+    await tester.pumpWidget(_host(key: key, reactionsMotion: true));
+    key.currentState!.show(_poll(votes: 100, optionVotes: 100));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 80));
+
+    expect(_firstProgress(tester).value, lessThan(1));
+    expect(find.text('100%'), findsNothing);
+
+    await tester.pumpWidget(
+      _host(key: key, reactionsMotion: true, reduceMotion: true),
+    );
+    await tester.pump();
+
+    expect(_firstProgress(tester).value, 1);
+    expect(find.text('100%'), findsOneWidget);
+  });
+
   testWidgets('like scale is driven by a local pointer press only', (
     tester,
   ) async {
@@ -87,13 +108,21 @@ void main() {
 Widget _host({
   required GlobalKey<_PollCardMotionHarnessState> key,
   required bool reactionsMotion,
+  bool reduceMotion = false,
 }) =>
     MaterialApp(
-      home: MotionSettingsScope(
-        reactionsMotion: reactionsMotion,
-        child: Scaffold(
-          body: SingleChildScrollView(
-            child: _PollCardMotionHarness(key: key),
+      home: Builder(
+        builder: (context) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            disableAnimations: reduceMotion,
+          ),
+          child: MotionSettingsScope(
+            reactionsMotion: reactionsMotion,
+            child: Scaffold(
+              body: SingleChildScrollView(
+                child: _PollCardMotionHarness(key: key),
+              ),
+            ),
           ),
         ),
       ),
