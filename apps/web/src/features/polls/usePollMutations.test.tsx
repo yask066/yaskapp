@@ -1,9 +1,12 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
+import { MemoryRouter } from 'react-router-dom';
 import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
+import { MotionSettingsProvider } from '../../core/motion/motion-settings';
+import { PollCard } from '../../components/PollCard';
 import { usePollMutations } from './usePollMutations';
 import { listPolls } from '../../api/polls';
 import type { Poll } from '../../api/models';
@@ -137,6 +140,43 @@ function PendingButtons() {
     <output>{mutations.isVoting('poll-b') ? 'B pending' : 'B ready'}</output>
   </>;
 }
+
+function ReactionPollCard() {
+  const mutations = usePollMutations();
+  const query = useQuery<Poll[]>({ queryKey: ['polls', 'newest'], queryFn: async () => [poll], staleTime: Infinity });
+  const currentPoll = query.data?.[0];
+  if (!currentPoll) return null;
+  return <PollCard poll={currentPoll} viewerId="viewer-1" onLike={(pollId, viewerHasLiked) => mutations.toggleLike({ pollId, viewerHasLiked })} isLiking={mutations.isLiking(currentPoll.id)} />;
+}
+
+test('animating a local like preserves the single mutation request and announces only pending state', async () => {
+  let writes = 0;
+  const result = { ...poll, stateRevisions: { ...poll.stateRevisions, likes: '1' }, likesCount: 3, viewerHasLiked: true };
+  server.use(http.post('/polls/poll-1/likes', () => {
+    writes += 1;
+    return HttpResponse.json({ poll: result }, { status: 201 });
+  }));
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  client.setQueryData(['polls', 'newest'], [poll]);
+  const user = userEvent.setup();
+  render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <MotionSettingsProvider flags={{ reactionsMotion: true, entryMotion: false }}>
+          <ReactionPollCard />
+        </MotionSettingsProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+
+  await user.click(screen.getByRole('button', { name: 'Like (2)' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Like (3)' })).toHaveAttribute('aria-pressed', 'true'));
+
+  expect(writes).toBe(1);
+  expect(client.getQueryData<Poll[]>(['polls', 'newest'])?.[0]).toMatchObject({ likesCount: 3, viewerHasLiked: true });
+  expect(screen.queryAllByRole('status')).toHaveLength(0);
+  client.clear();
+});
 
 test('deduplicates repeated taps per poll while another poll can start in parallel', async () => {
   const gates = { aVote: t02ResponseGate<Poll>(), aLike: t02ResponseGate<Poll>(), bVote: t02ResponseGate<Poll>() };

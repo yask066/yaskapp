@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import type { Poll } from '../api/models';
+import { useMotionSettings } from '../core/motion/use-motion-settings';
+import { motionTokens } from '../core/motion/motion-tokens';
 import { Avatar } from './Avatar';
+import { AnimatedCount } from './AnimatedCount';
 import { MaterialIcon } from './MaterialIcon';
 
 interface PollCardProps {
@@ -18,6 +21,9 @@ interface PollCardProps {
 
 export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelete, onOpenComments, isVoting = false, isLiking = false }: PollCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { reactionsMotion, reduceMotion } = useMotionSettings();
+  const reactionsEnabled = reactionsMotion && !reduceMotion;
+  const likeAnimation = useRef<Animation | null>(null);
   const authorName = poll.author.displayName || poll.author.username;
   const isClosed = Boolean(poll.endsAt && new Date(poll.endsAt).getTime() <= Date.now());
   const hasVoted = Boolean(poll.viewerVoteOptionId);
@@ -26,8 +32,30 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
   const voteHelp = viewerId ? 'Voting is not available for this poll.' : 'Sign in to vote on this poll.';
   const likeHelp = viewerId ? 'Liking is not available for this poll.' : 'Sign in to like this poll.';
   const createdLabel = formatPollDate(poll.createdAt);
+  useEffect(() => {
+    if (!reactionsEnabled) {
+      likeAnimation.current?.cancel();
+      likeAnimation.current = null;
+    }
+    return () => {
+      likeAnimation.current?.cancel();
+      likeAnimation.current = null;
+    };
+  }, [reactionsEnabled]);
+
+  function handleLike(event: MouseEvent<HTMLButtonElement>) {
+    if (reactionsEnabled && typeof event.currentTarget.animate === 'function') {
+      likeAnimation.current?.cancel();
+      likeAnimation.current = event.currentTarget.animate(
+        [{ transform: 'scale(1)' }, { transform: 'scale(1.08)' }, { transform: 'scale(1)' }],
+        { duration: motionTokens.reactionDurationMs, easing: 'ease-out' },
+      );
+    }
+    onLike?.(poll.id, poll.viewerHasLiked);
+  }
+
   return (
-    <article className="poll-card" data-list-item-id={poll.id} tabIndex={-1} aria-labelledby={`poll-${poll.id}-question`}>
+    <article className={`poll-card${reactionsEnabled ? ' poll-card--reactions' : ''}`} data-list-item-id={poll.id} tabIndex={-1} aria-labelledby={`poll-${poll.id}-question`}>
       <header className="poll-card-header poll-card__meta">
         <Avatar name={authorName} src={poll.author.avatarUrl} />
         <div className="poll-author-meta">
@@ -54,9 +82,9 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
               const isPendingOption = isVoting && poll.viewerVoteOptionId === option.id;
               return <button className={`poll-option${poll.viewerVoteOptionId === option.id ? ' is-selected' : ''}${hasVoted ? ' is-results' : ''}`} key={option.id} type="button" disabled={!canVote} onClick={() => onVote?.(poll.id, option.id)} aria-label={`${option.text} (${formatVotes(option.votesCount)})`} aria-describedby={onVote ? undefined : `poll-${poll.id}-vote-help`}>
                 <span className="poll-option-label poll-option__content">{option.text}</span>
-                <span className="poll-option-votes">{formatVotes(option.votesCount, true)}</span>
-                <span className="poll-option-percent">{percentage}%</span>
-                <span className="poll-result-bar" role="progressbar" aria-label={option.text} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage}><span style={{ width: `${percentage}%` }} /></span>
+                <span className="poll-option-votes"><AnimatedCount value={option.votesCount} enabled={reactionsEnabled} formatValue={(count) => formatVotes(count, true)} /></span>
+                <span className="poll-option-percent"><AnimatedCount value={percentage} enabled={reactionsEnabled} formatValue={(count) => `${count}%`} /></span>
+                <span className="poll-result-bar" role="progressbar" aria-label={option.text} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage} aria-valuetext={`${percentage}%`}><span className={reactionsEnabled ? 'poll-result-bar__fill poll-result-bar__fill--animated' : 'poll-result-bar__fill'} style={{ width: `${percentage}%` }} /></span>
                 <span className="poll-option-loading" aria-hidden="true">{isPendingOption ? '…' : ''}</span>
               </button>;
             })()
@@ -65,8 +93,8 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
         {!onVote ? <p id={`poll-${poll.id}-vote-help`}>{voteHelp}</p> : null}
       </section>
       <footer className="poll-actions poll-card__actions">
-        <button className="poll-action-button" type="button" disabled={!onLike || isLiking} onClick={() => onLike?.(poll.id, poll.viewerHasLiked)} aria-label={`Like (${formatFullCount(poll.likesCount)})`} aria-pressed={poll.viewerHasLiked} aria-busy={isLiking || undefined} aria-describedby={onLike ? undefined : `poll-${poll.id}-like-help`}>
-          <MaterialIcon className="poll-action-icon" name={poll.viewerHasLiked ? 'favorite' : 'favorite_border'} /><span className="poll-action-label">Like</span> <span className="poll-action-count">{formatCompactCount(poll.likesCount)}</span>{isLiking ? <span className="sr-only" role="status" aria-label="Updating like">Updating like…</span> : null}
+        <button className={`poll-action-button${poll.viewerHasLiked ? ' is-liked' : ''}`} type="button" disabled={!onLike || isLiking} onClick={handleLike} aria-label={`Like (${formatFullCount(poll.likesCount)})`} aria-pressed={poll.viewerHasLiked} aria-busy={isLiking || undefined} aria-describedby={onLike ? undefined : `poll-${poll.id}-like-help`}>
+          <MaterialIcon className="poll-action-icon" name={poll.viewerHasLiked ? 'favorite' : 'favorite_border'} /><span className="poll-action-label">Like</span> <span className="poll-action-count"><AnimatedCount value={poll.likesCount} enabled={reactionsEnabled} formatValue={formatCompactCount} /></span>{isLiking ? <span className="sr-only" role="status" aria-label="Updating like">Updating like…</span> : null}
         </button>
         {!onLike ? <p id={`poll-${poll.id}-like-help`}>{likeHelp}</p> : null}
         <button className="poll-action-button" type="button" disabled={!onOpenComments} onClick={() => onOpenComments?.(poll)} aria-label={`Comments (${formatFullCount(poll.commentsCount)})`} aria-describedby={onOpenComments ? undefined : `poll-${poll.id}-comments-help`}>
