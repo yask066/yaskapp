@@ -1,0 +1,74 @@
+[
+  {
+    "scenario": "firstLoad",
+    "refreshHz": 60,
+    "run": 1,
+    "frames": 13,
+    "lateFrames": 6,
+    "latePercent": 46.1538,
+    "totalSpanP95ms": 63.763,
+    "totalSpanMaxMs": 144.587,
+    "loadingPollsVisible": true,
+    "file": "first-load-60hz-1.log"
+  },
+  {
+    "scenario": "firstLoad",
+    "refreshHz": 60,
+    "run": 2,
+    "frames": 36,
+    "lateFrames": 10,
+    "latePercent": 27.7778,
+    "totalSpanP95ms": 68.88,
+    "totalSpanMaxMs": 164.811,
+    "loadingPollsVisible": true,
+    "file": "first-load-60hz-2.log"
+  },
+  {
+    "scenario": "firstLoad",
+    "refreshHz": 60,
+    "run": 3,
+    "frames": 13,
+    "lateFrames": 6,
+    "latePercent": 46.1538,
+    "totalSpanP95ms": 90.741,
+    "totalSpanMaxMs": 115.02,
+    "loadingPollsVisible": true,
+    "file": "first-load-60hz-3.log"
+  },
+  {
+    "scenario": "firstLoad",
+    "refreshHz": 90,
+    "run": 1,
+    "frames": 13,
+    "lateFrames": 10,
+    "latePercent": 76.9231,
+    "totalSpanP95ms": 65.413,
+    "totalSpanMaxMs": 135.802,
+    "loadingPollsVisible": true,
+    "file": "first-load-90hz-1.log"
+  },
+  {
+    "scenario": "firstLoad",
+    "refreshHz": 90,
+    "run": 2,
+    "frames": 12,
+    "lateFrames": 9,
+    "latePercent": 75,
+    "totalSpanP95ms": 99.752,
+    "totalSpanMaxMs": 104.199,
+    "loadingPollsVisible": true,
+    "file": "first-load-90hz-2.log"
+  },
+  {
+    "scenario": "firstLoad",
+    "refreshHz": 90,
+    "run": 3,
+    "frames": 15,
+    "lateFrames": 8,
+    "latePercent": 53.3333,
+    "totalSpanP95ms": 129.784,
+    "totalSpanMaxMs": 138.901,
+    "loadingPollsVisible": true,
+    "file": "first-load-90hz-3.log"
+  }
+]

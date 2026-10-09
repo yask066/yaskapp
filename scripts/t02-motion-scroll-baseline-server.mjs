@@ -18,6 +18,7 @@ if (scenario === 'profiling') {
     const poll = structuredClone(fixture.cards[(seed + index) % fixture.cards.length]);
     poll.id = `${fixture.profiling.idPrefix}-${seed}-${String(index + 1).padStart(3, '0')}`;
     poll.options = poll.options.map((option, optionIndex) => ({ ...option, id: `${poll.id}-option-${optionIndex}` }));
+    poll.stateRevisions = { votes: '0', likes: '0', comments: '0' };
     current.set(poll.id, poll);
   }
 }
@@ -39,12 +40,32 @@ function withHost(poll, origin) {
 function snapshot(id, kind, value) {
   const poll = structuredClone(independentSnapshots ? initial.get(id) : current.get(id));
   if (!poll) return null;
+  const advanceRevision = (group) => {
+    if (!poll.stateRevisions) return;
+    poll.stateRevisions[group] = (BigInt(poll.stateRevisions[group]) + 1n).toString();
+  };
   if (kind === 'like') {
-    poll.viewerHasLiked = value;
-    poll.likesCount = Math.max(0, poll.likesCount + (value ? 1 : -1));
-  } else if (kind === 'vote' && value) {
-    const option = poll.options.find((item) => item.id === value);
-    if (option) { option.votesCount += 1; poll.votesCount += 1; poll.viewerVoteOptionId = option.id; }
+    if (poll.viewerHasLiked !== value) {
+      poll.viewerHasLiked = value;
+      poll.likesCount = Math.max(0, poll.likesCount + (value ? 1 : -1));
+      advanceRevision('likes');
+    }
+  } else if (kind === 'vote') {
+    const currentOptionId = poll.viewerVoteOptionId ?? null;
+    const nextOptionId = value ?? null;
+    const currentOption = poll.options.find((item) => item.id === currentOptionId);
+    const nextOption = poll.options.find((item) => item.id === nextOptionId);
+    if (nextOptionId === null && currentOption) {
+      currentOption.votesCount = Math.max(0, currentOption.votesCount - 1);
+      poll.votesCount = Math.max(0, poll.votesCount - 1);
+      poll.viewerVoteOptionId = null;
+      advanceRevision('votes');
+    } else if (currentOptionId === null && nextOption) {
+      nextOption.votesCount += 1;
+      poll.votesCount += 1;
+      poll.viewerVoteOptionId = nextOption.id;
+      advanceRevision('votes');
+    }
   }
   if (!independentSnapshots) current.set(id, structuredClone(poll));
   return poll;

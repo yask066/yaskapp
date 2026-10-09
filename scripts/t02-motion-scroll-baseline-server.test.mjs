@@ -113,6 +113,48 @@ test('profiling feed creates 100 stable unique poll and option IDs', async () =>
   });
 });
 
+test('profiling mutations return current revisions and idempotent like/vote state', async () => {
+  await withServer({ T02_SCENARIO: 'profiling' }, async (origin) => {
+    const feed = await (await fetch(`${origin}/polls`)).json();
+    const original = feed.items[0];
+    assert.deepEqual(original.stateRevisions, { votes: '0', likes: '0', comments: '0' });
+
+    const post = async (path, body) => fetch(`${origin}/polls/${original.id}/${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    const remove = async (path) => fetch(`${origin}/polls/${original.id}/${path}`, { method: 'DELETE' });
+    const pollFrom = async (response) => (await response.json()).poll;
+
+    const liked = await pollFrom(await post('likes'));
+    assert.equal(liked.likesCount, original.likesCount + 1);
+    assert.equal(liked.viewerHasLiked, true);
+    assert.equal(liked.stateRevisions.likes, '1');
+
+    const duplicateLike = await pollFrom(await post('likes'));
+    assert.equal(duplicateLike.likesCount, liked.likesCount);
+    assert.equal(duplicateLike.stateRevisions.likes, '1');
+    const unliked = await pollFrom(await remove('likes'));
+    assert.equal(unliked.likesCount, original.likesCount);
+    assert.equal(unliked.viewerHasLiked, false);
+    assert.equal(unliked.stateRevisions.likes, '2');
+
+    const optionId = original.options[0].id;
+    const voted = await pollFrom(await post('votes', { optionId }));
+    assert.equal(voted.votesCount, original.votesCount + 1);
+    assert.equal(voted.options[0].votesCount, original.options[0].votesCount + 1);
+    assert.equal(voted.viewerVoteOptionId, optionId);
+    assert.equal(voted.stateRevisions.votes, '1');
+
+    const cancelled = await pollFrom(await remove('votes'));
+    assert.equal(cancelled.votesCount, original.votesCount);
+    assert.equal(cancelled.options[0].votesCount, original.options[0].votesCount);
+    assert.equal(cancelled.viewerVoteOptionId, null);
+    assert.equal(cancelled.stateRevisions.votes, '2');
+  });
+});
+
 test('media error preserves a repeatable error; valid media loads after delay', async () => {
   await withServer({ T02_MEDIA_DELAY_MS: '40' }, async (origin) => {
     const start = performance.now();
