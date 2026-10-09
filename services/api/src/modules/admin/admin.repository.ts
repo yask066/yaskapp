@@ -343,7 +343,7 @@ export async function deleteAdminComment(
     }
 
     const lockedPoll = await client.query(
-      `SELECT id FROM polls WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+      `SELECT id FROM polls WHERE id = $1 FOR UPDATE`,
       [pollId]
     );
     if (lockedPoll.rowCount === 0) {

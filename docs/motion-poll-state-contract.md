@@ -2,9 +2,11 @@
 
 **Решение принято:** 3 октября 2026 года. **Исследованный HEAD:** `8a794e5` (M02), ветка `codex/m03-poll-state-contract`.
 
-M03 завершает техническое решение по [плану](superpowers/plans/2026-10-02-motion-scroll-loading.md#m03-контракт-свежести-poll-и-merge) и FR-01–FR-03 / AC-03 [PRD](prd-motion-scroll-loading.md). **M04 обязательна:** добавить независимые монотонные ревизии `votes`, `likes`, `comments`, согласованное чтение DTO и корректную область viewer. M05/M06 используют описанные ниже правила; контракт ещё не реализован в production. G0 закрыт; motion не разрешён.
+M03 завершает техническое решение по [плану](superpowers/plans/2026-10-02-motion-scroll-loading.md#m03-контракт-свежести-poll-и-merge) и FR-01–FR-03 / AC-03 [PRD](prd-motion-scroll-loading.md). M04 реализовала независимые монотонные ревизии `votes`, `likes`, `comments`, согласованное чтение DTO и корректную область viewer в API/shared (commit `1568778`). Повторная проверка на отдельной PostgreSQL test DB завершена 9 октября 2026 года; результаты и оставшийся unrelated baseline failure записаны в [M04 verification](motion-scroll-loading-evidence/m04-verification.md). M05/M06 используют описанные ниже правила. G0 остаётся `NOT PASSED`; motion rollout не разрешён.
 
-## 1. Что доказано в существующем коде
+## 1. Исходная диагностика M03 (до реализации M04)
+
+Таблица сохраняет найденное в M03 исходное состояние как историю принятого решения. Она не описывает текущую реализацию: требуемые изменения внесены M04 и проверены на отдельной test DB; см. [M04 verification](motion-scroll-loading-evidence/m04-verification.md).
 
 | Источник | Наблюдение | Вывод |
 |---|---|---|
@@ -36,7 +38,7 @@ type VersionedPoll = Poll & { stateRevisions: PollStateRevisions };
 
 Каждая строка — каноническое десятичное целое `0|[1-9][0-9]*`, диапазон `0..9223372036854775807`. Wire number, leading zeros, отрицательное/дробное/слишком большое значение — invalid response, без изменения группы. В TS сравнение через `BigInt`, в Dart через `BigInt.parse`, либо длина строки + лексикографический порядок; нельзя через JS Number или дату. При переполнении транзакция отказывает целиком, без wrap/reset.
 
-DB columns: `votes_revision`, `likes_revision`, `comments_revision` — `BIGINT NOT NULL DEFAULT 0`, CHECK >= 0. Номер новой migration выбирается в M04 по фактически свободному номеру; сейчас последняя — 026. Существующие Poll получают нули независимо от counters: revision — порядок изменений после migration, а не количество реакций.
+DB columns: `votes_revision`, `likes_revision`, `comments_revision` — `BIGINT NOT NULL DEFAULT 0`, CHECK >= 0. Они добавлены migration `027_poll_state_revisions.sql`. Существующие Poll получают нули независимо от counters: revision — порядок изменений после migration, а не количество реакций.
 
 | Группа | Payload, принимаемый атомарно | Изменение revision |
 |---|---|---|
@@ -83,7 +85,7 @@ Equal conflict и invalid group не запрещают принять друг�
 
 ### Legacy и rollout
 
-Старый клиент игнорирует дополнительное поле и продолжает читать прежние HTTP envelopes; M04 тестирует это реальными существующими decoders. Hub удаляет `viewerHasLiked`; старые defaults false уже поддерживают отсутствие, но существующий старый Flutter merge всё ещё может сбрасывать like: совместимость wire не означает исправление старого клиента.
+Старый клиент игнорирует дополнительное поле и продолжает читать прежние HTTP envelopes. Hub удаляет `viewerHasLiked`; старые defaults false поддерживают его отсутствие, но существующий старый Flutter merge всё ещё может сбрасывать like: совместимость wire не означает исправление старого клиента.
 
 Новый клиент на unversioned сервере может отобразить первый HTTP snapshot как **непроверенный bootstrap**, если в этой группе ещё нет ни известной revision, ни mutation/realtime после начала запроса. Последующие unversioned ответы не заменяют уже известные или изменённые группы. Legacy search viewer заглушки никогда не подтверждают viewer-state. Legacy broadcast служит invalidation hint, без замены известного state.
 

@@ -774,6 +774,7 @@ test('auth and polls happy path works end to end', async () => {
     poll_votes_count: string;
     option_votes_count: number;
     poll_votes_total: number;
+    votes_revision: string;
   }>(
     `
       SELECT
@@ -782,7 +783,9 @@ test('auth and polls happy path works end to end', async () => {
         (SELECT votes_count FROM poll_options WHERE id = $3)
           AS option_votes_count,
         (SELECT votes_count FROM polls WHERE id = $1)
-          AS poll_votes_total
+          AS poll_votes_total,
+        (SELECT votes_revision::text FROM polls WHERE id = $1)
+          AS votes_revision
     `,
     [createdPoll.id, login.user.id, optionId]
   );
@@ -790,6 +793,7 @@ test('auth and polls happy path works end to end', async () => {
   assert.equal(duplicateVoteState.rows[0]?.poll_votes_count, '1');
   assert.equal(duplicateVoteState.rows[0]?.option_votes_count, 1);
   assert.equal(duplicateVoteState.rows[0]?.poll_votes_total, 1);
+  assert.equal(duplicateVoteState.rows[0]?.votes_revision, '1');
 
   const legacyChangeResponse = await app.inject({
     method: 'POST',
@@ -1351,6 +1355,65 @@ test('concurrent votes keep poll and option counters consistent', async () => {
   assert.deepEqual(versionedPoll.json<PollResponse>().poll.stateRevisions, { votes: '1', likes: '0', comments: '0' });
   assert.equal((row?.first_option_votes ?? 0) + (row?.second_option_votes ?? 0), 1);
   assert.equal(row?.poll_votes_total, 1);
+});
+
+test('vote revision overflow rolls back the vote row and all counters', async () => {
+  const registered = await registerTestUser();
+  const createPollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(registered.accessToken),
+    payload: {
+      question: 'A failed revision update must roll back every vote write.',
+      options: ['Yes', 'No']
+    }
+  });
+
+  assert.equal(createPollResponse.statusCode, 201, createPollResponse.body);
+  const poll = createPollResponse.json<PollResponse>().poll;
+  const optionId = poll.options[0]?.id;
+  assert.ok(optionId);
+
+  await db.query(
+    'UPDATE polls SET votes_revision = 9223372036854775807 WHERE id = $1',
+    [poll.id]
+  );
+
+  const voteResponse = await app.inject({
+    method: 'POST',
+    url: `/polls/${poll.id}/votes`,
+    headers: bearer(registered.accessToken),
+    payload: { optionId }
+  });
+
+  assert.equal(voteResponse.statusCode, 500, voteResponse.body);
+
+  const state = await db.query<{
+    vote_rows: string;
+    option_votes_count: number;
+    poll_votes_count: number;
+    votes_revision: string;
+  }>(
+    `
+      SELECT
+        (SELECT count(*)::text FROM poll_votes WHERE poll_id = $1 AND voter_id = $2)
+          AS vote_rows,
+        (SELECT votes_count FROM poll_options WHERE id = $3)
+          AS option_votes_count,
+        p.votes_count AS poll_votes_count,
+        p.votes_revision::text AS votes_revision
+      FROM polls p
+      WHERE p.id = $1
+    `,
+    [poll.id, registered.user.id, optionId]
+  );
+
+  assert.deepEqual(state.rows[0], {
+    vote_rows: '0',
+    option_votes_count: 0,
+    poll_votes_count: 0,
+    votes_revision: '9223372036854775807'
+  });
 });
 
 test('vote mutations are rejected after a poll closes', async () => {
@@ -2635,6 +2698,7 @@ test('current user can unlike a poll safely', async () => {
   assert.equal(unlikedPoll.id, createdPoll.id);
   assert.equal(unlikedPoll.likesCount, 0);
   assert.equal(unlikedPoll.viewerHasLiked, false);
+  assert.deepEqual(unlikedPoll.stateRevisions, { votes: '0', likes: '2', comments: '0' });
 
   const unlikedPollCounterResult = await db.query<{ likes_count: number }>(
     'SELECT likes_count FROM polls WHERE id = $1',
@@ -2666,6 +2730,7 @@ test('current user can unlike a poll safely', async () => {
   assert.equal(duplicateUnlikedPoll.id, createdPoll.id);
   assert.equal(duplicateUnlikedPoll.likesCount, 0);
   assert.equal(duplicateUnlikedPoll.viewerHasLiked, false);
+  assert.deepEqual(duplicateUnlikedPoll.stateRevisions, { votes: '0', likes: '2', comments: '0' });
 
   const duplicateUnlikedPollCounterResult = await db.query<{ likes_count: number }>(
     'SELECT likes_count FROM polls WHERE id = $1',
