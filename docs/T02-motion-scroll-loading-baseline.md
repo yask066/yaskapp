@@ -103,14 +103,12 @@ Flutter widget tests — из D:\yaskapp\apps\mobile:
 |---|---|---|
 | Android 60 Hz | Google Pixel 8; Android 17; build CP3A.260905.009, security patch 2026-09-05; Smooth Display выключен, подтвердить 60 Hz | Flutter profile; 3 × 30 с |
 | Android до 120 Hz | Тот же Pixel 8 и build; Smooth Display включён; фиксировать фактическую частоту во время прогона | Flutter profile; 3 × 30 с |
-| iOS до 120 Hz, ограниченный режим | iPhone 17; iOS 27.0.1 (24A446); Settings → Accessibility → Motion → Limit Frame Rate включён, максимум 60 fps | Flutter profile; 3 × 30 с |
-| iOS ProMotion | Тот же iPhone 17 и build; Limit Frame Rate выключен; фиксировать фактическую адаптивную частоту (до 120 Hz) | Flutter profile; 3 × 30 с |
 | Chromium desktop | Windows 11 25H2 x64, OS build 26200.9457; Google Chrome Stable 154.0.8037.93; монитор 60 Hz; viewport 1440 × 900 CSS px, DPR 1 | Production web build, Chrome Performance; 3 × 30 с |
 | Узкий responsive viewport | Тот же Windows/Chrome; viewport 390 × 844 CSS px, DPR 3, mobile/touch emulation | Production web build, Chrome Performance; 3 × 30 с |
 
-Pixel 8 выбран как общая Android-платформа для режимов 60 и 120 Hz: его дисплей поддерживает Smooth Display 60–120 Hz. Google выпустил Android 17 16 июня 2026 г.; сентябрьский Pixel update для Pixel 8 — CP3A.260905.009. [Android 17](https://blog.google/products-and-platforms/platforms/android/android-17-features/), [Pixel update September 2026](https://support.google.com/pixelphone/thread/467705218/google-pixel-update-september-2026?hl=en), [Pixel 8 display specs](https://store.google.com/us/product/pixel_8_specs).
+**Обновление scope 8 октября 2026 года:** текущая работа ограничена Flutter на Android и web. iOS-профили удалены из рабочей матрицы и будут отдельной задачей; этот документ больше не требует iOS-устройство для M17/G0.
 
-Для iOS выбран iPhone 17 с iOS 27.0.1 (24A446). iOS 27 поддерживает эту модель; ProMotion достигает 120 Hz, а Limit Frame Rate задаёт максимум 60 fps. [iOS 27.0.1 release](https://developer.apple.com/news/releases/?id=09142026a), [iPhone 17 specs](https://www.apple.com/iphone-17/specs/), [iOS 27 compatibility](https://support.apple.com/en-md/guide/iphone/iphe3fa5df43/ios), [Limit Frame Rate instructions](https://support.apple.com/en-au/guide/iphone/iph0b691d3ed/ios).
+Pixel 8 выбран как общая Android-платформа для режимов 60 и 120 Hz: его дисплей поддерживает Smooth Display 60–120 Hz. Google выпустил Android 17 16 июня 2026 г.; сентябрьский Pixel update для Pixel 8 — CP3A.260905.009. [Android 17](https://blog.google/products-and-platforms/platforms/android/android-17-features/), [Pixel update September 2026](https://support.google.com/pixelphone/thread/467705218/google-pixel-update-september-2026?hl=en), [Pixel 8 display specs](https://store.google.com/us/product/pixel_8_specs).
 
 Для desktop закреплены Windows 11 25H2 build 26200.9457 и Chrome Stable 154.0.8037.93 — стабильные выпуски на дату матрицы. Узкий viewport эмулируется тем же Chromium. [Windows release information](https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information), [Chrome Stable update, September 29, 2026](https://chromereleases.googleblog.com/2026/09/stable-channel-update-for-desktop_01807488085.html).
 
@@ -124,7 +122,5 @@ Pixel 8 выбран как общая Android-платформа для реж�
 |---|---|---|---|---|---|
 | Android 60 Hz | Pixel 8 / Android 17 / CP3A.260905.009 | Не измерен | Не измерен | Не измерен | Ожидает устройство |
 | Android до 120 Hz | Pixel 8 / Android 17 / CP3A.260905.009 | Не измерен | Не измерен | Не измерен | Ожидает устройство |
-| iOS 60 fps cap | iPhone 17 / iOS 27.0.1 (24A446) | Не измерен | Не измерен | Не измерен | Ожидает устройство |
-| iOS ProMotion | iPhone 17 / iOS 27.0.1 (24A446) | Не измерен | Не измерен | Не измерен | Ожидает устройство |
 | Chromium desktop | Windows 11 25H2 build 26200.9457 / Chrome 154.0.8037.93 | Не измерен | Не измерен | Не измерен | Ожидает Performance |
 | Узкий viewport | Та же версия Chrome / 390 × 844, DPR 3 | Не измерен | Не измерен | Не измерен | Ожидает Performance |

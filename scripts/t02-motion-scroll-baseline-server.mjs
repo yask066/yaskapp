@@ -58,6 +58,14 @@ const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? '/', 'http://' + (request.headers.host ?? 'localhost'));
   const origin = 'http://' + (request.headers.host ?? 'localhost');
   if (url.pathname === '/healthz') return json(response, 200, { ok: true, scenario });
+  if (scenario === 'profiling' && url.pathname === '/auth/login' && request.method === 'POST') {
+    return json(response, 200, {
+      user: authUser,
+      accessToken: 't02-profiling-token',
+      tokenType: 'Bearer',
+      expiresIn: '1h',
+    });
+  }
   if (url.pathname === '/auth/me' && request.method === 'GET') return json(response, 200, { user: authUser });
   if (url.pathname === '/users' && request.method === 'GET') return json(response, 200, { items: [] });
 

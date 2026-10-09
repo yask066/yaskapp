@@ -1,0 +1,436 @@
+{
+  "device": "Samsung SM-A325F / Android 13 / API 33",
+  "screen": "1080x2400, 420 dpi",
+  "soc": "MT6769V/CT (mt6768)",
+  "gpu": "ARM Mali-G52 MC2 / OpenGL ES 3.2",
+  "refreshRatesTestedHz": [
+    60,
+    90
+  ],
+  "fixture": {
+    "seed": 20261002,
+    "polls": 100
+  },
+  "runs": [
+    {
+      "hz": 90,
+      "scenario": "scroll",
+      "run": 1,
+      "file": "run-1.log",
+      "frames": 2311,
+      "frameGaps": 737,
+      "durationSeconds": 33.854,
+      "lateFrames": 2285,
+      "latePercent": 98.8749,
+      "totalSpan": {
+        "p95Us": 29808,
+        "maxUs": 33398
+      },
+      "buildDuration": {
+        "p95Us": 2149,
+        "maxUs": 8179
+      },
+      "rasterDuration": {
+        "p95Us": 15073,
+        "maxUs": 17392
+      }
+    },
+    {
+      "hz": 90,
+      "scenario": "reactionUpdate",
+      "run": 1,
+      "file": "reaction-90hz-1.log",
+      "frames": 2000,
+      "frameGaps": 619,
+      "durationSeconds": 30.078,
+      "lateFrames": 1952,
+      "latePercent": 97.6,
+      "totalSpan": {
+        "p95Us": 30858,
+        "maxUs": 47114
+      },
+      "buildDuration": {
+        "p95Us": 3800,
+        "maxUs": 20626
+      },
+      "rasterDuration": {
+        "p95Us": 15267,
+        "maxUs": 31567
+      }
+    },
+    {
+      "hz": 90,
+      "scenario": "firstLoad",
+      "run": 1,
+      "file": "cold-90hz-1.log",
+      "frames": 10,
+      "frameGaps": 0,
+      "durationSeconds": 5.147,
+      "lateFrames": 8,
+      "latePercent": 80,
+      "totalSpan": {
+        "p95Us": 53499,
+        "maxUs": 53499
+      },
+      "buildDuration": {
+        "p95Us": 42383,
+        "maxUs": 42383
+      },
+      "rasterDuration": {
+        "p95Us": 7772,
+        "maxUs": 7772
+      },
+      "skeletonVisible": true
+    },
+    {
+      "hz": 90,
+      "scenario": "scroll",
+      "run": 2,
+      "file": "run-2.log",
+      "frames": 2308,
+      "frameGaps": 737,
+      "durationSeconds": 33.933,
+      "lateFrames": 2307,
+      "latePercent": 99.9567,
+      "totalSpan": {
+        "p95Us": 29970,
+        "maxUs": 37215
+      },
+      "buildDuration": {
+        "p95Us": 1817,
+        "maxUs": 14993
+      },
+      "rasterDuration": {
+        "p95Us": 15089,
+        "maxUs": 28156
+      }
+    },
+    {
+      "hz": 90,
+      "scenario": "reactionUpdate",
+      "run": 2,
+      "file": "reaction-90hz-2.log",
+      "frames": 1992,
+      "frameGaps": 637,
+      "durationSeconds": 29.921,
+      "lateFrames": 1987,
+      "latePercent": 99.749,
+      "totalSpan": {
+        "p95Us": 30817,
+        "maxUs": 38131
+      },
+      "buildDuration": {
+        "p95Us": 3015,
+        "maxUs": 23063
+      },
+      "rasterDuration": {
+        "p95Us": 15264,
+        "maxUs": 27165
+      }
+    },
+    {
+      "hz": 90,
+      "scenario": "firstLoad",
+      "run": 2,
+      "file": "cold-90hz-2.log",
+      "frames": 13,
+      "frameGaps": 0,
+      "durationSeconds": 5.369,
+      "lateFrames": 5,
+      "latePercent": 38.4615,
+      "totalSpan": {
+        "p95Us": 52515,
+        "maxUs": 52515
+      },
+      "buildDuration": {
+        "p95Us": 42449,
+        "maxUs": 42449
+      },
+      "rasterDuration": {
+        "p95Us": 8174,
+        "maxUs": 8174
+      },
+      "skeletonVisible": true
+    },
+    {
+      "hz": 90,
+      "scenario": "scroll",
+      "run": 3,
+      "file": "run-3.log",
+      "frames": 2306,
+      "frameGaps": 741,
+      "durationSeconds": 33.914,
+      "lateFrames": 2305,
+      "latePercent": 99.9566,
+      "totalSpan": {
+        "p95Us": 29823,
+        "maxUs": 37382
+      },
+      "buildDuration": {
+        "p95Us": 2076,
+        "maxUs": 15157
+      },
+      "rasterDuration": {
+        "p95Us": 14980,
+        "maxUs": 26563
+      }
+    },
+    {
+      "hz": 90,
+      "scenario": "reactionUpdate",
+      "run": 3,
+      "file": "reaction-90hz-3.log",
+      "frames": 1996,
+      "frameGaps": 623,
+      "durationSeconds": 30.244,
+      "lateFrames": 1988,
+      "latePercent": 99.5992,
+      "totalSpan": {
+        "p95Us": 30771,
+        "maxUs": 36117
+      },
+      "buildDuration": {
+        "p95Us": 3342,
+        "maxUs": 20624
+      },
+      "rasterDuration": {
+        "p95Us": 15283,
+        "maxUs": 26044
+      }
+    },
+    {
+      "hz": 90,
+      "scenario": "firstLoad",
+      "run": 3,
+      "file": "cold-90hz-3.log",
+      "frames": 13,
+      "frameGaps": 0,
+      "durationSeconds": 5.361,
+      "lateFrames": 7,
+      "latePercent": 53.8462,
+      "totalSpan": {
+        "p95Us": 54095,
+        "maxUs": 54095
+      },
+      "buildDuration": {
+        "p95Us": 44259,
+        "maxUs": 44259
+      },
+      "rasterDuration": {
+        "p95Us": 7954,
+        "maxUs": 7954
+      },
+      "skeletonVisible": true
+    },
+    {
+      "hz": 60,
+      "scenario": "scroll",
+      "run": 1,
+      "file": "run-60hz-1.log",
+      "frames": 2035,
+      "frameGaps": 0,
+      "durationSeconds": 33.917,
+      "lateFrames": 30,
+      "latePercent": 1.4742,
+      "totalSpan": {
+        "p95Us": 11882,
+        "maxUs": 30869
+      },
+      "buildDuration": {
+        "p95Us": 2005,
+        "maxUs": 17374
+      },
+      "rasterDuration": {
+        "p95Us": 8144,
+        "maxUs": 23217
+      }
+    },
+    {
+      "hz": 60,
+      "scenario": "reactionUpdate",
+      "run": 1,
+      "file": "reaction-60hz-1.log",
+      "frames": 1778,
+      "frameGaps": 0,
+      "durationSeconds": 30.031,
+      "lateFrames": 65,
+      "latePercent": 3.6558,
+      "totalSpan": {
+        "p95Us": 15727,
+        "maxUs": 30388
+      },
+      "buildDuration": {
+        "p95Us": 7636,
+        "maxUs": 16638
+      },
+      "rasterDuration": {
+        "p95Us": 9790,
+        "maxUs": 16358
+      }
+    },
+    {
+      "hz": 60,
+      "scenario": "firstLoad",
+      "run": 1,
+      "file": "cold-60hz-1.log",
+      "frames": 10,
+      "frameGaps": 0,
+      "durationSeconds": 5.224,
+      "lateFrames": 3,
+      "latePercent": 30,
+      "totalSpan": {
+        "p95Us": 55934,
+        "maxUs": 55934
+      },
+      "buildDuration": {
+        "p95Us": 45476,
+        "maxUs": 45476
+      },
+      "rasterDuration": {
+        "p95Us": 8276,
+        "maxUs": 8276
+      },
+      "skeletonVisible": true
+    },
+    {
+      "hz": 60,
+      "scenario": "scroll",
+      "run": 2,
+      "file": "run-60hz-2.log",
+      "frames": 2029,
+      "frameGaps": 0,
+      "durationSeconds": 33.78,
+      "lateFrames": 11,
+      "latePercent": 0.5421,
+      "totalSpan": {
+        "p95Us": 10825,
+        "maxUs": 28544
+      },
+      "buildDuration": {
+        "p95Us": 1939,
+        "maxUs": 9010
+      },
+      "rasterDuration": {
+        "p95Us": 6619,
+        "maxUs": 26364
+      }
+    },
+    {
+      "hz": 60,
+      "scenario": "reactionUpdate",
+      "run": 2,
+      "file": "reaction-60hz-2.log",
+      "frames": 1777,
+      "frameGaps": 0,
+      "durationSeconds": 30.038,
+      "lateFrames": 69,
+      "latePercent": 3.8829,
+      "totalSpan": {
+        "p95Us": 15528,
+        "maxUs": 29594
+      },
+      "buildDuration": {
+        "p95Us": 7807,
+        "maxUs": 14301
+      },
+      "rasterDuration": {
+        "p95Us": 9664,
+        "maxUs": 15206
+      }
+    },
+    {
+      "hz": 60,
+      "scenario": "firstLoad",
+      "run": 2,
+      "file": "cold-60hz-2.log",
+      "frames": 11,
+      "frameGaps": 0,
+      "durationSeconds": 5.389,
+      "lateFrames": 5,
+      "latePercent": 45.4545,
+      "totalSpan": {
+        "p95Us": 57504,
+        "maxUs": 57504
+      },
+      "buildDuration": {
+        "p95Us": 47338,
+        "maxUs": 47338
+      },
+      "rasterDuration": {
+        "p95Us": 8085,
+        "maxUs": 8085
+      },
+      "skeletonVisible": true
+    },
+    {
+      "hz": 60,
+      "scenario": "scroll",
+      "run": 3,
+      "file": "run-60hz-3.log",
+      "frames": 2032,
+      "frameGaps": 0,
+      "durationSeconds": 33.847,
+      "lateFrames": 15,
+      "latePercent": 0.7382,
+      "totalSpan": {
+        "p95Us": 11655,
+        "maxUs": 25481
+      },
+      "buildDuration": {
+        "p95Us": 5416,
+        "maxUs": 18635
+      },
+      "rasterDuration": {
+        "p95Us": 7392,
+        "maxUs": 19846
+      }
+    },
+    {
+      "hz": 60,
+      "scenario": "reactionUpdate",
+      "run": 3,
+      "file": "reaction-60hz-3.log",
+      "frames": 1756,
+      "frameGaps": 0,
+      "durationSeconds": 29.707,
+      "lateFrames": 63,
+      "latePercent": 3.5877,
+      "totalSpan": {
+        "p95Us": 15098,
+        "maxUs": 34816
+      },
+      "buildDuration": {
+        "p95Us": 7742,
+        "maxUs": 15982
+      },
+      "rasterDuration": {
+        "p95Us": 9139,
+        "maxUs": 28715
+      }
+    },
+    {
+      "hz": 60,
+      "scenario": "firstLoad",
+      "run": 3,
+      "file": "cold-60hz-3.log",
+      "frames": 11,
+      "frameGaps": 0,
+      "durationSeconds": 5.353,
+      "lateFrames": 4,
+      "latePercent": 36.3636,
+      "totalSpan": {
+        "p95Us": 58690,
+        "maxUs": 58690
+      },
+      "buildDuration": {
+        "p95Us": 49109,
+        "maxUs": 49109
+      },
+      "rasterDuration": {
+        "p95Us": 7956,
+        "maxUs": 7956
+      },
+      "skeletonVisible": true
+    }
+  ]
+}
