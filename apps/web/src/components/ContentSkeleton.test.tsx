@@ -1,4 +1,6 @@
 import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { AsyncState } from './AsyncState';
 import { ContentSkeleton } from './ContentSkeleton';
@@ -25,6 +27,7 @@ test('reserves the loading region immediately and reveals its skeleton at 150 ms
 
   const status = screen.getByRole('status');
   const skeleton = status.querySelector('.content-skeleton');
+  expect(screen.getAllByRole('status')).toHaveLength(1);
   expect(status).toHaveAttribute('aria-busy', 'true');
   expect(skeleton).toBeInTheDocument();
   expect(status).not.toHaveClass('async-state--skeleton-visible');
@@ -45,4 +48,19 @@ test('does not show a skeleton when loading resolves before the delay', async ()
 
   expect(screen.queryByTestId('loading-skeleton')).not.toBeInTheDocument();
   expect(screen.getByText('No comments yet.')).toBeInTheDocument();
+});
+
+test('moves keyboard focus from Retry to the loading status when a retry starts', async () => {
+  const user = userEvent.setup();
+  function RetryHarness() {
+    const [state, setState] = useState<'error' | 'loading'>('error');
+    return <AsyncState state={state} error={new Error('Timed out.')} onRetry={() => setState('loading')} />;
+  }
+  render(<RetryHarness />);
+
+  await user.tab();
+  expect(screen.getByRole('button', { name: 'Retry' })).toHaveFocus();
+  await user.keyboard('{Enter}');
+
+  expect(screen.getByRole('status')).toHaveFocus();
 });

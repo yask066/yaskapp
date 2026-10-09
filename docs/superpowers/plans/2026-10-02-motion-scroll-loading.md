@@ -318,10 +318,10 @@
 - [x] Fake-clock tests: pending 149 мс — декоративный skeleton ещё скрыт, область зарезервирована; 150 мс — показан; ready — данные сразу; cached refetch — skeleton не появляется.
 - [x] Реализовать статические templates, единый status/aria-busy и скрытые decorative части; никакого shimmer/crossfade на этом этапе.
 - [x] Подключить initial/refresh/load-more/pending/empty/error/retry/media матрицу на всех web-поверхностях M01; локальная ошибка не заменяет существующий список.
-- [ ] Keyboard/screen-reader check: focus не теряется, один status на область, Retry доступен после 10 с timeout.
-- [ ] Выполнить skeleton и affected page tests, browser geometry и typecheck; сохранить commit.
+- [x] Keyboard/screen-reader semantics check: focus не теряется, один status на область, Retry доступен после 10 с timeout. Проверено клавиатурой и browser accessibility tree; spoken screen-reader output отдельно не измерен.
+- [x] Выполнить skeleton и affected page tests, browser geometry и typecheck; сохранить commit. См. [M15 verification](../../motion-scroll-loading-evidence/m15-verification.md).
 
-**Выполнено 6 октября 2026 года:** automated suites/typecheck/lint/build прошли; браузерная геометрия и реальный screen reader не измерены, подробности в [M15 verification](../../motion-scroll-loading-evidence/m15-verification.md). Последние два пункта остаются открыты до ручной проверки.
+**Выполнено 6 октября 2026 года; проверено и закрыто 9 октября 2026 года:** web suite 238/238, typecheck, lint и production build прошли. Browser screenshot comparison подтвердил сохранение видимой позиции при переходе skeleton→данные; Tab/Enter reaches Retry after timeout, browser accessibility tree показывает один status, focus handoff сохраняется на `main-content`. Spoken output реальным screen reader не измерен. См. [M15 verification](../../motion-scroll-loading-evidence/m15-verification.md).
 
 **Готово:** все 9 строк FR-06 покрыты, placeholder transition не сбрасывает scroll. **AC:** AC-08, статическая часть AC-11.
 

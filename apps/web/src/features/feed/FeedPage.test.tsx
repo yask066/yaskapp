@@ -452,3 +452,27 @@ test('reissues the feed request when Retry is selected after a failed load', asy
   await user.click(await screen.findByRole('button', { name: 'Retry' }));
   await waitFor(() => expect(requests).toBe(2));
 });
+
+test('keeps keyboard focus in the feed when Retry replaces the error view', async () => {
+  let requests = 0;
+  let finishRetry!: (response: Response) => void;
+  server.use(http.get('/polls', () => {
+    requests += 1;
+    if (requests === 1) return HttpResponse.json({ error: 'unavailable' }, { status: 503 });
+    return new Promise((resolve) => { finishRetry = resolve; });
+  }));
+
+  const user = userEvent.setup();
+  renderFeed();
+  const retry = await screen.findByRole('button', { name: 'Retry' });
+  for (let index = 0; index < 32 && document.activeElement !== retry; index += 1) await user.tab();
+  expect(retry).toHaveFocus();
+
+  await user.keyboard('{Enter}');
+
+  const main = screen.getByRole('main');
+  expect(main).toHaveFocus();
+  finishRetry(HttpResponse.json({ items: [poll] }));
+  expect(await screen.findByText('Which option?')).toBeInTheDocument();
+  expect(main).toHaveFocus();
+});
