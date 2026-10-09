@@ -478,13 +478,15 @@
 
 **Зависимости:** M26. **Файлы:** release verification и configuration flags из M19/M20; обновить app README только для реальных launch/config points.
 
-- [ ] Зафиксировать tested commit/build, platform matrix, traces, closed blockers и решение об optional shimmer.
-- [ ] Проверить сценарий отключения reactions/entry: статические реакции, loading и scroll продолжают работать без изменения backend/state.
-- [ ] Подготовить порядок выпуска: стабилизированная версия flags off → reactions на проверенных сборках → entry; для каждой ступени указать smoke и условия возврата flags off.
-- [ ] Определить владельца включения и способ доставки config отдельно для Flutter/web; не обещать remote kill switch, если инфраструктуры нет. Build-time flags требуют новой сборки — это явно записывается.
+- [x] Зафиксировать tested commit/build, platform matrix, traces, closed blockers и решение об optional shimmer.
+- [x] Проверить сценарий отключения reactions/entry: статические реакции, loading и scroll продолжают работать без изменения backend/state.
+- [x] Подготовить порядок выпуска: стабилизированная версия flags off → reactions на проверенных сборках → entry; для каждой ступени указать smoke и условия возврата flags off.
+- [x] Определить владельца включения и способ доставки config отдельно для Flutter/web; не обещать remote kill switch, если инфраструктуры нет. Build-time flags требуют новой сборки — это явно записывается.
 - [ ] Завершить Definition of Done по PRD. Публикация/deploy не запускается автоматически этой задачей планирования; перед реальным выпуском применяется действующая авторизация проекта.
 
-**Готово:** результат готов к выпуску с доказательствами и рабочей инструкцией отключения; фактический rollout отмечается отдельно. **AC:** AC-14–AC-16.
+**Готово:** результат допускает rollout только после прохождения M26/G0; инструкции отключения и фактическое состояние выпуска задокументированы. **AC:** AC-14–AC-16.
+
+**Результат 9 октября 2026 года — подготовка выполнена, выпуск заблокирован.** Flutter production entry point reads `YASKAPP_REACTIONS_MOTION` and `YASKAPP_ENTRY_MOTION` at build time; both default to false. Web reads `VITE_REACTIONS_MOTION` and `VITE_ENTRY_MOTION`, also defaulting to false. App READMEs now include enable/rollback commands. `docs/motion-release-verification.md` records the release sequence, smoke checks, configuration owners and current evidence. Automated checks cover the static/default paths on both clients; see [M27 verification](../../motion-scroll-loading-evidence/m27-automated-verification.md). M26 remains partial, G0 is NOT PASSED, Android paired AC-12 traces and the 20-cycle lifecycle comparison are unmeasured, and physical accessibility smoke is outstanding. Therefore AC-14–AC-16 and the PRD Definition of Done are not complete; do not start rollout. No deploy was performed.
 
 ## 6. Команды проверки для исполнителя
 

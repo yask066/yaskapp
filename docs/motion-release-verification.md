@@ -43,3 +43,35 @@ ADB detected the physical Samsung SM-A325F, Android 13/API 33. The root app entr
 **Ruling:** Treat the missing root-level motion flag configuration as a prerequisite to the live paired profile and leave M26 open — M26 is a verification task and M27 owns release configuration; adding a new runtime/build control here would exceed the approved M26 scope — cost if wrong: the release matrix remains blocked until that configuration is implemented and verified.
 
 The earlier M17 keyboard, text-scale and web navigation evidence, plus M21–M24 automated results, remain useful historical evidence but do not close these M26 checks. Do not change the G0 decision: **G0 remains NOT PASSED**.
+
+## M27 — Release preparation
+
+**Status: PREPARED, BLOCKED FROM ROLLOUT.** M27 wires Flutter's existing presentation flags into the production entry point and documents platform-specific build/rollback steps. This enables the M26 live configuration matrix; it does not supply the missing performance or lifecycle evidence.
+
+### Configuration and ownership
+
+| Client | Build-time controls | Default | How to disable |
+|---|---|---|---|
+| Web | `VITE_REACTIONS_MOTION`, `VITE_ENTRY_MOTION` | Both off unless exactly `true` | Set the affected value to `false` or unset it, rebuild the static client, and deploy that build |
+| Flutter | `YASKAPP_REACTIONS_MOTION`, `YASKAPP_ENTRY_MOTION` via `--dart-define` | Both false | Set the affected define to `false` or omit it, build a new APK/app bundle, and distribute that build |
+
+There is no remote kill switch. The Engineering release owner builds and configures each client and records the exact build delivered. QA owns the smoke/profile evidence and blocks each stage if its acceptance checks fail. Product and Engineering review the release gate together after M26 and G0 are closed.
+
+### Staged rollout and rollback
+
+| Stage | Configuration | Required smoke before expansion | Rollback condition and action |
+|---|---|---|---|
+| 0. Stabilized client | Both flags off on web and Flutter | Login, feed/search, vote/like, skeleton/error/retry, scroll restore, reduced-motion setting; confirm no backend or state behavior depends on motion | Any correctness, geometry, loading, accessibility, or scroll regression: keep this stage and repair the owning task |
+| 1. Reactions | `reactionsMotion=true`, `entryMotion=false` on a build/configuration that passed M26's paired profile | Vote/like success and failure, rapid repeat input, changed counts, keyboard/screen reader/text scale, reduced motion; confirm content and anchor positions | Any mismatch in state, anchor shift over 2 px, accessibility regression, or AC-12 failure: set reactions false and rebuild/redeploy that client |
+| 2. Entry | Both flags true, only after Stage 1 passes on the same client matrix | First visible entry, back/remount without replay, append, focus/hit testing, reduced motion, loading/error and scroll restore | Repeated entry, focus/input problem, anchor shift over 2 px, or AC-12 failure: set entry false and rebuild/redeploy; disable reactions too if their checks fail |
+
+Web build examples are in [the web README](../apps/web/README.md); Flutter commands are in [the mobile README](../apps/mobile/README.md). The static flag-off behavior continues to use the same poll state, API calls, skeletons, and list scroll code.
+
+### M27 verification record
+
+| Target | Build/configuration | Automated result | Device/browser evidence |
+|---|---|---|---|
+| Flutter | Profile APK with reactions on and entry off; default/off and independent flag configurations tested | See [M27 automated verification](motion-scroll-loading-evidence/m27-automated-verification.md) | Samsung SM-A325F was detected by ADB, but paired off/on AC-12 traces, 20-cycle lifecycle comparison, and physical accessibility smoke remain unmeasured |
+| Web | Production static build with the staged build-time environment flags | See [M27 automated verification](motion-scroll-loading-evidence/m27-automated-verification.md) | Existing M17/M23 Chrome evidence is historical and does not replace M26 paired profiles |
+
+The full evidence file records commands and outputs on the tested M27 source revision. M25's approved decision remains **no shimmer**; the static skeleton path stays in use. M26 is still partial, G0 remains **NOT PASSED**, and AC-12 is not passed. Accordingly this is a prepared release procedure, not a release approval: do not enable motion in a delivered build or claim PRD AC-14–AC-16/Definition of Done complete until the M26 and G0 gates pass. No publish or deployment occurred.
