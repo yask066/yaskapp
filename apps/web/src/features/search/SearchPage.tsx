@@ -5,9 +5,11 @@ import { search } from '../../api/search';
 import { PollCard } from '../../components/PollCard';
 import { Avatar } from '../../components/Avatar';
 import { AsyncState } from '../../components/AsyncState';
+import { ContentEntryTransition } from '../../components/ContentEntryTransition';
 import { useSession } from '../../app/session-provider';
 import { fetchPollQuery } from '../polls/poll-state';
 import { useListScrollState } from '../../core/scroll/useListScrollState';
+import { EntryMotion } from '../../core/motion/EntryMotion';
 type SearchType = 'all' | 'polls' | 'users'; type SearchSort = 'relevance' | 'newest' | 'popular';
 export function SearchPage() {
   const { user, status, sessionEpoch } = useSession();
@@ -32,6 +34,7 @@ export function SearchPage() {
     { userId: user?.id ?? null, route: '/search', list: 'search-results', query: submitted?.q ?? '', filter: submitted?.type ?? type, sort: submitted?.sort ?? sort },
     { itemIds: resultIds, restoreFocusOnPop: navigationType === 'POP' },
   );
+  const searchEntryContext = `search:${sessionEpoch}:${user?.id ?? 'anonymous'}:${submitted?.q ?? ''}:${submitted?.type ?? 'all'}:${submitted?.sort ?? 'relevance'}`;
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (query.trim().length < 2) return;
@@ -51,17 +54,22 @@ export function SearchPage() {
       <div className="segmented-tabs" role="tablist" aria-label="Search result type">
         {(['all', 'polls', 'users'] as const).map((value) => <button key={value} type="button" role="tab" aria-selected={type === value} aria-pressed={type === value} onClick={() => { if (value !== type) { setType(value); if (submitted) setSearchParams({}, { replace: true }); } }}>{value === 'all' ? 'All' : value === 'polls' ? 'Polls' : 'Users'}</button>)}
       </div>
-      {searchQuery.isFetching && !searchQuery.data ? <AsyncState state="loading" kind={submittedType === 'users' ? 'user' : 'poll'} rows={2} /> : null}
       {searchQuery.isError && !searchQuery.data ? <AsyncState state="error" error={searchQuery.error} onRetry={() => void searchQuery.refetch()} /> : null}
       {searchQuery.data && searchQuery.data.items.length === 0 ? <AsyncState state="empty" emptyMessage="No matching results. Try a different search." /> : null}
+      <ContentEntryTransition loading={searchQuery.isFetching && !searchQuery.data} kind={submittedType === 'users' ? 'user' : 'poll'} rows={2}>
       <div className="search-results" ref={searchScroll.listRef} aria-busy={searchQuery.isFetching}>
         <section className="feed-list" aria-label="Poll results">
-          {searchQuery.data?.items.filter((item) => item.type === 'poll').map((item) => <PollCard key={`poll-${item.poll.id}`} poll={item.poll} viewerId={user?.id} />)}
+          {searchQuery.data?.items.filter((item) => item.type === 'poll').map((item, index) => <EntryMotion key={`poll-${item.poll.id}`} contextKey={searchEntryContext} itemId={`poll:${item.poll.id}`} visible indexInBatch={index}>
+            <PollCard poll={item.poll} viewerId={user?.id} />
+          </EntryMotion>)}
         </section>
         <section className="people-results" aria-label="User results">
-          {searchQuery.data?.items.filter((item) => item.type === 'user').map((item) => <article className="profile-result" data-list-item-id={`user:${item.user.id}`} key={`user-${item.user.id}`} tabIndex={-1}><Avatar name={item.user.profile.displayName || item.user.username} src={item.user.profile.avatarUrl} /><div><Link to={`/users/${item.user.id}`}>{item.user.profile.displayName || item.user.username}</Link><p>@{item.user.username}</p></div></article>)}
+          {searchQuery.data?.items.filter((item) => item.type === 'user').map((item, index) => <EntryMotion key={`user-${item.user.id}`} contextKey={searchEntryContext} itemId={`user:${item.user.id}`} visible indexInBatch={index}>
+            <article className="profile-result" data-list-item-id={`user:${item.user.id}`} tabIndex={-1}><Avatar name={item.user.profile.displayName || item.user.username} src={item.user.profile.avatarUrl} /><div><Link to={`/users/${item.user.id}`}>{item.user.profile.displayName || item.user.username}</Link><p>@{item.user.username}</p></div></article>
+          </EntryMotion>)}
         </section>
       </div>
+      </ContentEntryTransition>
       {searchQuery.isError && searchQuery.data ? <AsyncState state="error" error={searchQuery.error} onRetry={() => void searchQuery.refetch()} /> : null}{searchQuery.isFetching && searchQuery.data ? <AsyncState state="refreshing" kind={submittedType === 'users' ? 'user' : 'poll'} /> : null}
     </main>
   );

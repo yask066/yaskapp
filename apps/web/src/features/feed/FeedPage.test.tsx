@@ -6,6 +6,7 @@ import { setupServer } from 'msw/node';
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest';
 import { SessionProvider } from '../../app/session-provider';
+import { MotionSettingsProvider } from '../../core/motion/motion-settings';
 import { listScrollState } from '../../core/scroll/list-scroll-state';
 import { t02MotionScrollCursorPages, t02MotionScrollPolls } from '../../test-utils/t02-motion-scroll-fixture';
 import { FeedPage } from './FeedPage';
@@ -28,14 +29,16 @@ const poll = {
 
 const server = setupServer();
 
-function renderFeed(queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } })) {
+function renderFeed(queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } }), entryMotion = false) {
   return { queryClient, ...render(
     <QueryClientProvider client={queryClient}>
-      <SessionProvider>
-        <MemoryRouter>
-          <FeedPage />
-        </MemoryRouter>
-      </SessionProvider>
+      <MotionSettingsProvider flags={{ reactionsMotion: false, entryMotion }}>
+        <SessionProvider>
+          <MemoryRouter>
+            <FeedPage />
+          </MemoryRouter>
+        </SessionProvider>
+      </MotionSettingsProvider>
     </QueryClientProvider>,
   ) };
 }
@@ -54,6 +57,21 @@ afterEach(() => {
   vi.useRealTimers();
 });
 afterAll(() => server.close());
+
+test('applies entry motion to a newly visible poll while keeping its actions interactive', async () => {
+  server.use(http.get('/auth/me', () => HttpResponse.json({ user: {
+    id: 'user-1', email: 'member@example.com', username: 'member', status: 'active',
+    profile: { displayName: 'Member', pollsCount: 0, followersCount: 0, followingCount: 0, countryCode: 'BY', bio: null, avatarObjectKey: null, avatarUrl: null },
+  } })));
+  server.use(http.get('/polls', () => HttpResponse.json({ items: [poll] })));
+  const view = renderFeed(undefined, true);
+
+  const card = await screen.findByRole('article', { name: 'Which option?' });
+  expect(card).toHaveAttribute('data-entry-motion', 'active');
+  expect(screen.getByRole('button', { name: 'Like (2)' })).toBeEnabled();
+  view.unmount();
+  view.queryClient.clear();
+});
 
 test('read_timeout_then_retry_ignores_old_response in the feed UI without automatic retry', async () => {
   vi.useFakeTimers();

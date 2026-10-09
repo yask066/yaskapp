@@ -14,7 +14,7 @@ export function PollDetailPage() {
   const { pollId = '' } = useParams();
   const [searchParams] = useSearchParams();
   const focusedCommentId = searchParams.get('comment');
-  const { user, status } = useSession();
+  const { user, status, sessionEpoch } = useSession();
   const queryClient = useQueryClient();
   const pollMutations = usePollMutations();
   const pollQuery = useQuery({ queryKey: ['poll', pollId], queryFn: ({ signal }) => fetchPollQuery(queryClient, user?.id ?? null, () => getPoll(pollId, signal), true, signal), enabled: Boolean(pollId) && status !== 'loading' });
@@ -56,6 +56,7 @@ export function PollDetailPage() {
         {pollId ? <CommentList
           pollId={pollId}
           currentUserId={user?.id}
+          sessionEpoch={sessionEpoch}
           focusedCommentId={focusedReplyId ? null : focusedCommentId}
           focusedReplyId={focusedReplyId}
           forcedExpandedRootId={targetRootId}

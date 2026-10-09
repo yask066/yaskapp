@@ -1,3 +1,4 @@
+import { forwardRef, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import type { NotificationItem } from '@yaskapp/shared';
 import { notificationHref } from './notification-target';
@@ -5,6 +6,9 @@ import { notificationHref } from './notification-target';
 interface NotificationCardProps {
   item: NotificationItem;
   onRead: (id: string) => void | Promise<void>;
+  className?: string;
+  style?: CSSProperties;
+  'data-entry-motion'?: 'active' | 'idle';
 }
 
 function notificationCopy(item: NotificationItem): string {
@@ -24,7 +28,7 @@ function relativeTime(createdAt: string): string {
   return `${Math.floor(seconds / 86400)}d ago`;
 }
 
-export function NotificationCard({ item, onRead }: NotificationCardProps) {
+export const NotificationCard = forwardRef<HTMLElement, NotificationCardProps>(function NotificationCard({ item, onRead, className, style, 'data-entry-motion': entryMotionState }, ref) {
   const href = notificationHref(item);
   const copy = notificationCopy(item);
   const content = (
@@ -35,8 +39,8 @@ export function NotificationCard({ item, onRead }: NotificationCardProps) {
   );
 
   return (
-    <article className={`notification-card${item.readAt ? '' : ' notification-card--unread'}`} data-list-item-id={item.id} tabIndex={-1} aria-label={item.readAt ? copy : `${copy}, unread`}>
+    <article ref={ref} className={`notification-card${item.readAt ? '' : ' notification-card--unread'}${className ? ` ${className}` : ''}`} style={style} data-entry-motion={entryMotionState} data-list-item-id={item.id} tabIndex={-1} aria-label={item.readAt ? copy : `${copy}, unread`}>
       {href ? <Link to={href} onClick={() => { void onRead(item.id); }}>{content}</Link> : <div className="notification-card__unavailable">{content}<span className="notification-card__status" role="status">This content is no longer available</span></div>}
     </article>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { forwardRef, useEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import type { Poll } from '../api/models';
 import { useMotionSettings } from '../core/motion/use-motion-settings';
@@ -17,9 +17,12 @@ interface PollCardProps {
   onOpenComments?: (poll: Poll) => void;
   isVoting?: boolean;
   isLiking?: boolean;
+  className?: string;
+  style?: CSSProperties;
+  'data-entry-motion'?: 'active' | 'idle';
 }
 
-export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelete, onOpenComments, isVoting = false, isLiking = false }: PollCardProps) {
+export const PollCard = forwardRef<HTMLElement, PollCardProps>(function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelete, onOpenComments, isVoting = false, isLiking = false, className, style, 'data-entry-motion': entryMotionState }, ref) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { reactionsMotion, reduceMotion } = useMotionSettings();
   const reactionsEnabled = reactionsMotion && !reduceMotion;
@@ -55,7 +58,7 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
   }
 
   return (
-    <article className={`poll-card${reactionsEnabled ? ' poll-card--reactions' : ''}`} data-list-item-id={poll.id} tabIndex={-1} aria-labelledby={`poll-${poll.id}-question`}>
+    <article ref={ref} className={`poll-card${reactionsEnabled ? ' poll-card--reactions' : ''}${className ? ` ${className}` : ''}`} style={style} data-entry-motion={entryMotionState} data-list-item-id={poll.id} tabIndex={-1} aria-labelledby={`poll-${poll.id}-question`}>
       <header className="poll-card-header poll-card__meta">
         <Avatar name={authorName} src={poll.author.avatarUrl} />
         <div className="poll-author-meta">
@@ -104,7 +107,7 @@ export function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelet
       </footer>
     </article>
   );
-}
+});
 
 function PollMedia({ src }: { src: string }) {
   const [failed, setFailed] = useState(false);

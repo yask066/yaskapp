@@ -8,10 +8,13 @@ import { CommentForm } from './CommentForm';
 import { pollSessionEpoch, reconcilePoll } from '../polls/poll-state';
 import { isAmbiguousMutationError } from '../polls/usePollMutations';
 import { useListScrollState } from '../../core/scroll/useListScrollState';
+import { EntryMotion } from '../../core/motion/EntryMotion';
+import { ContentEntryTransition } from '../../components/ContentEntryTransition';
 import { AsyncState } from '../../components/AsyncState';
 
 interface CommentThreadProps {
   pollId: string;
+  sessionEpoch?: number;
   rootComment: PollComment;
   currentUserId?: string | null;
   focusedReplyId?: string | null;
@@ -21,6 +24,7 @@ interface CommentThreadProps {
 
 export function CommentThread({
   pollId,
+  sessionEpoch = 0,
   rootComment,
   currentUserId,
   focusedReplyId,
@@ -111,24 +115,25 @@ export function CommentThread({
       /> : null}
 
       {isExpanded ? <div className="comment-thread__replies" id={`replies-${rootComment.id}`} ref={repliesScroll.listRef}>
-        {repliesQuery.isPending && !repliesQuery.data ? <AsyncState state="loading" kind="comment" rows={2} /> : null}
+        <ContentEntryTransition loading={repliesQuery.isPending && !repliesQuery.data} kind="comment" rows={2}>
         {repliesQuery.isError && !repliesQuery.data ? <div className="comment-thread__error">
           <p role="alert">{mutationErrorMessage(repliesQuery.error)}</p>
           <button className="button" type="button" onClick={() => void repliesQuery.refetch()}>Retry loading replies</button>
         </div> : null}
         {!repliesQuery.isPending && !repliesQuery.isError && replies.length === 0 ? <p>No replies yet.</p> : null}
         {replies.length ? <ul className="comment-thread__list">
-          {replies.map((reply) => <li
-            className={`comment-card comment-thread__reply${reply.id === focusedReplyId ? ' comment-card--focused' : ''}`}
-            data-list-item-id={reply.id}
-            key={reply.id}
-            ref={reply.id === focusedReplyId ? focusedReplyRef : undefined}
-            tabIndex={-1}
-            aria-current={reply.id === focusedReplyId ? 'location' : undefined}
-          >
-            <p className="comment-card__author"><strong>{reply.author.displayName || reply.author.username}</strong> <span>@{reply.author.username}</span></p>
-            <p className="comment-card__body">{reply.body}</p>
-          </li>)}
+          {replies.map((reply, index) => <EntryMotion key={reply.id} contextKey={`replies:${sessionEpoch}:${currentUserId ?? 'anonymous'}:${pollId}:${rootComment.id}`} itemId={reply.id} visible indexInBatch={index}>
+            <li
+              className={`comment-card comment-thread__reply${reply.id === focusedReplyId ? ' comment-card--focused' : ''}`}
+              data-list-item-id={reply.id}
+              ref={reply.id === focusedReplyId ? focusedReplyRef : undefined}
+              tabIndex={-1}
+              aria-current={reply.id === focusedReplyId ? 'location' : undefined}
+            >
+              <p className="comment-card__author"><strong>{reply.author.displayName || reply.author.username}</strong> <span>@{reply.author.username}</span></p>
+              <p className="comment-card__body">{reply.body}</p>
+            </li>
+          </EntryMotion>)}
         </ul> : null}
         {repliesQuery.hasNextPage ? <button
           className="button comment-thread__load-more"
@@ -138,6 +143,7 @@ export function CommentThread({
         >{repliesQuery.isFetchingNextPage ? 'Loading more replies…' : 'Load more replies'}</button> : null}
         {repliesQuery.isError && repliesQuery.data ? <div className="comment-thread__error"><p role="alert">{mutationErrorMessage(repliesQuery.error)}</p><button className="button" type="button" onClick={() => void repliesQuery.refetch()}>Retry loading replies</button></div> : null}
         {repliesQuery.isFetching && !repliesQuery.isFetchingNextPage && repliesQuery.data ? <AsyncState state="refreshing" kind="comment" /> : null}
+        </ContentEntryTransition>
       </div> : null}
     </section>
   );

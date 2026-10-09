@@ -4,6 +4,7 @@ import { getMe, login, logout, register } from '../api/auth';
 import { ApiError, apiClient } from '../api/client';
 import type { AuthUser } from '../api/models';
 import { reconcileCachedPolls, resetPollSession } from '../features/polls/poll-state';
+import { clearEntryMotionRegistry } from '../core/motion/entry-motion-registry';
 
 type SessionStatus = 'loading' | 'authenticated' | 'anonymous';
 
@@ -28,6 +29,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const requestEpoch = useRef(0);
 
   const clearSession = useCallback(() => {
+    clearEntryMotionRegistry();
     requestEpoch.current += 1;
     apiClient.cancelSessionRequests();
     setSessionEpoch((epoch) => epoch + 1);
@@ -62,6 +64,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [clearSession]);
 
   const establishSession = useCallback((nextUser: AuthUser) => {
+    clearEntryMotionRegistry();
     requestEpoch.current += 1;
     apiClient.cancelSessionRequests();
     setSessionEpoch((epoch) => epoch + 1);

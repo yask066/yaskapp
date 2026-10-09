@@ -5,12 +5,14 @@ import { listPolls } from '../../api/polls';
 import { listPopularUsers } from '../../api/profiles';
 import { useSession } from '../../app/session-provider';
 import { AsyncState } from '../../components/AsyncState';
+import { ContentEntryTransition } from '../../components/ContentEntryTransition';
 import { Avatar } from '../../components/Avatar';
 import { PollCard } from '../../components/PollCard';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { usePollMutations } from '../polls/usePollMutations';
 import { fetchPollQuery } from '../polls/poll-state';
 import { useListScrollState } from '../../core/scroll/useListScrollState';
+import { EntryMotion } from '../../core/motion/EntryMotion';
 
 type FeedSort = 'for-you' | 'following' | 'trending';
 const trends = [
@@ -23,7 +25,7 @@ const trends = [
 export function FeedPage() {
   const [sort, setSort] = useState<FeedSort>('for-you');
   const [trendsOpen, setTrendsOpen] = useState(true);
-  const { status, user } = useSession();
+  const { status, user, sessionEpoch } = useSession();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const navigationType = useNavigationType();
@@ -33,14 +35,19 @@ export function FeedPage() {
     { userId: user?.id ?? null, route: '/', list: 'feed', query: '', filter: '', sort },
     { itemIds: pollsQuery.data?.map((poll) => poll.id) ?? [], restoreFocusOnPop: navigationType === 'POP' },
   );
+  const feedEntryContext = `feed:${sessionEpoch}:${user?.id ?? 'anonymous'}:${sort}`;
   const suggestedUsersQuery = useQuery({ queryKey: ['popular-users'], queryFn: ({ signal }) => listPopularUsers(3, signal), enabled: status === 'authenticated' });
   const suggestedUsers = suggestedUsersQuery.data?.filter((person) => person.id !== user?.id && !person.viewerIsFollowing) ?? [];
   return <main id="main-content" className="feed-page">
     <section className="feed-main" aria-label="Poll feed">
       <header className="page-heading feed-heading"><div><p className="eyebrow">Latest conversations</p><h1>Your feed</h1></div><Link className="button button--primary" to="/polls/new"><MaterialIcon name="add" /> Create poll</Link></header>
       <section className="feed-toolbar" aria-label="Create and filter polls"><section className="poll-composer" aria-label="Create a poll"><div className="composer-avatar">{user?.profile.displayName.slice(0, 1).toUpperCase() ?? 'Y'}</div><p>What's on your mind today?</p><Link className="create-poll-link" to="/polls/new"><MaterialIcon name="add" /> Post</Link><div className="composer-actions"><span><MaterialIcon name="image" /> Image</span><span><MaterialIcon name="poll" /> Poll</span><span><MaterialIcon name="gif" /> GIF</span></div></section><div className="segmented-tabs feed-tabs" aria-label="Feed order"><button type="button" aria-pressed={sort === 'for-you'} onClick={() => setSort('for-you')}>For you</button><button type="button" aria-pressed={sort === 'following'} onClick={() => setSort('following')}>Following</button><button type="button" aria-pressed={sort === 'trending'} onClick={() => setSort('trending')}>Trending</button></div></section>
-      {pollsQuery.isPending && !pollsQuery.data ? <AsyncState state="loading" kind="poll" rows={2} /> : null}{pollsQuery.isError && !pollsQuery.data ? <AsyncState state="error" error={pollsQuery.error} onRetry={() => void pollsQuery.refetch()} /> : null}{pollsQuery.data && pollsQuery.data.length === 0 ? <AsyncState state="empty" emptyMessage="No polls to show yet." /> : null}{mutations.error ? <p aria-live="polite">{mutations.error}</p> : null}
-      <div className="feed-list" ref={feedScroll.listRef} aria-busy={pollsQuery.isFetching}>{pollsQuery.data?.map((poll) => <PollCard key={poll.id} poll={poll} viewerId={user?.id} isVoting={mutations.isVoting(poll.id)} isLiking={mutations.isLiking(poll.id)} onVote={user ? (pollId, optionId) => mutations.vote({ pollId, optionId }) : undefined} onCancelVote={user ? mutations.cancelVote : undefined} onLike={user ? (pollId, viewerHasLiked) => mutations.toggleLike({ pollId, viewerHasLiked }) : undefined} onDelete={user ? mutations.deletePoll : undefined} onOpenComments={(openedPoll) => navigate(`/polls/${openedPoll.id}`)} />)}</div>{pollsQuery.isError && pollsQuery.data ? <AsyncState state="error" error={pollsQuery.error} onRetry={() => void pollsQuery.refetch()} /> : null}{pollsQuery.isFetching && pollsQuery.data ? <AsyncState state="refreshing" kind="poll" /> : null}</section>
+      {pollsQuery.isError && !pollsQuery.data ? <AsyncState state="error" error={pollsQuery.error} onRetry={() => void pollsQuery.refetch()} /> : null}{pollsQuery.data && pollsQuery.data.length === 0 ? <AsyncState state="empty" emptyMessage="No polls to show yet." /> : null}{mutations.error ? <p aria-live="polite">{mutations.error}</p> : null}
+      <ContentEntryTransition loading={pollsQuery.isPending && !pollsQuery.data} kind="poll" rows={2}>
+      <div className="feed-list" ref={feedScroll.listRef} aria-busy={pollsQuery.isFetching}>{pollsQuery.data?.map((poll, index) => <EntryMotion key={poll.id} contextKey={feedEntryContext} itemId={poll.id} visible indexInBatch={index}>
+        <PollCard poll={poll} viewerId={user?.id} isVoting={mutations.isVoting(poll.id)} isLiking={mutations.isLiking(poll.id)} onVote={user ? (pollId, optionId) => mutations.vote({ pollId, optionId }) : undefined} onCancelVote={user ? mutations.cancelVote : undefined} onLike={user ? (pollId, viewerHasLiked) => mutations.toggleLike({ pollId, viewerHasLiked }) : undefined} onDelete={user ? mutations.deletePoll : undefined} onOpenComments={(openedPoll) => navigate(`/polls/${openedPoll.id}`)} />
+      </EntryMotion>)}</div>
+      </ContentEntryTransition>{pollsQuery.isError && pollsQuery.data ? <AsyncState state="error" error={pollsQuery.error} onRetry={() => void pollsQuery.refetch()} /> : null}{pollsQuery.isFetching && pollsQuery.data ? <AsyncState state="refreshing" kind="poll" /> : null}</section>
     <aside className="feed-sidebar context-rail" aria-label="Discover content"><section className="context-panel discovery-card trends-card"><header className="discovery-heading"><h2><MaterialIcon name="fire" /> Trending today</h2></header><button className="trends-toggle" type="button" aria-expanded={trendsOpen} aria-controls="trends-list" onClick={() => setTrendsOpen((open) => !open)}>Toggle trending topics</button>{trendsOpen ? <ul id="trends-list">{trends.map((trend, index) => <li key={trend.topic}><a href={`/?topic=${trend.topic}`}><span>{index + 1}</span><div><strong>{trend.topic}</strong><small>{trend.polls}</small></div></a></li>)}</ul> : null}</section><section className="context-panel discovery-card suggested-users"><header className="discovery-heading"><h2>Who to follow</h2><a className="show-more" href="/search">See all</a></header><ul>{suggestedUsersQuery.isFetching && !suggestedUsersQuery.data ? <li><AsyncState state="loading" kind="user" rows={2} /></li> : null}{suggestedUsersQuery.isError ? <li><AsyncState state="error" kind="user" error={suggestedUsersQuery.error} onRetry={() => void suggestedUsersQuery.refetch()} /></li> : null}{suggestedUsers.map((person) => <li key={person.id}><Link to={`/users/${person.id}`}><Avatar name={person.profile.displayName || person.username} src={person.profile.avatarUrl} size={40} /></Link><p><Link to={`/users/${person.id}`}><strong>{person.profile.displayName || person.username}</strong></Link><small>@{person.username}</small></p><button type="button">Follow</button></li>)}</ul></section><footer className="sidebar-links"><div><a href="/">About</a><a href="/">Help</a><a href="/">Privacy</a><a href="/">Terms</a></div><p>© {new Date().getFullYear()} Yask. All rights reserved.</p></footer></aside>
   </main>;
 }

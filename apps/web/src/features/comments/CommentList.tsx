@@ -8,9 +8,12 @@ import { commentScrollBehavior } from './comment-scroll';
 import { CommentThread } from './CommentThread';
 import { useListScrollState } from '../../core/scroll/useListScrollState';
 import { AsyncState } from '../../components/AsyncState';
+import { EntryMotion } from '../../core/motion/EntryMotion';
+import { ContentEntryTransition } from '../../components/ContentEntryTransition';
 
 interface CommentListProps {
   pollId: string;
+  sessionEpoch?: number;
   currentUserId?: string | null;
   focusedCommentId?: string | null;
   focusedReplyId?: string | null;
@@ -25,6 +28,7 @@ function replaceComment(queryClient: ReturnType<typeof useQueryClient>, pollId: 
 
 export function CommentList({
   pollId,
+  sessionEpoch = 0,
   currentUserId,
   focusedCommentId,
   focusedReplyId,
@@ -66,7 +70,6 @@ export function CommentList({
   }, [commentsQuery.data, focusRootId, focusedReplyId]);
   const writeError = likeMutation.error ?? deleteMutation.error;
 
-  if (commentsQuery.isPending && !commentsQuery.data) return <AsyncState state="loading" kind="comment" rows={2} />;
   if (commentsQuery.isError && !commentsQuery.data) return <div role="alert"><p>{mutationErrorMessage(commentsQuery.error)}</p><button type="button" onClick={() => void commentsQuery.refetch()}>Retry loading comments</button></div>;
 
   function handleReplyCreated(rootComment: PollComment, _reply: PollComment, poll: Poll) {
@@ -84,21 +87,26 @@ export function CommentList({
   return (
     <div className="comment-list" ref={commentScroll.listRef}>
       {writeError ? <p role="alert">{mutationErrorMessage(writeError)}</p> : null}
+      <ContentEntryTransition loading={commentsQuery.isPending && !commentsQuery.data} kind="comment" rows={2}>
       {visibleComments.length ? <ul>
-        {visibleComments.map((comment) => <li className={`comment-card${comment.id === focusRootId && !focusedReplyId ? ' comment-card--focused' : ''}`} data-list-item-id={comment.id} key={comment.id} ref={comment.id === focusRootId ? focusedCommentRef : undefined} tabIndex={-1} aria-current={comment.id === focusRootId && !focusedReplyId ? 'location' : undefined}>
+        {visibleComments.map((comment, index) => <EntryMotion key={comment.id} contextKey={`comments:${sessionEpoch}:${currentUserId ?? 'anonymous'}:${pollId}`} itemId={comment.id} visible indexInBatch={index}>
+          <li className={`comment-card${comment.id === focusRootId && !focusedReplyId ? ' comment-card--focused' : ''}`} data-list-item-id={comment.id} ref={comment.id === focusRootId ? focusedCommentRef : undefined} tabIndex={-1} aria-current={comment.id === focusRootId && !focusedReplyId ? 'location' : undefined}>
           <p className="comment-card__author"><strong>{comment.author.displayName || comment.author.username}</strong> <span>@{comment.author.username}</span></p>
           <p className="comment-card__body">{comment.body}</p>
           <div className="comment-card__actions">{currentUserId ? <button className="button" type="button" aria-pressed={comment.viewerHasLiked} onClick={() => likeMutation.mutate(comment)}>Like ({comment.likesCount})</button> : null}{comment.author.id === currentUserId ? <button className="button" type="button" onClick={() => { if (window.confirm('Delete this comment?')) deleteMutation.mutate(comment.id); }}>Delete</button> : null}</div>
           <CommentThread
             pollId={pollId}
+            sessionEpoch={sessionEpoch}
             rootComment={comment}
             currentUserId={currentUserId}
             focusedReplyId={comment.id === forcedExpandedRootId ? focusedReplyId : null}
             autoExpand={comment.id === forcedExpandedRootId}
             onReplyCreated={(reply, poll) => handleReplyCreated(comment, reply, poll)}
           />
-        </li>)}
-      </ul> : <p>No comments yet.</p>}
+          </li>
+        </EntryMotion>)}
+      </ul> : commentsQuery.isPending ? null : <p>No comments yet.</p>}
+      </ContentEntryTransition>
       {commentsQuery.isError && commentsQuery.data ? <div role="alert" className="async-state async-state--error"><p>{mutationErrorMessage(commentsQuery.error)}</p><button type="button" onClick={() => void commentsQuery.refetch()}>Retry loading comments</button></div> : null}
       {commentsQuery.isFetching && commentsQuery.data ? <AsyncState state="refreshing" kind="comment" /> : null}
     </div>
