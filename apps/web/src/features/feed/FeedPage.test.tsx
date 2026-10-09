@@ -476,3 +476,24 @@ test('keeps keyboard focus in the feed when Retry replaces the error view', asyn
   expect(await screen.findByText('Which option?')).toBeInTheDocument();
   expect(main).toHaveFocus();
 });
+
+test('a sidebar Retry does not steal focus during a later feed sort load', async () => {
+  let pollReads = 0;
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: {
+      id: 'user-1', email: 'member@example.com', username: 'member', status: 'active',
+      profile: { displayName: 'Member', pollsCount: 0, followersCount: 0, followingCount: 0, countryCode: 'BY', bio: null, avatarObjectKey: null, avatarUrl: null },
+    } })),
+    http.get('/polls', () => ++pollReads === 2 ? new Promise(() => {}) : HttpResponse.json({ items: [poll] })),
+    http.get('/users', () => HttpResponse.json({ error: 'unavailable' }, { status: 503 })),
+  );
+  const user = userEvent.setup();
+  renderFeed();
+
+  const retry = await screen.findByRole('button', { name: 'Retry' });
+  await user.click(retry);
+  const following = screen.getByRole('button', { name: 'Following' });
+  await user.click(following);
+
+  expect(following).toHaveFocus();
+});

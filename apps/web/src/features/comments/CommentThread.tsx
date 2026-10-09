@@ -11,6 +11,7 @@ import { useListScrollState } from '../../core/scroll/useListScrollState';
 import { EntryMotion } from '../../core/motion/EntryMotion';
 import { ContentEntryTransition } from '../../components/ContentEntryTransition';
 import { AsyncState } from '../../components/AsyncState';
+import { focusRetryLandmark } from '../../components/focusRetryLandmark';
 
 interface CommentThreadProps {
   pollId: string;
@@ -118,7 +119,7 @@ export function CommentThread({
         <ContentEntryTransition loading={repliesQuery.isPending && !repliesQuery.data} kind="comment" rows={2}>
         {repliesQuery.isError && !repliesQuery.data ? <div className="comment-thread__error">
           <p role="alert">{mutationErrorMessage(repliesQuery.error)}</p>
-          <button className="button" type="button" onClick={() => void repliesQuery.refetch()}>Retry loading replies</button>
+          <button className="button" type="button" onClick={(event) => { focusRetryLandmark(event.currentTarget); void repliesQuery.refetch(); }}>Retry loading replies</button>
         </div> : null}
         {!repliesQuery.isPending && !repliesQuery.isError && replies.length === 0 ? <p>No replies yet.</p> : null}
         {replies.length ? <ul className="comment-thread__list">
@@ -141,7 +142,7 @@ export function CommentThread({
           disabled={repliesQuery.isFetchingNextPage}
           onClick={() => void repliesQuery.fetchNextPage()}
         >{repliesQuery.isFetchingNextPage ? 'Loading more replies…' : 'Load more replies'}</button> : null}
-        {repliesQuery.isError && repliesQuery.data ? <div className="comment-thread__error"><p role="alert">{mutationErrorMessage(repliesQuery.error)}</p><button className="button" type="button" onClick={() => void repliesQuery.refetch()}>Retry loading replies</button></div> : null}
+        {repliesQuery.isError && repliesQuery.data ? <div className="comment-thread__error"><p role="alert">{mutationErrorMessage(repliesQuery.error)}</p><button className="button" type="button" onClick={(event) => { focusRetryLandmark(event.currentTarget); void repliesQuery.refetch(); }}>Retry loading replies</button></div> : null}
         {repliesQuery.isFetching && !repliesQuery.isFetchingNextPage && repliesQuery.data ? <AsyncState state="refreshing" kind="comment" /> : null}
         </ContentEntryTransition>
       </div> : null}

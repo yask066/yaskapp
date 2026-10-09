@@ -89,6 +89,7 @@ test('retries a failed notification load-more instead of refreshing the first pa
   renderPage();
 
   await userEvent.setup().click(screen.getByRole('button', { name: 'Retry' }));
+  expect(screen.getByRole('main')).toHaveFocus();
   expect(mocks.loadMore).toHaveBeenCalledOnce();
   expect(mocks.reconcile).not.toHaveBeenCalled();
 });

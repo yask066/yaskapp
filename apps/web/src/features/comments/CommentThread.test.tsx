@@ -28,12 +28,12 @@ function renderThread(input: { rootComment?: PollComment; currentUserId?: string
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <CommentThread
+      <main id="main-content"><CommentThread
         pollId="poll-1"
         rootComment={input.rootComment ?? root}
         currentUserId={input.currentUserId === undefined ? 'user-1' : input.currentUserId}
         onReplyCreated={input.onReplyCreated}
-      />
+      /></main>
     </QueryClientProvider>,
   );
 }
@@ -58,6 +58,7 @@ test('shows the reply count, retries a failed page, loads more, and collapses th
   await user.click(screen.getByRole('button', { name: 'Show replies (3)' }));
   expect(await screen.findByRole('alert')).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Retry loading replies' }));
+  expect(screen.getByRole('main')).toHaveFocus();
   expect(await screen.findByText('First reply.')).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Load more replies' }));
   expect(await screen.findByText('Second reply.')).toBeInTheDocument();

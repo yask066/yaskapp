@@ -7,6 +7,7 @@ import { useOptionalSession } from '../../app/session-provider';
 import { AsyncState } from '../../components/AsyncState';
 import { EntryMotion } from '../../core/motion/EntryMotion';
 import { ContentEntryTransition } from '../../components/ContentEntryTransition';
+import { focusRetryLandmark } from '../../components/focusRetryLandmark';
 
 type Filter = 'all' | 'unread';
 type Group = 'Today' | 'Yesterday' | 'Earlier';
@@ -50,7 +51,7 @@ export function NotificationsPage() {
   );
 
   if (notifications.error && !notifications.hasLoaded) {
-    return <main id="main-content" className="notifications-page"><header className="page-heading"><div><p className="eyebrow">Inbox</p><h1>Notifications</h1></div></header><section className="notifications-state" role="alert"><p>{notifications.error}</p><button className="button" type="button" onClick={() => void notifications.actions.reconcile()}>Retry</button></section></main>;
+    return <main id="main-content" className="notifications-page"><header className="page-heading"><div><p className="eyebrow">Inbox</p><h1>Notifications</h1></div></header><section className="notifications-state" role="alert"><p>{notifications.error}</p><button className="button" type="button" onClick={(event) => { focusRetryLandmark(event.currentTarget); void notifications.actions.reconcile(); }}>Retry</button></section></main>;
   }
 
   return (
@@ -80,7 +81,7 @@ export function NotificationsPage() {
         })}
       </div>}
       </ContentEntryTransition>
-      {notifications.error && notifications.hasLoaded ? <section className="notifications-state" role="alert"><p>{notifications.error}</p><button className="button" type="button" onClick={() => void (notifications.error === 'Unable to load more notifications.' ? notifications.actions.loadMore() : notifications.actions.reconcile())}>Retry</button></section> : null}
+      {notifications.error && notifications.hasLoaded ? <section className="notifications-state" role="alert"><p>{notifications.error}</p><button className="button" type="button" onClick={(event) => { focusRetryLandmark(event.currentTarget); void (notifications.error === 'Unable to load more notifications.' ? notifications.actions.loadMore() : notifications.actions.reconcile()); }}>Retry</button></section> : null}
       {notifications.nextCursor ? <button className="button notifications-load-more" type="button" disabled={notifications.loading} aria-busy={notifications.loadingMore || undefined} aria-label={notifications.loadingMore ? 'Loading more notifications' : undefined} onClick={() => void notifications.actions.loadMore()}>{notifications.loadingMore ? <><span>Loading…</span><span className="sr-only" role="status">Loading more notifications…</span></> : 'Load more'}</button> : null}
       {notifications.loading && notifications.hasLoaded && !notifications.loadingMore ? <AsyncState state="refreshing" kind="notification" /> : null}
     </main>

@@ -24,13 +24,13 @@ No frame-time, device, or real screen-reader result is claimed by this evidence.
 
 ### Automated checks
 
-- Current web suite: 238/238 tests passed across 36 files, including the new Retry focus regression.
+- Current web suite before review follow-up: 238/238 tests passed across 36 files. After the review follow-up, 240/240 tests passed across 36 files.
 - Vitest emitted existing MSW warnings for unhandled `/auth/me` and `/polls?limit=20` requests in unrelated fixture cases; the suite exited 0 and all assertions passed.
 - `npm run typecheck -w @yaskapp/web`: passed after `npm run shared:build`.
 - `npm run lint -w @yaskapp/web`: passed.
-- `npm run build -w @yaskapp/web`: passed; Vite transformed 133 modules.
+- `npm run build -w @yaskapp/web`: passed after review follow-up; Vite transformed 134 modules.
 - Loading tests assert the 149/150 ms boundary, immediate area reservation, exactly one `role=status`, and decorative skeleton exclusion from the accessibility tree.
-- Feed integration test activates Retry with Enter, verifies focus moves to the persistent main landmark without scrolling, then verifies focus remains there after data arrives.
+- Feed integration test activates Retry with Enter, verifies focus moves to the persistent main landmark, then verifies focus remains there after data arrives. The no-scroll observation comes from the browser check below; the automated test does not inspect scroll position or focus options.
 
 ### Browser geometry and keyboard/accessibility check
 
@@ -39,5 +39,13 @@ No frame-time, device, or real screen-reader result is claimed by this evidence.
 - In the T02 `timeout` scenario the API fixture waited 15 seconds; the client showed its retryable timeout after the 10-second read deadline. Tab navigation reached the named Retry button and Enter activated it.
 - During Retry → loading, browser accessibility state showed one `Loading polls` status. The skeleton rows were absent from the tree; after the fix, focus stayed on `main-content` through the transition and the page did not jump vertically.
 - The browser accessibility tree and keyboard path were checked. Spoken output on a standalone screen reader was not measured; no claim about announcement timing or pronunciation is made.
+
+### Review follow-up — 9 October 2026
+
+- Removed the document-wide Retry event because unrelated errors could arm a loading transition and steal focus on a later sort change.
+- Retry buttons now focus their nearest `main` landmark synchronously before starting a request, so focus survives error components that unmount or are conditionally replaced.
+- Added integration coverage for poll detail, comments, replies, notifications, and a sidebar retry followed by a separate feed sort load. The feed regression holds the second poll request pending, matching the actual sort query behavior. Targeted results before this fixture correction: 42/42 tests passed across four files; the final full-suite result after correction is recorded below.
+
+Final verification after the review follow-up and fixture correction: web suite 240/240 across 36 files; typecheck, lint, production build, and `git diff --check` passed.
 
 M15's two verification items are closed against the plan's observable acceptance criteria: focus remains in the affected page, one status is exposed, and Retry is keyboard accessible after timeout; loading geometry and the affected page checks are recorded above. Spoken screen-reader output remains explicitly unmeasured.

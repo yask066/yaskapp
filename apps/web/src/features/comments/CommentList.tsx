@@ -10,6 +10,7 @@ import { useListScrollState } from '../../core/scroll/useListScrollState';
 import { AsyncState } from '../../components/AsyncState';
 import { EntryMotion } from '../../core/motion/EntryMotion';
 import { ContentEntryTransition } from '../../components/ContentEntryTransition';
+import { focusRetryLandmark } from '../../components/focusRetryLandmark';
 
 interface CommentListProps {
   pollId: string;
@@ -70,7 +71,7 @@ export function CommentList({
   }, [commentsQuery.data, focusRootId, focusedReplyId]);
   const writeError = likeMutation.error ?? deleteMutation.error;
 
-  if (commentsQuery.isError && !commentsQuery.data) return <div role="alert"><p>{mutationErrorMessage(commentsQuery.error)}</p><button type="button" onClick={() => void commentsQuery.refetch()}>Retry loading comments</button></div>;
+  if (commentsQuery.isError && !commentsQuery.data) return <div role="alert"><p>{mutationErrorMessage(commentsQuery.error)}</p><button type="button" onClick={(event) => { focusRetryLandmark(event.currentTarget); void commentsQuery.refetch(); }}>Retry loading comments</button></div>;
 
   function handleReplyCreated(rootComment: PollComment, _reply: PollComment, poll: Poll) {
     queryClient.setQueryData<PollComment[]>(['comments', pollId], (cached = []) => {
@@ -107,7 +108,7 @@ export function CommentList({
         </EntryMotion>)}
       </ul> : commentsQuery.isPending ? null : <p>No comments yet.</p>}
       </ContentEntryTransition>
-      {commentsQuery.isError && commentsQuery.data ? <div role="alert" className="async-state async-state--error"><p>{mutationErrorMessage(commentsQuery.error)}</p><button type="button" onClick={() => void commentsQuery.refetch()}>Retry loading comments</button></div> : null}
+      {commentsQuery.isError && commentsQuery.data ? <div role="alert" className="async-state async-state--error"><p>{mutationErrorMessage(commentsQuery.error)}</p><button type="button" onClick={(event) => { focusRetryLandmark(event.currentTarget); void commentsQuery.refetch(); }}>Retry loading comments</button></div> : null}
       {commentsQuery.isFetching && commentsQuery.data ? <AsyncState state="refreshing" kind="comment" /> : null}
     </div>
   );

@@ -50,11 +50,11 @@ test('does not show a skeleton when loading resolves before the delay', async ()
   expect(screen.getByText('No comments yet.')).toBeInTheDocument();
 });
 
-test('moves keyboard focus from Retry to the loading status when a retry starts', async () => {
+test('moves keyboard focus from Retry to the persistent page landmark when a retry starts', async () => {
   const user = userEvent.setup();
   function RetryHarness() {
     const [state, setState] = useState<'error' | 'loading'>('error');
-    return <AsyncState state={state} error={new Error('Timed out.')} onRetry={() => setState('loading')} />;
+    return <main><AsyncState state={state} error={new Error('Timed out.')} onRetry={() => setState('loading')} /></main>;
   }
   render(<RetryHarness />);
 
@@ -62,5 +62,5 @@ test('moves keyboard focus from Retry to the loading status when a retry starts'
   expect(screen.getByRole('button', { name: 'Retry' })).toHaveFocus();
   await user.keyboard('{Enter}');
 
-  expect(screen.getByRole('status')).toHaveFocus();
+  expect(screen.getByRole('main')).toHaveFocus();
 });

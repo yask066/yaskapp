@@ -105,8 +105,36 @@ test('allows Retry after an initial comments read failure', async () => {
   );
   renderDetail();
   await userEvent.setup().click(await screen.findByRole('button', { name: 'Retry loading comments' }));
+  expect(screen.getByRole('main')).toHaveFocus();
   expect(await screen.findByText('First existing comment.')).toBeInTheDocument();
   expect(reads).toBe(2);
+});
+
+test('keeps focus on the page when Retry replaces a failed poll with a new loading state', async () => {
+  let reads = 0;
+  let finishRetry!: (response: Response) => void;
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: currentUser })),
+    http.get('/polls/poll-1', () => {
+      reads += 1;
+      if (reads === 1) return HttpResponse.json({ error: 'unavailable' }, { status: 503 });
+      return new Promise((resolve) => { finishRetry = resolve; });
+    }),
+    http.get('/polls/poll-1/comments', () => HttpResponse.json({ items: comments })),
+  );
+  const user = userEvent.setup();
+  renderDetail();
+
+  const retry = await screen.findByRole('button', { name: 'Retry' });
+  for (let index = 0; index < 32 && document.activeElement !== retry; index += 1) await user.tab();
+  expect(retry).toHaveFocus();
+  await user.keyboard('{Enter}');
+
+  const main = screen.getByRole('main');
+  expect(main).toHaveFocus();
+  finishRetry(HttpResponse.json({ poll }));
+  expect(await screen.findByRole('heading', { name: poll.question })).toBeInTheDocument();
+  expect(main).toHaveFocus();
 });
 
 test('shows a Login link instead of a comment text area for anonymous visitors', async () => {
