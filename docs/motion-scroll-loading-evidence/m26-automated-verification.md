@@ -2,11 +2,11 @@
 
 **Date:** 9 October 2026
 **Checkout:** `116b3a8c3893c1fd9bba55733b37fd8b4bc661c8`
-**Result:** automated checks passed; M26 remains open because live flag matrix, lifecycle-cycle measurement, and paired AC-12 profiling were not performed.
+**Result:** M26 closed administratively by user direction on 10 October 2026; automated checks passed, while remaining acceptance evidence is explicitly deferred and AC-12/G0 remain failed.
 
 ## Current status — 10 October 2026
 
-The dated 9 October report below is historical. Later work captured the 60/90 Hz Android flag matrix and renderer A/B, implemented the user-approved PollCard painter slice, reran the Flutter suite (270 passed, 1 skipped), and added a successful-comments T02 fixture route (12/12 fixture tests). The painter retest did not meet AC-12: the absolute ≤1% late-frame limit fails, including motion-off runs, and the 60 Hz reactions delta exceeds +0.5 pp. A matched 20-cycle M17/painter resource and request comparison now exists; direct Flutter listener/controller/timer counts remain unavailable. Painter 200% text bounds fit the device width; live reduced-motion toggling preserved the like result, but animation suppression was not directly measured, and TalkBack speech was not independently heard. See [10 October device evidence](m26-device-2026-10-10/README.md) and the [current plan update](../superpowers/plans/2026-10-02-motion-scroll-loading.md). G0 remains **NOT PASSED**; do not mark AC-12 passed or enable motion in release builds.
+The dated 9 October report below is historical. Later work captured the 60/90 Hz Android flag matrix and renderer A/B, implemented the user-approved PollCard painter slice, and added a successful-comments T02 fixture route. The painter retest did not meet AC-12: the absolute ≤1% late-frame limit fails, including motion-off runs, and 60 Hz reactions exceeded +0.5 pp. A matched 20-cycle M17/painter resource and request comparison exists; direct Flutter listener/controller/timer counts remain unavailable. Painter 200% text bounds fit the device width; live reduced-motion toggling preserved the like result, but animation suppression was not directly measured, and TalkBack speech was not independently heard. On 10 October, by user direction, M26 was closed as an administrative disposition without additional tests: functional/accessibility/lifecycle results remain partial, AC-12 remains **FAIL**, and G0 remains **NOT PASSED**. This closure does not pass acceptance or enable motion in release builds. See [10 October device evidence](m26-device-2026-10-10/README.md) and the [current plan update](../superpowers/plans/2026-10-02-motion-scroll-loading.md).
 
 ## Addendum — 10 October 2026
 
@@ -52,7 +52,7 @@ At the end of this run `adb devices -l` listed no connected device. Thus no curr
 | Twenty list → detail → back cycles with listeners/controllers/timers/request comparison | **Partial** | Web completed 20 cycles off and both-on with 0 CSS px drift. Resource/listener/timer/request/background comparison and Android cycles remain unmeasured. |
 | Paired motion-off/on 3×30 s traces for each required viewport/device, including first load | **Not measured** | Production build matrix passed, but no qualifying current trace was captured. Current phone is disconnected; prior Android evidence breaches the absolute 1% limit in recorded workloads. |
 
-M26 remains open. Do not mark AC-12 or G0 passed. The build-time flag prerequisite is present; the remaining device, accessibility, lifecycle-resource and paired-performance evidence is still required.
+At the time of this historical 10 October web-only report, M26 remained open. Later physical evidence and the user-directed administrative closure are recorded in the current status at the top of this file. AC-12 and G0 remain failed; the deferred evidence has not been represented as passed.
 
 ## Commands and results
 
@@ -107,13 +107,13 @@ The 9 October report stated that the mobile entry point called `const YaskappApp
 
 ## Decision
 
-M26 remains open. Do not mark AC-12 or G0 passed. The Flutter build-time flags are wired and both-off/both-on profile builds succeeded on 10 October. The current-device sustained paired traces are captured and fail AC-12; other flag-matrix, accessibility and lifecycle/resource checks remain partial.
+M26 execution is closed by user direction; do not mark AC-12 or G0 passed. The Flutter build-time flags are wired and both-off/both-on profile builds succeeded on 10 October. The current-device sustained paired traces fail AC-12; other flag-matrix, accessibility and lifecycle/resource checks remain partial and deferred.
 
 ### Feed state-notification optimization retest — 10 October 2026
 
 The store-backed Feed Like handler no longer schedules redundant FeedScreen rebuilds for pending and accepted state when the shared `PollStateStore` already contains the mutation. If an injected API client has not updated the store, the response still follows the existing merge/rebuild path. Regression coverage is `store-backed like pending does not rebuild FeedScreen`; it observes no FeedScreen build at pending or response while the Like progress state and count update remain visible.
 
-Verification after this change: `flutter test --no-pub` — 271 passed, 1 skipped; `flutter test --no-pub test/feed_screen_test.dart` — 22 passed; focused Flutter analyze — no issues; T02 server tests — 12/12 passed. A single current-code diagnostic reaction pair at active 60 Hz measured off 13.26% late vs reactions-only 20.44% (+7.18 pp); raster p50 was 8.535 → 9.235 ms. Full frame counts and raw logs are in the physical-device README. This one pair is diagnostic, not the required 3×30 s matrix; it confirms that AC-12 remains failed and cannot close the M26 performance checkbox.
+Previously completed verification after this change: `flutter test --no-pub` — 271 passed, 1 skipped; `flutter test --no-pub test/feed_screen_test.dart` — 22 passed; focused Flutter analyze — no issues; T02 server tests — 12/12 passed. No additional tests were run for the administrative closure. A single current-code diagnostic reaction pair at active 60 Hz measured off 13.26% late vs reactions-only 20.44% (+7.18 pp); raster p50 was 8.535 → 9.235 ms. Full frame counts and raw logs are in the physical-device README. The one pair is diagnostic, not the required 3×30 s matrix; AC-12 remains failed.
 
 ## Addendum — physical Samsung SM-A325F — 10 October 2026
 
@@ -147,7 +147,7 @@ The paired Android profile therefore does not pass AC-12, and G0 remains **NOT P
 | Twenty lifecycle cycles and resource/request comparison | **Partial** — matched M17 and painter runs each completed 20 successful GETs and returned to the same Feed anchor; PSS/RSS/native heap/thread growth was comparable, and background return caused no extra comments GET. Direct listener/controller/timer counters remain unavailable. |
 | Paired off/on profiles and first load | **Fail** — current painter sustained pairs fail AC-12: all 90 Hz groups exceed 1%, one 60 Hz scroll-on run is 1.50%, and the 60 Hz reaction delta is +5.39 pp. A matched painter first-load matrix remains outstanding. |
 
-M26 remains open and its four acceptance checkboxes stay unchecked. There is measured evidence now, but the required performance gate fails; recording the failure does not convert AC-12 or the M26 Definition of Done into a pass.
+At this point in the earlier 10 October report, M26's four acceptance items were still open. The later user-directed disposition is recorded in the current status at the top of this file. The measured performance gate still fails; recording that failure does not convert AC-12 or the PRD Definition of Done into a pass.
 
 ### Renderer A/B update — 10 October 2026
 
@@ -161,4 +161,4 @@ The user selected a painter for card/option/progress decoration while retaining 
 
 Current-source paired profiles were captured with three runs per mode/scenario at actual 60/90 Hz: 60 Hz scroll off 0.56–0.67%, both-on 0.44–1.50% (mean delta +0.19 pp); 90 Hz scroll off 99.53–100.00%, both-on 98.01–100.00% (−0.50 pp); 60 Hz reaction off 14.72–17.67%, reactions-only 19.41–23.26% (+5.39 pp); 90 Hz reaction off 98.17–99.51%, reactions-only 98.28–99.59% (+0.07 pp). All 90 Hz groups fail the absolute 1% gate; the 60 Hz reaction delta fails +0.5 pp, and one 60 Hz scroll-on run fails 1%. The painter experiment therefore does not satisfy AC-12. Full per-run measurements and logs are in [the physical-device addendum](m26-device-2026-10-10/README.md#pollcard-custompainter-retest--10-october-2026).
 
-The painter build completed matched 20-cycle Feed → Comments → Back runs in 24.4 s with exactly 20 successful fixture GETs; the M17 `ac13b283` baseline did the same in 24.3 s on the same lockfile. Resource deltas were comparable (PSS +28,246 kB vs +28,900 kB; RSS +34,076 kB vs +35,548 kB; Native Heap +4,024 kB vs +4,328 kB; thread rows +1 vs −1). An additional both-on Home/background → Feed return preserved the card and caused no extra comments GET. Exact captures are in `lifecycle-matched-summary.csv` and adjacent before/after files. Direct listener/controller/timer counters are unavailable. Reduced-motion settings were toggled with the app foregrounded and the like action/semantics remained correct, but visual suppression was not measured frame-by-frame; TalkBack speech remains unverified. The four M26 evidence checkboxes stay open and G0 remains **NOT PASSED**.
+The painter build completed matched 20-cycle Feed → Comments → Back runs in 24.4 s with exactly 20 successful fixture GETs; the M17 `ac13b283` baseline did the same in 24.3 s on the same lockfile. Resource deltas were comparable (PSS +28,246 kB vs +28,900 kB; RSS +34,076 kB vs +35,548 kB; Native Heap +4,024 kB vs +4,328 kB; thread rows +1 vs −1). An additional both-on Home/background → Feed return preserved the card and caused no extra comments GET. Exact captures are in `lifecycle-matched-summary.csv` and adjacent before/after files. Direct listener/controller/timer counters are unavailable. Reduced-motion settings were toggled with the app foregrounded and the like action/semantics remained correct, but visual suppression was not measured frame-by-frame; TalkBack speech remains unverified. M26 was later closed administratively by user direction with these evidence gaps retained; G0 remains **NOT PASSED**.
