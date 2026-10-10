@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart' show SemanticsRole;
 
 import '../../core/config/api_config.dart';
 import '../../core/motion/animated_count.dart';
@@ -120,268 +121,270 @@ class PollCard extends StatelessWidget {
     final canReport = onReport != null;
 
     return Card(
-      color: Colors.white,
+      color: Colors.transparent,
       margin: EdgeInsets.zero,
-      elevation: 2,
+      elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(compact ? 20 : 22),
       ),
-      shadowColor: const Color(0x22000000),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Semantics(
-                  button: onOpenAuthor != null,
-                  label: 'Open ${poll.author.displayName} profile',
-                  child: InkWell(
-                    onTap: onOpenAuthor,
-                    borderRadius: BorderRadius.circular(24),
-                    child: ExcludeSemantics(
-                      child: UserAvatar(
-                        displayName: poll.author.displayName,
-                        username: poll.author.username,
-                        imageUrl: poll.author.avatarUrl,
-                        radius: compact ? 22 : 22,
+      child: CustomPaint(
+        painter: _PollCardSurfacePainter(compact: compact),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Semantics(
+                    button: onOpenAuthor != null,
+                    label: 'Open ${poll.author.displayName} profile',
+                    child: InkWell(
+                      onTap: onOpenAuthor,
+                      borderRadius: BorderRadius.circular(24),
+                      child: ExcludeSemantics(
+                        child: UserAvatar(
+                          displayName: poll.author.displayName,
+                          username: poll.author.username,
+                          imageUrl: poll.author.avatarUrl,
+                          radius: compact ? 22 : 22,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: InkWell(
-                    onTap: onOpenAuthor,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            poll.author.displayName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFF10142D),
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: InkWell(
+                      onTap: onOpenAuthor,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              poll.author.displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFF10142D),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              '@${poll.author.username} \u00B7 ${poll.createdLabel}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFF667085),
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: PopupMenuButton<_PollAction>(
+                      tooltip: 'More',
+                      enabled: canEditPoll ||
+                          canCancelVote ||
+                          canDeletePoll ||
+                          canReport,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 220),
+                      menuPadding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 6,
+                      icon: Icon(Icons.more_vert, size: compact ? 20 : 22),
+                      onSelected: (action) {
+                        if (action == _PollAction.editPoll) {
+                          onEditPoll?.call();
+                        } else if (action == _PollAction.cancelVote) {
+                          onCancelVote?.call();
+                        } else if (action == _PollAction.deletePoll) {
+                          onDeletePoll?.call();
+                        } else if (action == _PollAction.report) {
+                          onReport?.call();
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        if (canEditPoll) ...[
+                          const PopupMenuItem<_PollAction>(
+                            value: _PollAction.editPoll,
+                            height: 52,
+                            child: _PollMenuRow(
+                              icon: Icons.edit_outlined,
+                              label: 'Edit poll',
                             ),
                           ),
-                          Text(
-                            '@${poll.author.username} \u00B7 ${poll.createdLabel}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFF667085),
-                              fontSize: 13,
+                          const PopupMenuDivider(),
+                        ],
+                        if (canCancelVote)
+                          const PopupMenuItem<_PollAction>(
+                            value: _PollAction.cancelVote,
+                            height: 52,
+                            child: _PollMenuRow(
+                              icon: Icons.undo,
+                              label: 'Cancel vote',
+                            ),
+                          ),
+                        if (canDeletePoll) ...[
+                          if (canCancelVote) const PopupMenuDivider(),
+                          const PopupMenuItem<_PollAction>(
+                            value: _PollAction.deletePoll,
+                            height: 52,
+                            child: _PollMenuRow(
+                              icon: Icons.delete_outline,
+                              label: 'Delete poll',
+                              destructive: true,
                             ),
                           ),
                         ],
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: PopupMenuButton<_PollAction>(
-                    tooltip: 'More',
-                    enabled: canEditPoll ||
-                        canCancelVote ||
-                        canDeletePoll ||
-                        canReport,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 220),
-                    menuPadding: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 6,
-                    icon: Icon(Icons.more_vert, size: compact ? 20 : 22),
-                    onSelected: (action) {
-                      if (action == _PollAction.editPoll) {
-                        onEditPoll?.call();
-                      } else if (action == _PollAction.cancelVote) {
-                        onCancelVote?.call();
-                      } else if (action == _PollAction.deletePoll) {
-                        onDeletePoll?.call();
-                      } else if (action == _PollAction.report) {
-                        onReport?.call();
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      if (canEditPoll) ...[
-                        const PopupMenuItem<_PollAction>(
-                          value: _PollAction.editPoll,
-                          height: 52,
-                          child: _PollMenuRow(
-                            icon: Icons.edit_outlined,
-                            label: 'Edit poll',
+                        if (canReport) ...[
+                          if (canDeletePoll || canCancelVote || canEditPoll)
+                            const PopupMenuDivider(),
+                          const PopupMenuItem<_PollAction>(
+                            value: _PollAction.report,
+                            height: 52,
+                            child: _PollMenuRow(
+                              icon: Icons.flag_outlined,
+                              label: 'Report',
+                            ),
                           ),
-                        ),
-                        const PopupMenuDivider(),
+                        ],
                       ],
-                      if (canCancelVote)
-                        const PopupMenuItem<_PollAction>(
-                          value: _PollAction.cancelVote,
-                          height: 52,
-                          child: _PollMenuRow(
-                            icon: Icons.undo,
-                            label: 'Cancel vote',
-                          ),
-                        ),
-                      if (canDeletePoll) ...[
-                        if (canCancelVote) const PopupMenuDivider(),
-                        const PopupMenuItem<_PollAction>(
-                          value: _PollAction.deletePoll,
-                          height: 52,
-                          child: _PollMenuRow(
-                            icon: Icons.delete_outline,
-                            label: 'Delete poll',
-                            destructive: true,
-                          ),
-                        ),
-                      ],
-                      if (canReport) ...[
-                        if (canDeletePoll || canCancelVote || canEditPoll)
-                          const PopupMenuDivider(),
-                        const PopupMenuItem<_PollAction>(
-                          value: _PollAction.report,
-                          height: 52,
-                          child: _PollMenuRow(
-                            icon: Icons.flag_outlined,
-                            label: 'Report',
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: compact ? 16 : 20),
-            Text(
-              poll.question,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: const Color(0xFF10142D),
-                fontSize: 15,
-                height: compact ? 22 / 15 : 24 / 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            if (poll.imageUrl != null) ...[
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: Image.network(
-                    const ApiConfig().uri(poll.imageUrl!).toString(),
-                    headers: accessToken == null
-                        ? null
-                        : {'authorization': 'Bearer $accessToken'},
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: const Color(0xFFF0F2F7),
-                      alignment: Alignment.center,
-                      child: const Icon(Icons.broken_image_outlined),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-            if (poll.isClosed) ...[
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Icon(
-                    Icons.lock_outline,
-                    size: 16,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Poll closed',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
               ),
-            ],
-            SizedBox(height: compact ? 14 : 16),
-            for (var index = 0; index < poll.options.length; index++) ...[
-              _PollOptionButton(
-                key: ValueKey(
-                    'poll-option-${poll.id}-${poll.options[index].id}'),
-                option: poll.options[index],
-                totalVotes: poll.votesCount,
-                isSelected: poll.selectedOptionIndex == index,
-                rank: rankByOptionIndex[index],
-                compact: compact,
-                profileVariant: compact,
-                isLoading: isVoting,
-                animateTap: onVote != null,
-                onTap:
-                    onVote == null ? null : () => onVote!(poll.options[index]),
+              SizedBox(height: compact ? 16 : 20),
+              Text(
+                poll.question,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: const Color(0xFF10142D),
+                  fontSize: 15,
+                  height: compact ? 22 / 15 : 24 / 15,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              const SizedBox(height: 8),
-            ],
-            SizedBox(height: compact ? 16 : 18),
-            LayoutBuilder(
-              builder: (context, _) {
-                final metrics = [
-                  _Metric(
-                    icon: Icons.people_outline,
-                    label: '${poll.votesCount} votes',
-                    animatedValue: poll.votesCount,
-                    dense: compact,
+              if (poll.imageUrl != null) ...[
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: Image.network(
+                      const ApiConfig().uri(poll.imageUrl!).toString(),
+                      headers: accessToken == null
+                          ? null
+                          : {'authorization': 'Bearer $accessToken'},
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: const Color(0xFFF0F2F7),
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.broken_image_outlined),
+                      ),
+                    ),
                   ),
-                  _Metric(
-                    icon: Icons.mode_comment_outlined,
-                    label: '${poll.commentsCount}',
-                    tooltip: 'Comments',
-                    onTap: onOpenComments,
-                    dense: compact,
-                  ),
-                  _Metric(
-                    icon: poll.viewerHasLiked
-                        ? Icons.favorite
-                        : Icons.favorite_border,
-                    label: '${poll.likesCount}',
-                    animatedValue: poll.likesCount,
-                    isActive: poll.viewerHasLiked,
-                    isLoading: isLiking,
-                    animateTap: onToggleLike != null,
-                    tooltip: poll.viewerHasLiked ? 'Unlike' : 'Like',
-                    onTap: onToggleLike,
-                    dense: compact,
-                  ),
-                  _Metric(
-                    icon: Icons.forward_outlined,
-                    label: '',
-                    tooltip: 'Share',
-                    dense: compact,
-                  ),
-                ];
+                ),
+              ],
+              if (poll.isClosed) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.lock_outline,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Poll closed',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              SizedBox(height: compact ? 14 : 16),
+              for (var index = 0; index < poll.options.length; index++) ...[
+                _PollOptionButton(
+                  key: ValueKey(
+                      'poll-option-${poll.id}-${poll.options[index].id}'),
+                  option: poll.options[index],
+                  totalVotes: poll.votesCount,
+                  isSelected: poll.selectedOptionIndex == index,
+                  rank: rankByOptionIndex[index],
+                  compact: compact,
+                  profileVariant: compact,
+                  isLoading: isVoting,
+                  animateTap: onVote != null,
+                  onTap: onVote == null
+                      ? null
+                      : () => onVote!(poll.options[index]),
+                ),
+                const SizedBox(height: 8),
+              ],
+              SizedBox(height: compact ? 16 : 18),
+              LayoutBuilder(
+                builder: (context, _) {
+                  final metrics = [
+                    _Metric(
+                      icon: Icons.people_outline,
+                      label: '${poll.votesCount} votes',
+                      animatedValue: poll.votesCount,
+                      dense: compact,
+                    ),
+                    _Metric(
+                      icon: Icons.mode_comment_outlined,
+                      label: '${poll.commentsCount}',
+                      tooltip: 'Comments',
+                      onTap: onOpenComments,
+                      dense: compact,
+                    ),
+                    _Metric(
+                      icon: poll.viewerHasLiked
+                          ? Icons.favorite
+                          : Icons.favorite_border,
+                      label: '${poll.likesCount}',
+                      animatedValue: poll.likesCount,
+                      isActive: poll.viewerHasLiked,
+                      isLoading: isLiking,
+                      animateTap: onToggleLike != null,
+                      tooltip: poll.viewerHasLiked ? 'Unlike' : 'Like',
+                      onTap: onToggleLike,
+                      dense: compact,
+                    ),
+                    _Metric(
+                      icon: Icons.forward_outlined,
+                      label: '',
+                      tooltip: 'Share',
+                      dense: compact,
+                    ),
+                  ];
 
-                return Wrap(
-                  spacing: 16,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.spaceBetween,
-                  children: metrics,
-                );
-              },
-            ),
-          ],
+                  return Wrap(
+                    spacing: 16,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.spaceBetween,
+                    children: metrics,
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -459,83 +462,89 @@ class _PollOptionButton extends StatelessWidget {
 
     return ConstrainedBox(
       constraints: BoxConstraints(minHeight: optionMinHeight),
-      child: Material(
-        color:
-            optionRank == 0 ? const Color(0xFFEFF2F8) : const Color(0xFFF5F6FA),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(compact ? 10 : 12),
-          side: BorderSide(
-            color: isSelected ? accentColor : Colors.transparent,
-            width: 2,
-          ),
+      child: CustomPaint(
+        painter: _PollOptionSurfacePainter(
+          compact: compact,
+          isTopRank: optionRank == 0,
+          isSelected: isSelected,
+          accentColor: accentColor,
         ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: _LocalReactionScale(
-            enabled: animateTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: numericOption
-                  ? Row(
-                      children: [
-                        SizedBox(
-                          width: numericOption ? 20.0 : 68.0,
-                          child: _OptionLabel(
-                            text: option.text,
-                            compact: compact,
-                            color: accentColor,
-                          ),
-                        ),
-                        SizedBox(width: compact ? 8 : 12),
-                        Expanded(
-                          child: _OptionProgress(
-                            percent: percent,
-                            color: accentColor,
-                            height: progressHeight,
-                          ),
-                        ),
-                        SizedBox(width: compact ? 8 : 12),
-                        SizedBox(
-                          width: 42,
-                          child: _OptionPercentage(
-                            percent: percent,
-                            compact: compact,
-                            color: accentColor,
-                          ),
-                        ),
-                        _OptionLoadingSlot(isLoading: isLoading),
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _OptionLabel(
-                                text: option.text,
-                                compact: compact,
-                                color: accentColor,
-                              ),
+        child: Material(
+          color: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(compact ? 10 : 12),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(compact ? 10 : 12),
+            onTap: onTap,
+            child: _LocalReactionScale(
+              enabled: animateTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                child: numericOption
+                    ? Row(
+                        children: [
+                          SizedBox(
+                            width: numericOption ? 20.0 : 68.0,
+                            child: _OptionLabel(
+                              text: option.text,
+                              compact: compact,
+                              color: accentColor,
                             ),
-                            const SizedBox(width: 8),
-                            _OptionPercentage(
+                          ),
+                          SizedBox(width: compact ? 8 : 12),
+                          Expanded(
+                            child: _OptionProgress(
+                              percent: percent,
+                              color: accentColor,
+                              height: progressHeight,
+                            ),
+                          ),
+                          SizedBox(width: compact ? 8 : 12),
+                          SizedBox(
+                            width: 42,
+                            child: _OptionPercentage(
                               percent: percent,
                               compact: compact,
                               color: accentColor,
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        _OptionProgress(
-                          percent: percent,
-                          color: accentColor,
-                          height: progressHeight,
-                        ),
-                        _OptionLoadingSlot(isLoading: isLoading),
-                      ],
-                    ),
+                          ),
+                          _OptionLoadingSlot(isLoading: isLoading),
+                        ],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _OptionLabel(
+                                  text: option.text,
+                                  compact: compact,
+                                  color: accentColor,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              _OptionPercentage(
+                                percent: percent,
+                                compact: compact,
+                                color: accentColor,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          _OptionProgress(
+                            percent: percent,
+                            color: accentColor,
+                            height: progressHeight,
+                          ),
+                          _OptionLoadingSlot(isLoading: isLoading),
+                        ],
+                      ),
+              ),
             ),
           ),
         ),
@@ -592,18 +601,130 @@ class _OptionProgress extends StatelessWidget {
       duration: shouldAnimate ? MotionTokens.barDuration : Duration.zero,
       curve: Curves.easeOutCubic,
       builder: (context, animatedPercent, child) {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(height / 2),
-          child: LinearProgressIndicator(
-            value: animatedPercent,
-            minHeight: height,
-            backgroundColor: const Color(0xFFE8EAF0),
-            valueColor: AlwaysStoppedAnimation<Color>(color),
+        final value = animatedPercent.isFinite
+            ? animatedPercent.clamp(0.0, 1.0).toDouble()
+            : 0.0;
+        return Semantics(
+          role: SemanticsRole.progressBar,
+          minValue: '0',
+          maxValue: '100',
+          value: '${(value * 100).round()}',
+          child: ExcludeSemantics(
+            child: CustomPaint(
+              painter: _PollProgressPainter(
+                value: value,
+                color: color,
+                textDirection: Directionality.of(context),
+              ),
+              child: SizedBox(height: height),
+            ),
           ),
         );
       },
     );
   }
+}
+
+class _PollCardSurfacePainter extends CustomPainter {
+  const _PollCardSurfacePainter({required this.compact});
+
+  final bool compact;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Offset.zero & size,
+        Radius.circular(compact ? 20 : 22),
+      ),
+      Paint()..color = Colors.white,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_PollCardSurfacePainter oldDelegate) =>
+      compact != oldDelegate.compact;
+}
+
+class _PollOptionSurfacePainter extends CustomPainter {
+  const _PollOptionSurfacePainter({
+    required this.compact,
+    required this.isTopRank,
+    required this.isSelected,
+    required this.accentColor,
+  });
+
+  final bool compact;
+  final bool isTopRank;
+  final bool isSelected;
+  final Color accentColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final borderRadius = Radius.circular(compact ? 10 : 12);
+    final surface = RRect.fromRectAndRadius(Offset.zero & size, borderRadius);
+    canvas.drawRRect(
+      surface,
+      Paint()
+        ..color = isTopRank ? const Color(0xFFEFF2F8) : const Color(0xFFF5F6FA),
+    );
+    if (isSelected) {
+      canvas.drawRRect(
+        surface.deflate(1),
+        Paint()
+          ..color = accentColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PollOptionSurfacePainter oldDelegate) =>
+      compact != oldDelegate.compact ||
+      isTopRank != oldDelegate.isTopRank ||
+      isSelected != oldDelegate.isSelected ||
+      accentColor != oldDelegate.accentColor;
+}
+
+class _PollProgressPainter extends CustomPainter {
+  const _PollProgressPainter({
+    required this.value,
+    required this.color,
+    required this.textDirection,
+  });
+
+  final double value;
+  final Color color;
+  final TextDirection textDirection;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bounds = Offset.zero & size;
+    final radius = Radius.circular(size.height / 2);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(bounds, radius),
+      Paint()..color = const Color(0xFFE8EAF0),
+    );
+    if (value <= 0 || size.width <= 0 || size.height <= 0) return;
+
+    final fillWidth = size.width * value;
+    final fillLeft =
+        textDirection == TextDirection.rtl ? size.width - fillWidth : 0.0;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(fillLeft, 0, fillWidth, size.height),
+        radius,
+      ),
+      Paint()..color = color,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_PollProgressPainter oldDelegate) =>
+      value != oldDelegate.value ||
+      color != oldDelegate.color ||
+      textDirection != oldDelegate.textDirection;
 }
 
 class _OptionPercentage extends StatelessWidget {

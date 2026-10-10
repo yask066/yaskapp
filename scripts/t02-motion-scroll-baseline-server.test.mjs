@@ -113,6 +113,21 @@ test('profiling feed creates 100 stable unique poll and option IDs', async () =>
   });
 });
 
+test('profiling comments route returns an empty successful page for a known poll', async () => {
+  await withServer({ T02_SCENARIO: 'profiling' }, async (origin) => {
+    const response = await fetch(
+      `${origin}/polls/motion-profile-20261002-001/comments?limit=50`,
+    );
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { items: [] });
+    assert.equal(
+      (await fetch(`${origin}/polls/unknown/comments?limit=50`)).status,
+      404,
+    );
+  });
+});
+
 test('profiling mutations return current revisions and idempotent like/vote state', async () => {
   await withServer({ T02_SCENARIO: 'profiling' }, async (origin) => {
     const feed = await (await fetch(`${origin}/polls`)).json();

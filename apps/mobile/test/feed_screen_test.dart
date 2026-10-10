@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart' show SemanticsRole;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yaskapp_mobile/src/features/auth/auth_session.dart';
 import 'package:yaskapp_mobile/src/features/feed/feed_screen.dart';
@@ -409,8 +410,6 @@ void main() {
   testWidgets('ties share medal colors and zero-vote options stay readable', (
     tester,
   ) async {
-    const navy = Color(0xFF00104F);
-
     final poll = PollSummary(
       id: 'ranked-poll',
       author: const PollAuthorSummary(
@@ -456,13 +455,13 @@ void main() {
     await tester.pumpAndSettle();
 
     final progressValues = tester
-        .widgetList<LinearProgressIndicator>(
-          find.byType(LinearProgressIndicator),
-        )
-        .map((progress) => progress.value)
+        .widgetList<Semantics>(find.byType(Semantics))
+        .where((semantics) =>
+            semantics.properties.role == SemanticsRole.progressBar)
+        .map((semantics) => int.parse(semantics.properties.value!))
         .toList();
 
-    expect(progressValues, containsAllInOrder([5 / 12, 5 / 12, 2 / 12, 0]));
+    expect(progressValues, containsAllInOrder([42, 42, 17, 0]));
     expect(
       tester.widget<Text>(find.text('No votes')).style?.color,
       const Color(0xFF566A9D),
@@ -598,6 +597,70 @@ void main() {
 
     likeResponse.complete(_poll(viewerHasLiked: true, likesCount: 4));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('store-backed like pending does not rebuild FeedScreen', (
+    tester,
+  ) async {
+    final poll = _poll(viewerHasLiked: false, likesCount: 3).copyWith(
+      stateRevisions: const PollStateRevisions(
+        votes: '1',
+        likes: '1',
+        comments: '1',
+      ),
+    );
+    final store = _seedPollStore(poll);
+    final likeResponse = Completer<PollSummary>();
+    final pollsApiClient = _FakePollsApiClient(
+      initialPolls: [poll],
+      likeResponse: likeResponse.future,
+      stateStore: store,
+    );
+    final realtime = _FakeRealtimeClient();
+    final originalDebugPrint = debugPrint;
+    final originalRebuildLogging = debugPrintRebuildDirtyWidgets;
+    final feedBuilds = <String>[];
+    addTearDown(() {
+      debugPrint = originalDebugPrint;
+      debugPrintRebuildDirtyWidgets = originalRebuildLogging;
+      realtime.close();
+      store.dispose();
+    });
+
+    debugPrint = (message, {wrapWidth}) {
+      if (message?.contains('FeedScreen') == true) feedBuilds.add(message!);
+    };
+    debugPrintRebuildDirtyWidgets = true;
+
+    await tester.pumpWidget(_feedWithStore(pollsApiClient, realtime, store));
+    await tester.pumpAndSettle();
+    final buildsBeforeLike = feedBuilds.length;
+
+    await tester.tap(find.byTooltip('Like'));
+    await tester.pump();
+
+    expect(store.isLiking(poll.id), isTrue);
+    expect(pollsApiClient.likeCalls, 1);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byTooltip('Like'), findsNothing);
+    expect(feedBuilds.length, buildsBeforeLike);
+
+    final buildsBeforeResponse = feedBuilds.length;
+    likeResponse.complete(
+      _poll(viewerHasLiked: true, likesCount: 4).copyWith(
+        stateRevisions: const PollStateRevisions(
+          votes: '1',
+          likes: '2',
+          comments: '1',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(store.pollById(poll.id)?.likesCount, 4);
+    expect(find.text('4'), findsOneWidget);
+    expect(feedBuilds.length, buildsBeforeResponse);
+    debugPrintRebuildDirtyWidgets = originalRebuildLogging;
+    debugPrint = originalDebugPrint;
   });
   testWidgets('shows an error when liking fails', (tester) async {
     final poll = _poll(viewerHasLiked: false, likesCount: 3);
@@ -869,6 +932,7 @@ class _FakePollsApiClient extends PollsApiClient {
     this.likeResponse,
     this.voteResponse,
     this.refreshResponse,
+    this.stateStore,
   });
 
   final List<PollSummary> initialPolls;
@@ -880,6 +944,7 @@ class _FakePollsApiClient extends PollsApiClient {
   final Future<PollSummary>? likeResponse;
   final Future<PollSummary>? voteResponse;
   final Future<List<PollSummary>>? refreshResponse;
+  final PollStateStore? stateStore;
   final responseOrder = <String>[];
   int likeCalls = 0;
   int voteCalls = 0;
@@ -916,19 +981,29 @@ class _FakePollsApiClient extends PollsApiClient {
   }) async {
     likeCalls++;
     responseOrder.add('like-start');
+    final operation = stateStore?.beginOperation(pollId, PollAction.like);
     final likeError = this.likeError;
 
     if (likeError != null) {
+      if (operation != null) {
+        stateStore!.failOperation(operation, ambiguous: false);
+      }
       throw likeError;
     }
 
     final likeResponse = this.likeResponse;
     if (likeResponse != null) {
       final result = await likeResponse;
+      if (operation != null) {
+        stateStore!.completeOperation(operation, result);
+      }
       responseOrder.add('like-finish');
       return result;
     }
 
+    if (operation != null) {
+      stateStore!.completeOperation(operation, likedPoll);
+    }
     responseOrder.add('like-finish');
     return likedPoll!;
   }

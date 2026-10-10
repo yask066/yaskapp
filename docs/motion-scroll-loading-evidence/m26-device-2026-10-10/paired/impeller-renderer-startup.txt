@@ -1,0 +1,1 @@
+10-10 20:00:26.814 I/flutter ( 8627): [IMPORTANT:flutter/shell/platform/android/android_context_vk_impeller.cc(62)] Using the Impeller rendering backend (Vulkan).

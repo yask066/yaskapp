@@ -11,4 +11,7 @@ class PollStateScope extends InheritedNotifier<PollStateStore> {
 
   static PollStateStore? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<PollStateScope>()?.notifier;
+
+  static PollStateStore? readOf(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<PollStateScope>()?.notifier;
 }

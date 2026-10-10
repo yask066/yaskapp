@@ -15,7 +15,7 @@
 - `flutter build apk --profile --no-pub` with defaults — succeeded with both flags off.
 - Full `flutter analyze --no-pub` remains exit 1 with 12 existing diagnostics in auth, home, poll, profile, reports and test files. This matches the M26/M22 record; none point to M27 files.
 
-No physical-device smoke was performed. The Samsung SM-A325F was previously detected by ADB in M26, but paired AC-12 off/on runs, the 20-cycle lifecycle comparison, and physical accessibility checks remain unmeasured. APK compilation does not substitute for those checks.
+No physical-device smoke was performed as part of the 9 October M27 run. A subsequent M26 physical-device addendum on 10 October captured paired 60/90 Hz profiles, first-load diagnostics, one 20-cycle navigation run, a 200% text hierarchy and TalkBack service state; see [M26 device evidence](m26-device-2026-10-10/README.md). That later evidence still fails the Android AC-12 threshold and leaves parts of accessibility and resource comparison open.
 
 ## Web
 
@@ -37,4 +37,4 @@ These are build and automated-test checks, not browser frame profiles. The M17/M
 
 ## Release gate
 
-M27 has supplied a tested Flutter configuration point and documented web/mobile build-time controls. Both flags default off, remain independent, and require rebuilding to roll back. The current profile builds and automated suites do not close M26. G0 remains **NOT PASSED**; Android AC-12 paired traces, 20-cycle lifecycle evidence and physical accessibility smoke are still open. No rollout or deployment is approved by these results.
+M27 has supplied a tested Flutter configuration point and documented web/mobile build-time controls. Both flags default off, remain independent, and require rebuilding to roll back. The current profile builds and automated suites do not close M26. G0 remains **NOT PASSED**; physical Android paired traces now exist but fail the absolute AC-12 threshold. A matched process-resource comparison exists, but direct Flutter listener/controller/timer counters, frame-by-frame live reduced-motion suppression and spoken TalkBack verification remain open. No rollout or deployment is approved by these results.

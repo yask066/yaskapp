@@ -1,0 +1,3 @@
+    mActiveModeId=1
+    mDefaultModeId=2
+    mActiveSfDisplayMode=DisplayMode{id=0, width=1080, height=2400, xDpi=409.432, yDpi=411.891, refreshRate=60.0, appVsyncOffsetNanos=0, presentationDeadlineNanos=17666667, group=-1}

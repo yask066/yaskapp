@@ -116,6 +116,15 @@ const server = createServer(async (request, response) => {
     return json(response, 200, { items: [...current.values()].map((poll) => withHost(poll, origin)) });
   }
 
+  const commentsMatch = url.pathname.match(/^\/polls\/([^/]+)\/comments$/);
+  if (commentsMatch && request.method === 'GET') {
+    const pollId = decodeURIComponent(commentsMatch[1]);
+    console.log(`T02_COMMENTS_GET ${pollId}`);
+    return current.has(pollId)
+      ? json(response, 200, { items: [] })
+      : json(response, 404, { error: 'not_found' });
+  }
+
   const match = url.pathname.match(/^\/polls\/([^/]+)(?:\/(likes|votes))?$/);
   if (match) {
     const id = decodeURIComponent(match[1]);

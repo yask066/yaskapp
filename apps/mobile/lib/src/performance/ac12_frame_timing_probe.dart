@@ -20,19 +20,8 @@ class Ac12FrameTimingProbe {
         .map(
           (timing) => <String, int>{
             'frame': timing.frameNumber,
-            'vsyncStartUs':
-                timing.timestampInMicroseconds(FramePhase.vsyncStart),
-            'buildStartUs':
-                timing.timestampInMicroseconds(FramePhase.buildStart),
-            'buildFinishUs':
-                timing.timestampInMicroseconds(FramePhase.buildFinish),
-            'rasterStartUs':
-                timing.timestampInMicroseconds(FramePhase.rasterStart),
-            'rasterFinishUs':
-                timing.timestampInMicroseconds(FramePhase.rasterFinish),
             'rasterFinishWallUs':
                 timing.timestampInMicroseconds(FramePhase.rasterFinishWallTime),
-            'vsyncOverheadUs': timing.vsyncOverhead.inMicroseconds,
             'buildDurationUs': timing.buildDuration.inMicroseconds,
             'rasterDurationUs': timing.rasterDuration.inMicroseconds,
             'totalSpanUs': timing.totalSpan.inMicroseconds,
@@ -40,10 +29,12 @@ class Ac12FrameTimingProbe {
         )
         .toList(growable: false);
 
-    // Flutter batches timing callbacks, but Android truncates long log records.
-    // Keep each record to at most two frames so profile captures remain parseable.
-    for (var start = 0; start < frames.length; start += 2) {
-      final end = (start + 2).clamp(0, frames.length);
+    // Keep the logcat callback overhead low without approaching Android's
+    // per-record truncation limit. These are the fields used by the AC-12
+    // report: frame window, build/raster duration, and end-to-end frame span.
+    const framesPerRecord = 6;
+    for (var start = 0; start < frames.length; start += framesPerRecord) {
+      final end = (start + framesPerRecord).clamp(0, frames.length);
       // ignore: avoid_print
       print('M17_AC12_FRAME_BATCH ${jsonEncode(frames.sublist(start, end))}');
     }

@@ -1,0 +1,1 @@
+cycles=20;seconds=30.78;appPid=22438

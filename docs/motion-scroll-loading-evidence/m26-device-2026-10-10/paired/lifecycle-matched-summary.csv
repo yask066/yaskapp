@@ -1,0 +1,3 @@
+build,source,flags,device,refreshHz,cycles,successfulCommentsGets,elapsedSeconds,PSSBeforeKB,PSSAfterKB,PSSDeltaKB,RSSBeforeKB,RSSAfterKB,RSSDeltaKB,NativeHeapBeforeKB,NativeHeapAfterKB,NativeHeapDeltaKB,threadsBefore,threadsAfter,threadsDelta
+M17,ac13b283,reactions=off;entry=off,SM-A325F Android 13,90,20,20,24.3,181184,210084,28900,277546,313094,35548,33312,37640,4328,75,74,-1
+M26 painter,working tree based on 3b3d296,reactions=off;entry=off,SM-A325F Android 13,90,20,20,24.4,185595,213841,28246,281630,315706,34076,33900,37924,4024,73,74,1

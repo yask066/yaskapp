@@ -1,0 +1,6 @@
+font_scale=1.1
+animator_duration_scale=1.0
+transition_animation_scale=1.0
+window_animation_scale=1.0
+remove_animations=0
+enabled_accessibility_services=null

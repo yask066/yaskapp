@@ -1,0 +1,3 @@
+mode=90Hz;scenario=scroll;run=1;swipes=75;elapsedSeconds=28.603;motion=off;build=profile;api=T02-local
+mode=90Hz;scenario=scroll;run=2;swipes=75;elapsedSeconds=25.089;motion=off;frames=1688;late=1638;latePercent=97.0379;p95ms=30.117;maxMs=51.441
+mode=90Hz;scenario=scroll;run=3;swipes=75;elapsedSeconds=25.08;motion=off;frames=1697;late=1696;latePercent=99.9411;p95ms=30.242;maxMs=44.098

@@ -134,7 +134,7 @@ class FeedScreenState extends State<FeedScreen> {
   }
 
   Future<void> _refreshPolls() async {
-    final store = PollStateScope.maybeOf(context);
+    final store = PollStateScope.readOf(context);
     final epoch = store?.sessionEpoch ?? 0;
     final viewerId = store?.viewerId;
     final generations = store?.generationSnapshot ?? const <String, int>{};
@@ -190,7 +190,7 @@ class FeedScreenState extends State<FeedScreen> {
       return;
     }
 
-    final store = PollStateScope.maybeOf(context);
+    final store = PollStateScope.readOf(context);
     final currentPoll = _polls[existingIndex];
     if (store == null) {
       _replacePollInFeedValue(
@@ -325,14 +325,13 @@ class FeedScreenState extends State<FeedScreen> {
   }
 
   Future<void> _toggleLike(PollSummary poll) async {
-    poll = PollStateScope.maybeOf(context)?.pollById(poll.id) ?? poll;
-    if (_likingPollIds.contains(poll.id)) {
+    final store = PollStateScope.readOf(context);
+    poll = store?.pollById(poll.id) ?? poll;
+    if (store?.isLiking(poll.id) ?? _likingPollIds.contains(poll.id)) {
       return;
     }
 
-    setState(() {
-      _likingPollIds.add(poll.id);
-    });
+    if (store == null) setState(() => _likingPollIds.add(poll.id));
 
     try {
       final updatedPoll = poll.viewerHasLiked
@@ -349,16 +348,25 @@ class FeedScreenState extends State<FeedScreen> {
         return;
       }
 
-      _replacePollInFeed(updatedPoll);
+      if (store == null) {
+        _replacePollInFeed(updatedPoll);
+      } else {
+        final storedPoll = store.pollById(poll.id);
+        if (storedPoll != null &&
+            storedPoll.likesCount == updatedPoll.likesCount &&
+            storedPoll.viewerHasLiked == updatedPoll.viewerHasLiked) {
+          _replacePollInFeedValue(storedPoll, rebuild: false);
+        } else {
+          _replacePollInFeed(updatedPoll);
+        }
+      }
     } on PollsApiException catch (error) {
       _showSnackBar(error.message);
     } catch (_) {
       _showSnackBar('Could not update like.');
     } finally {
-      if (mounted) {
-        setState(() {
-          _likingPollIds.remove(poll.id);
-        });
+      if (mounted && store == null) {
+        setState(() => _likingPollIds.remove(poll.id));
       }
     }
   }
@@ -444,7 +452,7 @@ class FeedScreenState extends State<FeedScreen> {
   }
 
   void _replacePollInFeed(PollSummary updatedPoll) {
-    final store = PollStateScope.maybeOf(context);
+    final store = PollStateScope.readOf(context);
     if (store != null) {
       final result = store.ingest(
         updatedPoll,
@@ -470,13 +478,22 @@ class FeedScreenState extends State<FeedScreen> {
     _replacePollInFeedValue(updatedPoll);
   }
 
-  void _replacePollInFeedValue(PollSummary updatedPoll) {
-    setState(() {
+  void _replacePollInFeedValue(
+    PollSummary updatedPoll, {
+    bool rebuild = true,
+  }) {
+    void replace() {
       _polls = _polls
           .map((currentPoll) =>
               currentPoll.id == updatedPoll.id ? updatedPoll : currentPoll)
           .toList();
-    });
+    }
+
+    if (rebuild) {
+      setState(replace);
+    } else {
+      replace();
+    }
   }
 
   void _promotePollToTop(PollSummary createdPoll) {

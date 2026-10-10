@@ -1,0 +1,1 @@
+system.remove_animations=1 system.reduce_animations=1 global.animator_duration_scale=0 global.transition_animation_scale=0 global.window_animation_scale=0

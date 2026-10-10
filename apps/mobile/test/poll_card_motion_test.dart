@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart' show SemanticsRole;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yaskapp_mobile/src/core/motion/motion_settings.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_card.dart';
@@ -8,14 +9,17 @@ void main() {
   testWidgets('motion flags off keep values and bars static', (tester) async {
     final key = GlobalKey<_PollCardMotionHarnessState>();
     await tester.pumpWidget(_host(key: key, reactionsMotion: false));
-    expect(_firstProgress(tester).value, 0);
-    expect(_firstProgress(tester).value!.isFinite, isTrue);
+    expect(_firstProgressSemantics(tester).properties.role,
+        SemanticsRole.progressBar);
+    expect(_firstProgressSemantics(tester).properties.minValue, '0');
+    expect(_firstProgressSemantics(tester).properties.maxValue, '100');
+    expect(_firstProgressValue(tester), 0);
 
     key.currentState!.show(_poll(votes: 100, optionVotes: 100));
     await tester.pump();
     expect(find.text('100 votes'), findsOneWidget);
     expect(find.text('100%'), findsOneWidget);
-    expect(_firstProgress(tester).value, 1);
+    expect(_firstProgressValue(tester), 100);
     expect(tester.takeException(), isNull);
   });
 
@@ -40,11 +44,11 @@ void main() {
           .any((semantics) => semantics.properties.label == '100%'),
       isTrue,
     );
-    expect(_firstProgress(tester).value, lessThan(1));
+    expect(_firstProgressValue(tester), lessThan(100));
     await tester.pump(const Duration(milliseconds: 180));
-    expect(_firstProgress(tester).value, lessThan(1));
+    expect(_firstProgressValue(tester), lessThan(100));
     await tester.pump(const Duration(milliseconds: 60));
-    expect(_firstProgress(tester).value, 1);
+    expect(_firstProgressValue(tester), 100);
     semantics.dispose();
   });
 
@@ -57,7 +61,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 80));
 
-    expect(_firstProgress(tester).value, lessThan(1));
+    expect(_firstProgressValue(tester), lessThan(100));
     expect(find.text('100%'), findsNothing);
 
     await tester.pumpWidget(
@@ -65,7 +69,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(_firstProgress(tester).value, 1);
+    expect(_firstProgressValue(tester), 100);
     expect(find.text('100%'), findsOneWidget);
   });
 
@@ -128,10 +132,13 @@ Widget _host({
       ),
     );
 
-LinearProgressIndicator _firstProgress(WidgetTester tester) =>
-    tester.widget<LinearProgressIndicator>(
-      find.byType(LinearProgressIndicator).first,
-    );
+Semantics _firstProgressSemantics(WidgetTester tester) =>
+    tester.widgetList<Semantics>(find.byType(Semantics)).firstWhere(
+          (semantics) => semantics.properties.role == SemanticsRole.progressBar,
+        );
+
+int _firstProgressValue(WidgetTester tester) =>
+    int.parse(_firstProgressSemantics(tester).properties.value!);
 
 double _likeScale(WidgetTester tester, IconData icon) => tester
     .widget<Transform>(

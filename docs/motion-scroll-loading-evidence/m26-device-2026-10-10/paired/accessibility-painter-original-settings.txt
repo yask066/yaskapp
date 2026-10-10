@@ -1,0 +1,4 @@
+secure.remove_animations=null
+global.animator_duration_scale=1.0
+global.transition_animation_scale=1.0
+global.window_animation_scale=1.0

@@ -1,0 +1,4 @@
+active_display=mActiveSfDisplayMode=DisplayMode{id=1, width=1080, height=2400, xDpi=409.432, yDpi=411.891, refreshRate=90.0, appVsyncOffsetNanos=0, presentationDeadlineNanos=12111111, group=-1} system.font_scale=1.1 system.remove_animations=0 system.reduce_animations=0 global.animator_duration_scale=1.0 global.transition_animation_scale=1.0 global.window_animation_scale=1.0 adb_reverse=
+installed_profile_sha256=BC936EF7E4AD07B81DD71096BDE92F00DF263F5F467A09E8280774FF284926A0
+installed_profile_motion_flags=reactions=false;entry=false (default build-time values)
+app=com.example.yaskapp_mobile (Feed)

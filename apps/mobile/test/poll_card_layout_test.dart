@@ -4,6 +4,58 @@ import 'package:yaskapp_mobile/src/features/polls/poll_card.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
 
 void main() {
+  testWidgets('poll card does not clip contained content a second time', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_card(_poll(imageUrl: '/media/polls/layout')));
+
+    final card = tester.widget<Card>(find.byType(Card).first);
+    expect(card.clipBehavior, isNull);
+    expect(find.byType(ClipRRect), findsWidgets);
+  });
+
+  testWidgets('poll card does not rasterize a shadow while scrolling', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_card(_poll()));
+
+    final card = tester.widget<Card>(find.byType(Card).first);
+    expect(card.elevation, 0);
+  });
+
+  testWidgets(
+      'poll options clip ink to their rounded shape without clipping the child',
+      (
+    tester,
+  ) async {
+    await tester.pumpWidget(_card(_poll()));
+
+    final optionMaterial = find
+        .ancestor(
+          of: find.text(
+            'Yes, this is a long enough poll option to wrap onto another line',
+          ),
+          matching: find.byType(Material),
+        )
+        .first;
+    final material = tester.widget<Material>(optionMaterial);
+    final inkWell = tester.widget<InkWell>(
+      find.descendant(of: optionMaterial, matching: find.byType(InkWell)),
+    );
+
+    expect(material.clipBehavior, Clip.none);
+    expect(inkWell.borderRadius, BorderRadius.circular(12));
+  });
+
+  testWidgets('poll card decorations are painted without progress indicators', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_card(_poll()));
+
+    expect(find.byType(CustomPaint), findsAtLeastNWidgets(3));
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+  });
+
   testWidgets('M12 option keys use stable poll and option IDs', (tester) async {
     final poll = _poll();
     await tester.pumpWidget(_card(poll));

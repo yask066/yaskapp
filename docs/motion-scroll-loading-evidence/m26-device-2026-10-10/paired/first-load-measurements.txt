@@ -1,0 +1,12 @@
+off,60,firstLoad,1,0,15.06,13,9,69.2308,293.053,293.053;loading=True
+off,60,firstLoad,2,0,11.208,13,10,76.9231,364.429,364.429;loading=True
+off,60,firstLoad,3,0,11.946,11,9,81.8182,141.294,141.294;loading=True
+both-on,60,firstLoad,1,0,12.229,24,12,50,160.486,278.012;loading=True
+both-on,60,firstLoad,2,0,11.147,12,8,66.6667,350.899,350.899;loading=True
+both-on,60,firstLoad,3,0,12.065,32,19,59.375,307.15,375.833;loading=True
+off,90,firstLoad,1,0,14.231,12,11,91.6667,243.786,243.786;loading=True
+off,90,firstLoad,2,0,12.261,14,14,100,167.949,167.949;loading=True
+off,90,firstLoad,3,0,11.371,16,12,75,112.887,112.887;loading=True
+both-on,90,firstLoad,1,0,11.839,31,30,96.7742,240.008,245.114;loading=True
+both-on,90,firstLoad,2,0,11.204,29,19,65.5172,338.919,372.699;loading=True
+both-on,90,firstLoad,3,0,12.581,34,18,52.9412,91.99,141.927;loading=True
