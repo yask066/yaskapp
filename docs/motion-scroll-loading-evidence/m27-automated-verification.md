@@ -1,8 +1,12 @@
 # M27 automated verification
 
-**Date:** 9 October 2026  
-**Source commit:** `fab3029` (`feat(mobile): configure motion rollout flags`)  
-**Result:** automated release preparation checks pass; device/performance release gates remain open.
+**Date:** 9 October 2026; refreshed 10 October 2026
+
+**Original source commit:** `fab3029` (`feat(mobile): configure motion rollout flags`)
+
+**Refreshed source commit:** `77adc92ba1bd53195ccb82aa2d7bf523b7e2867f` (`docs: close M26 disposition and finish M27 prep`)
+
+**Result:** M27 release preparation is complete. Current automated checks pass; the release gates that depend on device/accessibility/performance evidence remain partial or failed.
 
 ## Flutter
 
@@ -35,6 +39,36 @@ After `npm ci` and `npm run shared:build`:
 
 These are build and automated-test checks, not browser frame profiles. The M17/M23 Chrome profiles are historical and do not establish M26's paired results.
 
-## Release gate
+## Release gate — prior disposition before this refresh
 
-M27 release preparation is complete: Flutter configuration and web/mobile build-time controls are documented, both flags default off and remain independent, and rollback requires a rebuild. M26 was administratively closed at the user's direction without additional tests; this did not pass its acceptance gates. G0 remains **NOT PASSED** and physical Android paired traces fail the absolute AC-12 threshold. A matched process-resource comparison exists, but direct Flutter listener/controller/timer counters, frame-by-frame live reduced-motion suppression and spoken TalkBack verification remain open. No rollout or deployment is approved by these results; PRD AC-14–AC-16 remain incomplete.
+M27 release preparation is complete: Flutter configuration and web/mobile build-time controls are documented, both flags default off and remain independent, and rollback requires a rebuild. M26 was administratively closed at the user's direction without additional tests; this did not pass its acceptance gates. G0 remains **NOT PASSED** and physical Android paired traces fail the absolute AC-12 threshold. A matched process-resource comparison exists, but direct Flutter listener/controller/timer counters, frame-by-frame live reduced-motion suppression and spoken TalkBack verification remain open. In this pre-refresh disposition, PRD AC-14–AC-16 were incomplete; see the updated status below.
+
+## Refreshed verification on current source — 10 October 2026
+
+All commands below ran from the isolated worktree at `77adc92ba1bd53195ccb82aa2d7bf523b7e2867f`.
+
+### Flutter
+
+- `flutter test --no-pub` — **271 passed, 1 skipped**, exit 0.
+- `flutter test --no-pub --plain-name "reads independent rollout flags from the build environment" test/motion_flags_test.dart` — **1 passed** in each of four configurations: defaults, reactions-only, entry-only and both-on. The separate default-only assertion is exercised in the full suite; it is intentionally excluded from enabled-define runs.
+- Focused `flutter analyze --no-pub lib/main.dart lib/src/core/motion/motion_flags.dart test/motion_flags_test.dart` — **no issues found**.
+- Current-source profile APK with default/off flags — **built successfully**, 74.1 MB.
+- Additional current-source profile APK variants could not be completed: after earlier build attempts exhausted the C: drive, Gradle failed with “not enough space”; Flutter-generated build output was cleaned afterward. The 9 October source-revision matrix above remains historical evidence and is not represented as a current-source build.
+
+### Web
+
+- `npm ci` and `npm run shared:build` completed successfully.
+- `npm run test -w @yaskapp/web -- --run` — **240 passed across 36 files**, exit 0. MSW emitted existing unhandled-request notices for `/auth/me`, `/polls?limit=20`, and `/polls/poll-1`; no test failed.
+- `npm run typecheck -w @yaskapp/web` and `npm run lint -w @yaskapp/web` — exit 0.
+- Production builds succeeded for all four build-time flag combinations. The current JavaScript assets were `index-Yu76V5Zy.js` (off/off), `index-ByWbIjzg.js` (reactions only), `index-GfHg3Mmp.js` (entry only), and `index-DjYivNeA.js` (both on). Distinct assets confirm the selected values are embedded at build time; this does not replace browser interaction or frame-profile evidence.
+
+### M27 and PRD disposition
+
+| Item | Current disposition | Evidence / remaining condition |
+|---|---|---|
+| M27 release preparation | **Complete** | Build-time controls, defaults, rollback, rollout sequence, owners, tested platform matrix and blocker report are documented. |
+| PRD AC-14 | **Partial** | Four-mode web builds, Flutter flag-reader tests and current default APK build pass. The full cross-platform live smoke for errors/loading/anchors in every flag mode remains deferred with M26. |
+| PRD AC-15 | **Partial** | Current Flutter and Web automated suites pass. The deferred M26 accessibility/device matrix is not complete. |
+| PRD AC-16 | **Complete as documentation** | G0 report, final Android comparison, tested configuration/build matrix, limitations and disable instructions are recorded in this report and [release instructions](../motion-release-verification.md). AC-12 itself remains failed. |
+
+M26 remains closed administratively with its outstanding acceptance checks deferred. G0 remains **NOT PASSED**, AC-12 remains **FAIL**, and motion must stay off in delivered builds. M27 is complete as release preparation; this does not authorize rollout, deployment, or completion of the overall PRD Definition of Done.
