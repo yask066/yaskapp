@@ -24,6 +24,12 @@ test('realtime handshake accepts cookie sessions only from an allowed Origin', (
   assert.equal(getRealtimeAuthMode({ headers: { cookie: 'yaskapp_session=session' } }), 'cookie');
 });
 
+test('realtime cookie sessions trust the configured HTTP staging IP', () => {
+  assert.equal(isAllowedRealtimeOrigin('http://5.44.44.197', 'https://web.example.com', '5.44.44.197'), true);
+  assert.equal(isAllowedRealtimeOrigin('https://evil.example', 'https://web.example.com', '5.44.44.197'), false);
+  assert.equal(isAllowedRealtimeOrigin(undefined, 'https://web.example.com', '5.44.44.197'), false);
+});
+
 test('realtime handshake accepts bearer auth and rejects token query parameters', () => {
   assert.equal(getRealtimeAuthMode({ headers: { authorization: 'Bearer access-token' } }), 'bearer');
   assert.equal(isRealtimeTokenInQuery('/realtime?token=access-token'), true);
@@ -115,9 +121,12 @@ test('handshake rejects query tokens and cookie auth without an Origin', async (
 });
 
 test('registered realtime route enforces handshake auth, Origin, and rate limiting', async (context) => {
+  const previousStagingIp = env.STAGING_PUBLIC_IP;
+  env.STAGING_PUBLIC_IP = '5.44.44.197';
   const app = Fastify({ logger: false });
   await app.register(websocket);
   context.after(async () => {
+    env.STAGING_PUBLIC_IP = previousStagingIp;
     for (const socket of app.websocketServer.clients) socket.terminate();
     await app.close();
   });
@@ -159,6 +168,13 @@ test('registered realtime route enforces handshake auth, Origin, and rate limiti
   cookieAuth.close();
   await cookieClosed;
 
+  const stagingCookieAuth = await app.injectWS('/realtime', {
+    headers: { origin: 'http://5.44.44.197', cookie: 'yaskapp_session=session' }
+  });
+  const stagingCookieClosed = once(stagingCookieAuth, 'close');
+  stagingCookieAuth.close();
+  await stagingCookieClosed;
+
   const bearerAuth = await app.injectWS('/realtime', {
     headers: { authorization: 'Bearer test-token' }
   });
@@ -182,7 +198,7 @@ test('registered realtime route enforces handshake auth, Origin, and rate limiti
   );
 
   assert.equal(authCalls, authCallsBeforeRejectedRequests + 1);
-  assert.equal(rateLimitCalls, 6);
+  assert.equal(rateLimitCalls, 7);
 });
 
 test('realtime log fields redact payloads, comment bodies, cookies and tokens', () => {

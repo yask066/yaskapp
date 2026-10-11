@@ -8,7 +8,7 @@ import { env } from '../../config/env.js';
 function assertTrustedCookieOrigin(request: FastifyRequest, reply: FastifyReply) {
   const hasCookieSession = Boolean(request.cookies?.[sessionCookieName]);
   const usesBearer = /^Bearer\s/i.test(request.headers.authorization ?? '');
-  if (hasCookieSession && !usesBearer && !['GET', 'HEAD', 'OPTIONS'].includes(request.method) && !isTrustedOrigin(request.headers.origin, env.CORS_ORIGINS)) {
+  if (hasCookieSession && !usesBearer && !['GET', 'HEAD', 'OPTIONS'].includes(request.method) && !isTrustedOrigin(request.headers.origin, env.CORS_ORIGINS, env.STAGING_PUBLIC_IP)) {
     return reply.status(403).send({
       error: 'csrf_origin_rejected',
       message: 'The request origin is not trusted.'

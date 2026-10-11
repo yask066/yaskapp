@@ -10,6 +10,7 @@ const envSchema = z
   PORT: z.coerce.number().int().positive().default(3000),
   HOST: z.string().default('0.0.0.0'),
   CORS_ORIGINS: z.string().default('*'),
+  STAGING_PUBLIC_IP: z.string().ip().optional(),
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
   JWT_SECRET: z.string().min(16).default(developmentJwtSecret),

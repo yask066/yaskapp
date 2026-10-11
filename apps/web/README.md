@@ -42,3 +42,8 @@ clients during the migration.
 The public client is available at `WEB_HOST` (default:
 `web-staging.example.com`). Add its HTTPS origin to `CORS_ORIGINS` in
 `services/api/.env.staging` before deployment.
+
+For the temporary HTTP IP route, set `STAGING_PUBLIC_IP` in the same API
+environment. The API also trusts its exact `http://<STAGING_PUBLIC_IP>` origin
+for cookie-session writes, logout, and WebSocket connections. Rebuild and
+recreate the API containers after updating their code or environment.

@@ -112,7 +112,7 @@ export function registerAuthRoutes(app: FastifyInstance) {
   });
 
   app.post('/auth/logout', async (request, reply) => {
-    if (!isTrustedOrigin(request.headers.origin, env.CORS_ORIGINS)) {
+    if (!isTrustedOrigin(request.headers.origin, env.CORS_ORIGINS, env.STAGING_PUBLIC_IP)) {
       return reply.status(403).send({
         error: 'csrf_origin_rejected',
         message: 'The request origin is not trusted.'

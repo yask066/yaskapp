@@ -8,8 +8,8 @@ import { env } from '../config/env.js';
 import { rateLimit, type RateLimitOptions } from '../config/rate-limit.js';
 import { recordRateLimitResponse } from '../modules/notifications/notifications.metrics.js';
 
-export function isAllowedRealtimeOrigin(origin: string | undefined, configuredOrigins: string) {
-  return Boolean(origin && isTrustedOrigin(origin, configuredOrigins));
+export function isAllowedRealtimeOrigin(origin: string | undefined, configuredOrigins: string, stagingPublicIp?: string) {
+  return Boolean(origin && isTrustedOrigin(origin, configuredOrigins, stagingPublicIp));
 }
 
 export function isRealtimeTokenInQuery(url: string) {
@@ -41,7 +41,7 @@ async function validateRealtimeHandshake(request: Parameters<typeof authenticate
   if (isRealtimeTokenInQuery(request.url)) {
     return reply.status(401).send({ error: 'unauthorized', message: 'Authentication is required.' });
   }
-  if (getRealtimeAuthMode(request) === 'cookie' && !isAllowedRealtimeOrigin(request.headers.origin, env.CORS_ORIGINS)) {
+  if (getRealtimeAuthMode(request) === 'cookie' && !isAllowedRealtimeOrigin(request.headers.origin, env.CORS_ORIGINS, env.STAGING_PUBLIC_IP)) {
     return reply.status(403).send({ error: 'csrf_origin_rejected', message: 'The request origin is not trusted.' });
   }
 }

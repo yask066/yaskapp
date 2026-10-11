@@ -39,3 +39,21 @@ test('accepts configured web origins and rejects cross-site origins', () => {
   assert.equal(isTrustedOrigin('https://evil.example', 'https://web-staging.example.com'), false);
   assert.equal(isTrustedOrigin(undefined, 'https://web-staging.example.com'), true);
 });
+
+test('trusts only the exact HTTP origin of the configured staging IP', () => {
+  const configuredOrigins = 'https://web-staging.example.com';
+  assert.equal(isTrustedOrigin('http://5.44.44.197', configuredOrigins, '5.44.44.197'), true);
+  assert.equal(isTrustedOrigin('https://web-staging.example.com', configuredOrigins, '5.44.44.197'), true);
+  for (const origin of ['http://5.44.44.198', 'http://5.44.44.197:8080', 'https://5.44.44.197', 'http://5.44.44.197.evil.example', 'null']) {
+    assert.equal(isTrustedOrigin(origin, configuredOrigins, '5.44.44.197'), false, origin);
+  }
+  assert.equal(isTrustedOrigin('http://5.44.44.197', configuredOrigins), false);
+  assert.equal(isTrustedOrigin('http://[::1]', configuredOrigins, '::1'), true);
+});
+
+test('staging IP trust preserves the restricted wildcard development origins', () => {
+  assert.equal(isTrustedOrigin('http://5.44.44.197', '*', '5.44.44.197'), true);
+  assert.equal(isTrustedOrigin('http://localhost:5173', '*', '5.44.44.197'), true);
+  assert.equal(isTrustedOrigin('http://127.0.0.1:5173', '*', '5.44.44.197'), true);
+  assert.equal(isTrustedOrigin('https://evil.example', '*', '5.44.44.197'), false);
+});

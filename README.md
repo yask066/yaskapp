@@ -53,6 +53,9 @@ the public web client at `http://<STAGING_PUBLIC_IP>/`; the moderation panel is
 available at `/admin`. Pass the same address to Flutter through
 `API_BASE_URL` and `API_WEBSOCKET_URL`. This is an HTTP-only development
 route; switch to the domain-based HTTPS configuration before production use.
+The API trusts the exact `http://<STAGING_PUBLIC_IP>` origin for cookie-session
+writes, logout, and WebSocket connections when this IP is explicitly configured.
+Other browser origins must still be listed in `CORS_ORIGINS`.
 
 PowerShell example:
 

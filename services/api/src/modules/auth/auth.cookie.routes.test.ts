@@ -2,16 +2,19 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import Fastify from 'fastify';
 import jwt from '@fastify/jwt';
+import multipart from '@fastify/multipart';
 import { parseCookieHeader } from './auth.cookies.js';
 import { hashPassword } from './password.js';
 
 process.env.NODE_ENV = 'test';
+process.env.STAGING_PUBLIC_IP = '5.44.44.197';
 
-const [{ env }, { registerAuthRoutes }, { db }, { getCurrentUser }] = await Promise.all([
+const [{ env }, { registerAuthRoutes }, { db }, { getCurrentUser }, { registerPollRoutes }] = await Promise.all([
   import('../../config/env.js'),
   import('./auth.routes.js'),
   import('../../config/database.js'),
-  import('./auth.utils.js')
+  import('./auth.utils.js'),
+  import('../polls/polls.routes.js')
 ]);
 
 test('a production login stays authenticated over HTTP and HTTPS cookie sessions', async (context) => {
@@ -41,9 +44,11 @@ test('a production login stays authenticated over HTTP and HTTPS cookie sessions
     await app.close();
   });
   await app.register(jwt, { secret: env.JWT_SECRET, cookie: { cookieName: 'yaskapp_session', signed: false } });
+  await app.register(multipart);
   app.addHook('onRequest', async (request) => { request.cookies = parseCookieHeader(request.headers.cookie); });
   app.decorateRequest('getCurrentUser', function () { return getCurrentUser(this); });
   registerAuthRoutes(app);
+  registerPollRoutes(app);
 
   for (const protocol of ['http', 'https'] as const) {
     const login = await app.inject({
@@ -63,6 +68,28 @@ test('a production login stays authenticated over HTTP and HTTPS cookie sessions
     });
     assert.equal(me.statusCode, 200, me.body);
     assert.equal(me.json().user.id, account.id);
+
+    // An invalid body reaches poll validation only after the real cookie/JWT
+    // authentication and CSRF checks accept the public staging origin.
+    const poll = await app.inject({
+      method: 'POST', url: '/polls', payload: {},
+      headers: { cookie: cookie.split(';', 1)[0], origin: 'http://5.44.44.197', 'x-forwarded-proto': protocol }
+    });
+    assert.equal(poll.statusCode, 400, poll.body);
+    assert.equal(poll.json().error, 'validation_error');
+
+    const rejectedPoll = await app.inject({
+      method: 'POST', url: '/polls', payload: {},
+      headers: { cookie: cookie.split(';', 1)[0], origin: 'https://evil.example', 'x-forwarded-proto': protocol }
+    });
+    assert.equal(rejectedPoll.statusCode, 403, rejectedPoll.body);
+    assert.equal(rejectedPoll.json().error, 'csrf_origin_rejected');
+
+    const logout = await app.inject({
+      method: 'POST', url: '/auth/logout',
+      headers: { cookie: cookie.split(';', 1)[0], origin: 'http://5.44.44.197', 'x-forwarded-proto': protocol }
+    });
+    assert.equal(logout.statusCode, 204, logout.body);
   }
 });
 

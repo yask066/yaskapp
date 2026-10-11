@@ -33,11 +33,18 @@ export function serializeSessionCookie(value: string | null, secure: boolean): s
   ].join('; ');
 }
 
-export function isTrustedOrigin(origin: string | undefined, configuredOrigins: string): boolean {
+export function isTrustedOrigin(origin: string | undefined, configuredOrigins: string, stagingPublicIp?: string): boolean {
   if (!origin) return true;
 
   const origins = configuredOrigins.split(',').map((item) => item.trim()).filter(Boolean);
   if (origins.includes(origin)) return true;
+
+  // Caddy also serves the web client on this explicitly configured HTTP IP.
+  // Trust only that origin, without accepting arbitrary request/forwarded hosts.
+  if (stagingPublicIp) {
+    const host = stagingPublicIp.includes(':') ? `[${stagingPublicIp}]` : stagingPublicIp;
+    if (origin === `http://${host}`) return true;
+  }
 
   if (configuredOrigins === '*') {
     return origin === 'http://localhost:5173' || origin === 'http://127.0.0.1:5173';
