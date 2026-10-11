@@ -19,10 +19,19 @@ test('serializes a secure HttpOnly session cookie and a clearing cookie', () => 
   assert.match(cookie, /SameSite=Lax/);
   assert.doesNotMatch(cookie, /Secure/);
 
+  const secured = serializeSessionCookie('jwt.value', true);
+  assert.match(secured, /Secure/);
+
   const cleared = serializeSessionCookie(null, true);
   assert.match(cleared, /^yaskapp_session=;/);
   assert.match(cleared, /Max-Age=0/);
   assert.match(cleared, /Secure/);
+});
+
+test('clears an HTTP session cookie without a Secure attribute', () => {
+  const cleared = serializeSessionCookie(null, false);
+  assert.match(cleared, /Max-Age=0/);
+  assert.doesNotMatch(cleared, /Secure/);
 });
 
 test('accepts configured web origins and rejects cross-site origins', () => {

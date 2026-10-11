@@ -5,7 +5,8 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest';
-import { SessionProvider } from '../../app/session-provider';
+import { SessionProvider, useSession } from '../../app/session-provider';
+import { apiClient } from '../../api/client';
 import { MotionSettingsProvider } from '../../core/motion/motion-settings';
 import { listScrollState } from '../../core/scroll/list-scroll-state';
 import { t02MotionScrollCursorPages, t02MotionScrollPolls } from '../../test-utils/t02-motion-scroll-fixture';
@@ -29,11 +30,17 @@ const poll = {
 
 const server = setupServer();
 
+function SessionStatus() {
+  const session = useSession();
+  return <output aria-label="Session status">{session.status}</output>;
+}
+
 function renderFeed(queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } }), entryMotion = false) {
   return { queryClient, ...render(
     <QueryClientProvider client={queryClient}>
       <MotionSettingsProvider flags={{ reactionsMotion: false, entryMotion }}>
         <SessionProvider>
+          <SessionStatus />
           <MemoryRouter>
             <FeedPage />
           </MemoryRouter>
@@ -57,6 +64,33 @@ afterEach(() => {
   vi.useRealTimers();
 });
 afterAll(() => server.close());
+
+test('replaces the account feed with anonymous data after the session expires', async () => {
+  let expired = false;
+  let guestReads = 0;
+  server.use(
+    http.get('/auth/me', () => expired
+      ? HttpResponse.json({ error: 'unauthorized' }, { status: 401 })
+      : HttpResponse.json({ user: {
+        id: 'user-1', email: 'member@example.com', username: 'member', status: 'active',
+        profile: { displayName: 'Member', pollsCount: 0, followersCount: 0, followingCount: 0, countryCode: 'BY', bio: null, avatarObjectKey: null, avatarUrl: null },
+      } })),
+    http.get('/polls', () => {
+      if (expired) guestReads += 1;
+      return HttpResponse.json({ items: [{ ...poll, question: expired ? 'Public poll?' : 'Account poll?', viewerHasLiked: !expired }] });
+    }),
+  );
+  const view = renderFeed();
+  expect(await screen.findByText('Account poll?')).toBeInTheDocument();
+  expired = true;
+  await act(async () => { await apiClient.get('/auth/me', (body) => body).catch(() => undefined); });
+  expect(screen.getByLabelText('Session status')).toHaveTextContent('anonymous');
+  expect(screen.queryByText('Account poll?')).not.toBeInTheDocument();
+  expect(await screen.findByText('Public poll?')).toBeInTheDocument();
+  expect(guestReads).toBe(1);
+  view.unmount();
+  view.queryClient.clear();
+});
 
 test('applies entry motion to a newly visible poll while keeping its actions interactive', async () => {
   server.use(http.get('/auth/me', () => HttpResponse.json({ user: {

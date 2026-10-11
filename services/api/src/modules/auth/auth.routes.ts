@@ -13,12 +13,13 @@ import { authenticate } from './auth.utils.js';
 import { isTrustedOrigin, serializeSessionCookie } from './auth.cookies.js';
 import { env } from '../../config/env.js';
 
-function setSessionCookie(reply: FastifyReply, accessToken: string) {
-  reply.header('set-cookie', serializeSessionCookie(accessToken, env.NODE_ENV === 'production'));
+function setSessionCookie(request: FastifyRequest, reply: FastifyReply, accessToken: string) {
+  // trustProxy resolves the public protocol when Caddy terminates TLS.
+  reply.header('set-cookie', serializeSessionCookie(accessToken, request.protocol === 'https'));
 }
 
-function clearSessionCookie(reply: FastifyReply) {
-  reply.header('set-cookie', serializeSessionCookie(null, env.NODE_ENV === 'production'));
+function clearSessionCookie(request: FastifyRequest, reply: FastifyReply) {
+  reply.header('set-cookie', serializeSessionCookie(null, request.protocol === 'https'));
 }
 
 function responseForClient(request: FastifyRequest, result: { user: unknown; accessToken: string; tokenType: string; expiresIn: string }) {
@@ -83,7 +84,7 @@ export function registerAuthRoutes(app: FastifyInstance) {
     try {
       const result = await registerUser(app, parsedBody.data);
 
-      setSessionCookie(reply, result.accessToken);
+      setSessionCookie(request, reply, result.accessToken);
       return reply.status(201).send(responseForClient(request, result));
     } catch (error) {
       return authError(reply, error);
@@ -103,7 +104,7 @@ export function registerAuthRoutes(app: FastifyInstance) {
 
     try {
       const result = await signInUser(app, parsedBody.data);
-      setSessionCookie(reply, result.accessToken);
+      setSessionCookie(request, reply, result.accessToken);
       return responseForClient(request, result);
     } catch (error) {
       return authError(reply, error);
@@ -117,7 +118,7 @@ export function registerAuthRoutes(app: FastifyInstance) {
         message: 'The request origin is not trusted.'
       });
     }
-    clearSessionCookie(reply);
+    clearSessionCookie(request, reply);
     return reply.status(204).send();
   });
 
