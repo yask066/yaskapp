@@ -4,6 +4,7 @@ import { db } from '../../config/database.js';
 import { findAuthenticatedUserById } from './auth.repository.js';
 import { isTrustedOrigin, sessionCookieName } from './auth.cookies.js';
 import { env } from '../../config/env.js';
+import type { Pool } from 'pg';
 
 function assertTrustedCookieOrigin(request: FastifyRequest, reply: FastifyReply) {
   const hasCookieSession = Boolean(request.cookies?.[sessionCookieName]);
@@ -37,12 +38,18 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
   }
 }
 
-async function isSessionRevoked(userId: string, tokenSessionVersion: unknown) {
-  const result = await db.query<{ session_version: number }>(
-    'SELECT session_version FROM users WHERE id = $1 AND deleted_at IS NULL',
+export async function isSessionRevoked(
+  userId: string,
+  tokenSessionVersion: unknown,
+  executor: Pick<Pool, 'query'> = db
+) {
+  const result = await executor.query<{ session_version: number }>(
+    `SELECT session_version FROM users
+     WHERE id = $1 AND status = 'active' AND deleted_at IS NULL`,
     [userId]
   );
-  return result.rows[0] !== undefined && result.rows[0].session_version !== Number(tokenSessionVersion ?? 0);
+  const account = result.rows[0];
+  return !account || account.session_version !== Number(tokenSessionVersion ?? 0);
 }
 
 export async function optionalAuthenticate(
@@ -65,7 +72,7 @@ export async function optionalAuthenticate(
 
   const user = await request.getCurrentUser();
 
-  if (!user || user.status !== 'active') {
+  if (!user || user.status !== 'active' || await isSessionRevoked(user.id, request.user.sessionVersion)) {
     return reply.status(401).send({
       error: 'unauthorized',
       message: 'Authentication is required.'
@@ -80,7 +87,7 @@ export async function authenticateForAppeal(request: FastifyRequest, reply: Fast
     return reply.status(401).send({ error: 'unauthorized', message: 'Authentication is required.' });
   }
   const user = await request.getCurrentUser();
-  if (!user || user.status !== 'active') {
+  if (!user || user.status !== 'active' || await isSessionRevoked(user.id, request.user.sessionVersion)) {
     return reply.status(401).send({ error: 'unauthorized', message: 'Authentication is required.' });
   }
 }

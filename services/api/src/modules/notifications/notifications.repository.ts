@@ -29,13 +29,16 @@ type NotificationRow = {
   actor_display_name: string | null;
   actor_avatar_object_key: string | null;
   actor_deleted_at: Date | null;
+  actor_status: string | null;
   poll_id: string | null;
   comment_id: string | null;
   payload: Record<string, unknown>;
   read_at: Date | null;
   created_at: Date;
   poll_deleted_at: Date | null;
+  poll_author_deleted_at: Date | null;
   comment_deleted_at: Date | null;
+  comment_author_deleted_at: Date | null;
 };
 
 const displayPayloadKeys = new Set(['displayName', 'pollQuestion', 'optionLabel', 'commentExcerpt']);
@@ -49,10 +52,18 @@ function safeDisplayPayload(payload: Record<string, unknown>) {
 }
 
 export function mapNotification(row: NotificationRow): NotificationRecord {
+  const targetAvailable = row.poll_id !== null
+    ? row.poll_deleted_at === null && row.poll_author_deleted_at === null
+    : row.comment_id !== null
+      ? row.comment_deleted_at === null && row.poll_deleted_at === null
+        && row.poll_author_deleted_at === null && row.comment_author_deleted_at === null
+      : row.actor_id !== null && row.actor_status === 'active' && row.actor_deleted_at === null;
+  const actorAvailable = row.actor_id === null || (row.actor_status === 'active' && row.actor_deleted_at === null);
   return {
     id: row.id,
     type: row.type,
     actor: row.actor_id && row.actor_username && row.actor_display_name
+      && row.actor_status === 'active' && row.actor_deleted_at === null
       ? {
           id: row.actor_id,
           username: row.actor_username,
@@ -60,17 +71,13 @@ export function mapNotification(row: NotificationRow): NotificationRecord {
           avatarUrl: avatarUrlForUser(row.actor_id, row.actor_avatar_object_key)
         }
       : null,
-    pollId: row.poll_id,
-    commentId: row.comment_id,
+    pollId: targetAvailable ? row.poll_id : null,
+    commentId: targetAvailable ? row.comment_id : null,
     targetType: row.comment_id !== null ? 'comment' : row.poll_id !== null ? 'poll' : 'profile',
-    payload: safeDisplayPayload(row.payload),
+    payload: targetAvailable && actorAvailable ? safeDisplayPayload(row.payload) : {},
     readAt: row.read_at?.toISOString() ?? null,
     createdAt: row.created_at.toISOString(),
-    isTargetAvailable: row.poll_id !== null
-      ? row.poll_deleted_at === null
-      : row.comment_id !== null
-        ? row.comment_deleted_at === null && row.poll_deleted_at === null
-        : row.actor_id !== null && row.actor_deleted_at === null
+    isTargetAvailable: targetAvailable
   };
 }
 
@@ -81,13 +88,18 @@ const notificationSelect = `
   actor_profile.display_name AS actor_display_name,
   actor_profile.avatar_object_key AS actor_avatar_object_key,
   actor.deleted_at AS actor_deleted_at,
+  actor.status AS actor_status,
   poll.deleted_at AS poll_deleted_at,
-  comment.deleted_at AS comment_deleted_at
+  poll_author.deleted_at AS poll_author_deleted_at,
+  comment.deleted_at AS comment_deleted_at,
+  comment_author.deleted_at AS comment_author_deleted_at
 FROM notifications n
 LEFT JOIN users actor ON actor.id = n.actor_user_id
 LEFT JOIN profiles actor_profile ON actor_profile.user_id = actor.id
 LEFT JOIN polls poll ON poll.id = n.poll_id
-LEFT JOIN comments comment ON comment.id = n.comment_id`;
+LEFT JOIN users poll_author ON poll_author.id = poll.author_id
+LEFT JOIN comments comment ON comment.id = n.comment_id
+LEFT JOIN users comment_author ON comment_author.id = comment.author_id`;
 
 export async function createNotification(
   input: CreateNotificationInput,

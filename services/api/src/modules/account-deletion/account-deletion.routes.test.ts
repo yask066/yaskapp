@@ -12,7 +12,7 @@ const [
   { redis },
   { registerAccountDeletionRoutes },
   { registerAuthRoutes },
-  { getCurrentUser },
+  { getCurrentUser, optionalAuthenticate },
   { parseCookieHeader },
   { hashPassword }
 ] = await Promise.all([
@@ -239,6 +239,7 @@ async function makeApp() {
   await app.register(jwt, { secret: env.JWT_SECRET, cookie: { cookieName: 'yaskapp_session', signed: false } });
   app.addHook('onRequest', async (request) => { request.cookies = parseCookieHeader(request.headers.cookie); });
   app.decorateRequest('getCurrentUser', function () { return getCurrentUser(this); });
+  app.get('/test/optional-auth', { preHandler: optionalAuthenticate }, async (request) => ({ userId: request.user?.sub ?? null }));
   registerAuthRoutes(app);
   registerAccountDeletionRoutes(app);
   await app.ready();
@@ -254,6 +255,28 @@ function enableDeletion(context: TestContext) {
   env.ACCOUNT_DELETION_ENABLED = true;
   context.after(() => { env.ACCOUNT_DELETION_ENABLED = wasEnabled; });
 }
+
+test('bearer_cookie_optional_auth_all_rejected after session revocation', async (context) => {
+  const fakeDb = installDatabase(context);
+  const account = await fakeDb.createAccount();
+  const app = await makeApp();
+  context.after(() => app.close());
+  const accessToken = await bearerFor(app, account);
+  const cookie = `yaskapp_session=${accessToken}`;
+
+  assert.equal((await app.inject({ method: 'GET', url: '/test/optional-auth', headers: { authorization: `Bearer ${accessToken}` } })).statusCode, 200);
+  account.session_version += 1;
+
+  const bearerMe = await app.inject({ method: 'GET', url: '/auth/me', headers: { authorization: `Bearer ${accessToken}` } });
+  const cookieMe = await app.inject({ method: 'GET', url: '/auth/me', headers: { cookie } });
+  const bearerOptional = await app.inject({ method: 'GET', url: '/test/optional-auth', headers: { authorization: `Bearer ${accessToken}` } });
+  const cookieOptional = await app.inject({ method: 'GET', url: '/test/optional-auth', headers: { cookie } });
+
+  assert.equal(bearerMe.statusCode, 401);
+  assert.equal(cookieMe.statusCode, 401);
+  assert.equal(bearerOptional.statusCode, 401);
+  assert.equal(cookieOptional.statusCode, 401);
+});
 
 test('wrong_password_preserves_session', async (context) => {
   enableDeletion(context);

@@ -10,6 +10,8 @@ import {
 } from './account-deletion.repository.js';
 import { hashDeletionToken } from './account-deletion.verification.js';
 import { lockSuperadminMutation } from './account-activity.guard.js';
+import { dispatchPendingDeletionEvents } from './account-deletion.events.js';
+import { disconnectUser } from '../../realtime/realtime.hub.js';
 
 const cleanupSteps = ['discovery', 'notifications', 'moderation', 'content', 'relationships', 'media', 'completion'];
 
@@ -112,6 +114,15 @@ export async function acceptAccountDeletion(
     );
     await snapshotDeletionWork(client, permission.operationId, permission.userId);
     await client.query('COMMIT');
+    try {
+      disconnectUser(permission.userId, 'account_deleted', {
+        type: 'account.deleted',
+        payload: { userId: permission.userId, operationId: permission.operationId }
+      });
+    } catch {
+      // The committed outbox event and per-delivery account check still revoke remote access.
+    }
+    void dispatchPendingDeletionEvents().catch(() => undefined);
     return accepted;
   } catch (error) {
     await client.query('ROLLBACK');

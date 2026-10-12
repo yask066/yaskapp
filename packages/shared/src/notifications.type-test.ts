@@ -63,6 +63,10 @@ type ExpectedNotificationRealtimeEventV1 =
 
 type ExpectedLegacyRealtimeEvent =
   | {
+      type: 'account.deleted';
+      payload: { userId: string; operationId: string };
+    }
+  | {
       type: 'poll.vote.created';
       payload: {
         poll: Omit<Poll, 'viewerVoteOptionId'>;

@@ -11,6 +11,8 @@ class FakeRedis implements RedisClientLike {
   private listeners: Array<(channel: string, message: string) => void> = [];
   subscribeCalls = 0;
   quitCalls = 0;
+  disconnectCalls = 0;
+  failQuit = false;
   peer?: FakeRedis;
 
   async subscribe(channel: string) {
@@ -32,7 +34,12 @@ class FakeRedis implements RedisClientLike {
 
   async quit() {
     this.quitCalls += 1;
+    if (this.failQuit) throw new Error('Redis unavailable');
     return 'OK';
+  }
+
+  disconnect() {
+    this.disconnectCalls += 1;
   }
 
   emit(channel: string, message: string) {
@@ -122,4 +129,17 @@ test('two bus instances deliver only to the recipient-specific local hub', async
   removeSecondSocket();
   await first.close();
   await second.close();
+});
+
+test('close disconnects Redis clients when graceful quit fails during an outage', async () => {
+  const publisher = new FakeRedis();
+  const subscriber = new FakeRedis();
+  publisher.failQuit = true;
+  subscriber.failQuit = true;
+  const bus = new RealtimeBus({ createPublisher: () => publisher, createSubscriber: () => subscriber });
+
+  await bus.close();
+
+  assert.equal(publisher.disconnectCalls, 1);
+  assert.equal(subscriber.disconnectCalls, 1);
 });

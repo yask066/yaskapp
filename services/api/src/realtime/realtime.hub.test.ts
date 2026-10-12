@@ -3,6 +3,8 @@ import { test } from 'node:test';
 
 import type { Poll } from '../modules/polls/polls.repository.js';
 import { getNotificationMetrics } from '../modules/notifications/notifications.metrics.js';
+
+process.env.NODE_ENV = 'test';
 import {
   addRealtimeClient,
   broadcastPollVoteCreated,
@@ -21,7 +23,8 @@ import {
   getRealtimeConnectionMetrics,
   handleRealtimeMessage,
   resetRealtimeConnectionMetrics,
-  sweepIdleRealtimeClients
+  sweepIdleRealtimeClients,
+  RealtimeHub
 } from './realtime.hub.js';
 
 test('connection ready is versioned and sent only after socket registration', () => {
@@ -334,4 +337,62 @@ test('notification delivery records commit-to-client latency without logging pay
 
   assert.equal(getNotificationMetrics().commitToClientSamples, before + 1);
   remove();
+});
+
+test('notification delivery is suppressed and disconnected when account is inactive', async () => {
+  const messages: string[] = [];
+  const hub = new RealtimeHub({ canDeliverToUser: async () => false });
+  hub.addRealtimeClient({ readyState: 1, send: (message) => messages.push(message) }, 'deleted-user');
+  messages.length = 0;
+
+  await hub.sendToUser('deleted-user', {
+    type: 'notification.read',
+    payload: { notificationId: 'private-notification', unreadCount: 0 }
+  });
+
+  assert.deepEqual(messages, []);
+  assert.equal(hub.getConnectionMetrics().activeSockets, 0);
+});
+
+test('account deletion disconnect sends a minimal event and closes every local socket', () => {
+  const messages: string[][] = [[], []];
+  const closes: string[][] = [[], []];
+  const hub = new RealtimeHub();
+  for (let index = 0; index < 2; index += 1) {
+    hub.addRealtimeClient({
+      readyState: 1,
+      send: (message) => messages[index]?.push(message),
+      close: (_code, reason) => closes[index]?.push(reason ?? '')
+    }, 'deleted-user');
+    messages[index]?.splice(0);
+  }
+
+  hub.disconnectUser('deleted-user', 'account_deleted', {
+    type: 'account.deleted',
+    payload: { userId: 'deleted-user', operationId: 'operation-1' }
+  });
+
+  assert.deepEqual(messages.map((socketMessages) => socketMessages.map((message) => JSON.parse(message))), [
+    [{ type: 'account.deleted', payload: { userId: 'deleted-user', operationId: 'operation-1' } }],
+    [{ type: 'account.deleted', payload: { userId: 'deleted-user', operationId: 'operation-1' } }]
+  ]);
+  assert.deepEqual(closes, [['account_deleted'], ['account_deleted']]);
+  assert.equal(hub.getConnectionMetrics().activeSockets, 0);
+});
+
+test('missed Redis invalidation cannot deliver data to a deleted account socket', async () => {
+  let active = true;
+  const messages: string[] = [];
+  const remoteNode = new RealtimeHub({ canDeliverToUser: async () => active });
+  remoteNode.addRealtimeClient({ readyState: 1, send: (message) => messages.push(message) }, 'deleted-user');
+  messages.length = 0;
+  active = false;
+
+  await remoteNode.sendToUser('deleted-user', {
+    type: 'notification.read',
+    payload: { notificationId: 'private-notification', unreadCount: 0 }
+  });
+
+  assert.deepEqual(messages, []);
+  assert.equal(remoteNode.getConnectionMetrics().activeSockets, 0);
 });

@@ -53,6 +53,10 @@ export type NotificationRealtimeEventV1 =
 export type RealtimeEvent =
   | NotificationRealtimeEventV1
   | {
+      type: 'account.deleted';
+      payload: { userId: string; operationId: string };
+    }
+  | {
       type: 'poll.vote.created';
       payload: {
         poll: Omit<Poll, 'viewerVoteOptionId'>;

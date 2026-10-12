@@ -1,8 +1,21 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 
 import { db } from '../../config/database.js';
-import { deletePollCommentRecord } from './polls.repository.js';
+import { deletePollCommentRecord, findViewablePollImageRecord } from './polls.repository.js';
+
+test('poll image lookup excludes deleted owners before storage is purged', async (context: TestContext) => {
+  let query = '';
+  context.mock.method(db, 'query', async (sql: string) => {
+    query = sql;
+    return { rows: [] } as never;
+  });
+
+  await findViewablePollImageRecord('poll-1');
+
+  assert.match(query, /u\.status = 'active'/);
+  assert.match(query, /u\.deleted_at IS NULL/);
+});
 
 test('comment deletion locks the poll before locking comments', async () => {
   const queries: string[] = [];

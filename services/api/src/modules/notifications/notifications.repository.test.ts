@@ -21,13 +21,16 @@ test('notification actors expose a public avatar URL', async () => {
     actor_display_name: 'Alice',
     actor_avatar_object_key: 'avatars/actor-1/avatar.webp',
     actor_deleted_at: null,
+    actor_status: 'active',
     poll_id: null,
     comment_id: null,
     payload: {},
     read_at: null,
     created_at: new Date('2026-08-29T10:00:00.000Z'),
     poll_deleted_at: null,
-    comment_deleted_at: null
+    poll_author_deleted_at: null,
+    comment_deleted_at: null,
+    comment_author_deleted_at: null
   });
 
   assert.equal(notification.actor?.avatarUrl, '/media/avatars/actor-1');
@@ -44,6 +47,7 @@ test('notification mapping exposes canonical target type and strips unsafe paylo
     actor_display_name: 'Bob',
     actor_avatar_object_key: null,
     actor_deleted_at: null,
+    actor_status: 'active',
     poll_id: 'poll-2',
     comment_id: 'comment-2',
     payload: {
@@ -56,7 +60,9 @@ test('notification mapping exposes canonical target type and strips unsafe paylo
     read_at: null,
     created_at: new Date('2026-08-29T10:00:00.000Z'),
     poll_deleted_at: null,
-    comment_deleted_at: null
+    poll_author_deleted_at: null,
+    comment_deleted_at: null,
+    comment_author_deleted_at: null
   });
 
   assert.equal(notification.targetType, 'comment');
@@ -73,19 +79,76 @@ test('notification mapping marks missing or deleted targets unavailable', async 
     actor_display_name: 'Carol',
     actor_avatar_object_key: null,
     actor_deleted_at: null,
+    actor_status: 'active',
     poll_id: null,
     comment_id: null,
     payload: {},
     read_at: null,
     created_at: new Date('2026-08-29T10:00:00.000Z'),
     poll_deleted_at: null,
-    comment_deleted_at: null
+    poll_author_deleted_at: null,
+    comment_deleted_at: null,
+    comment_author_deleted_at: null
   };
 
   assert.equal(mapNotification({ ...base, actor_id: null, actor_username: null, actor_display_name: null }).isTargetAvailable, false);
   assert.equal(mapNotification({ ...base, actor_deleted_at: new Date() }).isTargetAvailable, false);
   assert.equal(mapNotification({ ...base, poll_id: 'poll-3', poll_deleted_at: new Date() }).isTargetAvailable, false);
   assert.equal(mapNotification({ ...base, comment_id: 'comment-3', comment_deleted_at: new Date() }).isTargetAvailable, false);
+});
+
+test('notification copies and target IDs are cleared when the content owner is deleted', async () => {
+  const { mapNotification } = await import('./notifications.repository.js');
+  const notification = mapNotification({
+    id: 'notification-deleted-owner',
+    type: 'comment',
+    actor_id: 'actor-4',
+    actor_username: 'dave',
+    actor_display_name: 'Dave',
+    actor_avatar_object_key: null,
+    actor_deleted_at: null,
+    actor_status: 'active',
+    poll_id: 'deleted-poll',
+    comment_id: 'deleted-comment',
+    payload: { displayName: 'Dave', pollQuestion: 'Private question', commentExcerpt: 'Private excerpt' },
+    read_at: null,
+    created_at: new Date('2026-08-29T10:00:00.000Z'),
+    poll_deleted_at: null,
+    poll_author_deleted_at: new Date(),
+    comment_deleted_at: null,
+    comment_author_deleted_at: null
+  });
+
+  assert.equal(notification.isTargetAvailable, false);
+  assert.equal(notification.pollId, null);
+  assert.equal(notification.commentId, null);
+  assert.deepEqual(notification.payload, {});
+});
+
+test('notification actor copies are cleared when the actor is deleted even if the target survives', async () => {
+  const { mapNotification } = await import('./notifications.repository.js');
+  const notification = mapNotification({
+    id: 'notification-deleted-actor',
+    type: 'poll_vote',
+    actor_id: 'deleted-actor',
+    actor_username: 'old_user',
+    actor_display_name: 'Deleted User',
+    actor_avatar_object_key: 'avatars/deleted-actor/avatar.webp',
+    actor_deleted_at: new Date(),
+    actor_status: 'deleted',
+    poll_id: 'surviving-poll',
+    comment_id: null,
+    payload: { displayName: 'Deleted User', optionLabel: 'A choice' },
+    read_at: null,
+    created_at: new Date('2026-08-29T10:00:00.000Z'),
+    poll_deleted_at: null,
+    poll_author_deleted_at: null,
+    comment_deleted_at: null,
+    comment_author_deleted_at: null
+  });
+
+  assert.equal(notification.actor, null);
+  assert.deepEqual(notification.payload, {});
 });
 
 test('read mutations return exact idempotent responses and stay recipient-scoped', async () => {

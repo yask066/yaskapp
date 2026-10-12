@@ -44,6 +44,16 @@ export async function lockActiveAccount(client: PoolClient, userId: string): Pro
   }
 }
 
+export async function isActiveAccount(userId: string) {
+  const result = await db.query<{ active: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM users WHERE id = $1 AND status = 'active' AND deleted_at IS NULL
+     ) AS active`,
+    [userId]
+  );
+  return result.rows[0]?.active === true;
+}
+
 export async function lockActiveAccounts(client: PoolClient, userIds: readonly string[]): Promise<void> {
   const orderedIds = [...new Set(userIds)].sort();
   for (const userId of orderedIds) {

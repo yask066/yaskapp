@@ -240,6 +240,7 @@ async function findPollRowsByIds(client: PoolClient, pollIds: string[]) {
       WHERE p.id = ANY($1::uuid[])
         AND p.deleted_at IS NULL
         AND u.status = 'active'
+        AND u.deleted_at IS NULL
       ORDER BY p.created_at DESC, p.id DESC
     `,
     [pollIds]
@@ -609,6 +610,7 @@ export async function listSubscriptionPollRecords(
           AND p.visibility = 'public'
           AND p.deleted_at IS NULL
           AND u.status = 'active'
+          AND u.deleted_at IS NULL
         ORDER BY p.created_at DESC, p.id DESC
         LIMIT $2
       `,
@@ -720,6 +722,7 @@ export async function findViewablePollRecordById(
         WHERE p.id = $1
           AND p.deleted_at IS NULL
           AND u.status = 'active'
+          AND u.deleted_at IS NULL
           AND (
             p.visibility = 'public'
             OR p.author_id = $2
@@ -761,6 +764,7 @@ export async function findViewablePollImageRecord(
       WHERE p.id = $1
         AND p.deleted_at IS NULL
         AND u.status = 'active'
+        AND u.deleted_at IS NULL
         AND (
           p.visibility = 'public'
           OR p.author_id = $2
@@ -996,7 +1000,9 @@ export async function findViewablePollCommentRecordById(input: {
           AND p.deleted_at IS NULL
           AND p.visibility = 'public'
           AND poll_author.status = 'active'
+          AND poll_author.deleted_at IS NULL
           AND u.status = 'active'
+          AND u.deleted_at IS NULL
       `,
       [input.commentId, input.pollId, input.viewerId]
     );

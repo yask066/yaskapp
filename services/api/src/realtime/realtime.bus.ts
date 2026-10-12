@@ -42,6 +42,9 @@ export class RealtimeBus {
   private readonly publisher: RedisClientLike;
   private readonly subscriber: RedisClientLike;
   private started = false;
+  private starting: Promise<void> | undefined;
+  private messageHandlerAttached = false;
+  private onMessage: ((message: RealtimeBusMessage) => void) | undefined;
 
   constructor(options: RealtimeBusOptions = {}) {
     this.publisher = options.createPublisher?.() ?? createRedisClient();
@@ -50,19 +53,28 @@ export class RealtimeBus {
 
   async start(onMessage: (message: RealtimeBusMessage) => void) {
     if (this.started) return;
-
-    this.subscriber.on('message', (channel, message) => {
-      if (channel !== realtimeChannel) return;
-      const decoded = decodeMessage(message);
-      if (decoded) onMessage(decoded);
-    });
-    try {
-      await this.subscriber.subscribe(realtimeChannel);
-    } catch (error) {
-      recordRealtimeSubscribeError();
-      throw error;
+    this.onMessage = onMessage;
+    if (this.starting) return this.starting;
+    if (!this.messageHandlerAttached) {
+      this.subscriber.on('message', (channel, message) => {
+        if (channel !== realtimeChannel) return;
+        const decoded = decodeMessage(message);
+        if (decoded) this.onMessage?.(decoded);
+      });
+      this.messageHandlerAttached = true;
     }
-    this.started = true;
+    this.starting = (async () => {
+      try {
+        await this.subscriber.subscribe(realtimeChannel);
+        this.started = true;
+      } catch (error) {
+        recordRealtimeSubscribeError();
+        throw error;
+      } finally {
+        this.starting = undefined;
+      }
+    })();
+    return this.starting;
   }
 
   async publish(recipientUserId: string, event: RealtimeEvent) {
@@ -74,7 +86,17 @@ export class RealtimeBus {
 
   async close() {
     this.started = false;
-    await Promise.all([this.publisher.quit(), this.subscriber.quit()]);
+    await Promise.all([this.publisher, this.subscriber].map(async (client) => {
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      const closed = await Promise.race([
+        Promise.resolve().then(() => client.quit()).then(() => true, () => false),
+        new Promise<boolean>((resolve) => {
+          timeout = setTimeout(() => resolve(false), 500);
+        })
+      ]);
+      if (timeout) clearTimeout(timeout);
+      if (!closed) client.disconnect?.();
+    }));
   }
 }
 

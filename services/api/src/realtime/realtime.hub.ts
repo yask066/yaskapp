@@ -1,5 +1,6 @@
 import type { Poll } from '../modules/polls/polls.repository.js';
 import type { NotificationCreatedEvent } from '../modules/notifications/notifications.events.js';
+import { isActiveAccount } from '../modules/account-deletion/account-activity.guard.js';
 import {
   recordCommitToClient,
   recordSocketConnected,
@@ -140,13 +141,18 @@ function send(socket: RealtimeSocket, event: RealtimeEvent) {
 
 type RealtimeHubOptions = { recordMetrics?: boolean };
 
+type AccountDeletedEvent = Extract<RealtimeEvent, { type: 'account.deleted' }>;
+type RealtimeHubOptionsWithGuard = RealtimeHubOptions & {
+  canDeliverToUser?: (userId: string) => boolean | Promise<boolean>;
+};
+
 /** A process-local socket registry. Each API process owns one hub instance. */
 export class RealtimeHub {
   private readonly clients = new Map<RealtimeSocket, { userId: string | undefined; lastSeen: number }>();
   private readonly disconnectMetrics: Record<string, number> = {};
   private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
 
-  constructor(private readonly options: RealtimeHubOptions = {}) {}
+  constructor(private readonly options: RealtimeHubOptionsWithGuard = {}) {}
 
   getConnectionMetrics() {
     return {
@@ -190,24 +196,99 @@ export class RealtimeHub {
   }
 
   broadcast(event: RealtimeEvent) {
-    for (const client of this.clients.keys()) {
+    for (const [client, state] of this.clients) {
+      if (!state.userId) {
+        this.sendToClient(client, event);
+        continue;
+      }
+      let permission: boolean | Promise<boolean>;
       try {
-        send(client, event);
+        permission = this.options.canDeliverToUser?.(state.userId) ?? true;
       } catch {
-        this.removeRealtimeClient(client, 'socket_error');
+        permission = false;
+      }
+      if (typeof permission === 'boolean') {
+        if (permission) this.sendToClient(client, event);
+        else this.disconnectUser(state.userId, 'account_deleted');
+      } else {
+        void permission.then((allowed) => {
+          if (allowed) this.sendToClient(client, event);
+          else this.disconnectUser(state.userId!, 'account_deleted');
+        }).catch(() => this.disconnectUser(state.userId!, 'account_deleted'));
       }
     }
   }
 
   sendToUser(userId: string, event: RealtimeEvent) {
+    let permission: boolean | Promise<boolean> = true;
+    try {
+      permission = this.options.canDeliverToUser?.(userId) ?? true;
+    } catch {
+      permission = false;
+    }
+    if (typeof permission === 'boolean') {
+      if (!permission) {
+        this.disconnectUser(userId, 'account_deleted');
+        return;
+      }
+      this.sendToActiveUser(userId, event);
+      return;
+    }
+    return permission.then((allowed) => {
+      if (allowed) this.sendToActiveUser(userId, event);
+      else this.disconnectUser(userId, 'account_deleted');
+    }).catch(() => {
+      this.disconnectUser(userId, 'account_deleted');
+    });
+  }
+
+  async sweepInactiveRealtimeClients() {
+    if (!this.options.canDeliverToUser) return;
+    const userIds = new Set(
+      [...this.clients.values()].flatMap((state) => state.userId ? [state.userId] : [])
+    );
+    await Promise.all([...userIds].map(async (userId) => {
+      let active = false;
+      try {
+        active = await this.options.canDeliverToUser?.(userId) === true;
+      } catch {
+        active = false;
+      }
+      if (!active) this.disconnectUser(userId, 'account_deleted');
+    }));
+  }
+
+  disconnectUser(userId: string, reason: 'account_deleted', event?: AccountDeletedEvent) {
+    for (const [client, state] of this.clients) {
+      if (state.userId !== userId) continue;
+      try {
+        if (event) send(client, event);
+      } catch {
+        // Closing the connection below still revokes access when event delivery fails.
+      }
+      try {
+        client.close?.(4003, reason);
+      } catch {
+        // Removing the socket from the registry still prevents further deliveries.
+      } finally {
+        this.removeRealtimeClient(client, reason);
+      }
+    }
+  }
+
+  private sendToActiveUser(userId: string, event: RealtimeEvent) {
     for (const [client, state] of this.clients) {
       if (state.userId !== userId) continue;
       state.lastSeen = Date.now();
-      try {
-        send(client, event);
-      } catch {
-        this.removeRealtimeClient(client, 'socket_error');
-      }
+      this.sendToClient(client, event);
+    }
+  }
+
+  private sendToClient(client: RealtimeSocket, event: RealtimeEvent) {
+    try {
+      send(client, event);
+    } catch {
+      this.removeRealtimeClient(client, 'socket_error');
     }
   }
 
@@ -215,6 +296,7 @@ export class RealtimeHub {
     if (this.heartbeatTimer) return;
     this.heartbeatTimer = setInterval(() => {
       this.sweepIdleRealtimeClients(Date.now());
+      void this.sweepInactiveRealtimeClients();
     }, 30_000);
     this.heartbeatTimer.unref?.();
   }
@@ -230,7 +312,10 @@ export class RealtimeHub {
   }
 }
 
-const processRealtimeHub = new RealtimeHub({ recordMetrics: true });
+const processRealtimeHub = new RealtimeHub({
+  recordMetrics: true,
+  canDeliverToUser: process.env.NODE_TEST_CONTEXT ? () => true : isActiveAccount
+});
 
 export function getRealtimeConnectionMetrics() {
   return processRealtimeHub.getConnectionMetrics();
@@ -341,5 +426,9 @@ function broadcast(event: RealtimeEvent) {
 }
 
 export function sendToUser(userId: string, event: RealtimeEvent) {
-  processRealtimeHub.sendToUser(userId, event);
+  return processRealtimeHub.sendToUser(userId, event);
+}
+
+export function disconnectUser(userId: string, reason: 'account_deleted', event?: AccountDeletedEvent) {
+  processRealtimeHub.disconnectUser(userId, reason, event);
 }

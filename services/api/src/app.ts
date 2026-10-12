@@ -25,8 +25,12 @@ import { registerRealtimeRoutes } from './realtime/realtime.routes.js';
 import { parseCookieHeader } from './modules/auth/auth.cookies.js';
 import { realtimeBus } from './realtime/realtime.bus.js';
 import { sendToUser } from './realtime/realtime.hub.js';
+import { disconnectUser } from './realtime/realtime.hub.js';
+import { dispatchPendingDeletionEvents } from './modules/account-deletion/account-deletion.events.js';
 
 export function buildApp() {
+  let realtimeRetryTimer: ReturnType<typeof setInterval> | undefined;
+  let deletionEventsTimer: ReturnType<typeof setInterval> | undefined;
   const app = Fastify({
     trustProxy: true,
     logger:
@@ -185,11 +189,26 @@ export function buildApp() {
   registerRealtimeRoutes(app);
 
   app.addHook('onReady', async () => {
-    await realtimeBus.start(({ recipientUserId, event }) => {
-      sendToUser(recipientUserId, event);
-    });
+    const receiveRealtimeMessage = ({ recipientUserId, event }: { recipientUserId: string; event: import('@yaskapp/shared').RealtimeEvent }) => {
+      if (event.type === 'account.deleted') {
+        disconnectUser(event.payload.userId, 'account_deleted', event);
+        return;
+      }
+      void sendToUser(recipientUserId, event)?.catch(() => undefined);
+    };
+    void realtimeBus.start(receiveRealtimeMessage).catch(() => undefined);
+    realtimeRetryTimer = setInterval(() => {
+      void realtimeBus.start(receiveRealtimeMessage).catch(() => undefined);
+    }, 1_000);
+    realtimeRetryTimer.unref?.();
+    deletionEventsTimer = setInterval(() => {
+      void dispatchPendingDeletionEvents().catch(() => undefined);
+    }, 1_000);
+    deletionEventsTimer.unref?.();
   });
   app.addHook('onClose', async () => {
+    if (realtimeRetryTimer) clearInterval(realtimeRetryTimer);
+    if (deletionEventsTimer) clearInterval(deletionEventsTimer);
     await realtimeBus.close();
   });
 
