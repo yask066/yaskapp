@@ -4,6 +4,7 @@ import { db } from '../../config/database.js';
 import type { UserRole, UserStatus } from '../auth/auth.repository.js';
 import { recordAdminAudit } from './audit.repository.js';
 import { decodeAdminCursor, pageWithCursor } from './pagination.js';
+import { lockSuperadminMutation } from '../account-deletion/account-activity.guard.js';
 
 export type AdminUser = {
   id: string;
@@ -159,13 +160,14 @@ type UserMutationResult =
   | { status: 'not_found' | 'self' | 'protected' | 'last_superadmin' };
 
 async function lockedUsers(client: PoolClient, actorId: string, targetId: string) {
-  const actorResult = await client.query<{ role: UserRole }>(
-    'SELECT role FROM users WHERE id = $1 FOR UPDATE', [actorId]
-  );
-  const targetResult = await client.query<{ role: UserRole; status: UserStatus; deleted_at: Date | null }>(
-    'SELECT role, status, deleted_at FROM users WHERE id = $1 FOR UPDATE', [targetId]
-  );
-  return { actor: actorResult.rows[0], target: targetResult.rows[0] };
+  const locked = new Map<string, { role: UserRole; status: UserStatus; deleted_at: Date | null }>();
+  for (const userId of [...new Set([actorId, targetId])].sort()) {
+    const result = await client.query<{ id: string; role: UserRole; status: UserStatus; deleted_at: Date | null }>(
+      'SELECT id, role, status, deleted_at FROM users WHERE id = $1 FOR UPDATE', [userId]
+    );
+    if (result.rows[0]) locked.set(userId, result.rows[0]);
+  }
+  return { actor: locked.get(actorId), target: locked.get(targetId) };
 }
 
 async function activeSuperadminCount(client: PoolClient) {
@@ -198,6 +200,7 @@ export async function deleteAdminUser(actorId: string, targetId: string, audit: 
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await lockSuperadminMutation(client);
     const { actor, target } = await lockedUsers(client, actorId, targetId);
     if (!actor || !target) return await rollback(client, 'not_found');
     if (actorId === targetId) return await rollback(client, 'self');
@@ -215,6 +218,7 @@ export async function changeUserRole(actorId: string, targetId: string, role: Us
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await lockSuperadminMutation(client);
     const { actor, target } = await lockedUsers(client, actorId, targetId);
     if (!actor || !target) return await rollback(client, 'not_found');
     if (actorId === targetId) return await rollback(client, 'self');

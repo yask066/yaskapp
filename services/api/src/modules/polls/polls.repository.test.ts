@@ -10,6 +10,10 @@ test('comment deletion locks the poll before locking comments', async () => {
     async query(sql: string) {
       queries.push(sql);
 
+      if (sql.includes('SELECT status, deleted_at FROM users')) {
+        return { rows: [{ status: 'active', deleted_at: null }], rowCount: 1 };
+      }
+
       if (sql.includes('SELECT id') && sql.includes('FROM polls')) {
         return { rows: [{ id: 'poll-1' }], rowCount: 1 };
       }
@@ -43,8 +47,9 @@ test('comment deletion locks the poll before locking comments', async () => {
     });
 
     assert.equal(result.status, 'deleted');
-    assert.match(queries[1] ?? '', /FROM polls[\s\S]*FOR UPDATE/i);
-    assert.match(queries[2] ?? '', /^\s*UPDATE comments c/i);
+    assert.match(queries[1] ?? '', /SELECT status, deleted_at FROM users[\s\S]*FOR UPDATE/i);
+    assert.match(queries[2] ?? '', /FROM polls[\s\S]*FOR UPDATE/i);
+    assert.match(queries[3] ?? '', /^\s*UPDATE comments c/i);
   } finally {
     Object.defineProperty(db, 'connect', {
       configurable: true,

@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
+import { lockActiveAccount, lockActiveAccounts } from '../account-deletion/account-activity.guard.js';
 import type { UserRole } from '../auth/auth.repository.js';
 import { recordAdminAudit } from '../admin/audit.repository.js';
 
@@ -235,6 +236,7 @@ export async function issueSanction(input: {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await lockActiveAccounts(client, [input.actorUserId, input.userId]);
     const existing = await client.query<{ request_fingerprint: string; status_code: number | null; response: unknown }>(
       `SELECT request_fingerprint, status_code, response
          FROM moderation_idempotency_keys
@@ -287,6 +289,7 @@ export async function revokeSanction(input: { sanctionId: string; actorUserId: s
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, input.actorUserId);
     const existing = await client.query<{ request_fingerprint: string; response: unknown }>(
       'SELECT request_fingerprint, response FROM moderation_idempotency_keys WHERE actor_user_id = $1 AND idempotency_key = $2 FOR UPDATE',
       [input.actorUserId, input.idempotencyKey]

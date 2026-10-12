@@ -3,6 +3,7 @@ import type { MultipartFile } from '@fastify/multipart';
 import sharp from 'sharp';
 
 import { deleteObject, putObject } from '../../config/storage.js';
+import { withActiveAccountTransaction } from '../account-deletion/account-activity.guard.js';
 import { findUserById } from '../auth/auth.repository.js';
 import {
   clearAvatarObjectKey,
@@ -147,6 +148,10 @@ function isInvalidImageError(error: unknown) {
 }
 
 export async function uploadAvatar(userId: string, part: MultipartFile) {
+  return withActiveAccountTransaction(userId, async () => uploadAvatarWhileLocked(userId, part));
+}
+
+async function uploadAvatarWhileLocked(userId: string, part: MultipartFile) {
   if (part.fieldname !== 'avatar') {
     throw new AvatarUploadError('The avatar field is required.');
   }
@@ -231,6 +236,10 @@ export async function uploadAvatar(userId: string, part: MultipartFile) {
 }
 
 export async function deleteAvatar(userId: string) {
+  return withActiveAccountTransaction(userId, async () => deleteAvatarWhileLocked(userId));
+}
+
+async function deleteAvatarWhileLocked(userId: string) {
   const objectKey = await findAvatarObjectKey(userId);
 
   if (objectKey === undefined) {

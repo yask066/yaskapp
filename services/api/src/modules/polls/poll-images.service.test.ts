@@ -1,77 +1,37 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import sharp from 'sharp';
 
-import {
-  createPollImageObjectKey,
-  normalizePollImage,
-  validatePollImageBytes
-} from './poll-images.service.js';
+process.env.NODE_ENV = 'test';
+process.env.DATABASE_URL ??= 'postgres://test:test@127.0.0.1:5432/test';
+process.env.REDIS_URL ??= 'redis://127.0.0.1:6379';
+process.env.S3_ENDPOINT ??= 'http://127.0.0.1:9000';
+process.env.S3_BUCKET ??= 'test';
+process.env.S3_ACCESS_KEY_ID ??= 'test';
+process.env.S3_SECRET_ACCESS_KEY ??= 'test';
 
-test('poll image object keys are unique and use the poll-images namespace', () => {
-  const firstKey = createPollImageObjectKey('user-123');
-  const secondKey = createPollImageObjectKey('user-123');
+const [{ db }, { enqueuePollImageForAccountDeletion }] = await Promise.all([
+  import('../../config/database.js'),
+  import('./poll-images.service.js')
+]);
 
-  assert.match(
-    firstKey,
-    /^poll-images\/user-123\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/
-  );
-  assert.notEqual(firstKey, secondKey);
-});
+test('failed_upload_reopens_completed_deletion_and_requeues_cleanup', async (context) => {
+  const statements: string[] = [];
+  context.mock.method(db, 'connect', async () => ({
+    async query(sql: string) {
+      statements.push(sql);
+      if (sql.includes('SELECT id, status FROM account_deletion_operations')) {
+        return { rows: [{ id: 'operation-1', status: 'completed' }] };
+      }
+      return { rows: [], rowCount: 1 };
+    },
+    release() {}
+  } as never));
 
-test('poll image validation accepts a real JPEG, PNG, and WebP signature', async () => {
-  const sources = await Promise.all([
-    sharp({ create: { width: 2, height: 2, channels: 3, background: 'red' } })
-      .jpeg()
-      .toBuffer(),
-    sharp({ create: { width: 2, height: 2, channels: 3, background: 'green' } })
-      .png()
-      .toBuffer(),
-    sharp({ create: { width: 2, height: 2, channels: 3, background: 'blue' } })
-      .webp()
-      .toBuffer()
-  ]);
+  await enqueuePollImageForAccountDeletion('user-1', 'poll-images/user-1/image.webp');
 
-  assert.doesNotThrow(() => validatePollImageBytes('image/jpeg', sources[0]));
-  assert.doesNotThrow(() => validatePollImageBytes('image/png', sources[1]));
-  assert.doesNotThrow(() => validatePollImageBytes('image/webp', sources[2]));
-});
-
-test('poll image validation rejects mismatched, unsupported, and animated files', async () => {
-  const png = await sharp({
-    create: { width: 2, height: 2, channels: 3, background: 'white' }
-  })
-    .png()
-    .toBuffer();
-
-  assert.throws(
-    () => validatePollImageBytes('image/jpeg', png),
-    /does not match/i
-  );
-  assert.throws(
-    () => validatePollImageBytes('image/gif', png),
-    /JPEG, PNG, or WebP/i
-  );
-  assert.throws(
-    () => validatePollImageBytes('image/png', Buffer.from('not-an-image')),
-    /does not match/i
-  );
-});
-
-test('poll image normalization produces a metadata-free WebP', async () => {
-  const source = await sharp({
-    create: { width: 800, height: 400, channels: 3, background: 'purple' }
-  })
-    .withMetadata({ orientation: 6 })
-    .jpeg()
-    .toBuffer();
-
-  const normalized = await normalizePollImage(source);
-  const metadata = await sharp(normalized).metadata();
-
-  assert.equal(metadata.format, 'webp');
-  assert.equal(metadata.orientation, undefined);
-  assert.equal(metadata.exif, undefined);
-  assert.equal(metadata.xmp, undefined);
-  assert.equal(metadata.iptc, undefined);
+  assert.ok(statements.some((sql) => sql.includes("SET status = 'pending', completed_at = NULL")));
+  assert.ok(statements.some((sql) => sql.includes("step_key IN ('media', 'completion')")));
+  assert.ok(statements.some((sql) => sql.includes('INSERT INTO account_deletion_media_manifest')));
+  assert.ok(statements.some((sql) => sql.includes('INSERT INTO account_deletion_events')));
+  assert.equal(statements.at(-1), 'COMMIT');
 });

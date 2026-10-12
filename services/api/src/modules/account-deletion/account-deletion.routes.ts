@@ -6,7 +6,7 @@ import { env } from '../../config/env.js';
 import { db } from '../../config/database.js';
 import { rateLimit } from '../../config/rate-limit.js';
 import { findUserByEmailOrUsername, findUserByIdWithPassword } from '../auth/auth.repository.js';
-import { isTrustedOrigin, sessionCookieName } from '../auth/auth.cookies.js';
+import { isTrustedOrigin, serializeSessionCookie, sessionCookieName } from '../auth/auth.cookies.js';
 import { authenticate } from '../auth/auth.utils.js';
 import { verifyPassword } from '../auth/password.js';
 import {
@@ -20,12 +20,14 @@ import {
   reserveVerificationAttempt,
   releaseVerificationAttempt
 } from './account-deletion.verification.js';
+import { AccountDeletionAcceptanceError, acceptAccountDeletion } from './account-deletion.service.js';
 
 const verificationSchema = z.object({ password: z.string().min(1).max(128) }).strict();
 const loginVerificationSchema = z.object({
   login: z.string().trim().min(3).max(320),
   password: z.string().min(1).max(128)
 }).strict();
+const acceptanceSchema = z.object({ confirm: z.literal(true) }).strict();
 const bearerTokenPattern = /^Bearer\s+(\S+)$/i;
 const genericCredentialError = { error: 'unauthorized', message: 'Invalid login or password.' };
 const unknownPasswordHash = '$2a$12$C6UzMDM.H6dfI/f/IKcEe.4d/Mg7u9tC9J6YhJKVQn9Z3p0e4D6Wm';
@@ -170,5 +172,31 @@ export function registerAccountDeletionRoutes(app: FastifyInstance) {
     const operation = await getDeletionOperation(permission.operationId);
     if (!operation) return sendUnauthorized(reply);
     return reply.status(200).send(operation satisfies AccountDeletionStatusResponse);
+  });
+
+  app.delete('/auth/me', async (request, reply) => {
+    if (!env.ACCOUNT_DELETION_ENABLED) {
+      return reply.status(503).send({ error: 'account_deletion_disabled', message: 'Account deletion is temporarily unavailable.' });
+    }
+    const parsed = acceptanceSchema.safeParse(request.body);
+    if (!parsed.success) return sendValidationError(reply);
+    const token = bearerTokenPattern.exec(request.headers.authorization ?? '')?.[1];
+    if (!token) return sendUnauthorized(reply);
+
+    try {
+      const operation = await acceptAccountDeletion(token, parsed.data.confirm);
+      reply.header('set-cookie', serializeSessionCookie(null, request.protocol === 'https'));
+      return reply.status(202).send(operation satisfies AccountDeletionStatusResponse);
+    } catch (error) {
+      if (error instanceof AccountDeletionAcceptanceError) {
+        if (error.code === 'unauthorized') return sendUnauthorized(reply);
+        if (error.code === 'last_superadmin') {
+          return reply.status(403).send({ error: 'last_superadmin', message: 'The last active superadmin cannot delete this account.' });
+        }
+        return reply.status(409).send({ error: 'account_deletion_conflict', message: 'The account state changed. Check the deletion status and try again if needed.' });
+      }
+      request.log.error({ err: error }, 'Account deletion acceptance failed');
+      return reply.status(503).send({ error: 'account_deletion_unavailable', message: 'Account deletion could not be confirmed. Check the saved receipt and retry.' });
+    }
   });
 }

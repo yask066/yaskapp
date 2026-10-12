@@ -285,5 +285,5 @@ export async function findUserById(userId: string) {
 }
 
 export async function markUserSeen(userId: string) {
-  await db.query('UPDATE users SET last_seen_at = now() WHERE id = $1', [userId]);
+  await db.query("UPDATE users SET last_seen_at = now() WHERE id = $1 AND status = 'active' AND deleted_at IS NULL", [userId]);
 }

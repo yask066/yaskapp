@@ -3,6 +3,8 @@ import type { MultipartFile } from '@fastify/multipart';
 import sharp, { type Metadata } from 'sharp';
 
 import { deleteObject, putObject } from '../../config/storage.js';
+import { db } from '../../config/database.js';
+import { withActiveAccountTransaction } from '../account-deletion/account-activity.guard.js';
 
 const maxPollImageBytes = 5 * 1024 * 1024;
 
@@ -105,6 +107,10 @@ function isInvalidImageError(error: unknown) {
 type PollImagePart = Pick<MultipartFile, 'fieldname' | 'mimetype' | 'toBuffer'>;
 
 export async function processPollImage(authorId: string, part: PollImagePart) {
+  return withActiveAccountTransaction(authorId, async () => processPollImageWhileLocked(authorId, part));
+}
+
+async function processPollImageWhileLocked(authorId: string, part: PollImagePart) {
   if (part.fieldname !== 'image') {
     throw new PollImageUploadError('The image field is required.');
   }
@@ -152,4 +158,57 @@ export async function processPollImage(authorId: string, part: PollImagePart) {
 
 export function deletePollImageObject(objectKey: string) {
   return deleteObject(objectKey);
+}
+
+export async function enqueuePollImageForAccountDeletion(userId: string, objectKey: string) {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const operation = await client.query<{ id: string; status: string }>(
+      `SELECT id, status FROM account_deletion_operations
+        WHERE user_id = $1 AND status <> 'not_started'
+        ORDER BY accepted_at DESC LIMIT 1 FOR UPDATE`,
+      [userId]
+    );
+    const deletion = operation.rows[0];
+    if (!deletion) throw new Error('No accepted account deletion operation was found for the uploaded image.');
+
+    if (deletion.status === 'completed') {
+      await client.query(
+        `UPDATE account_deletion_operations
+            SET status = 'pending', completed_at = NULL, available_at = now(),
+                lease_owner = NULL, lease_until = NULL, updated_at = now()
+          WHERE id = $1`,
+        [deletion.id]
+      );
+      await client.query(
+        `UPDATE account_deletion_steps
+            SET status = 'pending', cursor_id = NULL, completed_at = NULL,
+                started_at = NULL, available_at = now(), last_error_code = NULL, updated_at = now()
+          WHERE operation_id = $1 AND step_key IN ('media', 'completion')`,
+        [deletion.id]
+      );
+    }
+    await client.query(
+      `INSERT INTO account_deletion_media_manifest (operation_id, owner_user_id, object_key)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (operation_id, object_key, version_id) DO UPDATE
+         SET status = 'pending', available_at = now(), completed_at = NULL`,
+      [deletion.id, userId, objectKey]
+    );
+    await client.query(
+      `INSERT INTO account_deletion_events (operation_id, event_key)
+       VALUES ($1, 'cleanup_requested')
+       ON CONFLICT (operation_id, event_key) DO UPDATE
+         SET available_at = now(), attempts = 0, lease_owner = NULL, lease_until = NULL,
+             last_error_code = NULL, delivered_at = NULL`,
+      [deletion.id]
+    );
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }

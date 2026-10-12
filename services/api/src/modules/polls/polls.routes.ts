@@ -13,6 +13,7 @@ import { authenticate, optionalAuthenticate } from '../auth/auth.utils.js';
 import { UserSanctionedError } from '../moderation/sanctions.repository.js';
 import {
   deletePollImageObject,
+  enqueuePollImageForAccountDeletion,
   PollImageStorageError,
   PollImageUploadError,
   processPollImage
@@ -167,13 +168,24 @@ function pollError(reply: FastifyReply, error: unknown) {
 export async function cleanupUploadedPollImage(
   objectKey: string,
   deleteImage: (key: string) => Promise<void> = deletePollImageObject,
-  onCleanupError?: (error: unknown, objectKey: string) => void
+  onCleanupError?: (error: unknown, objectKey: string) => void,
+  enqueueForDeletion?: (objectKey: string) => Promise<void>
 ) {
   try {
     await deleteImage(objectKey);
+    return true;
   } catch (error) {
     onCleanupError?.(error, objectKey);
-    // Preserve the original poll creation error for the client.
+    if (enqueueForDeletion) {
+      try {
+        await enqueueForDeletion(objectKey);
+        return true;
+      } catch (enqueueError) {
+        onCleanupError?.(enqueueError, objectKey);
+      }
+    }
+    // Let the route report that cleanup could not be recorded durably.
+    return false;
   }
 }
 
@@ -335,16 +347,23 @@ export function registerPollRoutes(app: FastifyInstance) {
         });
       } catch (error) {
         if (uploadedImageObjectKey) {
-          await cleanupUploadedPollImage(
+          const cleanupRecorded = await cleanupUploadedPollImage(
             uploadedImageObjectKey,
             deletePollImageObject,
-            (cleanupError, objectKey) => {
+              (cleanupError, objectKey) => {
               request.log.warn(
                 { err: cleanupError, objectKey },
                 'Failed to clean up uploaded poll image after poll creation failed'
               );
-            }
+            },
+            (objectKey) => enqueuePollImageForAccountDeletion(request.user.sub, objectKey)
           );
+          if (!cleanupRecorded) {
+            return reply.status(503).send({
+              error: 'poll_image_cleanup_pending',
+              message: 'The poll image could not be removed or queued for deletion.'
+            });
+          }
         }
 
         return pollError(reply, error);

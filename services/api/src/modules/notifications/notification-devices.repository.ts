@@ -1,11 +1,15 @@
 import type { Pool, PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
+import { withActiveAccountTransaction } from '../account-deletion/account-activity.guard.js';
 
 type QueryExecutor = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>;
 export type DevicePlatform = 'android' | 'ios';
 
-export async function registerNotificationDevice(userId: string, token: string, platform: DevicePlatform, executor: QueryExecutor = db) {
+export async function registerNotificationDevice(userId: string, token: string, platform: DevicePlatform, executor: QueryExecutor = db): Promise<{ id: string }> {
+  if (executor === db) {
+    return withActiveAccountTransaction(userId, (client) => registerNotificationDevice(userId, token, platform, client));
+  }
   const result = await executor.query<{ id: string }>(
     `INSERT INTO notification_devices (user_id, token, platform, last_seen_at, revoked_at)
      VALUES ($1, $2, $3, now(), NULL)
@@ -16,7 +20,10 @@ export async function registerNotificationDevice(userId: string, token: string, 
   return { id: result.rows[0].id };
 }
 
-export async function revokeNotificationDevice(userId: string, token: string, executor: QueryExecutor = db) {
+export async function revokeNotificationDevice(userId: string, token: string, executor: QueryExecutor = db): Promise<boolean> {
+  if (executor === db) {
+    return withActiveAccountTransaction(userId, (client) => revokeNotificationDevice(userId, token, client));
+  }
   const result = await executor.query(
     `UPDATE notification_devices SET revoked_at = COALESCE(revoked_at, now())
      WHERE user_id = $1 AND token = $2 AND revoked_at IS NULL`,

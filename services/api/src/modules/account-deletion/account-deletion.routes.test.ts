@@ -34,7 +34,7 @@ type Account = {
   password_hash: string;
   status: 'active' | 'blocked' | 'deleted';
   session_version: number;
-  role: 'user';
+  role: 'user' | 'superadmin';
   created_at: Date;
   updated_at: Date;
   display_name: string;
@@ -49,8 +49,10 @@ type Account = {
 function installDatabase(context: TestContext) {
   const accounts = new Map<string, Account>();
   const operations = new Map<string, { id: string; user_id: string; status: string; accepted_at: Date | null; deadline_at: Date | null; completed_at: Date | null }>();
-  const permissions = new Map<string, { operation_id: string; user_id: string; scope: 'delete' | 'status'; expires_at: Date; consumed_at: null }>();
+  const permissions = new Map<string, { operation_id: string; user_id: string; scope: 'delete' | 'status'; expires_at: Date; consumed_at: Date | null }>();
   const rateLimitCounts = new Map<string, number>();
+  let failAcceptanceAtEvents = false;
+  let transactionTail = Promise.resolve();
 
   context.mock.method(redis, 'eval', async (script: string, _keyCount: number, accountKey: string, ipKey: string, limit: number) => {
     if (script.includes('local accountCount')) {
@@ -94,9 +96,88 @@ function installDatabase(context: TestContext) {
     throw new Error(`Unexpected database query: ${sql}`);
   });
 
-  context.mock.method(db, 'connect', async () => ({
+  context.mock.method(db, 'connect', async () => {
+    let releaseTransaction: (() => void) | undefined;
+    let snapshot: { accounts: Map<string, Account>; operations: Map<string, typeof operations extends Map<string, infer T> ? T : never>; permissions: Map<string, typeof permissions extends Map<string, infer T> ? T : never> } | null = null;
+    const restore = <T>(target: Map<string, T>, source: Map<string, T>) => {
+      target.clear();
+      for (const [key, value] of source) target.set(key, structuredClone(value));
+    };
+    return {
     async query(sql: string, parameters: unknown[]) {
-      if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return { rows: [] };
+      if (sql === 'BEGIN') {
+        const previous = transactionTail;
+        let release!: () => void;
+        transactionTail = new Promise<void>((resolve) => { release = resolve; });
+        await previous;
+        releaseTransaction = release;
+        snapshot = {
+          accounts: new Map([...accounts].map(([key, value]) => [key, structuredClone(value)])),
+          operations: new Map([...operations].map(([key, value]) => [key, structuredClone(value)])),
+          permissions: new Map([...permissions].map(([key, value]) => [key, structuredClone(value)]))
+        };
+        return { rows: [] };
+      }
+      if (sql === 'COMMIT') { releaseTransaction?.(); return { rows: [] }; }
+      if (sql === 'ROLLBACK') {
+        if (snapshot) {
+          restore(accounts, snapshot.accounts);
+          restore(operations, snapshot.operations);
+          restore(permissions, snapshot.permissions);
+        }
+        releaseTransaction?.();
+        return { rows: [] };
+      }
+      if (sql.startsWith('SELECT pg_advisory_xact_lock')) return { rows: [] };
+      if (sql.includes('FROM users WHERE id = $1 FOR UPDATE')) {
+        const account = accounts.get(String(parameters[0]));
+        return { rows: account ? [{ role: account.role, status: account.status, deleted_at: account.status === 'deleted' ? account.updated_at : null }] : [] };
+      }
+      if (sql.includes("count(*)::text AS count FROM users")) {
+        return { rows: [{ count: String([...accounts.values()].filter((account) => account.role === 'superadmin' && account.status !== 'deleted').length) }] };
+      }
+      if (sql.includes('FROM account_deletion_permissions permission')) {
+        const permission = permissions.get(String(parameters[0]));
+        return { rows: permission && permission.scope === parameters[1] && permission.expires_at > new Date() ? [permission] : [] };
+      }
+      if (sql.includes('FROM account_deletion_operations WHERE id = $1')) {
+        const operation = operations.get(String(parameters[0]));
+        return { rows: operation ? [operation] : [] };
+      }
+      if (sql.includes('UPDATE account_deletion_permissions SET consumed_at')) {
+        const permission = permissions.get(String(parameters[0]));
+        if (!permission || permission.scope !== 'delete') return { rows: [] };
+        permission.consumed_at ??= new Date();
+        return { rows: [{ id: 'permission-id' }], rowCount: 1 };
+      }
+      if (sql.startsWith('UPDATE account_deletion_operations')) {
+        const operation = operations.get(String(parameters[0]));
+        if (!operation || operation.user_id !== parameters[1]) return { rows: [] };
+        if (operation.status === 'not_started') {
+          operation.status = 'pending';
+          operation.accepted_at = parameters[2] as Date;
+          operation.deadline_at = parameters[3] as Date;
+        }
+        return { rows: [operation] };
+      }
+      if (sql.startsWith('UPDATE users SET status = \'deleted\'')) {
+        const account = accounts.get(String(parameters[0]));
+        if (account) {
+          account.status = 'deleted';
+          account.session_version += 1;
+          account.updated_at = parameters[1] as Date;
+        }
+        return { rows: [] };
+      }
+      if (sql.includes('INSERT INTO account_deletion_steps')) return { rows: [] };
+      if (sql.includes('INSERT INTO account_deletion_media_manifest')) return { rows: [] };
+      if (sql.includes('INSERT INTO account_deletion_events')) {
+        if (failAcceptanceAtEvents) {
+          failAcceptanceAtEvents = false;
+          throw new Error('event insert failed');
+        }
+        return { rows: [] };
+      }
       if (sql.includes('SELECT id FROM users WHERE id = $1 FOR UPDATE')) {
         return { rows: accounts.has(String(parameters[0])) ? [{ id: parameters[0] }] : [] };
       }
@@ -127,11 +208,15 @@ function installDatabase(context: TestContext) {
       }
       throw new Error(`Unexpected transaction query: ${sql}`);
     },
-    release() {}
-  } as never));
+    release() { releaseTransaction?.(); }
+  } as never;
+  });
 
   return {
     storedPermissionHashes: () => [...permissions.keys()],
+    account: (id: string) => accounts.get(id),
+    promoteToSuperadmin(id: string) { const account = accounts.get(id); if (account) account.role = 'superadmin'; },
+    failNextAcceptanceEvent() { failAcceptanceAtEvents = true; },
     async createAccount(status: Account['status'] = 'active') {
       const id = randomUUID();
       const username = `deletion_${id.slice(0, 12).replaceAll('-', '_')}`;
@@ -374,3 +459,107 @@ test('administratively_deleted_account_is_not_migrated_into_self_service_deletio
 });
 
 const failedWindowMs = 15 * 60_000;
+test('accepted_deletion_closes_account_and_returns_a_durable_receipt', async (context) => {
+  enableDeletion(context);
+  const fakeDb = installDatabase(context);
+  const account = await fakeDb.createAccount();
+  const app = await makeApp();
+  context.after(() => app.close());
+  const accessToken = await bearerFor(app, account);
+  const verification = await app.inject({
+    method: 'POST', url: '/auth/account-deletion/verification',
+    headers: { authorization: `Bearer ${accessToken}` }, payload: { password: account.password }
+  });
+  const deletionToken = verification.json<{ deletionToken: string }>().deletionToken;
+
+  const acceptance = await app.inject({
+    method: 'DELETE', url: '/auth/me',
+    headers: { authorization: `Bearer ${deletionToken}` }, payload: { confirm: true }
+  });
+
+  assert.equal(acceptance.statusCode, 202, acceptance.body);
+  assert.equal(acceptance.json().status, 'pending');
+  assert.equal(acceptance.json().operationId, verification.json().operationId);
+  assert.match(String(acceptance.headers['set-cookie']), /yaskapp_session=;.*Max-Age=0/);
+
+  const replay = await app.inject({
+    method: 'DELETE', url: '/auth/me',
+    headers: { authorization: `Bearer ${deletionToken}` }, payload: { confirm: true }
+  });
+  assert.equal(replay.statusCode, 202, replay.body);
+  assert.deepEqual(replay.json(), acceptance.json());
+  assert.equal(fakeDb.account(account.id)?.status, 'deleted');
+  assert.equal(fakeDb.account(account.id)?.session_version, 1);
+});
+
+test('acceptance_rollback_leaves_active', async (context) => {
+  enableDeletion(context);
+  const fakeDb = installDatabase(context);
+  const account = await fakeDb.createAccount();
+  const app = await makeApp();
+  context.after(() => app.close());
+  const accessToken = await bearerFor(app, account);
+  const verification = await app.inject({
+    method: 'POST', url: '/auth/account-deletion/verification',
+    headers: { authorization: `Bearer ${accessToken}` }, payload: { password: account.password }
+  });
+  const tokens = verification.json<{ deletionToken: string; statusToken: string }>();
+  fakeDb.failNextAcceptanceEvent();
+
+  const rejected = await app.inject({
+    method: 'DELETE', url: '/auth/me',
+    headers: { authorization: `Bearer ${tokens.deletionToken}` }, payload: { confirm: true }
+  });
+
+  assert.equal(rejected.statusCode, 503);
+  assert.equal(fakeDb.account(account.id)?.status, 'active');
+  assert.equal(fakeDb.account(account.id)?.session_version, 0);
+  const status = await app.inject({ method: 'GET', url: '/auth/account-deletion/status', headers: { authorization: `Bearer ${tokens.statusToken}` } });
+  assert.equal(status.json().status, 'not_started');
+});
+
+test('parallel_acceptance_returns_one_operation', async (context) => {
+  enableDeletion(context);
+  const fakeDb = installDatabase(context);
+  const account = await fakeDb.createAccount();
+  const app = await makeApp();
+  context.after(() => app.close());
+  const accessToken = await bearerFor(app, account);
+  const verification = await app.inject({
+    method: 'POST', url: '/auth/account-deletion/verification',
+    headers: { authorization: `Bearer ${accessToken}` }, payload: { password: account.password }
+  });
+  const deletionToken = verification.json<{ deletionToken: string }>().deletionToken;
+
+  const accept = () => app.inject({
+    method: 'DELETE', url: '/auth/me',
+    headers: { authorization: `Bearer ${deletionToken}` }, payload: { confirm: true }
+  });
+  const [first, second] = await Promise.all([accept(), accept()]);
+  assert.deepEqual([first.statusCode, second.statusCode], [202, 202]);
+  assert.equal(first.json().operationId, second.json().operationId);
+  assert.equal(fakeDb.account(account.id)?.session_version, 1);
+});
+
+test('last_superadmin_role_race', async (context) => {
+  enableDeletion(context);
+  const fakeDb = installDatabase(context);
+  const account = await fakeDb.createAccount();
+  fakeDb.promoteToSuperadmin(account.id);
+  const app = await makeApp();
+  context.after(() => app.close());
+  const accessToken = await bearerFor(app, account);
+  const verification = await app.inject({
+    method: 'POST', url: '/auth/account-deletion/verification',
+    headers: { authorization: `Bearer ${accessToken}` }, payload: { password: account.password }
+  });
+  const deletionToken = verification.json<{ deletionToken: string }>().deletionToken;
+
+  const acceptance = await app.inject({
+    method: 'DELETE', url: '/auth/me',
+    headers: { authorization: `Bearer ${deletionToken}` }, payload: { confirm: true }
+  });
+  assert.equal(acceptance.statusCode, 403);
+  assert.equal(acceptance.json().error, 'last_superadmin');
+  assert.equal(fakeDb.account(account.id)?.status, 'active');
+});

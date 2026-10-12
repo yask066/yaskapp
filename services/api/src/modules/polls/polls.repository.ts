@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 import type { PollStateRevisions } from '@yaskapp/shared';
 
 import { db } from '../../config/database.js';
+import { lockActiveAccount } from '../account-deletion/account-activity.guard.js';
 import { AdminCursorError, encodeAdminCursor } from '../admin/pagination.js';
 import { avatarUrlForUser } from '../profiles/avatar-url.js';
 import { createNotification } from '../notifications/notifications.repository.js';
@@ -349,6 +350,7 @@ export async function createPollRecord(input: CreatePollRecordInput) {
 
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, input.authorId);
 
     const pollResult = await client.query<{ id: string }>(
       `
@@ -427,6 +429,7 @@ export async function deletePollRecord(input: {
 
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, input.authorId);
 
     const result = await client.query<{ id: string; image_object_key: string | null }>(
       `
@@ -477,6 +480,7 @@ export async function deletePollCommentRecord(input: {
 
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, input.authorId);
 
     const pollResult = await client.query<{ id: string }>(
       `
@@ -1008,6 +1012,7 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
 
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, input.authorId);
     let notificationId: string | null = null;
     let notificationRecipientId: string | null = null;
     let parentAuthorId: string | null = null;
@@ -1191,6 +1196,7 @@ export async function likeCommentRecord(input: { pollId: string; commentId: stri
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, input.userId);
     let notificationId: string | null = null;
     let notificationRecipientId: string | null = null;
     const comment = await findCommentForUpdate(client, input.commentId);
@@ -1260,6 +1266,7 @@ export async function unlikeCommentRecord(input: { pollId: string; commentId: st
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, input.userId);
     const comment = await findCommentForUpdate(client, input.commentId);
     if (!comment || comment.poll_id !== input.pollId) {
       await client.query('ROLLBACK');
@@ -1317,6 +1324,7 @@ export async function likePollRecord(input: {
 
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, input.userId);
     let notificationId: string | null = null;
 
     const pollResult = await client.query<{ id: string; author_id: string }>(
@@ -1395,6 +1403,7 @@ export async function unlikePollRecord(input: {
 
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, input.userId);
 
     const pollResult = await client.query<{ id: string }>(
       `
@@ -1460,6 +1469,7 @@ export async function createVoteRecord(input: {
 
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, input.voterId);
     let notificationId: string | null = null;
 
     const pollResult = await client.query<{
@@ -1568,6 +1578,7 @@ export async function cancelVoteRecord(input: {
 
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, input.voterId);
 
     const pollResult = await client.query<{
       id: string;
@@ -1660,6 +1671,7 @@ export async function setVoteRecord(input: {
 
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, input.voterId);
 
     const pollResult = await client.query<{
       id: string;

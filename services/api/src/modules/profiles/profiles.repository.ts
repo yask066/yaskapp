@@ -1,4 +1,5 @@
 import { db } from '../../config/database.js';
+import { withActiveAccountTransaction } from '../account-deletion/account-activity.guard.js';
 import { avatarUrlForUser } from './avatar-url.js';
 import { searchPopularUserRecords } from '../search/search.repository.js';
 import type { PublicUser, UserWithProfileRow } from '../auth/auth.repository.js';
@@ -266,57 +267,58 @@ export async function listPopularProfileRecords(viewerId: string, limit: number)
 }
 
 export async function updateProfileRecord(input: UpdateProfileInput) {
-  const result = await db.query<UserWithProfileRow>(
-    `
-      WITH updated_profile AS (
-        UPDATE profiles
-        SET
-          display_name = COALESCE($2, display_name),
-          bio = CASE WHEN $4 THEN $3 ELSE bio END,
-          country_code = CASE WHEN $6 THEN $5 ELSE country_code END
-        WHERE user_id = $1
-        RETURNING
-          user_id,
-          display_name,
-          bio,
-          country_code,
-          avatar_object_key,
-          polls_count,
-          followers_count,
-          following_count
-      )
-      SELECT
-        u.id,
-        u.email::text AS email,
-        u.username::text AS username,
-        u.password_hash,
-        u.status,
-        u.created_at,
-        u.updated_at,
-        p.display_name,
-        p.bio,
-        p.country_code,
-        p.avatar_object_key,
-        p.polls_count,
-        p.followers_count,
-        p.following_count
-      FROM users u
-      JOIN updated_profile p ON p.user_id = u.id
-      WHERE u.id = $1
-        AND u.deleted_at IS NULL
-      LIMIT 1
-    `,
-    [
-      input.userId,
-      input.displayName ?? null,
-      input.bio ?? null,
-      'bio' in input,
-      input.countryCode ?? null,
-      'countryCode' in input
-    ]
-  );
-
-  const row = result.rows[0];
+  const row = await withActiveAccountTransaction(input.userId, async (client) => {
+    const result = await client.query<UserWithProfileRow>(
+      `
+        WITH updated_profile AS (
+          UPDATE profiles
+          SET
+            display_name = COALESCE($2, display_name),
+            bio = CASE WHEN $4 THEN $3 ELSE bio END,
+            country_code = CASE WHEN $6 THEN $5 ELSE country_code END
+          WHERE user_id = $1
+          RETURNING
+            user_id,
+            display_name,
+            bio,
+            country_code,
+            avatar_object_key,
+            polls_count,
+            followers_count,
+            following_count
+        )
+        SELECT
+          u.id,
+          u.email::text AS email,
+          u.username::text AS username,
+          u.password_hash,
+          u.status,
+          u.created_at,
+          u.updated_at,
+          p.display_name,
+          p.bio,
+          p.country_code,
+          p.avatar_object_key,
+          p.polls_count,
+          p.followers_count,
+          p.following_count
+        FROM users u
+        JOIN updated_profile p ON p.user_id = u.id
+        WHERE u.id = $1
+          AND u.deleted_at IS NULL
+        LIMIT 1
+      `,
+      [
+        input.userId,
+        input.displayName ?? null,
+        input.bio ?? null,
+        'bio' in input,
+        input.countryCode ?? null,
+        'countryCode' in input
+      ]
+    );
+    return result.rows[0];
+  });
 
   return row ? mapUser(row) : null;
 }

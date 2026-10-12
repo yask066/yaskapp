@@ -2,6 +2,7 @@ import type { NotificationType } from '@yaskapp/shared';
 import type { Pool, PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
+import { lockActiveAccount } from '../account-deletion/account-activity.guard.js';
 
 type QueryExecutor = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>;
 
@@ -71,16 +72,19 @@ export async function isPushEnabled(userId: string, type: NotificationType, exec
 
 export async function updateNotificationPreferences(
   userId: string,
-  input: NotificationPreferencesPatch,
-  executor: QueryExecutor = db
+  input: NotificationPreferencesPatch
 ) {
-  const current = await getNotificationPreferences(userId, executor);
-  const next = { ...current };
-  for (const type of Object.keys(columns) as NotificationType[]) {
-    if (input[type]) next[type] = { ...current[type], ...input[type] };
-  }
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    await lockActiveAccount(client, userId);
+    const current = await getNotificationPreferences(userId, client);
+    const next = { ...current };
+    for (const type of Object.keys(columns) as NotificationType[]) {
+      if (input[type]) next[type] = { ...current[type], ...input[type] };
+    }
 
-  await executor.query(
+    await client.query(
     `
       INSERT INTO notification_preferences (
         user_id, poll_vote_in_app, poll_vote_push, comment_in_app, comment_push,
@@ -94,7 +98,14 @@ export async function updateNotificationPreferences(
         like_in_app = EXCLUDED.like_in_app, like_push = EXCLUDED.like_push,
         follow_in_app = EXCLUDED.follow_in_app, follow_push = EXCLUDED.follow_push
     `,
-    [userId, next.poll_vote.inApp, next.poll_vote.push, next.comment.inApp, next.comment.push, next.comment_reply.inApp, next.comment_reply.push, next.like.inApp, next.like.push, next.follow.inApp, next.follow.push]
-  );
-  return next;
+      [userId, next.poll_vote.inApp, next.poll_vote.push, next.comment.inApp, next.comment.push, next.comment_reply.inApp, next.comment_reply.push, next.like.inApp, next.like.push, next.follow.inApp, next.follow.push]
+    );
+    await client.query('COMMIT');
+    return next;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }

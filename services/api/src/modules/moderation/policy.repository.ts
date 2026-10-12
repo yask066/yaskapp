@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
+import { lockActiveAccount } from '../account-deletion/account-activity.guard.js';
 import type { UserRole } from '../auth/auth.repository.js';
 import { recordAdminAudit } from '../admin/audit.repository.js';
 
@@ -53,6 +54,7 @@ export async function updateModerationPolicy(input: {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, input.actorUserId);
     const existing = await client.query<{ request_fingerprint: string; response: { policy: ReturnType<typeof mapPolicy> } | null }>(
       'SELECT request_fingerprint, response FROM moderation_idempotency_keys WHERE actor_user_id = $1 AND idempotency_key = $2 FOR UPDATE',
       [input.actorUserId, input.idempotencyKey]

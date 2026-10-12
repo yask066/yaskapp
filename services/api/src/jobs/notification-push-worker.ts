@@ -2,6 +2,7 @@ import { applicationDefault, getApps, initializeApp } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
 
 import { db } from '../config/database.js';
+import { InactiveAccountError, withActiveAccountTransaction } from '../modules/account-deletion/account-activity.guard.js';
 import { listActiveNotificationDevices, revokeNotificationDevice } from '../modules/notifications/notification-devices.repository.js';
 
 export type PushProvider = {
@@ -74,16 +75,19 @@ export async function deliverPendingPushNotifications(provider: PushProvider, li
     for (const job of jobs.rows) {
       processed += 1;
       try {
-        const devices = await listActiveNotificationDevices(job.recipientUserId);
-        let sent = false;
-        for (const device of devices) {
-          const result = await provider.send({
-            token: device.token, platform: device.platform,
-            data: { notificationId: job.notificationId, type: job.type, ...(job.pollId ? { pollId: job.pollId } : {}), ...(job.commentId ? { commentId: job.commentId } : {}) }
-          });
-          if (result === 'invalid_token') await revokeNotificationDevice(job.recipientUserId, device.token);
-          else sent = true;
-        }
+        const sent = await withActiveAccountTransaction(job.recipientUserId, async (accountClient) => {
+          const devices = await listActiveNotificationDevices(job.recipientUserId, accountClient);
+          let deliveredToDevice = false;
+          for (const device of devices) {
+            const result = await provider.send({
+              token: device.token, platform: device.platform,
+              data: { notificationId: job.notificationId, type: job.type, ...(job.pollId ? { pollId: job.pollId } : {}), ...(job.commentId ? { commentId: job.commentId } : {}) }
+            });
+            if (result === 'invalid_token') await revokeNotificationDevice(job.recipientUserId, device.token, accountClient);
+            else deliveredToDevice = true;
+          }
+          return deliveredToDevice;
+        });
         if (sent) {
           await db.query(`UPDATE notification_push_jobs SET status = 'sent', claimed_at = NULL, sent_at = now(), last_error = NULL WHERE id = $1`, [job.id]);
           delivered += 1;
@@ -91,6 +95,10 @@ export async function deliverPendingPushNotifications(provider: PushProvider, li
           await schedulePushRetry(job.id, job.attempts, job.maxAttempts, 'No active notification devices.');
         }
       } catch (error) {
+        if (error instanceof InactiveAccountError) {
+          await db.query("UPDATE notification_push_jobs SET status = 'failed', claimed_at = NULL, last_error = 'recipient_inactive' WHERE id = $1", [job.id]);
+          continue;
+        }
         await schedulePushRetry(job.id, job.attempts, job.maxAttempts, error instanceof Error ? error.message : 'Push provider failed.');
       }
     }

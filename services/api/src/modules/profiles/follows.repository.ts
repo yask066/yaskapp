@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
+import { lockActiveAccounts } from '../account-deletion/account-activity.guard.js';
 import { createNotification } from '../notifications/notifications.repository.js';
 import { publishNotificationAfterCommit } from '../notifications/notifications.publisher.js';
 
@@ -111,6 +112,7 @@ export async function followUserRecord(
   return withTransaction(async (client) => {
     let notificationId: string | null = null;
     const userIds = [input.followerId, input.followeeId].sort();
+    await lockActiveAccounts(client, userIds);
     const existingUsers = await lockUserProfiles(client, userIds);
 
     if (existingUsers.size !== userIds.length) {
@@ -183,6 +185,7 @@ export async function unfollowUserRecord(
 
   return withTransaction(async (client) => {
     const userIds = [input.followerId, input.followeeId].sort();
+    await lockActiveAccounts(client, userIds);
     const existingUsers = await lockUserProfiles(client, userIds);
 
     if (existingUsers.size !== userIds.length) {

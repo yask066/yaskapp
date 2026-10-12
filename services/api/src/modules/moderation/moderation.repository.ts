@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
+import { lockActiveAccount } from '../account-deletion/account-activity.guard.js';
 import { decodeAdminCursor, pageWithCursor } from '../admin/pagination.js';
 import type { UserRole } from '../auth/auth.repository.js';
 import { recordAdminAudit } from '../admin/audit.repository.js';
@@ -121,6 +122,7 @@ export async function createReport(input: {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, input.reporterUserId);
 
     if (!(await lockReportableTarget(client, input.targetType, input.targetId))) {
       throw new ModerationTargetNotFoundError('Report target was not found.');
@@ -375,6 +377,7 @@ async function mutateCase(
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, actorUserId);
     const current = await client.query<CaseRow>(
       `SELECT id, target_type, target_id, status, priority,
               assigned_to_user_id, created_at, updated_at, resolved_at
@@ -468,6 +471,7 @@ export async function addModerationNote(caseId: string, authorUserId: string, ac
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, authorUserId);
     const moderationCase = await client.query<{ id: string }>(
       `SELECT id FROM moderation_cases
         WHERE id = $1 AND status NOT IN ('resolved', 'dismissed', 'duplicate')

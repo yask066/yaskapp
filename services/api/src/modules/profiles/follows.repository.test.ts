@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 
 process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL ??= 'postgres://test:test@127.0.0.1:5432/test';
@@ -9,6 +9,7 @@ process.env.S3_BUCKET ??= 'test';
 process.env.S3_ACCESS_KEY_ID ??= 'test';
 process.env.S3_SECRET_ACCESS_KEY ??= 'test';
 
+const { db } = await import('../../config/database.js');
 const { FollowRepositoryError, followUserRecord } = await import('./follows.repository.js');
 
 test('self follow is rejected before a transaction or notification can be created', async () => {
@@ -16,4 +17,21 @@ test('self follow is rejected before a transaction or notification can be create
     () => followUserRecord({ followerId: 'same-user', followeeId: 'same-user' }),
     (error: unknown) => error instanceof FollowRepositoryError && error.code === 'SELF_FOLLOW'
   );
+});
+
+test('closed_account_cannot_create_a_follow', async (context: TestContext) => {
+  const statements: string[] = [];
+  context.mock.method(db, 'connect', async () => ({
+    async query(sql: string) {
+      statements.push(sql);
+      if (sql.includes('SELECT status, deleted_at FROM users')) {
+        return { rows: [{ status: 'deleted', deleted_at: new Date() }] };
+      }
+      return { rows: [], rowCount: 0 };
+    },
+    release() {}
+  } as never));
+
+  await assert.rejects(followUserRecord({ followerId: 'closed-user', followeeId: 'active-user' }), /account_not_active/);
+  assert.ok(!statements.some((sql) => sql.includes('INSERT INTO follows')));
 });

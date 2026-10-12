@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
+import { lockActiveAccount } from '../account-deletion/account-activity.guard.js';
 import { decodeAdminCursor, pageWithCursor } from '../admin/pagination.js';
 import { recordAdminAudit } from '../admin/audit.repository.js';
 import type { UserRole } from '../auth/auth.repository.js';
@@ -66,6 +67,7 @@ export async function createAppeal(input: { sanctionId: string; userId: string; 
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, input.userId);
     const idempotency = await claimIdempotency(client, input.userId, input.idempotencyKey, input.fingerprint);
     if (idempotency.replayed) {
       await client.query('COMMIT');
@@ -140,6 +142,7 @@ export async function resolveAppeal(input: {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, input.actorUserId);
     const idempotency = await claimIdempotency(client, input.actorUserId, input.idempotencyKey, input.fingerprint);
     if (idempotency.replayed) { await client.query('COMMIT'); return { replayed: true as const, ...idempotency.response }; }
     const result = await client.query<AppealRow & { sanction_user_id: string | null; sanction_type: string }>(

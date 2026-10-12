@@ -88,7 +88,8 @@ export type DeletionPermission = {
 export async function getDeletionPermission(
   tokenHash: string,
   scope: DeletionPermission['scope'],
-  executor: Executor = db
+  executor: Executor = db,
+  lock = false
 ): Promise<DeletionPermission | null> {
   const result = await executor.query<{
     operation_id: string;
@@ -102,7 +103,8 @@ export async function getDeletionPermission(
      FROM account_deletion_permissions permission
      JOIN account_deletion_operations operation ON operation.id = permission.operation_id
      WHERE permission.token_hash = $1 AND permission.scope = $2
-       AND permission.revoked_at IS NULL AND permission.expires_at > now()`,
+       AND permission.revoked_at IS NULL AND permission.expires_at > now()
+     ${lock ? 'FOR UPDATE OF permission' : ''}`,
     [tokenHash, scope]
   );
   const row = result.rows[0];
@@ -113,6 +115,16 @@ export async function getDeletionPermission(
     expiresAt: row.expires_at,
     consumedAt: row.consumed_at
   } : null;
+}
+
+export async function consumeDeletionPermission(tokenHash: string, client: PoolClient) {
+  const result = await client.query(
+    `UPDATE account_deletion_permissions SET consumed_at = COALESCE(consumed_at, now())
+     WHERE token_hash = $1 AND scope = 'delete' AND revoked_at IS NULL AND expires_at > now()
+     RETURNING id`,
+    [tokenHash]
+  );
+  return result.rowCount === 1;
 }
 
 // Persistence only. AD-04 must validate/consume the permission, close the account,
