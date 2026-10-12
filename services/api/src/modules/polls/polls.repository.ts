@@ -485,11 +485,14 @@ export async function deletePollCommentRecord(input: {
 
     const pollResult = await client.query<{ id: string }>(
       `
-        SELECT id
-        FROM polls
-        WHERE id = $1
-          AND visibility = 'public'
-          AND deleted_at IS NULL
+        SELECT p.id
+        FROM polls p
+        JOIN users poll_author ON poll_author.id = p.author_id
+        WHERE p.id = $1
+          AND poll_author.status = 'active'
+          AND poll_author.deleted_at IS NULL
+          AND p.visibility = 'public'
+          AND p.deleted_at IS NULL
         FOR UPDATE
       `,
       [input.pollId]
@@ -791,11 +794,14 @@ export async function listPollCommentRecords(input: { pollId: string; limit: num
   try {
     const pollResult = await client.query<{ id: string }>(
       `
-        SELECT id
-        FROM polls
-        WHERE id = $1
-          AND visibility = 'public'
-          AND deleted_at IS NULL
+        SELECT p.id
+        FROM polls p
+        JOIN users poll_author ON poll_author.id = p.author_id
+        WHERE p.id = $1
+          AND poll_author.status = 'active'
+          AND poll_author.deleted_at IS NULL
+          AND p.visibility = 'public'
+          AND p.deleted_at IS NULL
       `,
       [input.pollId]
     );
@@ -823,8 +829,11 @@ export async function listPollCommentRecords(input: { pollId: string; limit: num
           (
             SELECT count(*)::int
             FROM comments r
+            JOIN users reply_author ON reply_author.id = r.author_id
             WHERE r.parent_comment_id = c.id
               AND r.deleted_at IS NULL
+              AND reply_author.status = 'active'
+              AND reply_author.deleted_at IS NULL
           ) AS replies_count,
           c.created_at,
           c.updated_at
@@ -834,6 +843,8 @@ export async function listPollCommentRecords(input: { pollId: string; limit: num
         WHERE c.poll_id = $1
           AND c.parent_comment_id IS NULL
           AND c.deleted_at IS NULL
+          AND u.status = 'active'
+          AND u.deleted_at IS NULL
         ORDER BY c.created_at ASC, c.id ASC
         LIMIT $2
       `,
@@ -859,12 +870,18 @@ export async function listPollCommentReplyRecords(input: ListPollCommentRepliesR
         SELECT c.id
         FROM comments c
         JOIN polls p ON p.id = c.poll_id
+        JOIN users poll_author ON poll_author.id = p.author_id
+        JOIN users root_author ON root_author.id = c.author_id
         WHERE c.id = $1
           AND c.poll_id = $2
           AND c.parent_comment_id IS NULL
           AND c.deleted_at IS NULL
+          AND root_author.status = 'active'
+          AND root_author.deleted_at IS NULL
           AND p.visibility = 'public'
           AND p.deleted_at IS NULL
+          AND poll_author.status = 'active'
+          AND poll_author.deleted_at IS NULL
       `,
       [input.commentId, input.pollId]
     );
@@ -899,6 +916,8 @@ export async function listPollCommentReplyRecords(input: ListPollCommentRepliesR
         WHERE c.poll_id = $1
           AND c.parent_comment_id = $2
           AND c.deleted_at IS NULL
+          AND u.status = 'active'
+          AND u.deleted_at IS NULL
           AND (
             $3::timestamptz IS NULL
             OR (c.created_at, c.id) > ($3::timestamptz, $4::uuid)

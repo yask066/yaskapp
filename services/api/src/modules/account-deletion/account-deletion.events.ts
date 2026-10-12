@@ -35,6 +35,27 @@ export async function dispatchClaimedDeletionEvent(
   }
 }
 
+let dispatchInProgress = false;
+
+async function publishWithTimeout(
+  publish: DeliveryDependencies['publish'],
+  event: Extract<RealtimeEvent, { type: 'account.deleted' }>,
+  timeoutMs = 1_000
+) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      publish(event),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error('realtime publish timed out')), timeoutMs);
+        timer.unref?.();
+      })
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function claimDeletionEvents(client: PoolClient, limit: number, leaseOwner: string) {
   const result = await client.query<{ id: string; operation_id: string; user_id: string }>(
     `WITH claimable AS (
@@ -61,32 +82,36 @@ async function claimDeletionEvents(client: PoolClient, limit: number, leaseOwner
 }
 
 export async function dispatchPendingDeletionEvents(limit = 50) {
-  const client = await db.connect();
-  const leaseOwner = randomUUID();
-  let claimed: Awaited<ReturnType<typeof claimDeletionEvents>>;
+  if (dispatchInProgress) return { claimed: 0, delivered: 0 };
+  dispatchInProgress = true;
   try {
-    await client.query('BEGIN');
-    claimed = await claimDeletionEvents(client, limit, leaseOwner);
-    await client.query('COMMIT');
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
-
-  let delivered = 0;
-  await Promise.all(claimed.map(async (row) => {
-    const queryClient = await db.connect();
+    const client = await db.connect();
+    const leaseOwner = randomUUID();
+    let claimed: Awaited<ReturnType<typeof claimDeletionEvents>>;
     try {
+      await client.query('BEGIN');
+      claimed = await claimDeletionEvents(client, limit, leaseOwner);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    let delivered = 0;
+    await Promise.all(claimed.map(async (row) => {
       const result = await dispatchClaimedDeletionEvent({
         id: row.id,
         userId: row.user_id,
         operationId: row.operation_id
       }, {
-        publish: (event) => realtimeBus.publish(row.user_id, event),
+        publish: (event) => publishWithTimeout(
+          (message) => realtimeBus.publish(row.user_id, message),
+          event
+        ),
         markDelivered: async () => {
-          await queryClient.query(
+          await db.query(
             `UPDATE account_deletion_events
              SET delivered_at = now(), lease_owner = NULL, lease_until = NULL, last_error_code = NULL
              WHERE id = $1 AND lease_owner = $2`,
@@ -94,7 +119,7 @@ export async function dispatchPendingDeletionEvents(limit = 50) {
           );
         },
         scheduleRetry: async () => {
-          await queryClient.query(
+          await db.query(
             `UPDATE account_deletion_events
              SET available_at = now() + interval '5 seconds', lease_owner = NULL, lease_until = NULL,
                  last_error_code = 'realtime_unavailable'
@@ -104,9 +129,9 @@ export async function dispatchPendingDeletionEvents(limit = 50) {
         }
       });
       if (result) delivered += 1;
-    } finally {
-      queryClient.release();
-    }
-  }));
-  return { claimed: claimed.length, delivered };
+    }));
+    return { claimed: claimed.length, delivered };
+  } finally {
+    dispatchInProgress = false;
+  }
 }

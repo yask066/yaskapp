@@ -125,6 +125,34 @@ test('notification copies and target IDs are cleared when the content owner is d
   assert.deepEqual(notification.payload, {});
 });
 
+test('comment notification checks its comment target even when it also has a poll target', async () => {
+  const { mapNotification } = await import('./notifications.repository.js');
+  const notification = mapNotification({
+    id: 'notification-comment-target',
+    type: 'comment',
+    actor_id: 'actor-5',
+    actor_username: 'eve',
+    actor_display_name: 'Eve',
+    actor_avatar_object_key: null,
+    actor_deleted_at: null,
+    actor_status: 'active',
+    poll_id: 'surviving-poll',
+    comment_id: 'deleted-comment',
+    payload: { commentExcerpt: 'Private excerpt' },
+    read_at: null,
+    created_at: new Date('2026-08-29T10:00:00.000Z'),
+    poll_deleted_at: null,
+    poll_author_deleted_at: null,
+    comment_deleted_at: null,
+    comment_author_deleted_at: new Date()
+  });
+
+  assert.equal(notification.isTargetAvailable, false);
+  assert.equal(notification.pollId, null);
+  assert.equal(notification.commentId, null);
+  assert.deepEqual(notification.payload, {});
+});
+
 test('notification actor copies are cleared when the actor is deleted even if the target survives', async () => {
   const { mapNotification } = await import('./notifications.repository.js');
   const notification = mapNotification({

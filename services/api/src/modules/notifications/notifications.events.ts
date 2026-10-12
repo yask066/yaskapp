@@ -18,6 +18,19 @@ export function buildNotificationCreatedEvent(
   };
 }
 
+export async function refreshNotificationCreatedEvent(
+  recipientUserId: string,
+  event: NotificationCreatedEvent,
+  dependencies: {
+    getNotification: (notificationId: string, recipientUserId: string) => Promise<NotificationItem | null>;
+    countUnread: (recipientUserId: string) => Promise<number>;
+  }
+): Promise<NotificationCreatedEvent | null> {
+  const notification = await dependencies.getNotification(event.payload.notification.id, recipientUserId);
+  if (!notification) return null;
+  return buildNotificationCreatedEvent(notification, await dependencies.countUnread(recipientUserId));
+}
+
 export type PostCommitNotificationPublisherDependencies = {
   getNotification: (notificationId: string, recipientUserId: string) => Promise<NotificationItem | null>;
   countUnread: (recipientUserId: string) => Promise<number>;

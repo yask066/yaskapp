@@ -52,11 +52,11 @@ function safeDisplayPayload(payload: Record<string, unknown>) {
 }
 
 export function mapNotification(row: NotificationRow): NotificationRecord {
-  const targetAvailable = row.poll_id !== null
-    ? row.poll_deleted_at === null && row.poll_author_deleted_at === null
-    : row.comment_id !== null
-      ? row.comment_deleted_at === null && row.poll_deleted_at === null
-        && row.poll_author_deleted_at === null && row.comment_author_deleted_at === null
+  const targetAvailable = row.comment_id !== null
+    ? row.comment_deleted_at === null && row.poll_deleted_at === null
+      && row.poll_author_deleted_at === null && row.comment_author_deleted_at === null
+    : row.poll_id !== null
+      ? row.poll_deleted_at === null && row.poll_author_deleted_at === null
       : row.actor_id !== null && row.actor_status === 'active' && row.actor_deleted_at === null;
   const actorAvailable = row.actor_id === null || (row.actor_status === 'active' && row.actor_deleted_at === null);
   return {

@@ -27,6 +27,8 @@ import { realtimeBus } from './realtime/realtime.bus.js';
 import { sendToUser } from './realtime/realtime.hub.js';
 import { disconnectUser } from './realtime/realtime.hub.js';
 import { dispatchPendingDeletionEvents } from './modules/account-deletion/account-deletion.events.js';
+import { refreshNotificationCreatedEvent } from './modules/notifications/notifications.events.js';
+import { countUnreadNotifications, getNotificationForRecipient } from './modules/notifications/notifications.repository.js';
 
 export function buildApp() {
   let realtimeRetryTimer: ReturnType<typeof setInterval> | undefined;
@@ -192,6 +194,15 @@ export function buildApp() {
     const receiveRealtimeMessage = ({ recipientUserId, event }: { recipientUserId: string; event: import('@yaskapp/shared').RealtimeEvent }) => {
       if (event.type === 'account.deleted') {
         disconnectUser(event.payload.userId, 'account_deleted', event);
+        return;
+      }
+      if (event.type === 'notification.created') {
+        void refreshNotificationCreatedEvent(recipientUserId, event, {
+          getNotification: getNotificationForRecipient,
+          countUnread: countUnreadNotifications
+        }).then((currentEvent) => {
+          if (currentEvent) return sendToUser(recipientUserId, currentEvent);
+        }).catch(() => undefined);
         return;
       }
       void sendToUser(recipientUserId, event)?.catch(() => undefined);

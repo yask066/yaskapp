@@ -6,6 +6,7 @@ import type { NotificationItem } from '@yaskapp/shared';
 import {
   buildNotificationCreatedEvent,
   createPostCommitNotificationPublisher,
+  refreshNotificationCreatedEvent,
   type NotificationEventPublisher
 } from './notifications.events.js';
 
@@ -82,4 +83,29 @@ test('post-commit publisher never invokes the transport before its caller commit
   lifecycle.push('commit');
   await publisher('recipient-id', item.id);
   assert.deepEqual(lifecycle, ['commit', 'read-after-commit', 'publish']);
+});
+
+test('buffered notification events are rebuilt from current actor and target state', async () => {
+  const rebuilt = await refreshNotificationCreatedEvent('recipient-id', buildNotificationCreatedEvent(item, 99), {
+    getNotification: async () => ({ ...item, actor: null, payload: {}, isTargetAvailable: false, pollId: null, commentId: null }),
+    countUnread: async () => 4
+  });
+
+  assert.deepEqual(rebuilt, buildNotificationCreatedEvent({
+    ...item,
+    actor: null,
+    payload: {},
+    isTargetAvailable: false,
+    pollId: null,
+    commentId: null
+  }, 4));
+});
+
+test('buffered notification is dropped if it has been purged', async () => {
+  const rebuilt = await refreshNotificationCreatedEvent('recipient-id', buildNotificationCreatedEvent(item, 2), {
+    getNotification: async () => null,
+    countUnread: async () => 0
+  });
+
+  assert.equal(rebuilt, null);
 });
