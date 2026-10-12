@@ -206,6 +206,39 @@ export async function findUserByEmailOrUsername(login: string) {
   return row ? mapUserWithPassword(row) : null;
 }
 
+export async function findUserByIdWithPassword(userId: string) {
+  const result = await db.query<UserWithProfileRow>(
+    `
+      SELECT
+        u.id,
+        u.email::text AS email,
+        u.username::text AS username,
+        u.password_hash,
+        u.status,
+        u.session_version,
+        u.role,
+        u.created_at,
+        u.updated_at,
+        p.display_name,
+        p.bio,
+        p.country_code,
+        p.avatar_object_key,
+        p.polls_count,
+        p.followers_count,
+        p.following_count
+      FROM users u
+      JOIN profiles p ON p.user_id = u.id
+      WHERE u.id = $1
+        AND u.deleted_at IS NULL
+      LIMIT 1
+    `,
+    [userId]
+  );
+
+  const row = result.rows[0];
+  return row ? mapUserWithPassword(row) : null;
+}
+
 export async function findAuthenticatedUserById(userId: string) {
   const result = await db.query<UserWithProfileRow>(
     `

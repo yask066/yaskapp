@@ -20,6 +20,7 @@ const envSchema = z
   S3_ACCESS_KEY_ID: z.string().min(1),
   S3_SECRET_ACCESS_KEY: z.string().min(1),
   S3_FORCE_PATH_STYLE: z.coerce.boolean().default(true),
+  ACCOUNT_DELETION_ENABLED: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
   FIREBASE_PROJECT_ID: z.string().min(1).optional()
   })
   .superRefine((config, context) => {

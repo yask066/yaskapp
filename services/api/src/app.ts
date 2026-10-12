@@ -7,6 +7,7 @@ import Fastify from 'fastify';
 import { env } from './config/env.js';
 import { rateLimit } from './config/rate-limit.js';
 import { registerAuthRoutes } from './modules/auth/auth.routes.js';
+import { registerAccountDeletionRoutes } from './modules/account-deletion/account-deletion.routes.js';
 import { getCurrentUser } from './modules/auth/auth.utils.js';
 import { registerAdminRoutes } from './modules/admin/admin.routes.js';
 import {
@@ -36,10 +37,14 @@ export function buildApp() {
                 'req.headers.authorization',
                 'req.headers.cookie',
                 'req.body.password',
+                'req.body.deletionToken',
+                'req.body.statusToken',
                 'req.body.accessToken',
                 'req.body.refreshToken',
                 'req.body.token',
                 'password',
+                'deletionToken',
+                'statusToken',
                 'accessToken',
                 'refreshToken',
                 'JWT_SECRET',
@@ -168,6 +173,7 @@ export function buildApp() {
   });
 
   registerAuthRoutes(app);
+  registerAccountDeletionRoutes(app);
   registerAdminRoutes(app);
   registerHealthRoutes(app);
   registerModerationRoutes(app);
