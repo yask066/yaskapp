@@ -1,3 +1,9 @@
+export type {
+  AccountDeletionStatus,
+  AccountDeletionStatusResponse,
+  AccountDeletionVerificationResponse
+} from './account-deletion.js';
+
 export type PollVisibility = 'public' | 'followers' | 'private';
 
 export type PollAuthor = {
