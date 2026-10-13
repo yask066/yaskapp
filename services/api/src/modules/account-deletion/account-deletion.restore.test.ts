@@ -39,5 +39,26 @@ test('restore replay closes accounts and resets cleanup for repeatable worker pr
   assert.ok(statements.some((sql) => sql.includes('UPDATE account_deletion_media_manifest')));
   assert.ok(statements.some((sql) => sql.includes('INSERT INTO account_deletion_media_manifest')));
   assert.ok(statements.some((sql) => sql.includes('INSERT INTO account_deletion_events')));
+  const stepsInsert = statements.find((sql) => sql.includes('INSERT INTO account_deletion_steps')) ?? '';
+  assert.match(stepsInsert, /position\s*-\s*1/);
   assert.equal(statements.filter((sql) => sql === 'COMMIT').length, 1);
+});
+
+test('restore fails closed when the journal contains multiple operations for one user', async () => {
+  const entry = {
+    version: 1 as const,
+    operationId: 'e15d4d2b-5358-45a7-b036-f3648d34b361',
+    userId: '3ce3e770-fd0e-4e98-8472-0541d3e27cf1',
+    acceptedAt: '2026-10-12T12:00:00.000Z',
+    deadlineAt: '2026-10-13T12:00:00.000Z',
+    hmac: 'verified-by-journal-reader'
+  };
+  let connected = false;
+  const database = { async connect() { connected = true; throw new Error('unexpected_connect'); } } as never;
+
+  await assert.rejects(
+    reapplyAcceptedDeletions([entry, { ...entry, operationId: 'd5c5f5f8-e9c0-4822-8b3f-cd34a71a695d' }], database),
+    /account_deletion_journal_duplicate_user/
+  );
+  assert.equal(connected, false);
 });

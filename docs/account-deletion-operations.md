@@ -23,6 +23,11 @@ The API writes one signed JSON object per operation to a separate S3-compatible
 service before committing acceptance. The entry contains only operation ID,
 user ID, accepted time, deadline, format version, and HMAC. If that write fails,
 the PostgreSQL transaction rolls back and the API returns an unavailable error.
+Because object storage and PostgreSQL do not share a transaction, an uncertain
+database commit can leave a durable journal intent for a transaction that did
+not commit. Restore replay fails closed if it finds multiple journal operations
+for one user; resolve that condition against acceptance receipts and database or
+audit evidence before opening traffic.
 The journal endpoint must be independent of PostgreSQL backups and the media
 bucket (separate storage service/account, credentials, and failure domain).
 
@@ -39,8 +44,9 @@ ACCOUNT_DELETION_JOURNAL_HMAC_KEY=<at-least-32-random-characters>
 
 Give API credentials read, list, and write access to the journal prefix. Restrict
 deletion and lifecycle administration to a separate operator role. Enable bucket
-versioning and protect current objects from deletion for at least 35 days. Do
-not configure expiration shorter than 35 days. Keep the HMAC key in the secret
+versioning and protect current objects from deletion for at least 35 days. Apply
+and verify lifecycle expiry for current and noncurrent journal objects at 35 days.
+Keep the HMAC key in the secret
 manager separately from PostgreSQL and object-store credentials; preserve it
 for the full journal retention window and rotate only with an overlap procedure.
 Never copy journal objects into the main database backup.
@@ -86,7 +92,8 @@ Do not expose API traffic while data is being restored or journal reapply is
 running. If the journal service or HMAC key is unavailable, stop; do not start
 API/web traffic against the restored snapshot.
 
-1. Stop `https`, `web`, `moderation-web`, `api`, and both worker services. Keep
+1. Stop `https`, `web`, `moderation-web`, `api`, `notification-worker`,
+   `account-deletion-worker`, and `account-deletion-journal-exporter`. Keep
    PostgreSQL and object storage available for the restore.
 2. Restore PostgreSQL and the matching media snapshot, then run migrations.
 3. Use the newly built API image and restored database to reconcile the
@@ -99,7 +106,11 @@ API/web traffic against the restored snapshot.
      node services/api/dist/jobs/reapply-account-deletions.js
    ```
 
-   Export must exit zero before reapply may run. Reapply lists every journal object, checks its HMAC, key/ID agreement,
+   Export must exit zero before reapply may run. It checks each accepted row
+   present in the restored database against the journal; it cannot prove the
+   journal is complete when the restored database predates an acceptance.
+   Independently verify protected retention and the journal object inventory
+   before continuing. Reapply lists every journal object, checks its HMAC, key/ID agreement,
    timestamps, and duplicate IDs, and reopens every matching deletion as pending
    cleanup. It marks any surviving account row deleted, resets cleanup steps,
    and recreates the media manifest. It exits non-zero on missing credentials,

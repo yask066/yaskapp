@@ -25,7 +25,7 @@ export class AccountDeletionAcceptanceError extends Error {
 async function snapshotDeletionWork(client: PoolClient, operationId: string, userId: string) {
   await client.query(
     `INSERT INTO account_deletion_steps (operation_id, step_key, position)
-     SELECT $1, step_key, position::int
+     SELECT $1, step_key, (position - 1)::int
      FROM unnest($2::text[]) WITH ORDINALITY AS step(step_key, position)
      ON CONFLICT (operation_id, step_key) DO NOTHING`,
     [operationId, cleanupSteps]

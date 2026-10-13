@@ -10,9 +10,12 @@ export async function reapplyAcceptedDeletions(
   database: RestoreDatabase = db
 ) {
   const byOperation = new Map<string, AccountDeletionJournalEntry>();
+  const operationByUser = new Map<string, string>();
   for (const entry of entries) {
     if (byOperation.has(entry.operationId)) throw new Error('account_deletion_journal_duplicate_operation');
+    if (operationByUser.has(entry.userId)) throw new Error('account_deletion_journal_duplicate_user');
     byOperation.set(entry.operationId, entry);
+    operationByUser.set(entry.userId, entry.operationId);
   }
 
   let reapplied = 0;
@@ -52,7 +55,7 @@ export async function reapplyAcceptedDeletions(
       );
       await client.query(
         `INSERT INTO account_deletion_steps (operation_id, step_key, position)
-         SELECT $1, step_key, position::int FROM unnest($2::text[]) WITH ORDINALITY AS step(step_key, position)
+         SELECT $1, step_key, (position - 1)::int FROM unnest($2::text[]) WITH ORDINALITY AS step(step_key, position)
          ON CONFLICT (operation_id, step_key) DO UPDATE SET
            status = 'pending', cursor_id = NULL, processed_count = 0, attempts = 0,
            available_at = now(), last_error_code = NULL, started_at = NULL,

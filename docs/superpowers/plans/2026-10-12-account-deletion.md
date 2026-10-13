@@ -293,8 +293,15 @@ acceptance синхронно пишет подписанную запись т�
 Unit-тесты журнала/reapply, API typecheck и Compose YAML validation прошли.
 `restore_old_backup_does_not_resurrect_account` добавлен, но пропущен без
 `ACCOUNT_DELETION_TEST_DATABASE_URL`; staging restore/alert setup не запускались.
-Поэтому пункты о фактическом применении lifecycle, подтверждении полноты журнала
-на staging, алертах внешнего мониторинга и restore exercise остаются открытыми.
+При ревью исправлено смещение позиций этапов (worker использует индексы 0–6),
+а restore теперь останавливается при нескольких journal operation на одного
+user. Остались два существенных ограничения: pre-commit journal intent может
+пережить неопределённый/откаченный DB commit, а export не может доказать полноту
+журнала относительно старого backup, в котором отсутствуют принятые операции.
+Lifecycle внешнего журнала и alert rules не применялись к staging. Поэтому
+пункты о фактическом применении lifecycle, проверке полноты журнала, разборе
+uncertain commit, алертах внешнего мониторинга и restore exercise остаются
+открытыми.
 
 **Готово, когда:** worker переживает reboot, сроки хранения выполняются, restore без полного журнала не публикует старые данные. **PRD:** AC-11, AC-16.
 
