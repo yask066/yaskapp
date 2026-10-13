@@ -315,6 +315,20 @@ steps через реальный worker repository. Тесты `restore_old_bac
 
 **Готово, когда:** AC-01–AC-17 имеют доказательства; нет потерянных задач, утечек данных или необъяснённых расхождений счётчиков; продуктовые условия выпуска соблюдены.
 
+**Текущий результат AD-15:** подготовлены gated E2E сценарий (две Fastify app
+instances в одном процессе) verification → acceptance → проверка сессий и
+видимости → чтение трёх durable journal записей → реальный worker → status
+receipt → повторная регистрация, и [release smoke test](../../account-deletion-smoke-test.md)
+с матрицей AC-01–AC-17, fixture, отказами и rollout gate. API typecheck,
+route/worker/protocol (26/26), web (283/283, typecheck/lint/build) и mobile
+(294 passed, 1 skipped) прошли. Flutter analyze возвращает 10 существующих
+предупреждений/замечаний в нетронутых файлах. E2E-тест пропущен: отсутствуют
+выделенная `ACCOUNT_DELETION_TEST_DATABASE_URL`, Redis, media storage и оба
+независимых journal store. Полный API suite не запускался без тестового URL.
+Staging exercise, отдельные процессы API, полная fixture AC-01–AC-17,
+утверждение политики и rollout не проводились. Все пункты AD-15 остаются
+открытыми; выпуск не подтверждён.
+
 ## Команды проверки
 
 Для каждой серверной задачи сначала запускать её новый тест и видеть ожидаемый

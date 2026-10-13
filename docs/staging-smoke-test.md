@@ -67,3 +67,12 @@ Smoke test date:
 Tester:
 Result:
 ```
+
+## Account Deletion Release Gate
+
+The self-service account deletion flow remains disabled until its product
+retention decisions, AD-14 independent-journal/backup restore exercise, and
+all AC-01–AC-17 evidence are approved. Follow
+[`account-deletion-smoke-test.md`](account-deletion-smoke-test.md) on staging.
+Do not use production accounts for these checks. A rollout stop disables only
+new verification and acceptance; the worker must continue accepted deletions.
