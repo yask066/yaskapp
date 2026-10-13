@@ -21,6 +21,7 @@ type AppealRow = {
   resolved_by_user_id: string | null;
   created_at: Date;
   resolved_at: Date | null;
+  sanction_user_id?: string | null;
 };
 
 function mapAppeal(row: AppealRow) {
@@ -32,6 +33,7 @@ function mapAppeal(row: AppealRow) {
     reason: row.reason,
     decisionNote: row.decision_note,
     resolvedByUserId: row.resolved_by_user_id,
+    targetAvailable: row.sanction_user_id !== null,
     createdAt: row.created_at.toISOString(),
     resolvedAt: row.resolved_at?.toISOString() ?? null
   };
@@ -113,18 +115,18 @@ export async function createAppeal(input: { sanctionId: string; userId: string; 
 export async function listAppeals(input: { status?: AppealStatus; limit: number; cursor?: string }) {
   const values: unknown[] = [];
   const conditions = ['TRUE'];
-  if (input.status) { values.push(input.status); conditions.push(`status = $${values.length}`); }
+  if (input.status) { values.push(input.status); conditions.push(`a.status = $${values.length}`); }
   if (input.cursor) {
     const cursor = decodeAdminCursor(input.cursor);
     values.push(cursor.createdAt, cursor.id);
-    conditions.push(`(created_at, id) < ($${values.length - 1}::timestamptz, $${values.length}::uuid)`);
+    conditions.push(`(a.created_at, a.id) < ($${values.length - 1}::timestamptz, $${values.length}::uuid)`);
   }
   values.push(input.limit + 1);
   const result = await db.query<AppealRow>(
-    `SELECT id, sanction_id, user_id, status, reason, decision_note,
-            resolved_by_user_id, created_at, resolved_at
-       FROM appeals WHERE ${conditions.join(' AND ')}
-       ORDER BY created_at DESC, id DESC LIMIT $${values.length}`,
+    `SELECT a.id, a.sanction_id, a.user_id, a.status, a.reason, a.decision_note,
+            a.resolved_by_user_id, a.created_at, a.resolved_at, s.user_id AS sanction_user_id
+       FROM appeals a JOIN sanctions s ON s.id = a.sanction_id WHERE ${conditions.join(' AND ')}
+       ORDER BY a.created_at DESC, a.id DESC LIMIT $${values.length}`,
     values
   );
   return pageWithCursor(result.rows.map(mapAppeal), input.limit);
@@ -164,6 +166,7 @@ export async function resolveAppeal(input: {
       [input.status, input.decisionNote, input.actorUserId, input.appealId]
     )).rows[0];
     if (!resolved) throw new Error('Appeal update did not return a row.');
+    resolved.sanction_user_id = appeal.sanction_user_id;
     if (input.status === 'reduced' || input.status === 'revoked') {
       await client.query(
         `UPDATE sanctions SET status = 'revoked', revoked_at = now(), revoked_by_user_id = $1

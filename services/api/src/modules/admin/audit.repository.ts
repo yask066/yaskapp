@@ -109,7 +109,7 @@ export async function listAdminAudit(input: {
     actor_role: UserRole;
     action: AdminAuditAction;
     target_type: AdminAuditTargetType;
-    target_id: string;
+    target_id: string | null;
     reason: string;
     metadata: Record<string, unknown>;
     request_id: string | null;
@@ -142,6 +142,7 @@ export async function listAdminAudit(input: {
     action: row.action,
     targetType: row.target_type,
     targetId: row.target_id,
+    targetAvailable: row.target_id !== null,
     reason: row.reason,
     metadata: row.metadata,
     requestId: row.request_id,

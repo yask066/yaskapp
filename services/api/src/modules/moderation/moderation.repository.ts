@@ -40,7 +40,7 @@ type ReportRow = {
   id: string;
   reporter_user_id: string;
   target_type: ReportTargetType;
-  target_id: string;
+  target_id: string | null;
   category: ReportCategory;
   description: string;
   status: string;
@@ -51,7 +51,7 @@ type ReportRow = {
 type CaseRow = {
   id: string;
   target_type: ReportTargetType;
-  target_id: string;
+  target_id: string | null;
   status: ModerationCaseStatus;
   priority: ModerationCasePriority;
   assigned_to_user_id: string | null;
@@ -67,6 +67,7 @@ function mapReport(row: ReportRow) {
     reporterUserId: row.reporter_user_id,
     targetType: row.target_type,
     targetId: row.target_id,
+    targetAvailable: row.target_id !== null,
     category: row.category,
     description: row.description,
     status: row.status,
@@ -80,6 +81,7 @@ function mapCase(row: CaseRow) {
     id: row.id,
     targetType: row.target_type,
     targetId: row.target_id,
+    targetAvailable: row.target_id !== null,
     status: row.status,
     priority: row.priority,
     assignedToUserId: row.assigned_to_user_id,
@@ -351,7 +353,9 @@ export async function getModerationCase(caseId: string) {
         ORDER BY created_at ASC, id ASC`,
       [caseId]
     ),
-    moderationCase.target_type === 'user' ? listUserSanctions(moderationCase.target_id) : Promise.resolve([])
+    moderationCase.target_type === 'user' && moderationCase.target_id
+      ? listUserSanctions(moderationCase.target_id)
+      : Promise.resolve([])
   ]);
 
   return {
