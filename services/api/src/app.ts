@@ -24,7 +24,7 @@ import { registerSearchRoutes } from './modules/search/search.routes.js';
 import { registerRealtimeRoutes } from './realtime/realtime.routes.js';
 import { parseCookieHeader } from './modules/auth/auth.cookies.js';
 import { realtimeBus } from './realtime/realtime.bus.js';
-import { sendToUser } from './realtime/realtime.hub.js';
+import { broadcastPollVoteUpdated, sendToUser } from './realtime/realtime.hub.js';
 import { disconnectUser } from './realtime/realtime.hub.js';
 import { dispatchPendingDeletionEvents } from './modules/account-deletion/account-deletion.events.js';
 import { refreshNotificationCreatedEvent } from './modules/notifications/notifications.events.js';
@@ -192,6 +192,10 @@ export function buildApp() {
 
   app.addHook('onReady', async () => {
     const receiveRealtimeMessage = ({ recipientUserId, event }: { recipientUserId: string; event: import('@yaskapp/shared').RealtimeEvent }) => {
+      if (recipientUserId === '*') {
+        if (event.type === 'poll.vote.updated') broadcastPollVoteUpdated(event.payload);
+        return;
+      }
       if (event.type === 'account.deleted') {
         disconnectUser(event.payload.userId, 'account_deleted', event);
         return;

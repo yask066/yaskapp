@@ -84,6 +84,10 @@ export class RealtimeBus {
     await this.publisher.publish(realtimeChannel, JSON.stringify(envelope));
   }
 
+  async publishBroadcast(event: RealtimeEvent) {
+    await this.publish('*', event);
+  }
+
   async close() {
     this.started = false;
     await Promise.all([this.publisher, this.subscriber].map(async (client) => {

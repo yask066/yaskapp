@@ -311,7 +311,7 @@ async function findViewerVoteOptionIds(
   return new Map(result.rows.map((row) => [row.poll_id, row.option_id]));
 }
 
-async function hydratePolls(client: PoolClient, pollIds: string[], viewerId?: string) {
+export async function hydratePolls(client: PoolClient, pollIds: string[], viewerId?: string) {
   const pollRows = await findPollRowsByIds(client, pollIds);
   const optionRows = await findOptionRowsByPollIds(client, pollIds);
   const viewerLikedPollIds = await findViewerLikedPollIds(client, pollIds, viewerId);

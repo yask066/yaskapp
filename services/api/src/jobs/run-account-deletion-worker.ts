@@ -4,6 +4,7 @@ import {
   assertDeletionStepHandlersReady,
   processDeletionBatch
 } from '../modules/account-deletion/account-deletion.worker.js';
+import { dispatchPendingRelationshipEvents } from '../modules/account-deletion/account-deletion.relationships.js';
 
 const POLL_INTERVAL_MS = 1_000;
 let stopping = false;
@@ -20,6 +21,7 @@ async function run() {
   while (!stopping) {
     try {
       const result = await processDeletionBatch({ limit: 100, now: new Date() });
+      await dispatchPendingRelationshipEvents();
       if (result.processed === 0) await wait(POLL_INTERVAL_MS);
     } catch {
       console.error('Account deletion worker batch failed; it will retry.');

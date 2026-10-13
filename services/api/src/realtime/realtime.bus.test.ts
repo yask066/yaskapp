@@ -88,6 +88,24 @@ test('publishes a recipient envelope and delivers it to the subscriber', async (
   await bus.close();
 });
 
+test('publishes a broadcast envelope for all realtime nodes', async () => {
+  const publisher = new FakeRedis();
+  const subscriber = new FakeRedis();
+  const received: Array<{ recipientUserId: string; event: RealtimeEvent }> = [];
+  const bus = new RealtimeBus({ createPublisher: () => publisher, createSubscriber: () => subscriber });
+
+  await bus.start((message) => received.push(message));
+  await bus.publishBroadcast(event());
+  subscriber.emit(realtimeChannel, publisher.published[0]?.message ?? '');
+
+  assert.deepEqual(JSON.parse(publisher.published[0]?.message ?? ''), {
+    recipientUserId: '*',
+    event: event()
+  });
+  assert.deepEqual(received, [{ recipientUserId: '*', event: event() }]);
+  await bus.close();
+});
+
 test('ignores malformed messages and does not subscribe twice', async () => {
   const subscriber = new FakeRedis();
   const bus = new RealtimeBus({ createPublisher: () => new FakeRedis(), createSubscriber: () => subscriber });

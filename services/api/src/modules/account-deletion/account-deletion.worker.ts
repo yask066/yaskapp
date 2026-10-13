@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
 import { purgeAccountContent } from './account-deletion.content.js';
+import { purgeAccountRelationships } from './account-deletion.relationships.js';
 
 export const DELETION_STEP_ORDER = [
   'discovery', 'notifications', 'moderation', 'content', 'relationships', 'media', 'completion'
@@ -310,7 +311,8 @@ export async function processDeletionBatch(
 }
 
 export const accountDeletionStepHandlers: Partial<Record<DeletionStepKey, DeletionStepHandler>> = {
-  content: purgeAccountContent
+  content: purgeAccountContent,
+  relationships: purgeAccountRelationships
 };
 
 export function assertDeletionStepHandlersReady(handlers: Partial<Record<DeletionStepKey, DeletionStepHandler>>) {
