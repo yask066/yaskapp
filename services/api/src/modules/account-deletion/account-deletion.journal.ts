@@ -29,6 +29,7 @@ export type AccountDeletionJournalEntry = {
 };
 
 const JOURNAL_PREFIX = 'account-deletions/';
+const JOURNAL_RETENTION_MS = 35 * 24 * 60 * 60_000;
 
 function journalPayload(entry: Omit<AccountDeletionJournalEntry, 'hmac'>) {
   return JSON.stringify({
@@ -214,19 +215,19 @@ export function createAccountDeletionJournal(options: {
     async writePrepared(acceptance) {
       const entry = createJournalEntry(acceptance, options.signingKey, 'prepared');
       await putImmutable(options.client, options.bucket, operationKey('prepared', entry.operationId, entry.intentId), JSON.stringify(entry), 'account_deletion_journal_conflict',
-        new Date(acceptance.acceptedAt.getTime() + 48 * 60 * 60_000));
+        new Date(acceptance.acceptedAt.getTime() + JOURNAL_RETENTION_MS));
     },
 
     async writeAccepted(acceptance) {
       const entry = createJournalEntry(acceptance, options.signingKey, 'accepted');
       await putImmutable(options.client, options.bucket, operationKey('accepted', entry.operationId), JSON.stringify(entry), 'account_deletion_journal_conflict',
-        new Date(acceptance.acceptedAt.getTime() + 35 * 24 * 60 * 60_000));
+        new Date(acceptance.acceptedAt.getTime() + JOURNAL_RETENTION_MS));
     },
 
     async writeCheckpoint(acceptance) {
       const entry = createJournalEntry(acceptance, options.signingKey, 'checkpoint');
       await putImmutable(options.checkpointClient, options.checkpointBucket, operationKey('checkpoint', entry.operationId), JSON.stringify(entry), 'account_deletion_journal_checkpoint_conflict',
-        new Date(acceptance.acceptedAt.getTime() + 35 * 24 * 60 * 60_000));
+        new Date(acceptance.acceptedAt.getTime() + JOURNAL_RETENTION_MS));
     },
 
     async deletePrepared(operationId) {
@@ -274,7 +275,7 @@ export function createAccountDeletionJournal(options: {
           if (entry.state !== 'prepared' || item.Key !== operationKey('prepared', entry.operationId, entry.intentId)) {
             throw new Error('account_deletion_journal_key_mismatch');
           }
-          if (Date.parse(entry.acceptedAt) > now.getTime() - 48 * 60 * 60_000) continue;
+          if (Date.parse(entry.acceptedAt) > now.getTime() - JOURNAL_RETENTION_MS) continue;
           const accepted = await getObject(options.client, options.bucket, operationKey('accepted', entry.operationId));
           const checkpoint = await getObject(options.checkpointClient, options.checkpointBucket, operationKey('checkpoint', entry.operationId));
           let acceptedIntentId: string | null = null;
@@ -354,6 +355,10 @@ export function createAccountDeletionJournal(options: {
           throw new Error('account_deletion_journal_checkpoint_incomplete');
         }
         checkpoints.delete(entry.operationId);
+      }
+      const acceptedOperationIds = new Set(accepted.map((entry) => entry.operationId));
+      if ([...prepared.values()].some((entry) => !acceptedOperationIds.has(entry.operationId))) {
+        throw new Error('account_deletion_journal_incomplete');
       }
       if (checkpoints.size) throw new Error('account_deletion_journal_checkpoint_incomplete');
       return accepted;

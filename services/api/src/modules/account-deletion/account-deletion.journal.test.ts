@@ -62,12 +62,7 @@ test('journal persists acceptance before it can be replayed and rejects tampered
   await assert.rejects(journal.readAll(), /journal_not_initialized/);
   await journal.initialize();
   await journal.writePrepared(acceptance);
-  await journal.writePrepared({
-    ...acceptance,
-    acceptedAt: new Date(acceptance.acceptedAt.getTime() + 1_000),
-    deadlineAt: new Date(acceptance.deadlineAt.getTime() + 1_000)
-  });
-  assert.equal((await journal.readAll()).length, 0);
+  await assert.rejects(journal.readAll(), /journal_incomplete/);
   await journal.writeAccepted(acceptance);
   await journal.writeCheckpoint(acceptance);
   await journal.writeAccepted(acceptance);
@@ -77,7 +72,7 @@ test('journal persists acceptance before it can be replayed and rejects tampered
   const acceptedPut = puts.find((put) => put.key === `account-deletions/accepted/${acceptance.operationId}.json`);
   const checkpointPut = puts.find((put) => put.key === `account-deletions/checkpoint/${acceptance.operationId}.json`);
   assert.equal(preparedPut?.mode, 'COMPLIANCE');
-  assert.equal(preparedPut?.retainUntil?.getTime(), acceptance.acceptedAt.getTime() + 48 * 60 * 60_000);
+  assert.equal(preparedPut?.retainUntil?.getTime(), acceptance.acceptedAt.getTime() + 35 * 24 * 60 * 60_000);
   assert.equal(acceptedPut?.retainUntil?.getTime(), acceptance.acceptedAt.getTime() + 35 * 24 * 60 * 60_000);
   assert.equal(checkpointPut?.retainUntil?.getTime(), acceptance.acceptedAt.getTime() + 35 * 24 * 60 * 60_000);
   const key = `account-deletions/accepted/${acceptance.operationId}.json`;
@@ -123,6 +118,52 @@ test('journal rejects accepted entries without their prepared record', async () 
   await journal.initialize();
   await journal.writeAccepted(acceptance);
   await assert.rejects(journal.readAll(), /incomplete/);
+});
+
+test('restore fails closed on a prepared-only intent older than the previous backup window', async () => {
+  const stores = new Map<string, Map<string, string>>([
+    ['private-journal', new Map()],
+    ['private-checkpoint', new Map()]
+  ]);
+  const client = {
+    async send(command: unknown) {
+      const input = (command as { input: { Bucket: string; Key?: string; Prefix?: string; Body?: unknown } }).input;
+      const store = stores.get(input.Bucket)!;
+      if (command instanceof GetObjectCommand) {
+        const body = store.get(input.Key!);
+        if (body === undefined) {
+          const error = new Error('missing') as Error & { name: string };
+          error.name = 'NoSuchKey';
+          throw error;
+        }
+        return { Body: { async transformToString() { return body; } } };
+      }
+      if (command instanceof PutObjectCommand) {
+        store.set(input.Key!, String(input.Body));
+        return {};
+      }
+      if (command instanceof ListObjectsV2Command) {
+        return { Contents: [...store.keys()].filter((Key) => !input.Prefix || Key.startsWith(input.Prefix)).map((Key) => ({ Key })), IsTruncated: false };
+      }
+      throw new Error('unexpected_s3_command');
+    },
+    destroy() {}
+  } as unknown as S3Client;
+  const journal = createAccountDeletionJournal({
+    client,
+    bucket: 'private-journal',
+    checkpointClient: client,
+    checkpointBucket: 'private-checkpoint',
+    journalId: 'staging-account-deletion-journal',
+    signingKey: 'test-key-at-least-32-characters-long'
+  });
+  await journal.initialize();
+  await journal.writePrepared({
+    ...acceptance,
+    acceptedAt: new Date('2026-08-01T12:00:00.000Z'),
+    deadlineAt: new Date('2026-08-02T12:00:00.000Z')
+  });
+  await assert.rejects(journal.readAll(), /journal_incomplete/);
 });
 
 test('journal rejects an accepted entry missing its independent checkpoint record', async () => {

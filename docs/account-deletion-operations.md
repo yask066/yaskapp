@@ -22,9 +22,10 @@ bodies, credentials, tokens, or journal payloads.
 The API writes a signed `prepared` entry before the database commit. After the
 commit succeeds, it writes an `accepted` entry to the journal and a matching
 checkpoint to a second S3-compatible service. The API confirms acceptance only
-after both writes have been read back. A rollback leaves only a `prepared`
-entry, which replay ignores. Restore checks the signed identities in both
-stores and fails closed on a missing or mismatched record. Both stores must be
+after both writes have been read back. A `prepared` entry without an `accepted`
+entry is ambiguous because the database commit may have succeeded before the
+process failed. Restore fails closed while any such intent is within the
+35-day backup window. Both stores must be
 independent of PostgreSQL backups and each other (separate storage services,
 accounts, credentials, and failure domains).
 
@@ -63,10 +64,11 @@ read/list-versions/delete-versions credentials there; Compose passes that file
 to the deletion worker and retention exporter. The role must not write or alter
 retention.
 Enable versioning and S3 Object Lock in compliance mode on both buckets. Keep
-`prepared` records locked for 48 hours and accepted/checkpoint records for 35
-days from acceptance. The retention worker lists and deletes every object version
-for completed operations after the lock expires; it never removes unfinished
-accepted records. Do not add an unconditional lifecycle rule to these prefixes.
+`prepared`, accepted, and checkpoint records locked for 35 days from acceptance.
+The retention worker removes unresolved prepared-only intents after the backup
+window and removes accepted/checkpoint records only for completed operations
+after the lock expires; it never removes unfinished accepted records. Do not add
+an unconditional lifecycle rule to these prefixes.
 Alert on any retention worker error. Preserve the HMAC key separately from both
 stores and rotate only with an overlap procedure. Never copy journal objects into
 the database backup.
