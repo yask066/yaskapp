@@ -12,6 +12,7 @@ import { hashDeletionToken } from './account-deletion.verification.js';
 import { lockSuperadminMutation } from './account-activity.guard.js';
 import { dispatchPendingDeletionEvents } from './account-deletion.events.js';
 import { disconnectUser } from '../../realtime/realtime.hub.js';
+import { writeAcceptedDeletionToJournal } from './account-deletion.journal.js';
 
 const cleanupSteps = ['discovery', 'notifications', 'moderation', 'content', 'relationships', 'media', 'completion'];
 
@@ -115,6 +116,14 @@ export async function acceptAccountDeletion(
       [permission.userId, acceptedAt]
     );
     await snapshotDeletionWork(client, permission.operationId, permission.userId);
+    // The independent durable write happens before the database commit and before
+    // a success response can be sent. If it is unavailable, roll back acceptance.
+    await writeAcceptedDeletionToJournal({
+      operationId: permission.operationId,
+      userId: permission.userId,
+      acceptedAt,
+      deadlineAt
+    });
     await client.query('COMMIT');
     try {
       disconnectUser(permission.userId, 'account_deleted', {

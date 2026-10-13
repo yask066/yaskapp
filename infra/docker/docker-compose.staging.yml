@@ -148,6 +148,48 @@ services:
         done
     restart: unless-stopped
 
+  account-deletion-worker:
+    image: yaskapp-api:staging
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    env_file:
+      - ../../services/api/.env.staging
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    command: ["node", "services/api/dist/jobs/run-account-deletion-worker.js"]
+    restart: unless-stopped
+
+  account-deletion-journal-exporter:
+    image: yaskapp-api:staging
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    env_file:
+      - ../../services/api/.env.staging
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    command:
+      - sh
+      - -c
+      - >-
+        while true; do
+          if [ "$${ACCOUNT_DELETION_ENABLED:-false}" = "true" ]; then
+            node services/api/dist/jobs/export-account-deletion-journal.js ||
+              echo 'Account deletion journal export failed; alert on this log.';
+          fi;
+          sleep 300;
+        done
+    restart: unless-stopped
+
   moderation-web:
     image: yaskapp-moderation-web:staging
     build:

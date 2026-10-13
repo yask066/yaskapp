@@ -29,6 +29,11 @@ sudo BACKUP_DIR=/var/backups/yaskapp BACKUP_RETENTION_DAYS=30 \
   /usr/local/sbin/yaskapp-backup-postgres
 ```
 
+`BACKUP_RETENTION_DAYS` is limited to 1–30 days. Copy validated dumps to
+protected storage outside the VPS and configure that bucket to expire current
+and noncurrent dump versions within 30 days. Keep the staging account-deletion
+journal in its separate 35-day store; it is not part of these database dumps.
+
 Run it daily with root's cron (`sudo crontab -e`):
 
 ```cron
@@ -53,8 +58,11 @@ docker compose -f infra/docker/docker-compose.staging.yml run --rm migrate
 docker compose -f infra/docker/docker-compose.staging.yml ps
 ```
 
-After restore, run the staging smoke checklist and verify the API readiness
-endpoint before allowing test traffic.
+After a database or media restore, keep traffic blocked and reapply the
+independent account-deletion journal before starting API or frontend services.
+Follow [Account Deletion Operations](account-deletion-operations.md#restore-gate)
+for the exact order. Run the staging smoke checklist and verify the API
+readiness endpoint before allowing test traffic.
 
 ## Operations
 

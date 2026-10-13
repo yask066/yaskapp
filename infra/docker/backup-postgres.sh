@@ -6,6 +6,11 @@ readonly compose_file="${COMPOSE_FILE:-$project_root/infra/docker/docker-compose
 readonly backup_dir="${BACKUP_DIR:-/var/backups/yaskapp}"
 readonly retention_days="${BACKUP_RETENTION_DAYS:-30}"
 
+if ! [[ "$retention_days" =~ ^[0-9]+$ ]] || (( retention_days < 1 || retention_days > 30 )); then
+  echo "BACKUP_RETENTION_DAYS must be an integer between 1 and 30." >&2
+  exit 2
+fi
+
 mkdir -p "$backup_dir"
 chmod 700 "$backup_dir"
 
