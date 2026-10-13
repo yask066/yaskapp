@@ -17,6 +17,7 @@ import '../polls/poll_state_scope.dart';
 import '../realtime/realtime_client.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
+import '../account_deletion/account_deletion_controller.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
@@ -25,6 +26,8 @@ class ProfileScreen extends StatefulWidget {
     required this.authApiClient,
     required this.onLogout,
     required this.onUserUpdated,
+    this.onAccountDeletionAccepted,
+    this.onAccountDeletionCompleted,
     super.key,
     PollsApiClient? pollsApiClient,
     RealtimeClient? realtimeClient,
@@ -36,6 +39,8 @@ class ProfileScreen extends StatefulWidget {
   final AuthApiClient authApiClient;
   final VoidCallback onLogout;
   final ValueChanged<AuthUser> onUserUpdated;
+  final AccountDeletionAccepted? onAccountDeletionAccepted;
+  final VoidCallback? onAccountDeletionCompleted;
   final PollsApiClient? _pollsApiClient;
   final RealtimeClient? _realtimeClient;
 
@@ -366,6 +371,10 @@ class ProfileScreenState extends State<ProfileScreen> {
                             builder: (_) => SettingsScreen(
                               accessToken: widget.accessToken,
                               onLogout: widget.onLogout,
+                              onAccountDeletionAccepted:
+                                  widget.onAccountDeletionAccepted,
+                              onAccountDeletionCompleted:
+                                  widget.onAccountDeletionCompleted,
                             ),
                           ),
                         );

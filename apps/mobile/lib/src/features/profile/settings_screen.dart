@@ -2,16 +2,22 @@ import 'package:flutter/material.dart';
 
 import '../notifications/notification_preferences_screen.dart';
 import '../reports/my_reports_screen.dart';
+import '../account_deletion/account_deletion_screen.dart';
+import '../account_deletion/account_deletion_controller.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({
     required this.accessToken,
     required this.onLogout,
+    this.onAccountDeletionAccepted,
+    this.onAccountDeletionCompleted,
     super.key,
   });
 
   final String accessToken;
   final VoidCallback onLogout;
+  final AccountDeletionAccepted? onAccountDeletionAccepted;
+  final VoidCallback? onAccountDeletionCompleted;
 
   void _openNotifications(BuildContext context) {
     Navigator.of(context).push(
@@ -53,6 +59,20 @@ class SettingsScreen extends StatelessWidget {
             icon: Icons.flag_outlined,
             label: 'My reports',
             onTap: () => _openReports(context),
+          ),
+          _SettingsTile(
+            icon: Icons.delete_outline,
+            label: 'Delete account',
+            color: Colors.red,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => AccountDeletionScreen(
+                  accessToken: accessToken,
+                  onAccepted: onAccountDeletionAccepted,
+                  onCompleted: onAccountDeletionCompleted,
+                ),
+              ),
+            ),
           ),
           const Divider(height: 24),
           _SettingsTile(

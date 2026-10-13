@@ -51,4 +51,23 @@ void main() {
       isNull,
     );
   });
+
+  test('decodes account deletion events only for supported protocol version',
+      () {
+    expect(
+      decodeAccountDeletedRealtimeEvent({
+        'type': 'account.deleted',
+        'payload': {'userId': 'user-1', 'operationId': 'op-1'},
+      }),
+      isNotNull,
+    );
+    expect(
+      decodeAccountDeletedRealtimeEvent({
+        'version': 2,
+        'type': 'account.deleted',
+        'payload': {'userId': 'user-1', 'operationId': 'op-1'},
+      }),
+      isNull,
+    );
+  });
 }

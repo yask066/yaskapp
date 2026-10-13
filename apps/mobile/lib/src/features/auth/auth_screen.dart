@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'auth_api_client.dart';
 import 'auth_session.dart';
 import 'country_selector.dart';
+import '../account_deletion/account_deletion_screen.dart';
+import '../account_deletion/account_deletion_controller.dart';
 
 enum _AuthMode { login, register }
 
@@ -11,10 +13,14 @@ class AuthScreen extends StatefulWidget {
     required this.onAuthenticated,
     super.key,
     AuthApiClient? authApiClient,
+    this.onAccountDeletionAccepted,
+    this.onAccountDeletionCompleted,
   }) : _authApiClient = authApiClient;
 
   final ValueChanged<AuthSession> onAuthenticated;
   final AuthApiClient? _authApiClient;
+  final AccountDeletionAccepted? onAccountDeletionAccepted;
+  final VoidCallback? onAccountDeletionCompleted;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -386,6 +392,20 @@ class _AuthScreenState extends State<AuthScreen> {
                                   style: const TextStyle(fontSize: 18),
                                 ),
                               ),
+                              if (!_isRegistering)
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => AccountDeletionScreen(
+                                        onAccepted:
+                                            widget.onAccountDeletionAccepted,
+                                        onCompleted:
+                                            widget.onAccountDeletionCompleted,
+                                      ),
+                                    ),
+                                  ),
+                                  child: const Text('Delete account'),
+                                ),
                             ],
                           ),
                         ),

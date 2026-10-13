@@ -17,6 +17,7 @@ import '../realtime/realtime_session.dart';
 import '../polls/poll_state_store.dart';
 import '../polls/poll_state_scope.dart';
 import '../realtime/realtime_client.dart';
+import '../account_deletion/account_deletion_controller.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -26,6 +27,8 @@ class HomeScreen extends StatefulWidget {
     required this.onUserUpdated,
     required this.realtimeSession,
     required this.pollStateStore,
+    this.onAccountDeletionAccepted,
+    this.onAccountDeletionCompleted,
     super.key,
     PollsApiClient? pollsApiClient,
   }) : _pollsApiClient = pollsApiClient;
@@ -36,6 +39,8 @@ class HomeScreen extends StatefulWidget {
   final ValueChanged<AuthUser> onUserUpdated;
   final RealtimeSession realtimeSession;
   final PollStateStore pollStateStore;
+  final AccountDeletionAccepted? onAccountDeletionAccepted;
+  final VoidCallback? onAccountDeletionCompleted;
   final PollsApiClient? _pollsApiClient;
 
   @override
@@ -177,6 +182,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 widget.onLogout();
               },
               onUserUpdated: widget.onUserUpdated,
+              onAccountDeletionAccepted: widget.onAccountDeletionAccepted,
+              onAccountDeletionCompleted: widget.onAccountDeletionCompleted,
             ),
           ],
         ),

@@ -4,6 +4,7 @@ import 'package:yaskapp_mobile/src/app.dart';
 import 'package:yaskapp_mobile/src/features/auth/auth_session_store.dart';
 import 'package:yaskapp_mobile/src/features/auth/auth_session.dart';
 import 'package:yaskapp_mobile/src/features/home/home_screen.dart';
+import 'package:yaskapp_mobile/src/features/account_deletion/account_deletion_receipt_store.dart';
 
 void main() {
   testWidgets('shows auth entry point', (tester) async {
@@ -13,7 +14,10 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      YaskappApp(authSessionStore: MemoryAuthSessionStore()),
+      YaskappApp(
+        authSessionStore: MemoryAuthSessionStore(),
+        accountDeletionReceiptStore: MemoryAccountDeletionReceiptStore(),
+      ),
     );
     await tester.pumpAndSettle();
 

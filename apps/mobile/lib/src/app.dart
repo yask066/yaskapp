@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import 'core/motion/motion_settings.dart';
 import 'features/auth/auth_api_client.dart';
@@ -13,14 +14,19 @@ import 'features/notifications/firebase_push_service.dart';
 import 'features/notifications/notification_devices_api_client.dart';
 import 'features/polls/polls_api_client.dart';
 import 'features/realtime/realtime_session.dart';
+import 'features/realtime/realtime_client.dart';
 import 'features/polls/poll_state_store.dart';
 import 'features/polls/poll_state_scope.dart';
+import 'features/account_deletion/account_deletion_receipt_store.dart';
+import 'features/account_deletion/account_deletion_screen.dart';
+import 'features/search/search_history.dart';
 
 class YaskappApp extends StatefulWidget {
   const YaskappApp({
     super.key,
     this.authApiClient,
     this.authSessionStore,
+    this.accountDeletionReceiptStore,
     this.pollsApiClient,
     this.reactionsMotion = false,
     this.entryMotion = false,
@@ -28,6 +34,7 @@ class YaskappApp extends StatefulWidget {
 
   final AuthApiClient? authApiClient;
   final AuthSessionStore? authSessionStore;
+  final AccountDeletionReceiptStore? accountDeletionReceiptStore;
   final PollsApiClient? pollsApiClient;
   final bool reactionsMotion;
   final bool entryMotion;
@@ -39,6 +46,7 @@ class YaskappApp extends StatefulWidget {
 class _YaskappAppState extends State<YaskappApp> {
   late final AuthApiClient _authApiClient;
   late final AuthSessionStore _authSessionStore;
+  late final AccountDeletionReceiptStore _accountDeletionReceiptStore;
   late final NotificationDevicesApiClient _notificationDevicesApiClient;
   late final FirebasePushService _firebasePushService;
   StreamSubscription<String>? _pushTokenSubscription;
@@ -47,7 +55,15 @@ class _YaskappAppState extends State<YaskappApp> {
   AuthSession? _session;
   late final RealtimeSession _realtimeSession;
   late final PollStateStore _pollStateStore;
+  StreamSubscription<AccountDeletedRealtimeEvent>? _accountDeletedSubscription;
   var _isBootstrapping = true;
+  var _deletionOnly = false;
+  var _remoteDeletionCleanupPending = false;
+  var _receiptStorageFailed = false;
+  Future<void>? _accountCleanupFuture;
+  var _completionPending = false;
+  var _navigationEpoch = 0;
+  String? _deletionCleanupError;
 
   @override
   void initState() {
@@ -56,12 +72,18 @@ class _YaskappAppState extends State<YaskappApp> {
     _authApiClient = widget.authApiClient ?? AuthApiClient();
     _authSessionStore =
         widget.authSessionStore ?? const SecureAuthSessionStore();
+    _accountDeletionReceiptStore = widget.accountDeletionReceiptStore ??
+        const SecureAccountDeletionReceiptStore();
     _notificationDevicesApiClient = NotificationDevicesApiClient();
     _firebasePushService = FirebasePushService();
     _pollStateStore = PollStateStore(viewerId: null);
     _realtimeSession = RealtimeSession(
       reconcilePolls: _pollStateStore.reconcileLoadedPolls,
     );
+    _accountDeletedSubscription =
+        _realtimeSession.accountDeletedEvents.listen((_) {
+      unawaited(_handleRemoteAccountDeleted());
+    });
     _initializePushRegistration();
     _bootstrapSession();
   }
@@ -72,6 +94,7 @@ class _YaskappAppState extends State<YaskappApp> {
       _authApiClient.close();
     }
     _pushTokenSubscription?.cancel();
+    _accountDeletedSubscription?.cancel();
     _notificationDevicesApiClient.close();
     unawaited(_realtimeSession.close());
     _pollStateStore.dispose();
@@ -80,6 +103,29 @@ class _YaskappAppState extends State<YaskappApp> {
   }
 
   Future<void> _bootstrapSession() async {
+    try {
+      final receipt = await _accountDeletionReceiptStore
+          .read()
+          .timeout(const Duration(seconds: 5));
+      if (receipt != null) {
+        if (mounted) {
+          setState(() {
+            _deletionOnly = true;
+            _isBootstrapping = false;
+          });
+        }
+        return;
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _receiptStorageFailed = true;
+          _isBootstrapping = false;
+        });
+      }
+      return;
+    }
+
     try {
       final accessToken = await _authSessionStore
           .readAccessToken()
@@ -129,6 +175,7 @@ class _YaskappAppState extends State<YaskappApp> {
 
     setState(() {
       _session = session;
+      _navigationEpoch++;
     });
     unawaited(_realtimeSession.start(session));
     unawaited(_registerPushToken(session.accessToken));
@@ -156,7 +203,117 @@ class _YaskappAppState extends State<YaskappApp> {
 
     setState(() {
       _session = null;
+      _navigationEpoch++;
     });
+  }
+
+  Future<void> _handleDeletionAccepted(AccountDeletionReceipt receipt) async {
+    if (!mounted) return;
+    setState(() {
+      _session = null;
+      _deletionOnly = true;
+      _deletionCleanupError = null;
+      _navigationEpoch++;
+    });
+    await _clearAccountData();
+  }
+
+  Future<void> _handleDeletionCompleted() async {
+    await _clearAccountData();
+    if (!mounted) return;
+    if (_deletionCleanupError != null) {
+      _completionPending = true;
+      return;
+    }
+    _leaveDeletionOnlyMode();
+  }
+
+  Future<void> _retryDeletionCleanup() async {
+    await _clearAccountData();
+    if (mounted &&
+        _remoteDeletionCleanupPending &&
+        _deletionCleanupError == null) {
+      _remoteDeletionCleanupPending = false;
+      _leaveDeletionOnlyMode();
+      return;
+    }
+    if (mounted && _completionPending && _deletionCleanupError == null) {
+      _leaveDeletionOnlyMode();
+    }
+  }
+
+  Future<void> _clearAccountData() async {
+    final activeCleanup = _accountCleanupFuture;
+    if (activeCleanup != null) return activeCleanup;
+    final cleanup = _performAccountDataCleanup();
+    _accountCleanupFuture = cleanup;
+    try {
+      await cleanup;
+    } finally {
+      if (identical(_accountCleanupFuture, cleanup)) {
+        _accountCleanupFuture = null;
+      }
+    }
+  }
+
+  Future<void> _performAccountDataCleanup() async {
+    final failures = <String>[];
+    Future<void> attempt(String label, Future<void> Function() clear) async {
+      try {
+        await clear();
+      } catch (_) {
+        failures.add(label);
+      }
+    }
+
+    // Revoke access in memory and clear the private navigation root before any
+    // asynchronous local cleanup can fail or complete out of order.
+    await attempt('realtime notification state', _realtimeSession.stop);
+    _pollStateStore.clear();
+    await attempt('secure authentication token', _authSessionStore.clear);
+    await attempt(
+      'search history',
+      SecureSearchHistoryStore.clearAll,
+    );
+    await attempt('cached media', () async {
+      await DefaultCacheManager().emptyCache();
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+    });
+    _latestPushToken = null;
+    if (!mounted) return;
+    setState(() {
+      _deletionCleanupError = failures.isEmpty
+          ? null
+          : 'Secure cleanup could not finish: ${failures.join(', ')}. The server deletion remains active.';
+    });
+  }
+
+  void _leaveDeletionOnlyMode() {
+    setState(() {
+      _deletionOnly = false;
+      _receiptStorageFailed = false;
+      _deletionCleanupError = null;
+      _session = null;
+      _completionPending = false;
+      _navigationEpoch++;
+    });
+  }
+
+  Future<void> _handleRemoteAccountDeleted() async {
+    if (mounted) {
+      setState(() {
+        _session = null;
+        _deletionOnly = true;
+        _remoteDeletionCleanupPending = true;
+        _navigationEpoch++;
+      });
+    }
+    await _clearAccountData();
+    if (mounted && _deletionCleanupError == null) {
+      _remoteDeletionCleanupPending = false;
+      _leaveDeletionOnlyMode();
+    }
   }
 
   void _initializePushRegistration() {
@@ -212,6 +369,7 @@ class _YaskappAppState extends State<YaskappApp> {
     const brandColor = Color(0xFF566A9D);
 
     return MaterialApp(
+      key: ValueKey(_navigationEpoch),
       title: 'Yaskapp',
       theme: ThemeData(
         colorScheme: const ColorScheme.light(
@@ -252,24 +410,112 @@ class _YaskappAppState extends State<YaskappApp> {
           child: child ?? const SizedBox.shrink(),
         ),
       ),
-      home: _isBootstrapping
-          ? const _AuthBootstrapScreen()
-          : session == null
-              ? AuthScreen(
-                  authApiClient: _authApiClient,
-                  onAuthenticated: _setSession,
-                )
-              : HomeScreen(
-                  session: session,
-                  authApiClient: _authApiClient,
-                  onLogout: _clearSession,
-                  onUserUpdated: _updateUser,
-                  pollsApiClient: widget.pollsApiClient,
-                  realtimeSession: _realtimeSession,
-                  pollStateStore: _pollStateStore,
-                ),
+      home: _receiptStorageFailed
+          ? _ReceiptRecoveryError(onRetry: () {
+              setState(() {
+                _receiptStorageFailed = false;
+                _isBootstrapping = true;
+              });
+              unawaited(_bootstrapSession());
+            })
+          : _isBootstrapping
+              ? const _AuthBootstrapScreen()
+              : _deletionOnly
+                  ? _remoteDeletionCleanupPending
+                      ? _RemoteDeletionLockScreen(
+                          error: _deletionCleanupError,
+                          onRetry: _retryDeletionCleanup,
+                        )
+                      : AccountDeletionScreen(
+                          receiptStore: _accountDeletionReceiptStore,
+                          onAccepted: _handleDeletionAccepted,
+                          onCompleted: () =>
+                              unawaited(_handleDeletionCompleted()),
+                          localCleanupError: _deletionCleanupError,
+                          onRetryLocalCleanup: _retryDeletionCleanup,
+                        )
+                  : session == null
+                      ? AuthScreen(
+                          authApiClient: _authApiClient,
+                          onAuthenticated: _setSession,
+                          onAccountDeletionAccepted: _handleDeletionAccepted,
+                          onAccountDeletionCompleted: () =>
+                              unawaited(_handleDeletionCompleted()),
+                        )
+                      : HomeScreen(
+                          session: session,
+                          authApiClient: _authApiClient,
+                          onLogout: _clearSession,
+                          onUserUpdated: _updateUser,
+                          pollsApiClient: widget.pollsApiClient,
+                          realtimeSession: _realtimeSession,
+                          pollStateStore: _pollStateStore,
+                          onAccountDeletionAccepted: _handleDeletionAccepted,
+                          onAccountDeletionCompleted: () =>
+                              unawaited(_handleDeletionCompleted()),
+                        ),
     );
   }
+}
+
+class _ReceiptRecoveryError extends StatelessWidget {
+  const _ReceiptRecoveryError({required this.onRetry});
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Secure deletion status is unavailable. Your account data stays locked until recovery is checked.',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                FilledButton(onPressed: onRetry, child: const Text('Retry')),
+              ],
+            ),
+          ),
+        ),
+      );
+}
+
+class _RemoteDeletionLockScreen extends StatelessWidget {
+  const _RemoteDeletionLockScreen({
+    required this.error,
+    required this.onRetry,
+  });
+
+  final String? error;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'This account was closed on another device. Secure local cleanup must finish before sign in.',
+                  textAlign: TextAlign.center,
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(error!, textAlign: TextAlign.center),
+                ],
+                const SizedBox(height: 16),
+                FilledButton(
+                    onPressed: onRetry, child: const Text('Retry cleanup')),
+              ],
+            ),
+          ),
+        ),
+      );
 }
 
 class _AuthBootstrapScreen extends StatelessWidget {

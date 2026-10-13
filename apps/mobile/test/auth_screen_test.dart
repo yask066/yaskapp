@@ -8,8 +8,34 @@ import 'package:yaskapp_mobile/src/core/config/api_config.dart';
 import 'package:yaskapp_mobile/src/features/auth/auth_api_client.dart';
 import 'package:yaskapp_mobile/src/features/auth/country_selector.dart';
 import 'package:yaskapp_mobile/src/features/auth/auth_screen.dart';
+import 'package:yaskapp_mobile/src/features/account_deletion/account_deletion_screen.dart';
 
 void main() {
+  testWidgets(
+      'login screen exposes deletion-only access without authenticating',
+      (tester) async {
+    var authenticated = false;
+    await tester.pumpWidget(MaterialApp(
+      home: AuthScreen(
+        authApiClient: AuthApiClient(
+          config: const ApiConfig(baseUrl: 'http://api.test'),
+          httpClient: MockClient((_) async => http.Response('{}', 500)),
+        ),
+        onAuthenticated: (_) => authenticated = true,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Delete account'));
+    await tester.tap(find.text('Delete account'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(AccountDeletionScreen), findsOneWidget);
+    expect(find.text('Email or username'), findsWidgets);
+    expect(authenticated, isFalse);
+  });
+
   testWidgets('does not select a country by default', (tester) async {
     tester.view.physicalSize = const Size(412, 915);
     tester.view.devicePixelRatio = 1;

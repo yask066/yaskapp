@@ -57,9 +57,14 @@ class RealtimeSession with WidgetsBindingObserver {
   String? _currentUserId;
   final _notificationsController =
       StreamController<NotificationItemEvent>.broadcast();
+  final _accountDeletedController =
+      StreamController<AccountDeletedRealtimeEvent>.broadcast();
+  StreamSubscription<AccountDeletedRealtimeEvent>? _accountDeletedSubscription;
 
   Stream<NotificationItemEvent> get notificationEvents =>
       _notificationsController.stream;
+  Stream<AccountDeletedRealtimeEvent> get accountDeletedEvents =>
+      _accountDeletedController.stream;
   RealtimeClient get realtimeClient => _requireClient();
   NotificationStore get notificationStore => _requireStore();
   String? get currentUserId => _currentUserId;
@@ -96,6 +101,11 @@ class RealtimeSession with WidgetsBindingObserver {
         ),
       );
     });
+    _accountDeletedSubscription = _client!.accountDeleted.listen((event) {
+      if (epoch == _epoch && !_accountDeletedController.isClosed) {
+        _accountDeletedController.add(event);
+      }
+    });
     _notificationReadSubscription = _client!.notificationReads.listen((event) {
       if (epoch != _epoch) return;
       _store?.applyRemoteRead(
@@ -124,10 +134,12 @@ class RealtimeSession with WidgetsBindingObserver {
     _reconcileFuture = null;
     await _connectionSubscription?.cancel();
     await _notificationSubscription?.cancel();
+    await _accountDeletedSubscription?.cancel();
     await _notificationReadSubscription?.cancel();
     await _notificationsReadAllSubscription?.cancel();
     _connectionSubscription = null;
     _notificationSubscription = null;
+    _accountDeletedSubscription = null;
     _notificationReadSubscription = null;
     _notificationsReadAllSubscription = null;
     final client = _client;
@@ -141,6 +153,7 @@ class RealtimeSession with WidgetsBindingObserver {
   Future<void> close() async {
     await stop();
     await _notificationsController.close();
+    await _accountDeletedController.close();
   }
 
   void onLifecycleStateChanged(AppLifecycleState state) {

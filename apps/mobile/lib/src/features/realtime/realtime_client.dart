@@ -26,6 +26,36 @@ class UserModerationRealtimeEvent {
   final String userId;
 }
 
+class AccountDeletedRealtimeEvent {
+  const AccountDeletedRealtimeEvent({
+    required this.userId,
+    required this.operationId,
+  });
+
+  final String userId;
+  final String operationId;
+}
+
+AccountDeletedRealtimeEvent? decodeAccountDeletedRealtimeEvent(
+    Object? envelope) {
+  if (envelope is! Map<String, dynamic> ||
+      envelope['type'] != 'account.deleted') {
+    return null;
+  }
+  final version = envelope['version'];
+  final payload = envelope['payload'];
+  if (version != null && version != 1 ||
+      payload is! Map<String, dynamic> ||
+      payload['userId'] is! String ||
+      payload['operationId'] is! String) {
+    return null;
+  }
+  return AccountDeletedRealtimeEvent(
+    userId: payload['userId'] as String,
+    operationId: payload['operationId'] as String,
+  );
+}
+
 class CommentDeletedRealtimeEvent {
   const CommentDeletedRealtimeEvent(
       {required this.commentId, required this.pollId});
@@ -143,6 +173,8 @@ class RealtimeClient {
       StreamController<NotificationsReadAllRealtimeEvent>.broadcast();
   final _connectionController =
       StreamController<RealtimeConnectionEvent>.broadcast();
+  final _accountDeletedController =
+      StreamController<AccountDeletedRealtimeEvent>.broadcast();
 
   Stream<PollVoteRealtimeEvent> get pollVotes => _pollVoteController.stream;
   Stream<PollDeletedRealtimeEvent> get pollDeletions =>
@@ -161,6 +193,8 @@ class RealtimeClient {
       _notificationsReadAllController.stream;
   Stream<RealtimeConnectionEvent> get connectionEvents =>
       _connectionController.stream;
+  Stream<AccountDeletedRealtimeEvent> get accountDeleted =>
+      _accountDeletedController.stream;
 
   void connect() {
     if (_channel != null) {
@@ -217,6 +251,7 @@ class RealtimeClient {
     await _notificationReadController.close();
     await _notificationsReadAllController.close();
     await _connectionController.close();
+    await _accountDeletedController.close();
   }
 
   void emitConnectionEvent(RealtimeConnectionEvent event) {
@@ -231,8 +266,7 @@ class RealtimeClient {
     }
   }
 
-  void emitNotificationsReadAllEvent(
-      NotificationsReadAllRealtimeEvent event) {
+  void emitNotificationsReadAllEvent(NotificationsReadAllRealtimeEvent event) {
     if (!_notificationsReadAllController.isClosed) {
       _notificationsReadAllController.add(event);
     }
@@ -280,6 +314,12 @@ class RealtimeClient {
       if (decoded['version'] == 1) {
         _lastPong = DateTime.now().toUtc();
       }
+      return;
+    }
+
+    final accountDeleted = decodeAccountDeletedRealtimeEvent(decoded);
+    if (accountDeleted != null) {
+      _accountDeletedController.add(accountDeleted);
       return;
     }
 

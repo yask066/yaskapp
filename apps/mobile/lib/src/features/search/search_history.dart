@@ -20,6 +20,7 @@ class SecureSearchHistoryStore extends SearchHistoryStore {
         _historyKey = 'search.recentQueries.$userId';
 
   static const _maxEntries = 5;
+  static const _historyPrefix = 'search.recentQueries.';
 
   final FlutterSecureStorage _storage;
   final String _historyKey;
@@ -55,6 +56,16 @@ class SecureSearchHistoryStore extends SearchHistoryStore {
 
   @override
   Future<void> clear() => _storage.delete(key: _historyKey);
+
+  static Future<void> clearAll({
+    FlutterSecureStorage storage = const FlutterSecureStorage(),
+  }) async {
+    final values = await storage.readAll();
+    for (final key
+        in values.keys.where((key) => key.startsWith(_historyPrefix))) {
+      await storage.delete(key: key);
+    }
+  }
 }
 
 class MemorySearchHistoryStore extends SearchHistoryStore {

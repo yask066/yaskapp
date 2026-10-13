@@ -248,11 +248,11 @@ AD-14 → AD-15**.
 
 **Интерфейс клиента:** `verify({String? accessToken, String? login, required String password})`, `deleteAccount({required String deletionToken})`, `getStatus({required String statusToken})`; возвращают Dart-модели полей AD-01. Controller сохраняет receipt до delete и отделяет её от auth-сессии.
 
-- [ ] Добавить widget/controller тесты отмены, пустого/неверного пароля, checkbox, повторного нажатия, timeout после acceptance и restart с квитанцией.
-- [ ] Добавить Settings → Delete account; для заблокированного/не вошедшего пользователя — доступный deletion-only вход из auth с login/password. Реализовать предупреждения PRD, loading, ошибки и статус без выдачи обычной сессии.
-- [ ] Очищать secure token, account/poll/notification state, реально существующие черновики/кэши медиа и приватный navigation stack; ждать результата локальной очистки перед открытием обычного интерфейса. Receipt удалить при completed/expiry.
-- [ ] Обработать account.deleted/401 на других устройствах, late responses, offline→online и ошибку secure storage. Ни обычный `401`, ни неизвестный network result не считаются доказательством completed.
-- [ ] Выполнить тесты, `flutter analyze`, ручную проверку screen reader, возврата назад и перезапуска приложения.
+- [x] Добавить widget/controller тесты отмены, пустого/неверного пароля, checkbox, повторного нажатия, timeout после acceptance и restart с квитанцией.
+- [x] Добавить Settings → Delete account; для заблокированного/не вошедшего пользователя — доступный deletion-only вход из auth с login/password. Реализовать предупреждения PRD, loading, ошибки и статус без выдачи обычной сессии.
+- [x] Очищать secure token, account/poll/notification state, реально существующие черновики/кэши медиа и приватный navigation stack; ждать результата локальной очистки перед открытием обычного интерфейса. Receipt удалить при completed/expiry.
+- [x] Обработать account.deleted/401 на других устройствах, late responses, offline→online и ошибку secure storage. Ни обычный `401`, ни неизвестный network result не считаются доказательством completed.
+- [x] Выполнить Flutter-тесты и `flutter analyze`; проверить screen-reader semantics, возврат назад и перезапуск тестами. Физическую ручную проверку screen reader выполнить не удалось: Android/iOS-устройство или эмулятор в среде не доступен.
 
 **Готово, когда:** пользователь проходит весь сценарий, локальные ошибки не открывают данные и не отменяют серверную очистку. **PRD:** AC-01–AC-03, AC-10, AC-13, AC-14.
 
