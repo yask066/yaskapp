@@ -19,6 +19,10 @@ export default defineConfig(({ mode }) => {
         '/profiles': apiProxy,
         '/search': apiProxy,
         '/media': apiProxy,
+        '/notifications': apiProxy,
+        '/notification-preferences': apiProxy,
+        '/notification-devices': apiProxy,
+        '/realtime': { ...apiProxy, ws: true },
       },
     },
     test: {
