@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ApiError } from '../../api/client';
 import { deleteAccount, getAccountDeletionStatus, verifyAccountDeletion } from '../../api/account-deletion';
 import type { AccountDeletionStatusResponse, AccountDeletionVerificationResponse } from '@yaskapp/shared';
@@ -26,7 +26,11 @@ export function AccountDeletionPage() {
   const completeAccountDeletion = session?.completeAccountDeletion;
   const setAccountDeletionPending = session?.setAccountDeletionPending;
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [receipt, setReceipt] = useState<AccountDeletionReceipt | null>(() => loadAccountDeletionReceipt());
+  const [receiptExpired, setReceiptExpired] = useState(Boolean(session?.accountDeletionReceiptExpired));
+  const [lockedReceiptToken, setLockedReceiptToken] = useState<string | null>(null);
+  const receiptLockReady = !receipt || lockedReceiptToken === receipt.statusToken;
   const [statusResult, setStatusResult] = useState<AccountDeletionStatusResponse | null>(null);
   const [checking, setChecking] = useState(Boolean(receipt));
   const [verification, setVerification] = useState<Verification | null>(null);
@@ -35,14 +39,55 @@ export function AccountDeletionPage() {
   const [understood, setUnderstood] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cleanupFailed, setCleanupFailed] = useState(false);
+  const [cleanupFailed, setCleanupFailed] = useState(searchParams.get('cleanup') === 'failed');
+  const acceptedWithoutReceipt = !receipt && searchParams.get('status') === 'accepted';
+  const cleanupApplied = useRef(false);
   const inFlight = useRef(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   useLayoutEffect(() => { headingRef.current?.focus(); }, [receipt, verification]);
 
   useEffect(() => {
-    if (!receipt) return undefined;
+    if (!receipt || lockedReceiptToken === receipt.statusToken) return undefined;
+    let alive = true;
+    void Promise.resolve(setAccountDeletionPending?.(true)).then(() => {
+      if (alive) setLockedReceiptToken(receipt.statusToken);
+    }).catch(() => {
+      if (alive) {
+        setCleanupFailed(true);
+        setError('Could not clear private data from this browser. Retry browser cleanup before checking the deletion result.');
+      }
+    });
+    return () => { alive = false; };
+  }, [lockedReceiptToken, receipt, setAccountDeletionPending]);
+
+  useEffect(() => {
+    if (!session?.accountDeletionReceiptExpired || receipt) return;
+    let alive = true;
+    setReceiptExpired(true);
+    void (async () => {
+      try {
+        await completeAccountDeletion?.();
+        await setAccountDeletionPending?.(false);
+        if (alive) setError('The status receipt expired. This browser has been cleared, but the server deletion result could not be confirmed here.');
+      } catch {
+        if (alive) {
+          setCleanupFailed(true);
+          setError('The status receipt expired and private browser cleanup could not finish. Retry cleanup before continuing.');
+        }
+      }
+    })();
+    return () => { alive = false; };
+  }, [completeAccountDeletion, receipt, session?.accountDeletionReceiptExpired, setAccountDeletionPending]);
+
+  useEffect(() => {
+    if (!acceptedWithoutReceipt) return;
+    if (cleanupFailed) return;
+    void setAccountDeletionPending?.(false);
+  }, [acceptedWithoutReceipt, cleanupFailed, setAccountDeletionPending]);
+
+  useEffect(() => {
+    if (!receipt || !receiptLockReady) return undefined;
     let alive = true;
     let delay = 2_000;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -61,6 +106,7 @@ export function AccountDeletionPage() {
           }
           try {
             await completeAccountDeletion?.();
+            cleanupApplied.current = true;
             await setAccountDeletionPending?.(false);
           } catch {
             setCleanupFailed(true);
@@ -72,19 +118,50 @@ export function AccountDeletionPage() {
           setReceipt(null);
           return;
         }
+        if (next.status === 'not_started' && inFlight.current) {
+          timer = setTimeout(() => { void check(); }, delay);
+          delay = Math.min(30_000, delay * 2);
+          return;
+        }
         if (next.status === 'not_started') {
           await setAccountDeletionPending?.(false);
           setError('The deletion request was not accepted. Verify your password again to restart.');
           setChecking(false);
           return;
         }
+        if (!cleanupApplied.current) {
+          try {
+            await completeAccountDeletion?.();
+            cleanupApplied.current = true;
+            announceAccountDeletion();
+          } catch {
+            setCleanupFailed(true);
+            setError('Could not clear private data from this browser. Your account is closed; retry browser cleanup before continuing.');
+            setChecking(false);
+            return;
+          }
+        }
         timer = setTimeout(() => { void check(); }, delay);
         delay = Math.min(30_000, delay * 2);
+        return;
       } catch (reason) {
         if (!alive) return;
-        setError(reason instanceof ApiError && reason.status === 401
-          ? 'This status receipt has expired. The deletion request may still be processing.'
-          : 'We could not check the result yet. Your receipt is saved and you can try again.');
+        if (reason instanceof ApiError && reason.status === 401) {
+          clearAccountDeletionReceipt();
+          setReceipt(null);
+          setReceiptExpired(true);
+          try {
+            await completeAccountDeletion?.();
+            cleanupApplied.current = true;
+            await setAccountDeletionPending?.(false);
+            setError('The status receipt expired. This browser has been cleared, but the server deletion result could not be confirmed here.');
+          } catch {
+            setCleanupFailed(true);
+            setError('The status receipt expired and private browser cleanup could not finish. Retry cleanup before continuing.');
+          }
+          return;
+        }
+        setError('We could not check the result yet. Your receipt is saved and you can try again.');
         timer = setTimeout(() => { void check(); }, delay);
         delay = Math.min(30_000, delay * 2);
       } finally {
@@ -93,7 +170,7 @@ export function AccountDeletionPage() {
     };
     void check();
     return () => { alive = false; if (timer) clearTimeout(timer); };
-  }, [cleanupFailed, completeAccountDeletion, pending, receipt, setAccountDeletionPending]);
+  }, [cleanupFailed, completeAccountDeletion, pending, receipt, receiptLockReady, setAccountDeletionPending]);
 
   async function verify(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -123,6 +200,7 @@ export function AccountDeletionPage() {
     setChecking(false);
     try {
       await completeAccountDeletion?.();
+      cleanupApplied.current = true;
       announceAccountDeletion();
       setCleanupFailed(false);
       await Promise.resolve(navigate('/account-deletion?status=accepted', { replace: true }));
@@ -176,9 +254,17 @@ export function AccountDeletionPage() {
     setError(null);
     try {
       await completeAccountDeletion?.();
+      cleanupApplied.current = true;
       announceAccountDeletion();
       setCleanupFailed(false);
-      await Promise.resolve(navigate('/account-deletion?status=accepted', { replace: true }));
+      if (receipt && statusResult?.status === 'completed') {
+        clearAccountDeletionReceipt();
+        setReceipt(null);
+        await setAccountDeletionPending?.(false);
+      } else if (!receipt) {
+        await setAccountDeletionPending?.(false);
+      }
+      if (acceptedWithoutReceipt) await Promise.resolve(navigate('/account-deletion?status=accepted', { replace: true }));
     } catch {
       setError('Could not clear private data from this browser. Try again after closing other tabs.');
     } finally {
@@ -190,7 +276,14 @@ export function AccountDeletionPage() {
     clearAccountDeletionReceipt();
     void setAccountDeletionPending?.(false);
     setReceipt(null);
+    setReceiptExpired(false);
     setStatusResult(null);
+    setVerification(null);
+    setUnderstood(false);
+    setLogin('');
+    setPassword('');
+    setPending(false);
+    setCleanupFailed(false);
     setError(null);
   }
 
@@ -198,14 +291,23 @@ export function AccountDeletionPage() {
     return <main id="main-content"><p role="status">Loading your session…</p></main>;
   }
 
+  if (cleanupFailed) {
+    return <main id="main-content" className="profile-page"><h1 ref={headingRef} tabIndex={-1}>Account deletion</h1><p role="status">{receiptExpired ? 'The status receipt expired.' : statusText(statusResult?.status ?? 'pending')}</p>{error ? <p role="alert">{error}</p> : null}<button className="button button--primary" disabled={pending} onClick={() => void retryCleanup()}>{pending ? 'Securing browser…' : 'Retry browser cleanup'}</button></main>;
+  }
+
   if (receipt) {
-    if (cleanupFailed) {
-      return <main id="main-content" className="profile-page"><h1 ref={headingRef} tabIndex={-1}>Account deletion</h1><p role="status">{statusText(statusResult?.status ?? 'pending')}</p>{error ? <p role="alert">{error}</p> : null}<button className="button button--primary" disabled={pending} onClick={() => void retryCleanup()}>{pending ? 'Securing browser…' : 'Retry browser cleanup'}</button></main>;
-    }
     if (statusResult?.status === 'not_started') {
       return <main id="main-content" className="profile-page"><h1 ref={headingRef} tabIndex={-1}>Account deletion</h1><p role="alert">{error}</p><button className="button" onClick={restartVerification}>Verify again</button></main>;
     }
     return <main id="main-content" className="profile-page"><h1 ref={headingRef} tabIndex={-1}>Account deletion</h1><p role="status" aria-live="polite">{checking ? 'Checking the result of your request…' : statusResult ? statusText(statusResult.status) : 'Checking whether the server accepted your request. Your receipt is saved.'}</p>{error && !checking ? <p role="alert">{error}</p> : null}{statusResult?.status === 'completed' ? <p>{statusText('completed')}</p> : null}</main>;
+  }
+
+  if (acceptedWithoutReceipt) {
+    return <main id="main-content" className="profile-page"><h1 ref={headingRef} tabIndex={-1}>Account deletion</h1><p role="status">Your account access was closed on another device. This browser has no status receipt, so it cannot show the deletion progress.</p></main>;
+  }
+
+  if (receiptExpired) {
+    return <main id="main-content" className="profile-page"><h1 ref={headingRef} tabIndex={-1}>Account deletion</h1><p role="status">The status receipt expired. This browser has been cleared, but the server deletion result could not be confirmed here.</p>{error ? <p role="alert">{error}</p> : null}<button className="button" onClick={restartVerification}>Verify again</button></main>;
   }
 
   if (statusResult?.status === 'completed') {

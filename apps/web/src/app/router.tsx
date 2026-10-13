@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { AppLayout } from '../components/AppLayout';
 import { AuthPage } from '../features/auth/AuthPage';
 import { FeedPage } from '../features/feed/FeedPage';
@@ -13,8 +14,18 @@ import { useSession } from './session-provider';
 import { ScrollRestorationCoordinator } from '../core/scroll/ScrollRestorationCoordinator';
 import { AccountDeletionPage } from '../features/account-deletion/AccountDeletionPage';
 
-function AppRouteRoot() {
-  return <><ScrollRestorationCoordinator /><AppLayout /></>;
+export function AccountDeletionBoundary({ children }: { children: ReactNode }) {
+  const { accountDeletionPending } = useSession();
+  const location = useLocation();
+  if (accountDeletionPending) {
+    if (location.pathname !== '/account-deletion') return <Navigate to="/account-deletion" replace />;
+    return <AccountDeletionPage />;
+  }
+  return children;
+}
+
+export function AppRouteRoot() {
+  return <AccountDeletionBoundary><><ScrollRestorationCoordinator /><AppLayout /></></AccountDeletionBoundary>;
 }
 
 function LoadingMain() {

@@ -30,6 +30,7 @@ function SessionProbe() {
   return <>
     <output>{session.status === 'authenticated' && session.user ? session.user.username : session.status}</output>
     <output data-testid="deletion-pending">{String(session.accountDeletionPending)}</output>
+    <output data-testid="receipt-expired">{String(session.accountDeletionReceiptExpired)}</output>
     <button type="button" onClick={() => session.signOut()}>Sign out</button>
     <button type="button" onClick={() => { void session.completeAccountDeletion(); }}>Complete deletion</button>
     <button type="button" onClick={() => { void session.setAccountDeletionPending(true); }}>Lock for deletion</button>
@@ -54,7 +55,9 @@ function renderSession() {
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   server.resetHandlers();
+  localStorage.clear();
   sessionStorage.clear();
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 afterAll(() => server.close());
@@ -174,17 +177,34 @@ describe('SessionProvider', () => {
     await act(async () => { screen.getByRole('button', { name: 'Lock for deletion' }).click(); });
 
     expect(screen.getByTestId('deletion-pending')).toHaveTextContent('true');
+    expect(screen.getByText('anonymous')).toBeInTheDocument();
     expect(queryClient.getQueryData(['profile', 'private'])).toBeUndefined();
   });
 
   it('restores the private-route lock from a saved receipt after reload', async () => {
-    saveAccountDeletionReceipt({ operationId: 'operation-1', statusToken: 'status-secret', expiresAt: '2026-10-15T20:00:00.000Z' });
-    server.use(http.get('/auth/me', () => HttpResponse.json({ user })));
+    saveAccountDeletionReceipt({ operationId: 'operation-1', statusToken: 'status-secret', expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() });
+    const restoreRequest = vi.fn(() => HttpResponse.json({ user }));
+    server.use(http.get('/auth/me', restoreRequest));
 
     renderSession();
 
-    await screen.findByText('member');
+    expect(await screen.findByText('anonymous')).toBeInTheDocument();
     expect(screen.getByTestId('deletion-pending')).toHaveTextContent('true');
+    expect(restoreRequest).not.toHaveBeenCalled();
+  });
+
+  it('restores an expired receipt as a locked cleanup state without restoring the old session', async () => {
+    vi.setSystemTime(new Date('2026-10-16T10:00:00.000Z'));
+    saveAccountDeletionReceipt({ operationId: 'operation-1', statusToken: 'expired-secret', expiresAt: '2026-10-15T10:00:00.000Z' });
+    const restoreRequest = vi.fn(() => HttpResponse.json({ user }));
+    server.use(http.get('/auth/me', restoreRequest));
+
+    renderSession();
+
+    expect(await screen.findByText('anonymous')).toBeInTheDocument();
+    expect(screen.getByTestId('deletion-pending')).toHaveTextContent('true');
+    expect(screen.getByTestId('receipt-expired')).toHaveTextContent('true');
+    expect(restoreRequest).not.toHaveBeenCalled();
   });
 
   it('does not restore an account query that resolves after deletion cleanup', async () => {

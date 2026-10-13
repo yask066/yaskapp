@@ -1,13 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { expect, test, vi } from 'vitest';
-import { ProtectedRoute, PublicOnlyRoute, router } from './router';
+import { AccountDeletionBoundary, ProtectedRoute, PublicOnlyRoute, router } from './router';
 
 let sessionStatus: 'loading' | 'anonymous' = 'loading';
 let accountDeletionPending = false;
 vi.mock('./session-provider', () => ({
   useSession: () => ({ status: sessionStatus, accountDeletionPending }),
 }));
+vi.mock('../features/account-deletion/AccountDeletionPage', () => ({ AccountDeletionPage: () => <main><h1>Deletion recovery</h1></main> }));
 
 test('keeps a main landmark available while public-route session restoration is loading', () => {
   render(<MemoryRouter><PublicOnlyRoute /></MemoryRouter>);
@@ -53,4 +54,19 @@ test('redirects private routes to the receipt while deletion acceptance is being
 test('registers account deletion outside the protected and public-only route groups', () => {
   const root = router.routes.find((route) => route.path === '/');
   expect(root?.children?.some((route) => route.path === 'account-deletion')).toBe(true);
+});
+
+test('blocks unprotected app routes and hides the authenticated shell during unresolved deletion', () => {
+  sessionStatus = 'authenticated' as typeof sessionStatus;
+  accountDeletionPending = true;
+  render(<MemoryRouter initialEntries={['/polls/poll-1']}><Routes>
+    <Route path="/account-deletion" element={<main><h1>Deletion recovery</h1></main>} />
+    <Route path="*" element={<AccountDeletionBoundary><p>Private poll data</p></AccountDeletionBoundary>} />
+  </Routes></MemoryRouter>);
+
+  expect(screen.getByRole('heading', { name: 'Deletion recovery' })).toBeInTheDocument();
+  expect(screen.queryByText('Private poll data')).not.toBeInTheDocument();
+  expect(screen.queryByRole('navigation', { name: 'Primary navigation' })).not.toBeInTheDocument();
+  accountDeletionPending = false;
+  sessionStatus = 'loading';
 });

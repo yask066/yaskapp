@@ -270,7 +270,7 @@ AD-14 → AD-15**.
 
 **Готово, когда:** web поддерживает тот же сценарий и не возвращает приватные данные из кэша/истории. **PRD:** AC-01–AC-03, AC-10, AC-13, AC-14.
 
-**Результат AD-13:** добавлены отдельный deletion transport, открытый маршрут сценария, сохранение status receipt в `localStorage` с 48-часовым expiry, блокировка приватных экранов и запросов при неопределённом результате, очистка auth/query/browser state, межвкладочное уведомление и обработка серверного `account.deleted`. Полный web-набор: 275/275; `typecheck`, `lint` и production build web прошли. Клавиатура, focus, screen-reader semantics, reload, browser back, double submit, поздний query response и ошибки cleanup покрыты автоматизированными тестами; ручная проверка screen reader не выполнялась.
+**Результат AD-13:** добавлены отдельный deletion transport, открытый маршрут сценария, сохранение status receipt в `localStorage` с 48-часовым expiry, блокировка всей приватной оболочки и запросов при неопределённом результате, очистка auth/query/browser state, межвкладочное уведомление и обработка серверного `account.deleted`. Receipt-восстановление очищает локальное состояние на каждом подтверждённом acceptance; истёкший status token завершает polling без заявления о серверном результате. Полный web-набор: 283/283; `typecheck`, `lint` и production build web прошли. Клавиатура, focus, screen-reader semantics, reload, browser back, double submit, late query response, race `not_started`/DELETE, receiptless cross-device event и ошибки cleanup покрыты автоматизированными тестами; ручная проверка screen reader не выполнялась.
 
 ## AD-14. Worker в инфраструктуре, retention и restore
 

@@ -11,31 +11,33 @@ import { ProtectedRoute } from '../../app/router';
 
 const completeAccountDeletion = vi.fn();
 const setAccountDeletionPending = vi.fn(async () => undefined);
+let sessionReceiptExpired = false;
 vi.mock('../../api/account-deletion', () => ({
   deleteAccount: vi.fn(),
   getAccountDeletionStatus: vi.fn(),
   verifyAccountDeletion: vi.fn(),
 }));
 vi.mock('../../app/session-provider', () => ({
-  useOptionalSession: () => ({ status: 'anonymous', user: null, completeAccountDeletion, setAccountDeletionPending }),
+  useOptionalSession: () => ({ status: 'anonymous', user: null, accountDeletionReceiptExpired: sessionReceiptExpired, completeAccountDeletion, setAccountDeletionPending }),
   useSession: () => ({ status: 'anonymous' }),
 }));
 
 const verification = {
   operationId: 'operation-1', status: 'not_started' as const,
   deletionToken: 'deletion-secret', statusToken: 'status-secret',
-  deletionTokenExpiresAt: '2026-10-13T21:00:00.000Z', statusTokenExpiresAt: '2026-10-15T20:00:00.000Z',
+  deletionTokenExpiresAt: '2026-10-13T21:00:00.000Z', statusTokenExpiresAt: receiptExpiry(),
 };
 const pendingStatus = {
   operationId: 'operation-1', status: 'pending' as const,
   acceptedAt: '2026-10-13T20:00:00.000Z', deadlineAt: '2026-10-14T20:00:00.000Z', completedAt: null,
 };
+function receiptExpiry() { return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); }
 
-function mountPage() {
+function mountPage(path = '/account-deletion') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={['/account-deletion']}>
+      <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/account-deletion" element={<AccountDeletionPage />} />
           <Route path="/private" element={<h1>Private profile</h1>} />
@@ -52,6 +54,7 @@ beforeEach(() => {
   vi.mocked(getAccountDeletionStatus).mockReset().mockResolvedValue(pendingStatus);
   completeAccountDeletion.mockReset().mockResolvedValue(undefined);
   setAccountDeletionPending.mockReset().mockResolvedValue(undefined);
+  sessionReceiptExpired = false;
 });
 afterEach(() => { localStorage.clear(); sessionStorage.clear(); });
 
@@ -96,6 +99,7 @@ test('saves the status receipt before requesting account deletion', async () => 
 
   expect(deleteAccount).toHaveBeenCalledWith('deletion-secret');
   expect(setAccountDeletionPending).toHaveBeenCalledWith(true);
+  expect(setAccountDeletionPending).not.toHaveBeenCalledWith(false);
   expect(completeAccountDeletion).toHaveBeenCalledTimes(1);
   expect(await screen.findByText(/Your account is closed/i)).toBeInTheDocument();
 });
@@ -117,7 +121,7 @@ test('does not accept deletion twice while the first request is pending', async 
 });
 
 test('reload checks the receipt after a lost acceptance response', async () => {
-  saveAccountDeletionReceipt({ operationId: 'operation-1', statusToken: 'status-secret', expiresAt: '2026-10-15T20:00:00.000Z' });
+  saveAccountDeletionReceipt({ operationId: 'operation-1', statusToken: 'status-secret', expiresAt: receiptExpiry() });
   vi.mocked(getAccountDeletionStatus).mockResolvedValue(pendingStatus);
 
   mountPage();
@@ -125,21 +129,100 @@ test('reload checks the receipt after a lost acceptance response', async () => {
   expect(await screen.findByText(/Your account is closed/i)).toBeInTheDocument();
   expect(getAccountDeletionStatus).toHaveBeenCalledWith('status-secret');
   expect(verifyAccountDeletion).not.toHaveBeenCalled();
+  expect(completeAccountDeletion).toHaveBeenCalled();
 });
 
-test('keeps an expired status receipt and does not interpret 401 as completion', async () => {
-  saveAccountDeletionReceipt({ operationId: 'operation-1', statusToken: 'expired-secret', expiresAt: '2026-10-15T20:00:00.000Z' });
+test('does not release the privacy lock for not_started while DELETE is still in flight', async () => {
+  let resolveDelete!: (value: typeof pendingStatus) => void;
+  vi.mocked(deleteAccount).mockReturnValueOnce(new Promise((done) => { resolveDelete = done; }));
+  vi.mocked(getAccountDeletionStatus).mockResolvedValueOnce({ ...pendingStatus, status: 'not_started' });
+  const user = userEvent.setup();
+  mountPage();
+  await user.type(screen.getByLabelText('Login'), 'member@example.com');
+  await user.type(screen.getByLabelText('Password'), 'correct');
+  await user.click(screen.getByRole('button', { name: 'Verify password' }));
+  await user.click(await screen.findByLabelText('I understand that this action cannot be undone'));
+  await user.click(screen.getByRole('button', { name: 'Delete my account' }));
+  await waitFor(() => expect(getAccountDeletionStatus).toHaveBeenCalled());
+
+  expect(setAccountDeletionPending).not.toHaveBeenCalledWith(false);
+  await act(async () => { resolveDelete(pendingStatus); });
+});
+
+test('Verify again clears the old confirmation and obtains a fresh deletion token', async () => {
+  vi.mocked(deleteAccount).mockRejectedValueOnce(new ApiError(401, 'unauthorized', 'The deletion token expired.'));
+  vi.mocked(getAccountDeletionStatus).mockResolvedValue({ ...pendingStatus, status: 'not_started' });
+  const user = userEvent.setup();
+  mountPage();
+  await user.type(screen.getByLabelText('Login'), 'member@example.com');
+  await user.type(screen.getByLabelText('Password'), 'first-password');
+  await user.click(screen.getByRole('button', { name: 'Verify password' }));
+  await user.click(await screen.findByLabelText('I understand that this action cannot be undone'));
+  await user.click(screen.getByRole('button', { name: 'Delete my account' }));
+  await user.click(await screen.findByRole('button', { name: 'Verify again' }));
+
+  expect(await screen.findByRole('button', { name: 'Verify password' })).toBeInTheDocument();
+  await user.type(screen.getByLabelText('Login'), 'member@example.com');
+  await user.type(screen.getByLabelText('Password'), 'fresh-password');
+  await user.click(screen.getByRole('button', { name: 'Verify password' }));
+  expect(await screen.findByLabelText('I understand that this action cannot be undone')).toBeInTheDocument();
+  expect(verifyAccountDeletion).toHaveBeenCalledTimes(2);
+  expect(verifyAccountDeletion).toHaveBeenLastCalledWith({ login: 'member@example.com', password: 'fresh-password' });
+});
+
+test('shows receiptless acceptance from another device and releases the local navigation lock', async () => {
+  mountPage('/account-deletion?status=accepted');
+
+  expect(await screen.findByRole('status')).toHaveTextContent(/closed on another device/i);
+  expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
+  await waitFor(() => expect(setAccountDeletionPending).toHaveBeenCalledWith(false));
+});
+
+test('offers browser cleanup retry for receiptless cross-device cleanup failure', async () => {
+  mountPage('/account-deletion?status=accepted&cleanup=failed');
+  expect(await screen.findByRole('button', { name: 'Retry browser cleanup' })).toBeInTheDocument();
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'Retry browser cleanup' }));
+  await waitFor(() => expect(setAccountDeletionPending).toHaveBeenCalledWith(false));
+});
+
+test('stops polling and clears local state when a live receipt expires', async () => {
+  vi.mocked(getAccountDeletionStatus).mockRejectedValueOnce(new ApiError(401, 'unauthorized', 'The status token has expired.'));
+  saveAccountDeletionReceipt({ operationId: 'operation-1', statusToken: 'expired-secret', expiresAt: receiptExpiry() });
+  mountPage();
+
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/receipt expired/i));
+  expect(loadAccountDeletionReceipt()).toBeNull();
+  expect(completeAccountDeletion).toHaveBeenCalled();
+  expect(setAccountDeletionPending).toHaveBeenCalledWith(false);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'Verify again' }));
+  expect(await screen.findByRole('button', { name: 'Verify password' })).toBeInTheDocument();
+});
+
+test('clears local state when an expired receipt is found during reload', async () => {
+  sessionReceiptExpired = true;
+  mountPage();
+
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/server deletion result could not be confirmed/i));
+  expect(completeAccountDeletion).toHaveBeenCalled();
+  expect(setAccountDeletionPending).toHaveBeenCalledWith(false);
+});
+
+test('cleans local state when the server says the status token expired without claiming completion', async () => {
+  saveAccountDeletionReceipt({ operationId: 'operation-1', statusToken: 'expired-secret', expiresAt: receiptExpiry() });
   vi.mocked(getAccountDeletionStatus).mockRejectedValueOnce(new ApiError(401, 'unauthorized', 'The status token has expired.'));
 
   mountPage();
 
-  expect(await screen.findByRole('alert')).toHaveTextContent('The deletion request may still be processing.');
-  expect(loadAccountDeletionReceipt()?.statusToken).toBe('expired-secret');
-  expect(completeAccountDeletion).not.toHaveBeenCalled();
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/server deletion result could not be confirmed/i));
+  expect(loadAccountDeletionReceipt()).toBeNull();
+  expect(completeAccountDeletion).toHaveBeenCalled();
+  expect(setAccountDeletionPending).toHaveBeenCalledWith(false);
 });
 
 test('does not claim an account is closed while receipt status is unknown', async () => {
-  saveAccountDeletionReceipt({ operationId: 'operation-1', statusToken: 'status-secret', expiresAt: '2026-10-15T20:00:00.000Z' });
+  saveAccountDeletionReceipt({ operationId: 'operation-1', statusToken: 'status-secret', expiresAt: receiptExpiry() });
   vi.mocked(getAccountDeletionStatus).mockRejectedValueOnce(new Error('network unavailable'));
 
   mountPage();
@@ -160,6 +243,10 @@ test('keeps the public deletion screen open when browser cleanup fails', async (
 
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not clear private data from this browser.');
   expect(screen.queryByRole('heading', { name: 'Private profile' })).not.toBeInTheDocument();
+  expect(loadAccountDeletionReceipt()?.statusToken).toBe('status-secret');
+  await user.click(screen.getByRole('button', { name: 'Retry browser cleanup' }));
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/data deletion is in progress/i));
+  expect(setAccountDeletionPending).not.toHaveBeenCalledWith(false);
   expect(loadAccountDeletionReceipt()?.statusToken).toBe('status-secret');
 });
 
