@@ -137,7 +137,9 @@ class _AccountDeletionScreenState extends State<AccountDeletionScreen> {
     }
   }
 
-  void _cancel() {
+  Future<void> _cancel() async {
+    await _controller.discardPreparedReceipt();
+    if (!mounted) return;
     if (widget.onCancel != null) {
       widget.onCancel!();
     } else {
@@ -157,7 +159,7 @@ class _AccountDeletionScreenState extends State<AccountDeletionScreen> {
     final showForm = !receiptPending && !isCompleted;
 
     return PopScope<void>(
-      canPop: !receiptPending,
+      canPop: !receiptPending && !state.isSubmitting,
       child: Scaffold(
         backgroundColor: const Color(0xFFF7F8FC),
         appBar: AppBar(
@@ -166,6 +168,7 @@ class _AccountDeletionScreenState extends State<AccountDeletionScreen> {
           surfaceTintColor: Colors.transparent,
           elevation: 0,
           leading: receiptPending ||
+                  state.isSubmitting ||
                   widget.onCancel == null && !Navigator.of(context).canPop()
               ? null
               : IconButton(
@@ -223,11 +226,11 @@ class _AccountDeletionScreenState extends State<AccountDeletionScreen> {
                   label: const Text('Check status'),
                 ),
               ] else if (showForm) ...[
-              const Text(
-                'Your profile, avatar, polls, comments, votes, likes, subscriptions, '
-                'and notification settings will be deleted. Discussions and actions '
-                'by other people inside polls you created will be deleted too. '
-                'This action cannot be undone.',
+                const Text(
+                  'Your profile, avatar, polls, comments, votes, likes, subscriptions, '
+                  'and notification settings will be deleted. Discussions and actions '
+                  'by other people inside polls you created will be deleted too. '
+                  'This action cannot be undone.',
                   style: TextStyle(fontSize: 16, height: 1.5),
                 ),
                 const SizedBox(height: 20),
@@ -288,7 +291,10 @@ class _AccountDeletionScreenState extends State<AccountDeletionScreen> {
                           ? 'Confirm deletion'
                           : 'Delete account'),
                 ),
-                TextButton(onPressed: _cancel, child: const Text('Cancel')),
+                TextButton(
+                  onPressed: state.isSubmitting ? null : _cancel,
+                  child: const Text('Cancel'),
+                ),
               ],
               if (state.isLoading) ...[
                 const SizedBox(height: 20),

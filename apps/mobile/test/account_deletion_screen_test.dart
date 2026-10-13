@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yaskapp_mobile/src/features/account_deletion/account_deletion_screen.dart';
@@ -20,6 +22,57 @@ void main() {
     await tester.pump();
 
     expect(cancelled, isTrue);
+  });
+
+  testWidgets('does not allow cancelling while password verification is active',
+      (tester) async {
+    final verification = Completer<AccountDeletionVerification>();
+    final receiptStore = MemoryAccountDeletionReceiptStore();
+    final controller = AccountDeletionController(
+      api: _Api(onVerify: () => verification.future),
+      receiptStore: receiptStore,
+    );
+    addTearDown(controller.dispose);
+    var cancelled = false;
+    await tester.pumpWidget(MaterialApp(
+      home: AccountDeletionScreen(
+        accessToken: 'session-token',
+        controller: controller,
+        onCancel: () => cancelled = true,
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'secret');
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete account'));
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<TextButton>(find.widgetWithText(TextButton, 'Cancel'))
+          .onPressed,
+      isNull,
+    );
+    expect(find.byType(IconButton), findsNothing);
+    expect(cancelled, isFalse);
+
+    verification.complete(AccountDeletionVerification(
+      operationId: 'op-1',
+      deletionToken: 'delete-token',
+      statusToken: 'status-token',
+      deletionTokenExpiresAt:
+          DateTime.now().toUtc().add(const Duration(hours: 1)),
+      statusTokenExpiresAt: DateTime.now().toUtc().add(const Duration(days: 1)),
+    ));
+    await tester.pump();
+    await tester.pump();
+    await tester.tap(find.text('Cancel'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(cancelled, isTrue);
+    expect(await receiptStore.read(), isNull);
   });
 
   testWidgets(
@@ -172,13 +225,17 @@ void main() {
 }
 
 class _Api extends AccountDeletionApi {
+  _Api({this.onVerify});
+
+  final Future<AccountDeletionVerification> Function()? onVerify;
+
   @override
   Future<AccountDeletionVerification> verify({
     String? accessToken,
     String? login,
     required String password,
   }) async =>
-      throw UnimplementedError();
+      onVerify?.call() ?? (throw UnimplementedError());
   @override
   Future<AccountDeletionStatusResponse> deleteAccount({
     required String deletionToken,

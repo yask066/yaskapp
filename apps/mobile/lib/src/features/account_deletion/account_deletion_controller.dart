@@ -194,6 +194,25 @@ class AccountDeletionController extends ChangeNotifier {
     }
   }
 
+  Future<void> discardPreparedReceipt() async {
+    final receipt = _state.receipt;
+    if (receipt == null ||
+        _state.isAccepted ||
+        _state.acceptanceUncertain ||
+        _state.isSubmitting ||
+        _state.isLoading) {
+      return;
+    }
+    ++_requestEpoch;
+    await _receiptStore.clear();
+    _set(_state.copyWith(
+      clearReceipt: true,
+      clearStatus: true,
+      clearError: true,
+      clearMessage: true,
+    ));
+  }
+
   Future<void> refreshStatus() async {
     if (_state.isLoading || _state.isSubmitting) return;
     final receipt = _state.receipt ?? await _receiptStore.read();

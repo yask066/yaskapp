@@ -106,6 +106,23 @@ void main() {
     expect(store.clearCalls, 0);
   });
 
+  test('discarding an unaccepted receipt removes it without deleting',
+      () async {
+    final store = _RecordingReceiptStore();
+    final api = _FakeApi();
+    final controller = AccountDeletionController(api: api, receiptStore: store);
+    addTearDown(controller.dispose);
+
+    await controller.restoreReceipt();
+    expect(controller.state.status?.status, AccountDeletionStatus.notStarted);
+
+    await controller.discardPreparedReceipt();
+
+    expect(store.receipt, isNull);
+    expect(store.clearCalls, 1);
+    expect(controller.state.receipt, isNull);
+  });
+
   test('ignores repeated acceptance while a request is in flight', () async {
     final store = _RecordingReceiptStore();
     final request = Completer<AccountDeletionStatusResponse>();
@@ -131,7 +148,9 @@ AccountDeletionStatusResponse _status(AccountDeletionStatus status) =>
     AccountDeletionStatusResponse(
       operationId: 'op-1',
       status: status,
-      acceptedAt: DateTime.utc(2026, 10, 13),
+      acceptedAt: status == AccountDeletionStatus.notStarted
+          ? null
+          : DateTime.utc(2026, 10, 13),
       deadlineAt: DateTime.utc(2026, 10, 14),
       completedAt: status == AccountDeletionStatus.completed
           ? DateTime.utc(2026, 10, 13, 0, 5)

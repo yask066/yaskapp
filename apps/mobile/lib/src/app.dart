@@ -43,7 +43,7 @@ class YaskappApp extends StatefulWidget {
   State<YaskappApp> createState() => _YaskappAppState();
 }
 
-class _YaskappAppState extends State<YaskappApp> {
+class _YaskappAppState extends State<YaskappApp> with WidgetsBindingObserver {
   late final AuthApiClient _authApiClient;
   late final AuthSessionStore _authSessionStore;
   late final AccountDeletionReceiptStore _accountDeletionReceiptStore;
@@ -56,6 +56,9 @@ class _YaskappAppState extends State<YaskappApp> {
   late final RealtimeSession _realtimeSession;
   late final PollStateStore _pollStateStore;
   StreamSubscription<AccountDeletedRealtimeEvent>? _accountDeletedSubscription;
+  Timer? _sessionValidationTimer;
+  var _sessionValidationInFlight = false;
+  var _sessionGeneration = 0;
   var _isBootstrapping = true;
   var _deletionOnly = false;
   var _remoteDeletionCleanupPending = false;
@@ -68,6 +71,7 @@ class _YaskappAppState extends State<YaskappApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _ownsAuthApiClient = widget.authApiClient == null;
     _authApiClient = widget.authApiClient ?? AuthApiClient();
     _authSessionStore =
@@ -95,6 +99,8 @@ class _YaskappAppState extends State<YaskappApp> {
     }
     _pushTokenSubscription?.cancel();
     _accountDeletedSubscription?.cancel();
+    _sessionValidationTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _notificationDevicesApiClient.close();
     unawaited(_realtimeSession.close());
     _pollStateStore.dispose();
@@ -153,7 +159,14 @@ class _YaskappAppState extends State<YaskappApp> {
       });
       _pollStateStore.clear(viewerId: user.id);
       unawaited(_realtimeSession.start(_session!));
+      _startSessionValidation();
       unawaited(_registerPushToken(accessToken));
+    } on AuthApiException catch (error) {
+      if (error.statusCode == 401) {
+        await _handleRemoteAccountDeleted();
+      } else {
+        await _authSessionStore.clear();
+      }
     } catch (_) {
       await _authSessionStore.clear();
     } finally {
@@ -176,12 +189,58 @@ class _YaskappAppState extends State<YaskappApp> {
     setState(() {
       _session = session;
       _navigationEpoch++;
+      _sessionGeneration++;
     });
     unawaited(_realtimeSession.start(session));
+    _startSessionValidation();
     unawaited(_registerPushToken(session.accessToken));
   }
 
+  void _startSessionValidation() {
+    _sessionValidationTimer?.cancel();
+    _sessionValidationTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      unawaited(_validateActiveSession());
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_validateActiveSession());
+    }
+  }
+
+  Future<void> _validateActiveSession() async {
+    final session = _session;
+    final sessionGeneration = _sessionGeneration;
+    if (session == null ||
+        _deletionOnly ||
+        _sessionValidationInFlight ||
+        !mounted) {
+      return;
+    }
+    _sessionValidationInFlight = true;
+    try {
+      await _authApiClient
+          .me(accessToken: session.accessToken)
+          .timeout(const Duration(seconds: 8));
+    } on AuthApiException catch (error) {
+      if (error.statusCode == 401 &&
+          identical(_session?.accessToken, session.accessToken) &&
+          _sessionGeneration == sessionGeneration) {
+        await _handleRemoteAccountDeleted();
+      }
+    } catch (_) {
+      // A network failure does not establish that the account was deleted.
+    } finally {
+      _sessionValidationInFlight = false;
+    }
+  }
+
   Future<void> _clearSession() async {
+    _sessionGeneration++;
+    _sessionValidationTimer?.cancel();
+    _sessionValidationTimer = null;
     final token = _latestPushToken;
     if (token != null) {
       try {
@@ -268,9 +327,9 @@ class _YaskappAppState extends State<YaskappApp> {
 
     // Revoke access in memory and clear the private navigation root before any
     // asynchronous local cleanup can fail or complete out of order.
-    await attempt('realtime notification state', _realtimeSession.stop);
     _pollStateStore.clear();
     await attempt('secure authentication token', _authSessionStore.clear);
+    await attempt('realtime notification state', _realtimeSession.stop);
     await attempt(
       'search history',
       SecureSearchHistoryStore.clearAll,
@@ -301,6 +360,9 @@ class _YaskappAppState extends State<YaskappApp> {
   }
 
   Future<void> _handleRemoteAccountDeleted() async {
+    _sessionGeneration++;
+    _sessionValidationTimer?.cancel();
+    _sessionValidationTimer = null;
     if (mounted) {
       setState(() {
         _session = null;
