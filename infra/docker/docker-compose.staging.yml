@@ -155,6 +155,7 @@ services:
       dockerfile: services/api/Dockerfile
     env_file:
       - ../../services/api/.env.staging
+      - ../../services/api/.env.account-deletion-retention.staging
     logging: *default-logging
     depends_on:
       postgres:
@@ -171,6 +172,7 @@ services:
       dockerfile: services/api/Dockerfile
     env_file:
       - ../../services/api/.env.staging
+      - ../../services/api/.env.account-deletion-retention.staging
     logging: *default-logging
     depends_on:
       postgres:
@@ -182,10 +184,8 @@ services:
       - -c
       - >-
         while true; do
-          if [ "$${ACCOUNT_DELETION_ENABLED:-false}" = "true" ]; then
-            node services/api/dist/jobs/export-account-deletion-journal.js ||
-              echo 'Account deletion journal export failed; alert on this log.';
-          fi;
+          node services/api/dist/jobs/export-account-deletion-journal.js ||
+            echo 'Account deletion journal export failed; alert on this log.';
           sleep 300;
         done
     restart: unless-stopped

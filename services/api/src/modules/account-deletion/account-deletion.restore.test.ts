@@ -25,7 +25,9 @@ test('restore replay closes accounts and resets cleanup for repeatable worker pr
   } as never;
   const entry = {
     version: 1 as const,
+    state: 'accepted' as const,
     operationId: 'e15d4d2b-5358-45a7-b036-f3648d34b361',
+    intentId: 'intent-1',
     userId: '3ce3e770-fd0e-4e98-8472-0541d3e27cf1',
     acceptedAt: '2026-10-12T12:00:00.000Z',
     deadlineAt: '2026-10-13T12:00:00.000Z',
@@ -47,7 +49,9 @@ test('restore replay closes accounts and resets cleanup for repeatable worker pr
 test('restore fails closed when the journal contains multiple operations for one user', async () => {
   const entry = {
     version: 1 as const,
+    state: 'accepted' as const,
     operationId: 'e15d4d2b-5358-45a7-b036-f3648d34b361',
+    intentId: 'intent-1',
     userId: '3ce3e770-fd0e-4e98-8472-0541d3e27cf1',
     acceptedAt: '2026-10-12T12:00:00.000Z',
     deadlineAt: '2026-10-13T12:00:00.000Z',

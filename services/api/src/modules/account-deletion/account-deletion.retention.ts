@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
+import { cleanupExpiredCompletedDeletionJournal } from './account-deletion.journal.js';
 
 const PERMISSION_RETENTION_SQL = `
   DELETE FROM account_deletion_permissions
@@ -69,10 +70,14 @@ export function createAccountDeletionRetentionRepository(executor: typeof db = d
   };
 }
 
-export function createAccountDeletionRetentionService(repository: AccountDeletionRetentionRepository) {
+export function createAccountDeletionRetentionService(
+  repository: AccountDeletionRetentionRepository,
+  cleanupExternalJournal: (now: Date) => Promise<unknown> = async () => undefined
+) {
   return {
     async cleanupDeletionRetention(now: Date): Promise<{ deleted: number }> {
       if (!Number.isFinite(now.getTime())) throw new Error('invalid_retention_time');
+      await cleanupExternalJournal(now);
       const permissions = await repository.cleanupExpiredPermissions(now);
       const prepared = await repository.cleanupExpiredPreparedOperations(now);
       const moderation = await repository.cleanupExpiredModerationIdentifiers(now);
@@ -82,6 +87,9 @@ export function createAccountDeletionRetentionService(repository: AccountDeletio
   };
 }
 
-const retentionService = createAccountDeletionRetentionService(createAccountDeletionRetentionRepository());
+const retentionService = createAccountDeletionRetentionService(
+  createAccountDeletionRetentionRepository(),
+  (now) => cleanupExpiredCompletedDeletionJournal(db, now)
+);
 
 export const cleanupDeletionRetention = retentionService.cleanupDeletionRetention;

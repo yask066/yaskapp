@@ -53,8 +53,8 @@ function mapStepKey(value: string): DeletionStepKey {
   throw new AccountDeletionStepError('unknown_step');
 }
 
-async function claimDeletionOperations(limit: number, now: Date, leaseOwner: string): Promise<ClaimedDeletionOperation[]> {
-  const client = await db.connect();
+async function claimDeletionOperations(limit: number, now: Date, leaseOwner: string, executor: typeof db): Promise<ClaimedDeletionOperation[]> {
+  const client = await executor.connect();
   try {
     await client.query('BEGIN');
     const result = await client.query<{ id: string; attempts: number }>(
@@ -83,8 +83,8 @@ async function claimDeletionOperations(limit: number, now: Date, leaseOwner: str
   }
 }
 
-async function withClient<T>(run: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await db.connect();
+async function withClient<T>(run: (client: PoolClient) => Promise<T>, executor: typeof db): Promise<T> {
+  const client = await executor.connect();
   try {
     return await run(client);
   } finally {
@@ -92,8 +92,9 @@ async function withClient<T>(run: (client: PoolClient) => Promise<T>): Promise<T
   }
 }
 
-const databaseRepository: AccountDeletionWorkerRepository = {
-  claim: claimDeletionOperations,
+export function createAccountDeletionWorkerRepository(executor: typeof db = db): AccountDeletionWorkerRepository {
+  return {
+  claim: (limit, now, owner) => claimDeletionOperations(limit, now, owner, executor),
   async nextStep(operationId) {
     return withClient(async (client) => {
       const result = await client.query<{ step_key: string; position: number }>(
@@ -108,7 +109,7 @@ const databaseRepository: AccountDeletionWorkerRepository = {
         throw new AccountDeletionStepError('step_order_invalid');
       }
       return stepKey;
-    });
+    }, executor);
   },
   async allStepsCompleted(operationId) {
     return withClient(async (client) => {
@@ -120,10 +121,10 @@ const databaseRepository: AccountDeletionWorkerRepository = {
       );
       return result.rows[0]?.completed_count === DELETION_STEP_ORDER.length
         && result.rows[0]?.total_count === DELETION_STEP_ORDER.length;
-    });
+    }, executor);
   },
   async markStepProcessing(operationId, stepKey, leaseOwner, now) {
-    const result = await db.query(
+    const result = await executor.query(
       `UPDATE account_deletion_steps step
        SET status = 'processing', attempts = attempts + 1,
            started_at = COALESCE(started_at, $4), updated_at = $4
@@ -136,7 +137,7 @@ const databaseRepository: AccountDeletionWorkerRepository = {
     return result.rowCount === 1;
   },
   async markStepCompleted(operationId, stepKey, leaseOwner, now) {
-    const result = await db.query(
+    const result = await executor.query(
       `UPDATE account_deletion_steps step
        SET status = 'completed', completed_at = $4, last_error_code = NULL, updated_at = $4
        FROM account_deletion_operations operation
@@ -146,7 +147,7 @@ const databaseRepository: AccountDeletionWorkerRepository = {
       [operationId, stepKey, leaseOwner, now]
     );
     if (result.rowCount === 1) {
-      await db.query(
+      await executor.query(
         `UPDATE account_deletion_operations SET retry_started_at = NULL
          WHERE id = $1 AND lease_owner = $2 AND status = 'processing'`,
         [operationId, leaseOwner]
@@ -155,7 +156,7 @@ const databaseRepository: AccountDeletionWorkerRepository = {
     return result.rowCount === 1;
   },
   async markStepPending(operationId, stepKey, leaseOwner, now) {
-    const result = await db.query(
+    const result = await executor.query(
       `UPDATE account_deletion_steps step SET status = 'pending', updated_at = $4
        FROM account_deletion_operations operation
        WHERE step.operation_id = $1 AND step.step_key = $2 AND step.status <> 'completed'
@@ -166,7 +167,7 @@ const databaseRepository: AccountDeletionWorkerRepository = {
     return result.rowCount === 1;
   },
   async markStepRetrying(operationId, stepKey, leaseOwner, now, delaySeconds, code) {
-    const result = await db.query(
+    const result = await executor.query(
       `UPDATE account_deletion_steps step
        SET status = 'retrying', available_at = $4 + ($5::text || ' seconds')::interval,
            last_error_code = $6, updated_at = $4
@@ -179,7 +180,7 @@ const databaseRepository: AccountDeletionWorkerRepository = {
     return result.rowCount === 1;
   },
   async renewLease(operationId, leaseOwner, now) {
-    const result = await db.query(
+    const result = await executor.query(
       `UPDATE account_deletion_operations SET lease_until = $3 + interval '120 seconds', updated_at = $3
        WHERE id = $1 AND lease_owner = $2 AND status = 'processing'`,
       [operationId, leaseOwner, now]
@@ -187,7 +188,7 @@ const databaseRepository: AccountDeletionWorkerRepository = {
     return result.rowCount === 1;
   },
   async yieldOperation(operationId, leaseOwner, now) {
-    const result = await db.query(
+    const result = await executor.query(
       `UPDATE account_deletion_operations
        SET status = 'pending', available_at = $3, lease_owner = NULL, lease_until = NULL, updated_at = $3
        WHERE id = $1 AND lease_owner = $2 AND status = 'processing' AND lease_until > $3`,
@@ -196,7 +197,7 @@ const databaseRepository: AccountDeletionWorkerRepository = {
     return result.rowCount === 1;
   },
   async retryOperation(operationId, leaseOwner, now, delaySeconds, errorCode) {
-    const result = await db.query(
+    const result = await executor.query(
       `UPDATE account_deletion_operations
        SET status = 'retrying', available_at = $3 + ($4::text || ' seconds')::interval,
            lease_owner = NULL, lease_until = NULL, attempts = attempts + 1,
@@ -207,7 +208,7 @@ const databaseRepository: AccountDeletionWorkerRepository = {
     return result.rowCount === 1;
   },
   async completeOperation(operationId, leaseOwner, now) {
-    const result = await db.query(
+    const result = await executor.query(
       `UPDATE account_deletion_operations operation
        SET status = 'completed', completed_at = $3, lease_owner = NULL, lease_until = NULL,
            last_error_code = NULL, retry_started_at = NULL, updated_at = $3
@@ -222,7 +223,10 @@ const databaseRepository: AccountDeletionWorkerRepository = {
     );
     return result.rowCount === 1;
   }
-};
+  };
+}
+
+const databaseRepository = createAccountDeletionWorkerRepository();
 
 function retryDelaySeconds(attempts: number) {
   return Math.min(INITIAL_RETRY_SECONDS * (2 ** Math.max(0, attempts - 1)), MAX_RETRY_SECONDS);

@@ -12,7 +12,8 @@ import { hashDeletionToken } from './account-deletion.verification.js';
 import { lockSuperadminMutation } from './account-activity.guard.js';
 import { dispatchPendingDeletionEvents } from './account-deletion.events.js';
 import { disconnectUser } from '../../realtime/realtime.hub.js';
-import { writeAcceptedDeletionToJournal } from './account-deletion.journal.js';
+import { acceptDeletionInJournal, prepareDeletionInJournal } from './account-deletion.journal.js';
+import { commitJournaledAcceptance } from './account-deletion.acceptance-protocol.js';
 
 const cleanupSteps = ['discovery', 'notifications', 'moderation', 'content', 'relationships', 'media', 'completion'];
 
@@ -59,6 +60,7 @@ export async function acceptAccountDeletion(
   }
 
   const client = await db.connect();
+  let transactionCommitted = false;
   try {
     await client.query('BEGIN');
     const tokenHash = hashDeletionToken(deletionToken);
@@ -72,6 +74,14 @@ export async function acceptAccountDeletion(
         throw new AccountDeletionAcceptanceError('account_deletion_conflict');
       }
       await client.query('COMMIT');
+      transactionCommitted = true;
+      if (!operation.acceptedAt || !operation.deadlineAt) throw new Error('account_deletion_accepted_timestamps_missing');
+      await acceptDeletionInJournal({
+        operationId: operation.operationId,
+        userId: permission.userId,
+        acceptedAt: new Date(operation.acceptedAt),
+        deadlineAt: new Date(operation.deadlineAt)
+      });
       return operation;
     }
 
@@ -116,15 +126,23 @@ export async function acceptAccountDeletion(
       [permission.userId, acceptedAt]
     );
     await snapshotDeletionWork(client, permission.operationId, permission.userId);
-    // The independent durable write happens before the database commit and before
-    // a success response can be sent. If it is unavailable, roll back acceptance.
-    await writeAcceptedDeletionToJournal({
+    // Record intent before committing, but only replay it after the durable
+    // accepted record is written below. A rollback leaves a harmless prepared entry.
+    const journalAcceptance = {
       operationId: permission.operationId,
       userId: permission.userId,
       acceptedAt,
       deadlineAt
+    };
+    // Do not confirm acceptance until the DB commit and both external journal writes.
+    await commitJournaledAcceptance({
+      writePrepared: () => prepareDeletionInJournal(journalAcceptance),
+      async commitDatabase() {
+        await client.query('COMMIT');
+        transactionCommitted = true;
+      },
+      writeAccepted: () => acceptDeletionInJournal(journalAcceptance)
     });
-    await client.query('COMMIT');
     try {
       disconnectUser(permission.userId, 'account_deleted', {
         type: 'account.deleted',
@@ -136,7 +154,7 @@ export async function acceptAccountDeletion(
     void dispatchPendingDeletionEvents().catch(() => undefined);
     return accepted;
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (!transactionCommitted) await client.query('ROLLBACK');
     throw error;
   } finally {
     client.release();

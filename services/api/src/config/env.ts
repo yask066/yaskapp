@@ -24,8 +24,14 @@ const envSchema = z
   ACCOUNT_DELETION_JOURNAL_ENDPOINT: z.string().url().optional(),
   ACCOUNT_DELETION_JOURNAL_REGION: z.string().default('us-east-1'),
   ACCOUNT_DELETION_JOURNAL_BUCKET: z.string().min(1).optional(),
+  ACCOUNT_DELETION_JOURNAL_ID: z.string().min(1).optional(),
   ACCOUNT_DELETION_JOURNAL_ACCESS_KEY_ID: z.string().min(1).optional(),
   ACCOUNT_DELETION_JOURNAL_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ENDPOINT: z.string().url().optional(),
+  ACCOUNT_DELETION_JOURNAL_CHECKPOINT_REGION: z.string().default('us-east-1'),
+  ACCOUNT_DELETION_JOURNAL_CHECKPOINT_BUCKET: z.string().min(1).optional(),
+  ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ACCESS_KEY_ID: z.string().min(1).optional(),
+  ACCOUNT_DELETION_JOURNAL_CHECKPOINT_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   ACCOUNT_DELETION_JOURNAL_HMAC_KEY: z.string().min(32).optional(),
   FIREBASE_PROJECT_ID: z.string().min(1).optional()
   })
@@ -33,9 +39,14 @@ const envSchema = z
     const journalSettings = [
       config.ACCOUNT_DELETION_JOURNAL_ENDPOINT,
       config.ACCOUNT_DELETION_JOURNAL_BUCKET,
+      config.ACCOUNT_DELETION_JOURNAL_ID,
       config.ACCOUNT_DELETION_JOURNAL_ACCESS_KEY_ID,
       config.ACCOUNT_DELETION_JOURNAL_SECRET_ACCESS_KEY,
-      config.ACCOUNT_DELETION_JOURNAL_HMAC_KEY
+      config.ACCOUNT_DELETION_JOURNAL_HMAC_KEY,
+      config.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ENDPOINT,
+      config.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_BUCKET,
+      config.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ACCESS_KEY_ID,
+      config.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_SECRET_ACCESS_KEY
     ];
     if (journalSettings.some(Boolean) && journalSettings.some((value) => !value)) {
       context.addIssue({
@@ -59,6 +70,17 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['ACCOUNT_DELETION_JOURNAL_ENDPOINT'],
         message: 'The account deletion journal must use an independent object-storage endpoint.'
+      });
+    }
+    if (
+      config.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ENDPOINT &&
+      (config.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ENDPOINT === config.S3_ENDPOINT ||
+       config.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ENDPOINT === config.ACCOUNT_DELETION_JOURNAL_ENDPOINT)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ENDPOINT'],
+        message: 'The account deletion checkpoint must use a separate object-storage endpoint from media and the journal.'
       });
     }
     const isPlaceholder = config.JWT_SECRET.includes('replace-with');

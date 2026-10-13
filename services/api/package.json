@@ -16,6 +16,7 @@
     "notifications:push-worker": "tsx src/jobs/run-notification-push-worker.ts",
     "account-deletion:worker": "tsx src/jobs/run-account-deletion-worker.ts",
     "account-deletion:journal-export": "tsx src/jobs/export-account-deletion-journal.ts",
+    "account-deletion:journal-init": "tsx src/jobs/initialize-account-deletion-journal.ts",
     "account-deletion:journal-reapply": "tsx src/jobs/reapply-account-deletions.ts",
     "test": "npm run db:migrate && node --import tsx --test --test-reporter spec \"src/**/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"

@@ -286,22 +286,20 @@ AD-14 → AD-15**.
 - [x] Документировать retry/recovery, alert escalation, защиту журналов, TTL и безопасный rollback приложения без восстановления аккаунтов.
 
 **Текущий результат AD-14:** добавлены отдельные Compose worker и journal exporter;
-acceptance синхронно пишет подписанную запись только с ID и timestamps во
-внешнее S3-совместимое хранилище до commit, а конфигурация включает доступность
-журнала в gate функции. Добавлены export/reapply CLI, повторная постановка всех
-операций на очистку, 30-дневный предел локального backup и операционный runbook.
-Unit-тесты журнала/reapply, API typecheck и Compose YAML validation прошли.
-`restore_old_backup_does_not_resurrect_account` добавлен, но пропущен без
-`ACCOUNT_DELETION_TEST_DATABASE_URL`; staging restore/alert setup не запускались.
-При ревью исправлено смещение позиций этапов (worker использует индексы 0–6),
-а restore теперь останавливается при нескольких journal operation на одного
-user. Остались два существенных ограничения: pre-commit journal intent может
-пережить неопределённый/откаченный DB commit, а export не может доказать полноту
-журнала относительно старого backup, в котором отсутствуют принятые операции.
-Lifecycle внешнего журнала и alert rules не применялись к staging. Поэтому
-пункты о фактическом применении lifecycle, проверке полноты журнала, разборе
-uncertain commit, алертах внешнего мониторинга и restore exercise остаются
-открытыми.
+acceptance использует `prepared` до DB commit и подписанные `accepted` плюс
+checkpoint в отдельном failure domain после commit; endpoint подтверждает
+acceptance только после readback обоих записей. Restore сравнивает полный набор
+IDs между хранилищами и сверяет HMAC/identity markers. Добавлены export/reapply
+CLI, retention cleanup для завершённых и истёкших prepared операций, S3 Object
+Lock per-entry сроки, 30-дневный предел локального backup и runbook. Worker
+steps хранят позиции 0–6, а integration сценарий теперь прогоняет восстановленные
+steps через реальный worker repository. Тесты `restore_old_backup_does_not_resurrect_account`
+и worker completion пропущены без `ACCOUNT_DELETION_TEST_DATABASE_URL`.
+
+Не выполнены staging-зависимые шаги: provisioning двух S3 failure domains,
+создание identity markers, применение Object Lock/lifecycle к реальным bucket,
+настройка alerts, проверка экспорта после потери БД и restore exercise. Поэтому
+пункт остаётся открытым до staging-проверки.
 
 **Готово, когда:** worker переживает reboot, сроки хранения выполняются, restore без полного журнала не публикует старые данные. **PRD:** AC-11, AC-16.
 

@@ -21,6 +21,7 @@ import {
   releaseVerificationAttempt
 } from './account-deletion.verification.js';
 import { AccountDeletionAcceptanceError, acceptAccountDeletion } from './account-deletion.service.js';
+import { acceptDeletionInJournal } from './account-deletion.journal.js';
 
 const verificationSchema = z.object({ password: z.string().min(1).max(128) }).strict();
 const loginVerificationSchema = z.object({
@@ -171,6 +172,19 @@ export function registerAccountDeletionRoutes(app: FastifyInstance) {
 
     const operation = await getDeletionOperation(permission.operationId);
     if (!operation) return sendUnauthorized(reply);
+    if (operation.acceptedAt && operation.deadlineAt) {
+      try {
+        await acceptDeletionInJournal({
+          operationId: operation.operationId,
+          userId: permission.userId,
+          acceptedAt: new Date(operation.acceptedAt),
+          deadlineAt: new Date(operation.deadlineAt)
+        });
+      } catch (error) {
+        request.log.error({ err: error }, 'Account deletion status journal confirmation failed');
+        return reply.status(503).send({ error: 'account_deletion_unavailable', message: 'Account deletion status is temporarily unavailable.' });
+      }
+    }
     return reply.status(200).send(operation satisfies AccountDeletionStatusResponse);
   });
 

@@ -6,11 +6,13 @@ import type { Database } from '../../config/database.js';
 
 function fixture() {
   const queries: Array<{ sql: string; values: unknown[] }> = [];
+  const order: string[] = [];
   const fakeDatabase = {
     async connect() {
       return {
         async query(sql: string, values: unknown[] = []) {
           queries.push({ sql, values });
+          order.push(sql);
           return { rows: [], rowCount: sql.trimStart().startsWith('DELETE') ? 1 : 0 };
         },
         release() {}
@@ -18,8 +20,8 @@ function fixture() {
     }
   } as unknown as Database;
   const repository = createAccountDeletionRetentionRepository(fakeDatabase);
-  const service = createAccountDeletionRetentionService(repository);
-  return { service, queries };
+  const service = createAccountDeletionRetentionService(repository, async () => { order.push('external_journal_cleanup'); });
+  return { service, queries, order };
 }
 
 test('unfinished_task_never_expires', async () => {
@@ -42,6 +44,17 @@ test('completed_journal_expires_day35', async () => {
   assert.ok(journal);
   assert.match(journal.sql, /accepted_at <= \$1::timestamptz - interval '35 days'/);
   assert.deepEqual(journal.values, [now]);
+});
+
+test('external_journal_is_pruned_before_database_receipt_retention', async () => {
+  const { service, order } = fixture();
+  await service.cleanupDeletionRetention(new Date('2026-10-13T00:00:00.000Z'));
+  const externalIndex = order.indexOf('external_journal_cleanup');
+  const preparedDeleteIndex = order.findIndex((sql) => sql.includes('DELETE FROM account_deletion_operations operation'));
+  const completedDeleteIndex = order.findIndex((sql) => sql.includes("WHERE status = 'completed'"));
+  assert.ok(externalIndex >= 0);
+  assert.ok(externalIndex < preparedDeleteIndex);
+  assert.ok(externalIndex < completedDeleteIndex);
 });
 
 test('moderation_identifiers_expire_day30', async () => {

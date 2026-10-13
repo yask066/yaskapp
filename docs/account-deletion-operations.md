@@ -19,17 +19,14 @@ bodies, credentials, tokens, or journal payloads.
 
 ## Independent acceptance journal
 
-The API writes one signed JSON object per operation to a separate S3-compatible
-service before committing acceptance. The entry contains only operation ID,
-user ID, accepted time, deadline, format version, and HMAC. If that write fails,
-the PostgreSQL transaction rolls back and the API returns an unavailable error.
-Because object storage and PostgreSQL do not share a transaction, an uncertain
-database commit can leave a durable journal intent for a transaction that did
-not commit. Restore replay fails closed if it finds multiple journal operations
-for one user; resolve that condition against acceptance receipts and database or
-audit evidence before opening traffic.
-The journal endpoint must be independent of PostgreSQL backups and the media
-bucket (separate storage service/account, credentials, and failure domain).
+The API writes a signed `prepared` entry before the database commit. After the
+commit succeeds, it writes an `accepted` entry to the journal and a matching
+checkpoint to a second S3-compatible service. The API confirms acceptance only
+after both writes have been read back. A rollback leaves only a `prepared`
+entry, which replay ignores. Restore checks the signed identities in both
+stores and fails closed on a missing or mismatched record. Both stores must be
+independent of PostgreSQL backups and each other (separate storage services,
+accounts, credentials, and failure domains).
 
 Configure these variables in the secret store used by both API and worker:
 
@@ -39,24 +36,50 @@ ACCOUNT_DELETION_JOURNAL_REGION=<region>
 ACCOUNT_DELETION_JOURNAL_BUCKET=<private-journal-bucket>
 ACCOUNT_DELETION_JOURNAL_ACCESS_KEY_ID=<write-and-list credential>
 ACCOUNT_DELETION_JOURNAL_SECRET_ACCESS_KEY=<secret>
+ACCOUNT_DELETION_JOURNAL_ID=<stable-unique-deployment-identity>
 ACCOUNT_DELETION_JOURNAL_HMAC_KEY=<at-least-32-random-characters>
+ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ENDPOINT=https://<independent-checkpoint-store>
+ACCOUNT_DELETION_JOURNAL_CHECKPOINT_REGION=<region>
+ACCOUNT_DELETION_JOURNAL_CHECKPOINT_BUCKET=<private-checkpoint-bucket>
+ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ACCESS_KEY_ID=<write-and-list credential>
+ACCOUNT_DELETION_JOURNAL_CHECKPOINT_SECRET_ACCESS_KEY=<secret>
 ```
 
-Give API credentials read, list, and write access to the journal prefix. Restrict
-deletion and lifecycle administration to a separate operator role. Enable bucket
-versioning and protect current objects from deletion for at least 35 days. Apply
-and verify lifecycle expiry for current and noncurrent journal objects at 35 days.
-Keep the HMAC key in the secret
-manager separately from PostgreSQL and object-store credentials; preserve it
-for the full journal retention window and rotate only with an overlap procedure.
-Never copy journal objects into the main database backup.
+Initialize the stable identity markers once, before enabling account deletion:
 
-`account-deletion-journal-exporter` runs every five minutes while deletion is
-enabled. Alert on its failure log. The
+```sh
+npm run account-deletion:journal-init -w @yaskapp/api
+```
+
+Do not reinitialize a missing marker during recovery. Its absence means the
+configured store is uninitialized, replaced, or incomplete and must block
+traffic until the intended store is restored.
+
+Give API credentials read, list, and write access to the journal and checkpoint
+prefixes, including Object Lock retention on writes. Copy
+`services/api/.env.account-deletion-retention.example` to
+`services/api/.env.account-deletion-retention.staging` and set separate
+read/list-versions/delete-versions credentials there; Compose passes that file
+to the deletion worker and retention exporter. The role must not write or alter
+retention.
+Enable versioning and S3 Object Lock in compliance mode on both buckets. Keep
+`prepared` records locked for 48 hours and accepted/checkpoint records for 35
+days from acceptance. The retention worker lists and deletes every object version
+for completed operations after the lock expires; it never removes unfinished
+accepted records. Do not add an unconditional lifecycle rule to these prefixes.
+Alert on any retention worker error. Preserve the HMAC key separately from both
+stores and rotate only with an overlap procedure. Never copy journal objects into
+the database backup.
+
+`account-deletion-journal-exporter` runs every five minutes, including while
+new deletion requests are disabled. It reconciles completed PostgreSQL rows into
+both stores before applying the 35-day retention cleanup. Alert on its failure
+log. The
 `npm run account-deletion:journal-export -w @yaskapp/api` command reconciles
-every accepted PostgreSQL row with the independent journal on demand. These
-exports are repair/check mechanisms; the synchronous write in the acceptance
-transaction is what protects the gap before the next export.
+every accepted PostgreSQL row with both stores on demand. Recovery verifies the
+entire journal/checkpoint inventory, so a pre-acceptance database backup still
+detects a missing journal record. This check assumes each store's compliance
+retention and independent failure domain remain intact.
 
 ## Retention
 
@@ -78,8 +101,9 @@ mc ilm rule add staging/$S3_BUCKET --noncurrent-expire-days 30 --expire-delete-m
 
 For a separate backup bucket, configure expiry for both current dumps and
 noncurrent versions at 30 days. Verify lifecycle rules after applying them and
-include the result in the staging restore record. The journal bucket is separate
-and must retain records for at least 35 days.
+include the result in the staging restore record. Both independent journal
+stores use Object Lock for accepted records and checkpoints; the retention worker
+removes them after 35 days only when the operation is completed.
 
 The worker removes expired permission hashes and completed operation records
 after their configured 35-day retention, and minimal moderation identifiers
@@ -89,7 +113,7 @@ after 30 days. The independent journal outlives the 30-day backup window.
 
 Treat every database or media restore as a traffic-blocking maintenance event.
 Do not expose API traffic while data is being restored or journal reapply is
-running. If the journal service or HMAC key is unavailable, stop; do not start
+running. If either journal service or the HMAC key is unavailable, stop; do not start
 API/web traffic against the restored snapshot.
 
 1. Stop `https`, `web`, `moderation-web`, `api`, `notification-worker`,
@@ -100,18 +124,19 @@ API/web traffic against the restored snapshot.
    restored accepted rows against the journal, then replay the full journal:
 
    ```sh
-   docker compose -f infra/docker/docker-compose.staging.yml run --rm --no-deps api \
-     node services/api/dist/jobs/export-account-deletion-journal.js
+   docker compose -f infra/docker/docker-compose.staging.yml run --rm --no-deps --entrypoint node account-deletion-journal-exporter \
+     services/api/dist/jobs/export-account-deletion-journal.js
    docker compose -f infra/docker/docker-compose.staging.yml run --rm --no-deps api \
      node services/api/dist/jobs/reapply-account-deletions.js
    ```
 
-   Export must exit zero before reapply may run. It checks each accepted row
-   present in the restored database against the journal; it cannot prove the
-   journal is complete when the restored database predates an acceptance.
-   Independently verify protected retention and the journal object inventory
+   Export must exit zero before reapply may run. It checks accepted rows in the
+   restored database against the journal and compares the full journal ID set
+   against the independently stored checkpoint set. This detects records missing
+   from either store even when the restored database predates acceptance.
+   Independently verify Object Lock retention and the journal object inventory
    before continuing. Reapply lists every journal object, checks its HMAC, key/ID agreement,
-   timestamps, and duplicate IDs, and reopens every matching deletion as pending
+   timestamps, checkpoint completeness, and duplicate IDs, and reopens every matching deletion as pending
    cleanup. It marks any surviving account row deleted, resets cleanup steps,
    and recreates the media manifest. It exits non-zero on missing credentials,
    incomplete listing, malformed or tampered data, owner mismatch, or database

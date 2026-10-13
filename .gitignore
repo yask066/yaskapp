@@ -13,6 +13,7 @@
 .env
 .env.*
 !.env.example
+!.env.account-deletion-retention.example
 backups/
 infra/docker/secrets/
 .worktrees/

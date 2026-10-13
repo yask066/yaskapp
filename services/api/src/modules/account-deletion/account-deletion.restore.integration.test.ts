@@ -4,6 +4,7 @@ import { Pool } from 'pg';
 import { test } from 'node:test';
 
 import { createJournalEntry } from './account-deletion.journal.js';
+import { createAccountDeletionWorkerRepository, DELETION_STEP_ORDER, processDeletionBatch } from './account-deletion.worker.js';
 
 process.env.DATABASE_URL ??= 'postgres://test:test@127.0.0.1:5432/yaskapp_test';
 process.env.REDIS_URL ??= 'redis://127.0.0.1:6379';
@@ -41,6 +42,16 @@ test('restore_old_backup_does_not_resurrect_account', { skip: !testDatabaseUrl }
     );
 
     assert.deepEqual(await reapplyAcceptedDeletions([entry], pool), { reapplied: 1 });
+    const workerHandlers = Object.fromEntries(DELETION_STEP_ORDER.map((stepKey) => [stepKey, async () => ({ done: true })]));
+    assert.deepEqual(await processDeletionBatch({ limit: 1, now: new Date() }, {
+      repository: createAccountDeletionWorkerRepository(pool as never),
+      handlers: workerHandlers
+    }), { processed: 1, completed: 1, retrying: 0 });
+    const workerCompleted = await pool.query<{ status: string }>(
+      'SELECT status FROM account_deletion_operations WHERE id = $1', [operationId]
+    );
+    assert.equal(workerCompleted.rows[0]?.status, 'completed');
+
     assert.deepEqual(await reapplyAcceptedDeletions([entry], pool), { reapplied: 1 });
 
     const user = await pool.query<{ status: string }>('SELECT status FROM users WHERE id = $1', [userId]);
