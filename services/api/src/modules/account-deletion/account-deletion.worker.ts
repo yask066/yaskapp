@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
+import { purgeAccountContent } from './account-deletion.content.js';
 
 export const DELETION_STEP_ORDER = [
   'discovery', 'notifications', 'moderation', 'content', 'relationships', 'media', 'completion'
@@ -308,7 +309,9 @@ export async function processDeletionBatch(
   return { processed: claimed.length, completed, retrying };
 }
 
-export const accountDeletionStepHandlers: Partial<Record<DeletionStepKey, DeletionStepHandler>> = {};
+export const accountDeletionStepHandlers: Partial<Record<DeletionStepKey, DeletionStepHandler>> = {
+  content: purgeAccountContent
+};
 
 export function assertDeletionStepHandlersReady(handlers: Partial<Record<DeletionStepKey, DeletionStepHandler>>) {
   const missing = DELETION_STEP_ORDER.filter((step) => !handlers[step]);
