@@ -34,6 +34,8 @@ async function snapshotDeletionWork(client: PoolClient, operationId: string, use
      SELECT $1, $2, object_key FROM (
        SELECT avatar_object_key AS object_key FROM profiles WHERE user_id = $2 AND avatar_object_key IS NOT NULL
        UNION
+       SELECT cover_object_key FROM profiles WHERE user_id = $2 AND cover_object_key IS NOT NULL
+       UNION
        SELECT image_object_key FROM polls WHERE author_id = $2 AND image_object_key IS NOT NULL
      ) AS media
      ON CONFLICT (operation_id, object_key, version_id) DO NOTHING`,

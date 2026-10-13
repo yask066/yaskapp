@@ -35,3 +35,23 @@ test('failed_upload_reopens_completed_deletion_and_requeues_cleanup', async (con
   assert.ok(statements.some((sql) => sql.includes('INSERT INTO account_deletion_events')));
   assert.equal(statements.at(-1), 'COMMIT');
 });
+
+test('late_upload_reopens_media_step_while_deletion_is_running', async (context) => {
+  const statements: string[] = [];
+  context.mock.method(db, 'connect', async () => ({
+    async query(sql: string) {
+      statements.push(sql);
+      if (sql.includes('SELECT id, status FROM account_deletion_operations')) {
+        return { rows: [{ id: 'operation-2', status: 'processing' }] };
+      }
+      return { rows: [], rowCount: 1 };
+    },
+    release() {}
+  } as never));
+
+  await enqueuePollImageForAccountDeletion('user-2', 'poll-images/user-2/late.webp');
+
+  assert.ok(statements.some((sql) => sql.includes("SET status = 'pending', completed_at = NULL")));
+  assert.ok(statements.some((sql) => sql.includes("step_key IN ('media', 'completion')")));
+  assert.ok(statements.some((sql) => sql.includes('lease_owner = NULL')));
+});

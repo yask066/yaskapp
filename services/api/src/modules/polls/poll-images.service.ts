@@ -173,22 +173,22 @@ export async function enqueuePollImageForAccountDeletion(userId: string, objectK
     const deletion = operation.rows[0];
     if (!deletion) throw new Error('No accepted account deletion operation was found for the uploaded image.');
 
-    if (deletion.status === 'completed') {
-      await client.query(
-        `UPDATE account_deletion_operations
-            SET status = 'pending', completed_at = NULL, available_at = now(),
-                lease_owner = NULL, lease_until = NULL, updated_at = now()
-          WHERE id = $1`,
-        [deletion.id]
-      );
-      await client.query(
-        `UPDATE account_deletion_steps
-            SET status = 'pending', cursor_id = NULL, completed_at = NULL,
-                started_at = NULL, available_at = now(), last_error_code = NULL, updated_at = now()
-          WHERE operation_id = $1 AND step_key IN ('media', 'completion')`,
-        [deletion.id]
-      );
-    }
+    // A failed finalize can enqueue an object after discovery, during media purge,
+    // or after the worker has just completed. Force the worker to revisit media.
+    await client.query(
+      `UPDATE account_deletion_operations
+          SET status = 'pending', completed_at = NULL, available_at = now(),
+              lease_owner = NULL, lease_until = NULL, updated_at = now()
+        WHERE id = $1`,
+      [deletion.id]
+    );
+    await client.query(
+      `UPDATE account_deletion_steps
+          SET status = 'pending', cursor_id = NULL, completed_at = NULL,
+              started_at = NULL, available_at = now(), last_error_code = NULL, updated_at = now()
+        WHERE operation_id = $1 AND step_key IN ('media', 'completion')`,
+      [deletion.id]
+    );
     await client.query(
       `INSERT INTO account_deletion_media_manifest (operation_id, owner_user_id, object_key)
        VALUES ($1, $2, $3)

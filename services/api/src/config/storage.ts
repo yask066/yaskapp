@@ -4,6 +4,7 @@ import {
   GetObjectCommand,
   HeadBucketCommand,
   ListObjectsV2Command,
+  ListObjectVersionsCommand,
   PutObjectCommand,
   S3Client
 } from '@aws-sdk/client-s3';
@@ -81,7 +82,7 @@ export async function listObjects(prefix: string): Promise<StorageObject[]> {
 
 export async function deleteObjects(keys: string[]) {
   for (let offset = 0; offset < keys.length; offset += 1_000) {
-    await storage.send(
+    const response = await storage.send(
       new DeleteObjectsCommand({
         Bucket: mediaBucket,
         Delete: {
@@ -90,6 +91,61 @@ export async function deleteObjects(keys: string[]) {
         }
       })
     );
+    if (response.Errors?.length) {
+      throw new Error(`storage_batch_delete_failed:${response.Errors.length}`);
+    }
+  }
+}
+
+export type StorageObjectVersion = {
+  key: string;
+  versionId: string | undefined;
+};
+
+export type StorageObjectVersionPage = {
+  objects: StorageObjectVersion[];
+  isTruncated: boolean;
+  nextKeyMarker?: string;
+  nextVersionIdMarker?: string;
+};
+
+export async function listObjectVersions(
+  prefix: string,
+  markers: { keyMarker?: string; versionIdMarker?: string } = {}
+): Promise<StorageObjectVersionPage> {
+  const response = await storage.send(new ListObjectVersionsCommand({
+    Bucket: mediaBucket,
+    Prefix: prefix,
+    KeyMarker: markers.keyMarker,
+    VersionIdMarker: markers.versionIdMarker
+  }));
+  const objects: StorageObjectVersion[] = [];
+  for (const entry of [...(response.Versions ?? []), ...(response.DeleteMarkers ?? [])]) {
+    if (entry.Key) objects.push({ key: entry.Key, versionId: entry.VersionId });
+  }
+  return {
+    objects,
+    isTruncated: response.IsTruncated ?? false,
+    nextKeyMarker: response.NextKeyMarker,
+    nextVersionIdMarker: response.NextVersionIdMarker
+  };
+}
+
+export async function deleteObjectVersions(objects: StorageObjectVersion[]) {
+  for (let offset = 0; offset < objects.length; offset += 1_000) {
+    const response = await storage.send(new DeleteObjectsCommand({
+      Bucket: mediaBucket,
+      Delete: {
+        Objects: objects.slice(offset, offset + 1_000).map(({ key, versionId }) => ({
+          Key: key,
+          VersionId: versionId
+        })),
+        Quiet: true
+      }
+    }));
+    if (response.Errors?.length) {
+      throw new Error(`storage_batch_delete_failed:${response.Errors.length}`);
+    }
   }
 }
 

@@ -6,6 +6,7 @@ import { purgeAccountContent } from './account-deletion.content.js';
 import { purgeAccountModerationData } from './account-deletion.moderation.js';
 import { purgeAccountNotifications } from './account-deletion.notifications.js';
 import { purgeAccountRelationships } from './account-deletion.relationships.js';
+import { discoverAccountMedia, purgeAccountMedia } from './account-deletion.media.js';
 
 export const DELETION_STEP_ORDER = [
   'discovery', 'notifications', 'moderation', 'content', 'relationships', 'media', 'completion'
@@ -313,10 +314,12 @@ export async function processDeletionBatch(
 }
 
 export const accountDeletionStepHandlers: Partial<Record<DeletionStepKey, DeletionStepHandler>> = {
+  discovery: discoverAccountMedia,
   notifications: purgeAccountNotifications,
   moderation: purgeAccountModerationData,
   content: purgeAccountContent,
-  relationships: purgeAccountRelationships
+  relationships: purgeAccountRelationships,
+  media: purgeAccountMedia
 };
 
 export function assertDeletionStepHandlersReady(handlers: Partial<Record<DeletionStepKey, DeletionStepHandler>>) {
