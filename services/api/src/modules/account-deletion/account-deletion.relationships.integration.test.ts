@@ -97,6 +97,10 @@ test('closed_poll_vote_removed', async () => {
   const first = await purgeAccountRelationships(operationId);
   const second = await purgeAccountRelationships(operationId);
   const retry = await purgeAccountRelationships(operationId);
+  const counterTargets = await db.query<{ target_type: string; target_id: string }>(
+    `SELECT target_type, target_id FROM account_deletion_counter_targets WHERE operation_id = $1`,
+    [operationId]
+  );
   const state = await db.query<{
     votes_count: number;
     option_a: number;
@@ -146,6 +150,10 @@ test('closed_poll_vote_removed', async () => {
   assert.equal(state.rows[0]?.comments_count, 2);
   assert.equal(state.rows[0]?.comments_revision, '1');
   assert.equal(state.rows[0]?.comment_likes, 0);
+  assert.ok(counterTargets.rows.some((target) => target.target_type === 'poll' && target.target_id === pollId));
+  assert.ok(counterTargets.rows.some((target) => target.target_type === 'comment' && target.target_id === commentId));
+  assert.ok(counterTargets.rows.some((target) => target.target_type === 'profile' && target.target_id === voterIds[0]));
+  assert.ok(counterTargets.rows.some((target) => target.target_type === 'profile' && target.target_id === voterIds[1]));
   assert.equal(state.rows[0]?.replies_count, 1);
   assert.deepEqual(followCounts.rows, [
     { followers_count: 0, following_count: 0 },

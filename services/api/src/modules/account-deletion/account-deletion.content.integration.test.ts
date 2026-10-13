@@ -86,7 +86,7 @@ test('surviving_reply_reparents_to_nearest_ancestor', async () => {
   const survivingReplyId = await createComment(foreignPollId, otherUserId, removedMiddleId, 'D');
   await db.query('UPDATE comments SET deleted_at = now() WHERE id = $1', [removedParentId]);
   await db.query('INSERT INTO likes (user_id, comment_id) VALUES ($1, $2)', [otherUserId, removedParentId]);
-  await createComment(ownPollId, otherUserId, null, 'Deleted with the owned poll');
+  const cascadedCommentId = await createComment(ownPollId, otherUserId, null, 'Deleted with the owned poll');
 
   await finishContentPurge(operationId);
 
@@ -111,6 +111,11 @@ test('surviving_reply_reparents_to_nearest_ancestor', async () => {
     [foreignPollId, ancestorId]
   );
   const targets = await getAccountDeletionContentTargets(operationId);
+  const cascadeTargets = await db.query<{ target_id: string }>(
+    `SELECT target_id FROM account_deletion_deleted_content_targets
+     WHERE operation_id = $1 AND target_type = 'comment' AND target_id = $2`,
+    [operationId, cascadedCommentId]
+  );
   const removedReaction = await db.query('SELECT id FROM likes WHERE comment_id = $1', [removedParentId]);
 
   assert.equal(reply.rows[0]?.parent_comment_id, ancestorId);
@@ -122,6 +127,7 @@ test('surviving_reply_reparents_to_nearest_ancestor', async () => {
   assert.equal(counts.rows[0]?.replies_count, 1);
   assert.ok(targets.some((target) => target.targetType === 'poll' && target.targetId === foreignPollId));
   assert.ok(targets.some((target) => target.targetType === 'comment' && target.targetId === ancestorId));
+  assert.equal(cascadeTargets.rowCount, 1);
 });
 
 test('surviving_reply_reparents_to_null_when_no_surviving_ancestor_exists', async () => {

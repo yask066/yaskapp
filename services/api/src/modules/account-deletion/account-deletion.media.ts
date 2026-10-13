@@ -17,6 +17,7 @@ type MediaRepository = {
   markManifestCompleted(operationId: string, objects: DeletionMediaObject[]): Promise<void>;
   markManifestRetrying(operationId: string, objects: DeletionMediaObject[], code: string): Promise<void>;
   hasUncompletedManifest(operationId: string): Promise<boolean>;
+  getManifestKeys(operationId: string): Promise<string[]>;
 };
 
 type MediaStorage = {
@@ -47,6 +48,25 @@ function isWithinOwnedPrefix(key: string, prefix: string) {
 
 function ownedPrefixes(userId: string) {
   return [`avatars/${userId}/`, `poll-images/${userId}/`];
+}
+
+async function listExactKeyVersions(storage: MediaStorage, key: string) {
+  const objects: DeletionMediaObject[] = [];
+  let keyMarker: string | undefined;
+  let versionIdMarker: string | undefined;
+  do {
+    const page = await storage.listObjectVersions(key, { keyMarker, versionIdMarker });
+    objects.push(...page.objects.filter((object) => object.key === key));
+    if (page.isTruncated
+      && (!page.nextKeyMarker
+        || (page.nextKeyMarker === keyMarker && page.nextVersionIdMarker === versionIdMarker))) {
+      throw new Error('storage_version_listing_cursor_invalid');
+    }
+    keyMarker = page.nextKeyMarker;
+    versionIdMarker = page.nextVersionIdMarker;
+    if (!page.isTruncated) break;
+  } while (true);
+  return objects;
 }
 
 function createDatabaseRepository(executor: typeof db = db): MediaRepository {
@@ -110,7 +130,7 @@ function createDatabaseRepository(executor: typeof db = db): MediaRepository {
       if (!objects.length) return;
       await executor.query(
         `UPDATE account_deletion_media_manifest manifest
-         SET status = 'completed', completed_at = now(), last_error_code = NULL
+         SET status = 'completed', completed_at = now(), last_error_code = NULL, last_failed_at = NULL
          FROM unnest($2::text[], $3::text[]) AS item(object_key, version_id)
          WHERE manifest.operation_id = $1 AND manifest.object_key = item.object_key
            AND manifest.version_id IS NOT DISTINCT FROM item.version_id`,
@@ -122,7 +142,8 @@ function createDatabaseRepository(executor: typeof db = db): MediaRepository {
       await executor.query(
         `UPDATE account_deletion_media_manifest manifest
          SET status = 'retrying', attempts = attempts + 1,
-             available_at = now() + interval '5 seconds', last_error_code = $4
+             available_at = now() + interval '5 seconds', last_error_code = $4,
+             last_failed_at = COALESCE(last_failed_at, now())
          FROM unnest($2::text[], $3::text[]) AS item(object_key, version_id)
          WHERE manifest.operation_id = $1 AND manifest.object_key = item.object_key
            AND manifest.version_id IS NOT DISTINCT FROM item.version_id`,
@@ -136,6 +157,13 @@ function createDatabaseRepository(executor: typeof db = db): MediaRepository {
         [operationId]
       );
       return result.rows[0]?.exists ?? false;
+    },
+    async getManifestKeys(operationId) {
+      const result = await executor.query<{ object_key: string }>(
+        'SELECT DISTINCT object_key FROM account_deletion_media_manifest WHERE operation_id = $1',
+        [operationId]
+      );
+      return result.rows.map((row) => row.object_key);
     }
   };
 }
@@ -147,8 +175,6 @@ export function createAccountDeletionMediaService(dependencies: AccountDeletionM
       if (!userId) throw new Error('account_deletion_operation_not_found');
 
       const referencedKeys = await dependencies.repository.getReferencedKeys(userId);
-      await dependencies.repository.addManifest(operationId, userId,
-        referencedKeys.map((key) => ({ key, versionId: undefined })));
 
       for (const prefix of ownedPrefixes(userId)) {
         let keyMarker: string | undefined;
@@ -167,6 +193,17 @@ export function createAccountDeletionMediaService(dependencies: AccountDeletionM
           if (!page.isTruncated) break;
         } while (true);
       }
+
+      const prefixes = ownedPrefixes(userId);
+      const knownKeys = new Set([
+        ...referencedKeys,
+        ...await dependencies.repository.getManifestKeys(operationId)
+      ]);
+      for (const key of knownKeys) {
+        if (prefixes.some((prefix) => isWithinOwnedPrefix(key, prefix))) continue;
+        const versions = await listExactKeyVersions(dependencies.storage, key);
+        if (versions.length) await dependencies.repository.addManifest(operationId, userId, versions);
+      }
       return { done: true };
     },
     async purgeAccountMedia(operationId: string): Promise<{ done: boolean }> {
@@ -182,6 +219,39 @@ export function createAccountDeletionMediaService(dependencies: AccountDeletionM
         return { done: false };
       }
       return { done: !(await dependencies.repository.hasUncompletedManifest(operationId)) };
+    },
+    async verifyAccountMediaEmpty(operationId: string): Promise<boolean> {
+      const userId = await dependencies.repository.getOwner(operationId);
+      if (!userId || await dependencies.repository.hasUncompletedManifest(operationId)) return false;
+
+      const prefixes = ownedPrefixes(userId);
+      for (const prefix of prefixes) {
+        let keyMarker: string | undefined;
+        let versionIdMarker: string | undefined;
+        do {
+          const page = await dependencies.storage.listObjectVersions(prefix, { keyMarker, versionIdMarker });
+          if (page.objects.some((object) => isWithinOwnedPrefix(object.key, prefix))) return false;
+          if (page.isTruncated
+            && (!page.nextKeyMarker
+              || (page.nextKeyMarker === keyMarker && page.nextVersionIdMarker === versionIdMarker))) {
+            throw new Error('storage_version_listing_cursor_invalid');
+          }
+          keyMarker = page.nextKeyMarker;
+          versionIdMarker = page.nextVersionIdMarker;
+          if (!page.isTruncated) break;
+        } while (true);
+      }
+
+      const namespaced = new Set(prefixes);
+      const keys = new Set([
+        ...await dependencies.repository.getReferencedKeys(userId),
+        ...await dependencies.repository.getManifestKeys(operationId)
+      ]);
+      for (const key of keys) {
+        if ([...namespaced].some((prefix) => isWithinOwnedPrefix(key, prefix))) continue;
+        if ((await listExactKeyVersions(dependencies.storage, key)).length > 0) return false;
+      }
+      return true;
     }
   };
 }
@@ -196,3 +266,4 @@ const mediaService = createAccountDeletionMediaService({
 
 export const discoverAccountMedia = mediaService.discoverAccountMedia;
 export const purgeAccountMedia = mediaService.purgeAccountMedia;
+export const verifyAccountMediaEmpty = mediaService.verifyAccountMediaEmpty;

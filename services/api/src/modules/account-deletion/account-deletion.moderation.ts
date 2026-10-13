@@ -242,6 +242,17 @@ export async function purgeAccountModerationData(operationId: string): Promise<{
   try {
     await client.query('BEGIN');
     const { userId, pollIds, commentIds, caseIds } = await loadDeletion(client, operationId);
+    if (caseIds.length) {
+      await client.query(
+        `INSERT INTO account_deletion_moderation_identifiers (operation_id, moderation_case_id, expires_at)
+         SELECT $1, target.id, operation.accepted_at + interval '30 days'
+         FROM account_deletion_operations operation
+         CROSS JOIN unnest($2::uuid[]) AS target(id)
+         WHERE operation.id = $1 AND operation.accepted_at IS NOT NULL
+         ON CONFLICT (operation_id, moderation_case_id) DO NOTHING`,
+        [operationId, caseIds]
+      );
+    }
     const changed = await purgeModerationBatch(client, userId, pollIds, commentIds, caseIds);
     const remaining = await client.query<{ exists: boolean }>(
       `SELECT EXISTS (SELECT 1 FROM reports WHERE reporter_user_id = $1 OR

@@ -3,10 +3,16 @@ import { test } from 'node:test';
 
 import {
   DELETION_STEP_ORDER,
+  accountDeletionStepHandlers,
+  assertDeletionStepHandlersReady,
   processDeletionBatch,
   type AccountDeletionWorkerRepository,
   type DeletionStepHandler
 } from './account-deletion.worker.js';
+
+test('production_worker_handlers_cover_every_step', () => {
+  assert.doesNotThrow(() => assertDeletionStepHandlersReady(accountDeletionStepHandlers));
+});
 
 type MemoryOperation = {
   id: string;

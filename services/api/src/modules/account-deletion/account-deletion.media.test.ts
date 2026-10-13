@@ -20,7 +20,8 @@ function fixture() {
         for (const object of objects) manifest.delete(`${object.key}\0${object.versionId ?? ''}`);
       },
       async markManifestRetrying() {},
-      async hasUncompletedManifest() { return manifest.size > 0; }
+      async hasUncompletedManifest() { return manifest.size > 0; },
+      async getManifestKeys() { return [...new Set([...manifest.values()].map(({ key }) => key))]; }
     },
     storage: {
       async listObjectVersions(prefix, markers) {
@@ -33,6 +34,12 @@ function fixture() {
       async deleteObjects(objects) {
         if (failDelete) throw new Error('partial delete failure');
         deleted.push(objects);
+        for (const object of objects) {
+          for (const [prefix, pages] of listed) {
+            listed.set(prefix, pages.map((page) => page.filter((listedObject) =>
+              listedObject.key !== object.key || listedObject.versionId !== object.versionId)));
+          }
+        }
       }
     }
   });
@@ -67,6 +74,7 @@ test('old_avatar_and_orphan_removed', async () => {
     { key: 'avatars/user-1/orphan.webp', versionId: 'orphan-version' }
   ]]);
   f.listed.set('poll-images/user-1/', [[]]);
+  f.listed.set('legacy/verified-cover.webp', [[{ key: 'legacy/verified-cover.webp', versionId: 'legacy-v1' }]]);
   const discovery = await f.service.discoverAccountMedia('operation-1');
   assert.deepEqual(discovery, { done: true });
   const result = await finishPurge(f.service, 'operation-1');
@@ -117,5 +125,36 @@ test('foreign_prefix_never_deleted', async () => {
   f.listed.set('poll-images/user-1/', [[]]);
   await f.service.discoverAccountMedia('operation-1');
   await finishPurge(f.service, 'operation-1');
-  assert.deepEqual(f.deleted.flat(), [{ key: 'legacy/verified-cover.webp', versionId: undefined }]);
+  assert.deepEqual(f.deleted.flat(), []);
+});
+
+test('final_scan_blocks_completion_when_owned_object_arrives_late', async () => {
+  const f = fixture();
+  f.listed.set('avatars/user-1/', [[{ key: 'avatars/user-1/late.webp', versionId: 'v2' }]]);
+  assert.equal(await f.service.verifyAccountMediaEmpty('operation-1'), false);
+});
+
+test('final_scan_checks_legacy_referenced_keys', async () => {
+  const f = fixture();
+  f.listed.set('legacy/verified-cover.webp', [[{ key: 'legacy/verified-cover.webp', versionId: 'legacy-v1' }]]);
+  assert.equal(await f.service.verifyAccountMediaEmpty('operation-1'), false);
+});
+
+test('legacy_referenced_key_versions_are_discovered_and_deleted', async () => {
+  const f = fixture();
+  f.listed.set('legacy/verified-cover.webp', [[
+    { key: 'legacy/verified-cover.webp.backup', versionId: 'neighbor' }
+  ], [
+    { key: 'legacy/verified-cover.webp', versionId: 'legacy-v1' },
+    { key: 'legacy/verified-cover.webp', versionId: 'legacy-v2' }
+  ]]);
+
+  assert.deepEqual(await f.service.discoverAccountMedia('operation-1'), { done: true });
+  assert.deepEqual(await finishPurge(f.service, 'operation-1'), { done: true });
+  assert.deepEqual(f.deleted.flat().filter(({ key }) => key === 'legacy/verified-cover.webp'), [
+    { key: 'legacy/verified-cover.webp', versionId: 'legacy-v1' },
+    { key: 'legacy/verified-cover.webp', versionId: 'legacy-v2' }
+  ]);
+  assert.equal(f.deleted.flat().some(({ key }) => key.includes('.backup')), false);
+  assert.equal(await f.service.verifyAccountMediaEmpty('operation-1'), true);
 });

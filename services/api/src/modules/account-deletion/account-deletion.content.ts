@@ -26,6 +26,27 @@ async function rememberTargets(client: PoolClient, operationId: string, userId: 
      ON CONFLICT DO NOTHING`,
     [operationId, userId]
   );
+  await client.query(
+    `INSERT INTO account_deletion_deleted_content_targets (operation_id, target_type, target_id)
+     SELECT $1, 'poll', p.id FROM polls p WHERE p.author_id = $2
+     ON CONFLICT DO NOTHING`,
+    [operationId, userId]
+  );
+  await client.query(
+    `INSERT INTO account_deletion_deleted_content_targets (operation_id, target_type, target_id)
+     SELECT $1, 'comment', comment.id FROM comments comment
+     LEFT JOIN polls poll ON poll.id = comment.poll_id
+     WHERE comment.author_id = $2 OR poll.author_id = $2
+     ON CONFLICT DO NOTHING`,
+    [operationId, userId]
+  );
+  await client.query(
+    `INSERT INTO account_deletion_counter_targets (operation_id, target_type, target_id)
+     SELECT operation_id, target_type, target_id FROM account_deletion_content_targets
+     WHERE operation_id = $1
+     ON CONFLICT DO NOTHING`,
+    [operationId]
+  );
 }
 
 async function deleteOwnedPollBatch(client: PoolClient, operationId: string, userId: string) {

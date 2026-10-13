@@ -9,6 +9,37 @@ import { realtimeBus } from '../../realtime/realtime.bus.js';
 type PollTargetRow = { id: string };
 type EventRow = { id: string; event_payload: RealtimeEvent };
 
+async function rememberCounterTargets(client: PoolClient, operationId: string, userId: string) {
+  await client.query(
+    `INSERT INTO account_deletion_counter_targets (operation_id, target_type, target_id)
+     SELECT $1, 'poll', affected.poll_id FROM (
+       SELECT poll_id FROM poll_votes WHERE voter_id = $2
+       UNION SELECT poll_id FROM likes WHERE user_id = $2 AND poll_id IS NOT NULL
+       UNION SELECT comment.poll_id FROM likes reaction
+         JOIN comments comment ON comment.id = reaction.comment_id
+         WHERE reaction.user_id = $2 AND reaction.comment_id IS NOT NULL
+     ) affected WHERE affected.poll_id IS NOT NULL
+     ON CONFLICT DO NOTHING`,
+    [operationId, userId]
+  );
+  await client.query(
+    `INSERT INTO account_deletion_counter_targets (operation_id, target_type, target_id)
+     SELECT $1, 'comment', comment_id FROM likes
+     WHERE user_id = $2 AND comment_id IS NOT NULL
+     ON CONFLICT DO NOTHING`,
+    [operationId, userId]
+  );
+  await client.query(
+    `INSERT INTO account_deletion_counter_targets (operation_id, target_type, target_id)
+     SELECT $1, 'profile', user_id FROM (
+       SELECT followee_id AS user_id FROM follows WHERE follower_id = $2
+       UNION SELECT follower_id AS user_id FROM follows WHERE followee_id = $2
+     ) affected WHERE affected.user_id <> $2
+     ON CONFLICT DO NOTHING`,
+    [operationId, userId]
+  );
+}
+
 async function getNextAffectedPoll(client: PoolClient, operationId: string, userId: string, cursorId: string | null) {
   const result = await client.query<PollTargetRow>(
     `WITH targets AS (
@@ -173,6 +204,7 @@ export async function purgeAccountRelationships(operationId: string): Promise<{ 
     if (!userId) throw new Error('account_deletion_operation_not_found');
 
     await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
+    await rememberCounterTargets(client, operationId, userId);
     const step = await client.query<{ cursor_id: string | null }>(
       `SELECT cursor_id FROM account_deletion_steps
        WHERE operation_id = $1 AND step_key = 'relationships' FOR UPDATE`,

@@ -7,6 +7,7 @@ import { purgeAccountModerationData } from './account-deletion.moderation.js';
 import { purgeAccountNotifications } from './account-deletion.notifications.js';
 import { purgeAccountRelationships } from './account-deletion.relationships.js';
 import { discoverAccountMedia, purgeAccountMedia } from './account-deletion.media.js';
+import { verifyAndCompleteDeletion } from './account-deletion.completion.js';
 
 export const DELETION_STEP_ORDER = [
   'discovery', 'notifications', 'moderation', 'content', 'relationships', 'media', 'completion'
@@ -144,6 +145,13 @@ const databaseRepository: AccountDeletionWorkerRepository = {
          AND operation.status = 'processing' AND operation.lease_until > $4`,
       [operationId, stepKey, leaseOwner, now]
     );
+    if (result.rowCount === 1) {
+      await db.query(
+        `UPDATE account_deletion_operations SET retry_started_at = NULL
+         WHERE id = $1 AND lease_owner = $2 AND status = 'processing'`,
+        [operationId, leaseOwner]
+      );
+    }
     return result.rowCount === 1;
   },
   async markStepPending(operationId, stepKey, leaseOwner, now) {
@@ -192,7 +200,7 @@ const databaseRepository: AccountDeletionWorkerRepository = {
       `UPDATE account_deletion_operations
        SET status = 'retrying', available_at = $3 + ($4::text || ' seconds')::interval,
            lease_owner = NULL, lease_until = NULL, attempts = attempts + 1,
-           last_error_code = $5, updated_at = $3
+           last_error_code = $5, retry_started_at = COALESCE(retry_started_at, $3), updated_at = $3
        WHERE id = $1 AND lease_owner = $2 AND status = 'processing' AND lease_until > $3`,
       [operationId, leaseOwner, now, delaySeconds, errorCode]
     );
@@ -202,7 +210,7 @@ const databaseRepository: AccountDeletionWorkerRepository = {
     const result = await db.query(
       `UPDATE account_deletion_operations operation
        SET status = 'completed', completed_at = $3, lease_owner = NULL, lease_until = NULL,
-           last_error_code = NULL, updated_at = $3
+           last_error_code = NULL, retry_started_at = NULL, updated_at = $3
        WHERE id = $1 AND lease_owner = $2 AND status = 'processing'
          AND operation.lease_until > $3
          AND (SELECT count(*) FROM account_deletion_steps step
@@ -248,7 +256,7 @@ async function runStepWithLeaseRenewal(
 
 export async function processDeletionBatch(
   input: { limit: number; now: Date },
-  dependencies: AccountDeletionWorkerDependencies = { repository: databaseRepository, handlers: {} }
+  dependencies: AccountDeletionWorkerDependencies = { repository: databaseRepository, handlers: accountDeletionStepHandlers }
 ): Promise<{ processed: number; completed: number; retrying: number }> {
   const limit = Math.max(1, Math.min(Math.floor(input.limit), DELETION_WORK_BATCH_SIZE));
   const claimed = await dependencies.repository.claim(limit, input.now, randomUUID());
@@ -319,7 +327,8 @@ export const accountDeletionStepHandlers: Partial<Record<DeletionStepKey, Deleti
   moderation: purgeAccountModerationData,
   content: purgeAccountContent,
   relationships: purgeAccountRelationships,
-  media: purgeAccountMedia
+  media: purgeAccountMedia,
+  completion: verifyAndCompleteDeletion
 };
 
 export function assertDeletionStepHandlersReady(handlers: Partial<Record<DeletionStepKey, DeletionStepHandler>>) {
