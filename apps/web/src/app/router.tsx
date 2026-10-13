@@ -11,6 +11,7 @@ import { NotificationsPage } from '../features/notifications/NotificationsPage';
 import { NotificationPreferencesPage } from '../features/notifications/NotificationPreferencesPage';
 import { useSession } from './session-provider';
 import { ScrollRestorationCoordinator } from '../core/scroll/ScrollRestorationCoordinator';
+import { AccountDeletionPage } from '../features/account-deletion/AccountDeletionPage';
 
 function AppRouteRoot() {
   return <><ScrollRestorationCoordinator /><AppLayout /></>;
@@ -21,15 +22,17 @@ function LoadingMain() {
 }
 
 export function PublicOnlyRoute() {
-  const { status } = useSession();
+  const { status, accountDeletionPending } = useSession();
+  if (accountDeletionPending) return <Navigate to="/account-deletion" replace />;
   if (status === 'loading') return <LoadingMain />;
   if (status === 'authenticated') return <Navigate to="/" replace />;
   return <Outlet />;
 }
 
 export function ProtectedRoute() {
-  const { status } = useSession();
+  const { status, accountDeletionPending } = useSession();
   const location = useLocation();
+  if (accountDeletionPending) return <Navigate to="/account-deletion" replace />;
   if (status === 'loading') return <LoadingMain />;
   if (status === 'anonymous') {
     return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
@@ -45,6 +48,7 @@ export const router = createBrowserRouter([
     element: <AppRouteRoot />,
     children: [
       { index: true, element: <FeedPage /> },
+      { path: 'account-deletion', element: <AccountDeletionPage /> },
       { path: 'polls/:pollId', element: <PollDetailPage /> },
       { path: 'users/:userId', element: <PublicProfilePage /> },
       {

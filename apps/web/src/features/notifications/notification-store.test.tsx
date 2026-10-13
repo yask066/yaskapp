@@ -13,7 +13,7 @@ const { getUnreadCount, listNotifications, markNotificationRead, markAllNotifica
   listNotifications: vi.fn(),
   markNotificationRead: vi.fn(),
   markAllNotificationsRead: vi.fn(),
-  session: { current: { status: 'authenticated' as 'authenticated' | 'anonymous', user: { id: 'user-1' } as { id: string } | null, sessionEpoch: 1 } },
+  session: { current: { status: 'authenticated' as 'authenticated' | 'anonymous', user: { id: 'user-1' } as { id: string } | null, sessionEpoch: 1, accountDeletionPending: false } },
 }));
 vi.mock('../../api/notifications', () => ({ getUnreadCount, listNotifications, markNotificationRead, markAllNotificationsRead }));
 
@@ -144,7 +144,7 @@ function ProviderProbe() {
 
 describe('NotificationProvider session lifecycle', () => {
   afterEach(() => {
-    session.current = { status: 'authenticated', user: { id: 'user-1' }, sessionEpoch: 1 };
+    session.current = { status: 'authenticated', user: { id: 'user-1' }, sessionEpoch: 1, accountDeletionPending: false };
     getUnreadCount.mockClear();
     listNotifications.mockClear();
     markNotificationRead.mockClear();
@@ -156,6 +156,14 @@ describe('NotificationProvider session lifecycle', () => {
 
     await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('3'));
     expect(getUnreadCount).toHaveBeenCalledOnce();
+    expect(listNotifications).not.toHaveBeenCalled();
+  });
+
+  it('does not load private notifications while deletion acceptance is unresolved', async () => {
+    session.current.accountDeletionPending = true;
+    render(<NotificationProvider><ProviderProbe /></NotificationProvider>);
+
+    expect(getUnreadCount).not.toHaveBeenCalled();
     expect(listNotifications).not.toHaveBeenCalled();
   });
 
@@ -197,7 +205,7 @@ describe('NotificationProvider session lifecycle', () => {
     const view = render(<NotificationProvider><ProviderProbe /></NotificationProvider>);
     await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('3'));
 
-    session.current = { status: 'anonymous', user: null, sessionEpoch: 2 };
+    session.current = { status: 'anonymous', user: null, sessionEpoch: 2, accountDeletionPending: false };
     view.rerender(<NotificationProvider><ProviderProbe /></NotificationProvider>);
     await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('0'));
   });
@@ -257,7 +265,7 @@ describe('NotificationProvider session lifecycle', () => {
     await waitFor(() => expect(screen.getByTestId('notification-ids')).toHaveTextContent('notification-1'));
     fireEvent.click(screen.getByRole('button', { name: 'read' }));
 
-    session.current = { status: 'authenticated', user: { id: 'user-2' }, sessionEpoch: 2 };
+    session.current = { status: 'authenticated', user: { id: 'user-2' }, sessionEpoch: 2, accountDeletionPending: false };
     view.rerender(<NotificationProvider><ProviderProbe /></NotificationProvider>);
     await waitFor(() => expect(screen.getByTestId('notification-ids')).toBeEmptyDOMElement());
     await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('3'));
@@ -280,7 +288,7 @@ describe('NotificationProvider session lifecycle', () => {
     await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('3'));
 
     fireEvent.click(screen.getByRole('button', { name: 'read all' }));
-    session.current = { status: 'authenticated', user: { id: 'user-2' }, sessionEpoch: 2 };
+    session.current = { status: 'authenticated', user: { id: 'user-2' }, sessionEpoch: 2, accountDeletionPending: false };
     view.rerender(<NotificationProvider><ProviderProbe /></NotificationProvider>);
     await waitFor(() => expect(screen.getByTestId('unread-count')).toHaveTextContent('3'));
 

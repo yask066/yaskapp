@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { ApiError } from '../../api/client';
 import { useSession } from '../../app/session-provider';
 import { MaterialIcon } from '../../components/MaterialIcon';
+import { Link } from 'react-router-dom';
 
 type AuthMode = 'login' | 'register';
 
@@ -88,6 +89,7 @@ export function AuthPage({ mode }: AuthPageProps) {
         </> : null}
         {serverError ? <p className="auth-server-error" role="alert">{serverError}</p> : null}
         {!isRegistration ? <a className="forgot-password-link" href="#forgot-password">Forgot password?</a> : null}
+        {!isRegistration ? <Link className="forgot-password-link" to="/account-deletion">Delete a locked account</Link> : null}
         <button className="auth-submit button button--primary" type="submit" disabled={pending}>{pending ? 'Submitting…' : isRegistration ? 'Create account' : 'Sign in'}</button>
           </form>
           {!isRegistration ? <>

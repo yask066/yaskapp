@@ -5,6 +5,8 @@ import { ApiError, apiClient } from '../api/client';
 import type { AuthUser } from '../api/models';
 import { reconcileCachedPolls, resetPollSession } from '../features/polls/poll-state';
 import { clearEntryMotionRegistry } from '../core/motion/entry-motion-registry';
+import { clearPrivateBrowserStorage, loadAccountDeletionReceipt } from '../features/account-deletion/account-deletion-receipt';
+import { replaceCurrentPageWithDeletionStatus, subscribeToAccountDeletion } from '../features/account-deletion/account-deletion-tabs';
 
 type SessionStatus = 'loading' | 'authenticated' | 'anonymous';
 
@@ -12,9 +14,12 @@ export interface SessionState {
   status: SessionStatus;
   user: AuthUser | null;
   sessionEpoch: number;
+  accountDeletionPending: boolean;
   signIn(input: { login: string; password: string }): Promise<void>;
   register(input: { email: string; username: string; password: string; countryCode: string; displayName?: string }): Promise<void>;
   signOut(): void;
+  completeAccountDeletion(): Promise<void>;
+  setAccountDeletionPending(pending: boolean): Promise<void>;
   updateUser(user: AuthUser): void;
   reconcilePolls(): Promise<void>;
 }
@@ -26,6 +31,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<SessionStatus>('loading');
   const [user, setUser] = useState<AuthUser | null>(null);
   const [sessionEpoch, setSessionEpoch] = useState(0);
+  const [accountDeletionPending, setAccountDeletionPendingState] = useState(() => Boolean(loadAccountDeletionReceipt()));
   const requestEpoch = useRef(0);
 
   const clearSession = useCallback(() => {
@@ -37,6 +43,33 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
     setUser(null);
     setStatus('anonymous');
+  }, [queryClient]);
+
+  const completeAccountDeletion = useCallback(async () => {
+    setAccountDeletionPendingState(true);
+    requestEpoch.current += 1;
+    apiClient.cancelSessionRequests();
+    await queryClient.cancelQueries();
+    clearEntryMotionRegistry();
+    setSessionEpoch((epoch) => epoch + 1);
+    resetPollSession(queryClient);
+    queryClient.clear();
+    setUser(null);
+    setStatus('anonymous');
+    clearPrivateBrowserStorage();
+  }, [queryClient]);
+
+  const setAccountDeletionPending = useCallback(async (pending: boolean) => {
+    setAccountDeletionPendingState(pending);
+    if (pending) {
+      requestEpoch.current += 1;
+      apiClient.cancelSessionRequests();
+      await queryClient.cancelQueries();
+      clearEntryMotionRegistry();
+      setSessionEpoch((epoch) => epoch + 1);
+      resetPollSession(queryClient);
+      queryClient.clear();
+    }
   }, [queryClient]);
 
   useEffect(() => {
@@ -86,20 +119,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [establishSession]);
 
-  const reconcilePolls = useCallback(() => status === 'loading' ? Promise.resolve() : reconcileCachedPolls(queryClient, user?.id ?? null), [queryClient, status, user?.id]);
+  const reconcilePolls = useCallback(() => status === 'loading' || accountDeletionPending ? Promise.resolve() : reconcileCachedPolls(queryClient, user?.id ?? null), [accountDeletionPending, queryClient, status, user?.id]);
   useEffect(() => {
     const unfocus = focusManager.subscribe((focused) => { if (focused && onlineManager.isOnline()) void reconcilePolls(); });
     const unonline = onlineManager.subscribe((online) => { if (online && focusManager.isFocused()) void reconcilePolls(); });
     return () => { unfocus(); unonline(); };
   }, [reconcilePolls, sessionEpoch]);
 
+  useEffect(() => subscribeToAccountDeletion(() => {
+    void completeAccountDeletion().then(() => {
+      replaceCurrentPageWithDeletionStatus();
+    }).catch(() => {
+      replaceCurrentPageWithDeletionStatus(true);
+    });
+  }), [completeAccountDeletion]);
+
   const value = useMemo<SessionState>(() => ({
     status, user, sessionEpoch,
     signIn: (input) => authenticate(() => login(input)),
     register: (input) => authenticate(() => register(input)),
     signOut: () => { clearSession(); void logout().catch(() => undefined); },
+    completeAccountDeletion, accountDeletionPending, setAccountDeletionPending,
     updateUser: setUser, reconcilePolls,
-  }), [authenticate, clearSession, reconcilePolls, sessionEpoch, status, user]);
+  }), [accountDeletionPending, authenticate, clearSession, completeAccountDeletion, reconcilePolls, sessionEpoch, setAccountDeletionPending, status, user]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

@@ -91,6 +91,14 @@ test('uploads an avatar and preserves edited profile fields in the authenticated
   expect(await screen.findByText('Renamed', { selector: 'span' })).toBeInTheDocument();
 });
 
+test('shows the account deletion action in My profile', async () => {
+  server.use(http.get('/auth/me', () => HttpResponse.json({ user: currentUser })));
+  renderPage('/me', <MyProfilePage />);
+
+  expect(await screen.findByRole('heading', { name: 'Delete account' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Delete account' })).toHaveAttribute('href', '/account-deletion');
+});
+
 test('sends avatar uploads as FormData without a manually supplied content type', async () => {
   const send = vi.spyOn(apiClient, 'send').mockResolvedValue(currentUser);
   const avatar = new File(['avatar'], 'avatar.png', { type: 'image/png' });

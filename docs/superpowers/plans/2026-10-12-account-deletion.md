@@ -10,7 +10,7 @@
 
 **PRD:** [Самостоятельное удаление аккаунта и очистка данных](../../prd-account-deletion.md).
 
-**Статус:** AD-01–AD-03 выполнены; следующие задачи ещё не реализованы. Все задачи обязательны для первого релиза. Существующие изменения в `apps/web/vite.config.ts` не относятся к этой работе.
+**Статус:** AD-01–AD-13 выполнены; AD-14–AD-15 ещё не реализованы. Все задачи обязательны для первого релиза. Существующие изменения в `apps/web/vite.config.ts` не относятся к этой работе.
 
 ## Общие ограничения
 
@@ -262,13 +262,15 @@ AD-14 → AD-15**.
 
 **Интерфейс клиента:** `verifyAccountDeletion(input)`, `deleteAccount(deletionToken)`, `getAccountDeletionStatus(statusToken)` с DTO AD-02. Специальный transport не использует глобальный logout-handler обычного API.
 
-- [ ] Добавить tests неверного пароля без signOut, double submit, сохранения receipt до отправки, reload после timeout, cleanup failure и запоздалого query response.
-- [ ] Добавить блок в My profile, доступный экран и deletion-only вход из AuthPage; исключить private route requirement для проверки receipt/удаления заблокированного пользователя.
-- [ ] При acceptance очистить auth state, cancel queries/requests, query cache, приватную навигацию и данные аккаунта в используемых browser storage. Server-side cookie удаляет AD-04; обычный JS не читает HttpOnly cookie.
-- [ ] Уведомить другие вкладки через `BroadcastChannel` с fallback `storage` event без токенов/профиля; обновить клиента на `account.deleted`, reconnect и 401. Receipt хранить отдельно с expiry 48 часов и удалять после completed.
-- [ ] Проверить клавиатуру, focus, screen reader, browser back, смену аккаунта, две вкладки и ошибки origin/expired token.
+- [x] Добавить tests неверного пароля без signOut, double submit, сохранения receipt до отправки, reload после timeout, cleanup failure и запоздалого query response.
+- [x] Добавить блок в My profile, доступный экран и deletion-only вход из AuthPage; исключить private route requirement для проверки receipt/удаления заблокированного пользователя.
+- [x] При acceptance очистить auth state, cancel queries/requests, query cache, приватную навигацию и данные аккаунта в используемых browser storage. Server-side cookie удаляет AD-04; обычный JS не читает HttpOnly cookie.
+- [x] Уведомить другие вкладки через `BroadcastChannel` с fallback `storage` event без токенов/профиля; обновить клиента на `account.deleted`, reconnect и 401. Receipt хранить отдельно с expiry 48 часов и удалять после completed.
+- [x] Проверить клавиатуру, focus, screen reader, browser back, смену пользователя, две вкладки и ошибки origin/expired token.
 
 **Готово, когда:** web поддерживает тот же сценарий и не возвращает приватные данные из кэша/истории. **PRD:** AC-01–AC-03, AC-10, AC-13, AC-14.
+
+**Результат AD-13:** добавлены отдельный deletion transport, открытый маршрут сценария, сохранение status receipt в `localStorage` с 48-часовым expiry, блокировка приватных экранов и запросов при неопределённом результате, очистка auth/query/browser state, межвкладочное уведомление и обработка серверного `account.deleted`. Полный web-набор: 275/275; `typecheck`, `lint` и production build web прошли. Клавиатура, focus, screen-reader semantics, reload, browser back, double submit, поздний query response и ошибки cleanup покрыты автоматизированными тестами; ручная проверка screen reader не выполнялась.
 
 ## AD-14. Worker в инфраструктуре, retention и restore
 

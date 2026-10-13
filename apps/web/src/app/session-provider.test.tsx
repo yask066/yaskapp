@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SessionProvider, useSession } from './session-provider';
+import { saveAccountDeletionReceipt } from '../features/account-deletion/account-deletion-receipt';
 
 const user = {
   id: 'user-1',
@@ -28,7 +29,10 @@ function SessionProbe() {
   const session = useSession();
   return <>
     <output>{session.status === 'authenticated' && session.user ? session.user.username : session.status}</output>
+    <output data-testid="deletion-pending">{String(session.accountDeletionPending)}</output>
     <button type="button" onClick={() => session.signOut()}>Sign out</button>
+    <button type="button" onClick={() => { void session.completeAccountDeletion(); }}>Complete deletion</button>
+    <button type="button" onClick={() => { void session.setAccountDeletionPending(true); }}>Lock for deletion</button>
     <button type="button" onClick={() => { void session.signIn({ login: 'second', password: 'password' }).catch(() => undefined); }}>Sign in</button>
   </>;
 }
@@ -145,5 +149,75 @@ describe('SessionProvider', () => {
     });
 
     expect(screen.getByText('anonymous')).toBeInTheDocument();
+  });
+
+  it('clears auth queries and browser caches when account deletion is accepted', async () => {
+    server.use(http.get('/auth/me', () => HttpResponse.json({ user })));
+    const { queryClient } = renderSession();
+    queryClient.setQueryData(['profile', 'private'], { displayName: 'Private profile' });
+    sessionStorage.setItem('private-route', 'profile');
+    await screen.findByText('member');
+
+    await act(async () => { screen.getByRole('button', { name: 'Complete deletion' }).click(); });
+
+    expect(screen.getByText('anonymous')).toBeInTheDocument();
+    expect(queryClient.getQueryData(['profile', 'private'])).toBeUndefined();
+    expect(sessionStorage.getItem('private-route')).toBeNull();
+  });
+
+  it('locks account views and clears in-flight query data while acceptance is uncertain', async () => {
+    server.use(http.get('/auth/me', () => HttpResponse.json({ user })));
+    const { queryClient } = renderSession();
+    await screen.findByText('member');
+    queryClient.setQueryData(['profile', 'private'], { displayName: 'Private profile' });
+
+    await act(async () => { screen.getByRole('button', { name: 'Lock for deletion' }).click(); });
+
+    expect(screen.getByTestId('deletion-pending')).toHaveTextContent('true');
+    expect(queryClient.getQueryData(['profile', 'private'])).toBeUndefined();
+  });
+
+  it('restores the private-route lock from a saved receipt after reload', async () => {
+    saveAccountDeletionReceipt({ operationId: 'operation-1', statusToken: 'status-secret', expiresAt: '2026-10-15T20:00:00.000Z' });
+    server.use(http.get('/auth/me', () => HttpResponse.json({ user })));
+
+    renderSession();
+
+    await screen.findByText('member');
+    expect(screen.getByTestId('deletion-pending')).toHaveTextContent('true');
+  });
+
+  it('does not restore an account query that resolves after deletion cleanup', async () => {
+    server.use(http.get('/auth/me', () => HttpResponse.json({ user })));
+    const { queryClient } = renderSession();
+    let resolveLate!: (value: { displayName: string }) => void;
+    const lateQuery = queryClient.fetchQuery({ queryKey: ['profile', 'late'], queryFn: () => new Promise<{ displayName: string }>((resolve) => { resolveLate = resolve; }) });
+    void lateQuery.catch(() => undefined);
+    await waitFor(() => expect(resolveLate).toBeDefined());
+    await screen.findByText('member');
+
+    await act(async () => { screen.getByRole('button', { name: 'Complete deletion' }).click(); });
+    resolveLate({ displayName: 'Deleted account data' });
+
+    await Promise.resolve();
+    expect(queryClient.getQueryData(['profile', 'late'])).toBeUndefined();
+  });
+
+  it('clears the current session when another tab announces deletion', async () => {
+    server.use(http.get('/auth/me', () => HttpResponse.json({ user })));
+    vi.stubGlobal('BroadcastChannel', undefined);
+    const { queryClient } = renderSession();
+    await screen.findByText('member');
+    queryClient.setQueryData(['profile', 'private'], { displayName: 'Member' });
+
+    await act(async () => {
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'yask.account-deletion.event',
+        newValue: JSON.stringify({ type: 'account.deleted', nonce: 'from-other-tab' }),
+      }));
+    });
+
+    await waitFor(() => expect(screen.getByText('anonymous')).toBeInTheDocument());
+    expect(queryClient.getQueryData(['profile', 'private'])).toBeUndefined();
   });
 });

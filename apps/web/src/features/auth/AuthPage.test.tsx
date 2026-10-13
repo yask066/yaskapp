@@ -104,3 +104,13 @@ test('uses a focused auth form composition without the showcase', () => {
   expect(container.querySelector('.auth-showcase')).not.toBeInTheDocument();
   expect(screen.getByRole('form')).toHaveClass('form-panel');
 });
+
+test('offers deletion-only access from login without creating a normal session', () => {
+  render(
+    <MemoryRouter initialEntries={['/login']}>
+      <Routes><Route path="/login" element={<AuthPage mode="login" />} /><Route path="/account-deletion" element={<h1>Delete your account</h1>} /></Routes>
+    </MemoryRouter>,
+  );
+
+  expect(screen.getByRole('link', { name: 'Delete a locked account' })).toHaveAttribute('href', '/account-deletion');
+});

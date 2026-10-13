@@ -141,4 +141,19 @@ describe('NotificationRealtimeClient', () => {
     expect(onUnknownMessage).toHaveBeenCalledTimes(3);
     expect(socket.readyState).toBe(1);
   });
+
+  it('forwards account.deleted so the current session can be cleared', () => {
+    const onAccountDeleted = vi.fn();
+    const client = new NotificationRealtimeClient({
+      url: '/realtime',
+      createWebSocket: (url) => new FakeWebSocket(url),
+      onAccountDeleted,
+    });
+    client.start();
+    const socket = FakeWebSocket.instances[0];
+    socket.open();
+    socket.message({ type: 'account.deleted', payload: { userId: 'user-1', operationId: 'operation-1' } });
+
+    expect(onAccountDeleted).toHaveBeenCalledWith({ userId: 'user-1', operationId: 'operation-1' });
+  });
 });

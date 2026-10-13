@@ -17,6 +17,7 @@ export interface NotificationRealtimeClientOptions {
   url: string;
   createWebSocket?: (url: string) => RealtimeWebSocket;
   onEvent?: (event: NotificationRealtimeEventV1) => void;
+  onAccountDeleted?: (event: { userId: string; operationId: string }) => void;
   onConnectionReady?: () => void | Promise<void>;
   onStatusChange?: (status: RealtimeConnectionStatus) => void;
   onUnknownMessage?: () => void;
@@ -118,6 +119,18 @@ export class NotificationRealtimeClient {
     try { value = JSON.parse(raw); } catch { this.unknown(); return; }
     if (typeof value !== 'object' || value === null) { this.unknown(); return; }
     const source = value as { version?: unknown; type?: unknown };
+    if (source.type === 'account.deleted') {
+      const payload = (value as { payload?: unknown }).payload;
+      if (typeof payload === 'object' && payload !== null && !Array.isArray(payload)) {
+        const deleted = payload as Record<string, unknown>;
+        if (typeof deleted.userId === 'string' && typeof deleted.operationId === 'string') {
+          if (socket === this.socket) this.config.onAccountDeleted?.({ userId: deleted.userId, operationId: deleted.operationId });
+          return;
+        }
+      }
+      this.unknown();
+      return;
+    }
     if (source.version !== 1) { this.unknown(); return; }
     if (source.type === 'connection.ready') {
       void this.config.onConnectionReady?.();

@@ -3,6 +3,7 @@ import type { NotificationItem, NotificationRealtimeEventV1 } from '@yaskapp/sha
 import { getUnreadCount, listNotifications, markAllNotificationsRead, markNotificationRead } from '../../api/notifications';
 import { useSession } from '../../app/session-provider';
 import { NotificationRealtimeClient, type RealtimeConnectionStatus, createRealtimeUrl } from './realtime-client';
+import { replaceCurrentPageWithDeletionStatus } from '../account-deletion/account-deletion-tabs';
 
 export interface NotificationStoreState {
   itemsById: Record<string, NotificationItem>;
@@ -168,7 +169,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     const currentSessionIdentity = sessionIdentity;
     const controller = new AbortController();
     dispatch({ type: 'reset' });
-    if (session.status !== 'authenticated' || !userId) return () => controller.abort();
+    if (session.status !== 'authenticated' || session.accountDeletionPending || !userId) return () => controller.abort();
     dispatch({ type: 'loading', value: true });
     void getUnreadCount(controller.signal).then(({ unreadCount }) => {
       if (epoch.current === currentEpoch && sessionIdentityRef.current === currentSessionIdentity) {
@@ -180,7 +181,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       }
     });
     return () => controller.abort();
-  }, [session.sessionEpoch, session.status, sessionIdentity, userId]);
+  }, [session, session.sessionEpoch, session.status, sessionIdentity, userId]);
 
   const reconcile = useCallback(async () => {
     const currentEpoch = epoch.current;
@@ -271,7 +272,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (session.status !== 'authenticated' || !userId) {
+    if (session.status !== 'authenticated' || session.accountDeletionPending || !userId) {
       setRealtimeStatus('idle');
       return undefined;
     }
@@ -280,6 +281,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       url: createRealtimeUrl(),
       onEvent: (event) => {
         if (sessionIdentityRef.current === currentSessionIdentity) applyRealtime(event);
+      },
+      onAccountDeleted: (event) => {
+        if (event.userId !== userId || sessionIdentityRef.current !== currentSessionIdentity) return;
+        void session.completeAccountDeletion().then(() => {
+          replaceCurrentPageWithDeletionStatus();
+        }).catch(() => {
+          replaceCurrentPageWithDeletionStatus(true);
+        });
       },
       onConnectionReady: () => {
         if (sessionIdentityRef.current !== currentSessionIdentity) return;
@@ -292,7 +301,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     });
     client.start();
     return () => client.stop();
-  }, [applyRealtime, reconcile, reconcileSessionPolls, session.sessionEpoch, session.status, sessionIdentity, userId]);
+  }, [applyRealtime, reconcile, reconcileSessionPolls, session, session.sessionEpoch, session.status, sessionIdentity, userId]);
 
   const actions = useMemo<NotificationStoreActions>(() => ({ reconcile, loadMore, markRead, markAllRead, applyRealtime, clearPending }), [applyRealtime, clearPending, loadMore, markAllRead, markRead, reconcile]);
   return <NotificationContext.Provider value={{ ...state, actions, realtimeStatus }}>{children}</NotificationContext.Provider>;
