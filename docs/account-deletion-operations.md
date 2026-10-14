@@ -9,6 +9,14 @@ reboot. Keep `ACCOUNT_DELETION_ENABLED=false` until the independent journal,
 worker, alerts, and backup lifecycle are configured. Disabling new requests does
 not stop this worker from finishing accepted operations.
 
+The default staging Compose stack does not include the account-deletion worker,
+journal exporter, or backup uploader, and does not require their cloud env files.
+This lets the rest of staging deploy while account deletion remains disabled.
+When the account-deletion services are configured, include
+`infra/docker/docker-compose.account-deletion.staging.yml` with the base Compose
+file. Until that overlay is running, accepted deletion operations remain queued;
+keep the feature disabled and do not accept new operations.
+
 The worker emits structured `account_deletion.metrics` records every minute.
 Alert on `account_deletion.alert`, journal exporter failures, worker container
 exits/restarts, and missing metrics for more than two minutes. Page the on-call
@@ -59,7 +67,10 @@ Do not attach a lifecycle expiration rule to either journal prefix.
 After credentials and buckets are ready, run the read-only configuration check:
 
 ```sh
-docker compose -f infra/docker/docker-compose.staging.yml run --rm --build --no-deps api \
+docker compose \
+  -f infra/docker/docker-compose.staging.yml \
+  -f infra/docker/docker-compose.account-deletion.staging.yml \
+  run --rm --build --no-deps api \
   node services/api/dist/jobs/account-deletion-staging-storage-check.js
 ```
 
@@ -109,37 +120,56 @@ retention and independent failure domain remain intact.
 Copy `services/api/.env.staging.example` to
 `services/api/.env.staging`, replace every `replace-with-*` value, and keep the
 result out of Git. Provision PostgreSQL, Redis, and media credentials for the
-staging host. Configure the journal and checkpoint endpoints as separate
-services/accounts/failure domains, then use
+staging host. This file is sufficient for the base staging stack while
+`ACCOUNT_DELETION_ENABLED=false`; that stack has no dependency on AWS or B2.
+
+Only when the independent stores are ready, configure the journal and
+checkpoint endpoints as separate services/accounts/failure domains. Copy
+`services/api/.env.account-deletion-cloud.staging.example` to
+`services/api/.env.account-deletion-cloud.staging` and fill in the B2 journal,
+AWS checkpoint, and AWS backup credentials. Then use
 `services/api/.env.account-deletion-retention.example` to create
 `services/api/.env.account-deletion-retention.staging` with read/list/delete
-versions credentials that cannot write or change retention. Keep
-`ACCOUNT_DELETION_ENABLED=false` until the independent stores, identity markers,
-Object Lock, backup lifecycle, and monitoring have passed the checks below.
+versions credentials that cannot write or change retention. Keep both files out
+of Git.
 
-Copy `.env.account-deletion-cloud.staging.example` to
-`.env.account-deletion-cloud.staging` and fill it with the B2 journal, AWS
-checkpoint, and AWS backup credentials. Copy
+If configuring Grafana Cloud log shipping, copy
 `.env.grafana-cloud.staging.example` to `.env.grafana-cloud.staging` and set a
 Grafana Cloud Loki URL, stack/tenant ID, and a token restricted to log writes.
-Do not commit either file. AWS checkpoint and backup credentials should be
-scoped separately; record account IDs to demonstrate the configured failure
+Do not commit any of these files. AWS checkpoint and backup credentials should
+be scoped separately; record account IDs to demonstrate the configured failure
 domains.
 
-Check the Compose file before applying it:
+The ordinary staging stack can be deployed without account-deletion cloud
+credentials:
 
 ```sh
 docker compose -f infra/docker/docker-compose.staging.yml config --quiet
+docker compose -f infra/docker/docker-compose.staging.yml up -d --build --remove-orphans
 ```
 
-Validate and start the Grafana Cloud log shipping overlay together with staging:
+After the cloud and retention env files are configured, include the
+account-deletion overlay to start the worker and exporter:
 
 ```sh
 docker compose \
   -f infra/docker/docker-compose.staging.yml \
+  -f infra/docker/docker-compose.account-deletion.staging.yml config --quiet
+docker compose \
+  -f infra/docker/docker-compose.staging.yml \
+  -f infra/docker/docker-compose.account-deletion.staging.yml up -d --build
+```
+
+To add Grafana Cloud log shipping, include its overlay as well:
+
+```sh
+docker compose \
+  -f infra/docker/docker-compose.staging.yml \
+  -f infra/docker/docker-compose.account-deletion.staging.yml \
   -f infra/docker/docker-compose.account-deletion-observability.yml config --quiet
 docker compose \
   -f infra/docker/docker-compose.staging.yml \
+  -f infra/docker/docker-compose.account-deletion.staging.yml \
   -f infra/docker/docker-compose.account-deletion-observability.yml up -d
 ```
 
@@ -219,9 +249,15 @@ API/web traffic against the restored snapshot.
    restored accepted rows against the journal, then replay the full journal:
 
    ```sh
-   docker compose -f infra/docker/docker-compose.staging.yml run --rm --no-deps --entrypoint node account-deletion-journal-exporter \
+   docker compose \
+     -f infra/docker/docker-compose.staging.yml \
+     -f infra/docker/docker-compose.account-deletion.staging.yml \
+     run --rm --no-deps --entrypoint node account-deletion-journal-exporter \
      services/api/dist/jobs/export-account-deletion-journal.js
-   docker compose -f infra/docker/docker-compose.staging.yml run --rm --no-deps api \
+   docker compose \
+     -f infra/docker/docker-compose.staging.yml \
+     -f infra/docker/docker-compose.account-deletion.staging.yml \
+     run --rm --no-deps api \
      node services/api/dist/jobs/reapply-account-deletions.js
    ```
 

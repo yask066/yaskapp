@@ -21,7 +21,10 @@ pg_restore --list "$backup_file" > "$backup_file.list"
 ```
 
 For the VPS, use the repository script so the dump is validated and old local
-dumps are removed according to retention:
+dumps are removed according to retention. This script also uploads the dump to
+the external AWS bucket, so it requires the account-deletion cloud env files and
+Compose overlay. Without those credentials, use the manual dump commands above;
+that leaves the dump on the VPS and is not an off-host backup.
 
 ```bash
 sudo install -m 0750 infra/docker/backup-postgres.sh /usr/local/sbin/yaskapp-backup-postgres
