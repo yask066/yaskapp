@@ -10,7 +10,7 @@
 
 **PRD:** [Самостоятельное удаление аккаунта и очистка данных](../../prd-account-deletion.md).
 
-**Статус:** AD-01–AD-13 выполнены; для AD-14–AD-15 подготовлена реализация и тестовая документация, но обязательные staging-проверки и выпускные ворота не завершены. Все задачи обязательны для первого релиза. Существующие изменения в `apps/web/vite.config.ts` не относятся к этой работе.
+**Статус:** AD-01–AD-13 выполнены; AD-14 закрыт по прямому решению пользователя без staging-проверки. AD-15 и выпускные ворота остаются открыты; закрытие AD-14 не означает эксплуатационную приёмку внешних хранилищ, alert delivery или восстановления. Существующие изменения в `apps/web/vite.config.ts` не относятся к этой работе.
 
 ## Общие ограничения
 
@@ -278,12 +278,11 @@ AD-14 → AD-15**.
 
 **Интерфейс:** export/reapply CLI с non-zero exit при неполной проверке. Журнал экспортируется в защищённое хранилище отдельно от backup основной БД, содержит только operation/user IDs и timestamps.
 
-- [ ] Настроить отдельный постоянно работающий worker, restart policy, наблюдение за lease/queue и alert из AD-11. API и worker используют одну версию схемы; при выключении входа в сценарий worker продолжает работать.
-- [ ] Настроить expiry во всех местах хранения backup и версий в пределах 30 дней. Обеспечить сохранность принятых удалений в независимом журнале до подтверждения acceptance клиенту, включая потерю основной БД; одного периодического асинхронного экспорта недостаточно. Связать готовность независимого журнала с доступностью новых acceptance, не останавливая существующую очередь.
-- [ ] Перед restore сверять полноту/актуальность журнала, при недоступном или неполном журнале не открывать трафик. Проверить потерю основной БД сразу после подтверждённого acceptance и до ближайшего периодического экспорта.
-- [ ] Реализовать reapply после restore БД/storage и до трафика, включая ранее завершённые операции. Истечение старого deletionToken не мешает очистке; старые данные не становятся видимыми.
-- [ ] Добавить тест `restore_old_backup_does_not_resurrect_account` и упражнение на staging с backup до удаления; повторное применение должно быть идемпотентно.
-- [x] Документировать retry/recovery, alert escalation, защиту журналов, TTL и безопасный rollback приложения без восстановления аккаунтов.
+- [x] Реализованы постоянно работающий worker и restart policy, синхронный durable journal/checkpoint gate, экспорт и replay после восстановления; добавлены проверка backup lifecycle, upload проверенного dump в S3 и runbook.
+- [x] Добавлен `restore_old_backup_does_not_resurrect_account`; локальные тесты, typecheck/build и Compose config проверены.
+- [x] AD-14 закрыт по прямому решению пользователя без staging-проверки (2026-10-15).
+
+**Не проверено и не считается пройденным:** реальные Object Lock/lifecycle настройки и failure domains B2/AWS, Grafana Cloud contact point/alert delivery, потеря staging-БД после acceptance и полноценное восстановление из backup до удаления. Эти staging-проверки пользователь исключил из условия закрытия AD-14; они остаются эксплуатационными ограничениями, а AD-15 и выпускные ворота не закрыты.
 
 **Текущий результат AD-14:** добавлены отдельные Compose worker и journal exporter;
 acceptance использует `prepared` до DB commit и подписанные `accepted` плюс
@@ -295,10 +294,10 @@ Lock per-entry сроки, 30-дневный предел локального b
 steps хранят позиции 0–6, а integration сценарий теперь прогоняет восстановленные
 steps через реальный worker repository.
 
-Не выполнены staging-зависимые шаги: provisioning двух S3 failure domains,
-создание identity markers, применение Object Lock/lifecycle к реальным bucket,
-настройка alerts, проверка экспорта после потери БД и restore exercise. Поэтому
-пункт остаётся открытым до staging-проверки.
+На момент проверки 2026-10-14 не были выполнены staging-зависимые шаги:
+provisioning двух S3 failure domains, создание identity markers, применение
+Object Lock/lifecycle к реальным bucket, настройка alerts, проверка экспорта
+после потери БД и restore exercise.
 
 Подготовка staging-проверок (2026-10-14): добавлены Backblaze B2 journal,
 AWS S3 checkpoint/backup и Grafana Cloud Loki env templates, read-only S3 checker
@@ -307,8 +306,9 @@ worker/exporter и upload проверенного PostgreSQL dump в AWS backup
 проверкой размера/SHA-256. Локальные cloud env-файлы являются копиями шаблонов
 с placeholders. Учетных данных B2/AWS/Grafana в окружении нет, поэтому создание
 buckets/contact point/alert rules, тестовая доставка, Object Lock/lifecycle API
-проверки, backup upload и полноценный restore пока не запускались. AD-14 остаётся
-открытым.
+проверки, backup upload и полноценный restore не запускались. 2026-10-15
+пользователь распорядился закрыть AD-14 без staging-проверки; см. принятое выше
+решение о waiver.
 
 **Проверка AD-14 (2026-10-14):** 18 unit-тестов journal/acceptance,
 recovery/retention прошли; `restore_old_backup_does_not_resurrect_account`
@@ -322,7 +322,9 @@ Compose config и сборка API image прошли. Локальные Postgr
 не настроены, retention env содержит пять `replace-me` placeholders.
 Секретные файлы исключены из Git. Media MinIO image недоступен из используемых
 registries; реальные независимые S3 stores, Object Lock/lifecycle, alerts,
-потеря основной БД и staging restore не проверены. Пункт остаётся открытым.
+потеря основной БД и staging restore не проверены. На 2026-10-14 пункт оставался
+открытым; решение пользователя о закрытии без staging-проверки зафиксировано
+выше датой 2026-10-15.
 
 **Готово, когда:** worker переживает reboot, сроки хранения выполняются, restore без полного журнала не публикует старые данные. **PRD:** AC-11, AC-16.
 
