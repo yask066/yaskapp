@@ -13,7 +13,10 @@
 .env
 .env.*
 !.env.example
+!.env.staging.example
 !.env.account-deletion-retention.example
+!.env.account-deletion-cloud.staging.example
+!.env.grafana-cloud.staging.example
 backups/
 infra/docker/secrets/
 .worktrees/

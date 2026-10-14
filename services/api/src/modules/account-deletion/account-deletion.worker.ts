@@ -126,7 +126,7 @@ export function createAccountDeletionWorkerRepository(executor: typeof db = db):
   async markStepProcessing(operationId, stepKey, leaseOwner, now) {
     const result = await executor.query(
       `UPDATE account_deletion_steps step
-       SET status = 'processing', attempts = attempts + 1,
+       SET status = 'processing', attempts = step.attempts + 1,
            started_at = COALESCE(started_at, $4), updated_at = $4
        FROM account_deletion_operations operation
        WHERE step.operation_id = $1 AND step.step_key = $2 AND step.status <> 'completed'

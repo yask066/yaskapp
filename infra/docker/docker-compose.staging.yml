@@ -89,6 +89,7 @@ services:
       dockerfile: services/api/Dockerfile
     env_file:
       - ../../services/api/.env.staging
+      - ../../services/api/.env.account-deletion-cloud.staging
     logging: *default-logging
     depends_on:
       postgres:
@@ -155,6 +156,7 @@ services:
       dockerfile: services/api/Dockerfile
     env_file:
       - ../../services/api/.env.staging
+      - ../../services/api/.env.account-deletion-cloud.staging
       - ../../services/api/.env.account-deletion-retention.staging
     logging: *default-logging
     depends_on:
@@ -172,6 +174,7 @@ services:
       dockerfile: services/api/Dockerfile
     env_file:
       - ../../services/api/.env.staging
+      - ../../services/api/.env.account-deletion-cloud.staging
       - ../../services/api/.env.account-deletion-retention.staging
     logging: *default-logging
     depends_on:
@@ -184,11 +187,27 @@ services:
       - -c
       - >-
         while true; do
-          node services/api/dist/jobs/export-account-deletion-journal.js ||
-            echo 'Account deletion journal export failed; alert on this log.';
+          if node services/api/dist/jobs/export-account-deletion-journal.js; then
+            echo '{"event":"account_deletion.journal_exporter.complete"}';
+          else
+            echo '{"event":"account_deletion.alert","component":"journal_exporter","error":"export_failed"}';
+          fi;
           sleep 300;
         done
     restart: unless-stopped
+
+  backup-uploader:
+    image: yaskapp-api:staging
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    profiles: ["maintenance"]
+    env_file:
+      - ../../services/api/.env.staging
+      - ../../services/api/.env.account-deletion-cloud.staging
+    logging: *default-logging
+    entrypoint: ["node", "services/api/dist/jobs/upload-staging-backup.js"]
+    restart: "no"
 
   moderation-web:
     image: yaskapp-moderation-web:staging

@@ -10,7 +10,7 @@
 
 **PRD:** [Самостоятельное удаление аккаунта и очистка данных](../../prd-account-deletion.md).
 
-**Статус:** AD-01–AD-13 выполнены; AD-14–AD-15 ещё не реализованы. Все задачи обязательны для первого релиза. Существующие изменения в `apps/web/vite.config.ts` не относятся к этой работе.
+**Статус:** AD-01–AD-13 выполнены; для AD-14–AD-15 подготовлена реализация и тестовая документация, но обязательные staging-проверки и выпускные ворота не завершены. Все задачи обязательны для первого релиза. Существующие изменения в `apps/web/vite.config.ts` не относятся к этой работе.
 
 ## Общие ограничения
 
@@ -293,13 +293,36 @@ IDs между хранилищами и сверяет HMAC/identity markers. �
 CLI, retention cleanup для завершённых и истёкших prepared операций, S3 Object
 Lock per-entry сроки, 30-дневный предел локального backup и runbook. Worker
 steps хранят позиции 0–6, а integration сценарий теперь прогоняет восстановленные
-steps через реальный worker repository. Тесты `restore_old_backup_does_not_resurrect_account`
-и worker completion пропущены без `ACCOUNT_DELETION_TEST_DATABASE_URL`.
+steps через реальный worker repository.
 
 Не выполнены staging-зависимые шаги: provisioning двух S3 failure domains,
 создание identity markers, применение Object Lock/lifecycle к реальным bucket,
 настройка alerts, проверка экспорта после потери БД и restore exercise. Поэтому
 пункт остаётся открытым до staging-проверки.
+
+Подготовка staging-проверок (2026-10-14): добавлены Backblaze B2 journal,
+AWS S3 checkpoint/backup и Grafana Cloud Loki env templates, read-only S3 checker
+для versioning/Object Lock/lifecycle, Alloy + Compose overlay только для логов
+worker/exporter и upload проверенного PostgreSQL dump в AWS backup bucket с
+проверкой размера/SHA-256. Локальные cloud env-файлы являются копиями шаблонов
+с placeholders. Учетных данных B2/AWS/Grafana в окружении нет, поэтому создание
+buckets/contact point/alert rules, тестовая доставка, Object Lock/lifecycle API
+проверки, backup upload и полноценный restore пока не запускались. AD-14 остаётся
+открытым.
+
+**Проверка AD-14 (2026-10-14):** 18 unit-тестов journal/acceptance,
+recovery/retention прошли; `restore_old_backup_does_not_resurrect_account`
+прошёл на отдельной одноразовой Docker PostgreSQL после исправления
+неоднозначного `attempts` в worker SQL на `step.attempts`. API typecheck,
+Compose config и сборка API image прошли. Локальные PostgreSQL/Redis подняты,
+32 migrations применены, worker работает при выключенном входе в удаление и
+пишет метрики; Compose restart policy виден как `unless-stopped`. Созданы
+шаблон `services/api/.env.staging.example` и локальные env-файлы с рандомными
+секретами PostgreSQL/MinIO/JWT; удаление выключено, внешние journal endpoints
+не настроены, retention env содержит пять `replace-me` placeholders.
+Секретные файлы исключены из Git. Media MinIO image недоступен из используемых
+registries; реальные независимые S3 stores, Object Lock/lifecycle, alerts,
+потеря основной БД и staging restore не проверены. Пункт остаётся открытым.
 
 **Готово, когда:** worker переживает reboot, сроки хранения выполняются, restore без полного журнала не публикует старые данные. **PRD:** AC-11, AC-16.
 
@@ -328,6 +351,12 @@ route/worker/protocol (26/26), web (283/283, typecheck/lint/build) и mobile
 Staging exercise, отдельные процессы API, полная fixture AC-01–AC-17,
 утверждение политики и rollout не проводились. Все пункты AD-15 остаются
 открытыми; выпуск не подтверждён.
+
+**Проверка AD-15 (2026-10-14):** gated E2E запущен и пропущен, поскольку
+отсутствуют выделенная тестовая БД, Redis, media storage, оба независимых
+journal store и их credentials/HMAC key, а также `ACCOUNT_DELETION_ENABLED`.
+Подключённый SM A325F виден Flutter, но без staging API и fixture на нём нельзя
+выполнить end-to-end приёмку или rollout.
 
 ## Команды проверки
 

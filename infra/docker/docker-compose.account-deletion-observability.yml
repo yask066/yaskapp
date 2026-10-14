@@ -1,0 +1,46 @@
+services:
+  account-deletion-alloy:
+    image: grafana/alloy:v1.20.1
+    env_file:
+      - ../../services/api/.env.grafana-cloud.staging
+    command: ["run", "/etc/alloy/account-deletion.alloy", "--storage.path=/var/lib/alloy/data"]
+    restart: unless-stopped
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+    ports:
+      - "127.0.0.1:1514:1514"
+    volumes:
+      - ../grafana/account-deletion.alloy:/etc/alloy/account-deletion.alloy:ro
+      - alloy-account-deletion-data:/var/lib/alloy/data
+
+  account-deletion-worker:
+    depends_on:
+      account-deletion-alloy:
+        condition: service_started
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://127.0.0.1:1514"
+        syslog-format: rfc5424
+        tag: account-deletion-worker
+        mode: non-blocking
+        max-buffer-size: 4m
+
+  account-deletion-journal-exporter:
+    depends_on:
+      account-deletion-alloy:
+        condition: service_started
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://127.0.0.1:1514"
+        syslog-format: rfc5424
+        tag: account-deletion-journal-exporter
+        mode: non-blocking
+        max-buffer-size: 4m
+
+volumes:
+  alloy-account-deletion-data:

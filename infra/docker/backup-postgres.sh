@@ -33,6 +33,10 @@ docker compose -f "$compose_file" exec -T postgres \
 mv "$temporary_file" "$backup_file"
 chmod 600 "$backup_file"
 
+docker compose --profile maintenance -f "$compose_file" run --rm --build --no-deps \
+  --volume "$backup_dir:/backups:ro" backup-uploader \
+  "$(basename "$backup_file")"
+
 find "$backup_dir" -type f -name 'yaskapp-staging-*.dump' \
   -mtime "+$retention_days" -delete
 
