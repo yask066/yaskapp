@@ -21,7 +21,7 @@ import {
   releaseVerificationAttempt
 } from './account-deletion.verification.js';
 import { AccountDeletionAcceptanceError, acceptAccountDeletion } from './account-deletion.service.js';
-import { acceptDeletionInJournal } from './account-deletion.journal.js';
+import { acceptDeletionInJournal, prepareDeletionInJournal } from './account-deletion.journal.js';
 
 const verificationSchema = z.object({ password: z.string().min(1).max(128) }).strict();
 const loginVerificationSchema = z.object({
@@ -91,7 +91,12 @@ function replyRateLimited(reply: FastifyReply, retryAfterSeconds: number) {
   });
 }
 
-export function registerAccountDeletionRoutes(app: FastifyInstance) {
+export function registerAccountDeletionRoutes(app: FastifyInstance, journal: {
+  prepareDeletionInJournal?: typeof prepareDeletionInJournal;
+  acceptDeletionInJournal?: typeof acceptDeletionInJournal;
+} = {}) {
+  const prepare = journal.prepareDeletionInJournal ?? prepareDeletionInJournal;
+  const accept = journal.acceptDeletionInJournal ?? acceptDeletionInJournal;
   app.post('/auth/account-deletion/verification', {
     preHandler: [
       rateLimit({ keyPrefix: 'account-deletion-verification-ip', limit: 30, windowMs: 15 * 60_000 }),
@@ -174,7 +179,7 @@ export function registerAccountDeletionRoutes(app: FastifyInstance) {
     if (!operation) return sendUnauthorized(reply);
     if (operation.acceptedAt && operation.deadlineAt) {
       try {
-        await acceptDeletionInJournal({
+        await accept({
           operationId: operation.operationId,
           userId: permission.userId,
           acceptedAt: new Date(operation.acceptedAt),
@@ -198,7 +203,10 @@ export function registerAccountDeletionRoutes(app: FastifyInstance) {
     if (!token) return sendUnauthorized(reply);
 
     try {
-      const operation = await acceptAccountDeletion(token, parsed.data.confirm);
+      const operation = await acceptAccountDeletion(token, parsed.data.confirm, {
+        writePrepared: prepare,
+        writeAccepted: accept
+      });
       reply.header('set-cookie', serializeSessionCookie(null, request.protocol === 'https'));
       return reply.status(202).send(operation satisfies AccountDeletionStatusResponse);
     } catch (error) {

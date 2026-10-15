@@ -234,14 +234,17 @@ function installDatabase(context: TestContext) {
   };
 }
 
-async function makeApp() {
+async function makeApp(journal?: {
+  prepareDeletionInJournal?: (acceptance: { operationId: string; userId: string; acceptedAt: Date; deadlineAt: Date }) => Promise<void>;
+  acceptDeletionInJournal?: (acceptance: { operationId: string; userId: string; acceptedAt: Date; deadlineAt: Date }) => Promise<void>;
+}) {
   const app = Fastify({ trustProxy: true });
   await app.register(jwt, { secret: env.JWT_SECRET, cookie: { cookieName: 'yaskapp_session', signed: false } });
   app.addHook('onRequest', async (request) => { request.cookies = parseCookieHeader(request.headers.cookie); });
   app.decorateRequest('getCurrentUser', function () { return getCurrentUser(this); });
   app.get('/test/optional-auth', { preHandler: optionalAuthenticate }, async (request) => ({ userId: request.user?.sub ?? null }));
   registerAuthRoutes(app);
-  registerAccountDeletionRoutes(app);
+  registerAccountDeletionRoutes(app, journal);
   await app.ready();
   return app;
 }
@@ -539,6 +542,86 @@ test('acceptance_rollback_leaves_active', async (context) => {
   assert.equal(fakeDb.account(account.id)?.session_version, 0);
   const status = await app.inject({ method: 'GET', url: '/auth/account-deletion/status', headers: { authorization: `Bearer ${tokens.statusToken}` } });
   assert.equal(status.json().status, 'not_started');
+});
+
+test('prepare_failure_never_returns_accepted_or_commits_application_transaction', async (context) => {
+  enableDeletion(context);
+  const fakeDb = installDatabase(context);
+  const account = await fakeDb.createAccount();
+  const app = await makeApp({ prepareDeletionInJournal: async () => { throw new Error('journal_unavailable'); } });
+  context.after(() => app.close());
+  const accessToken = await bearerFor(app, account);
+  const verification = await app.inject({
+    method: 'POST', url: '/auth/account-deletion/verification',
+    headers: { authorization: `Bearer ${accessToken}` }, payload: { password: account.password }
+  });
+  const deletionToken = verification.json<{ deletionToken: string }>().deletionToken;
+
+  const response = await app.inject({
+    method: 'DELETE', url: '/auth/me',
+    headers: { authorization: `Bearer ${deletionToken}` }, payload: { confirm: true }
+  });
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(fakeDb.account(account.id)?.status, 'active');
+  assert.equal(fakeDb.account(account.id)?.session_version, 0);
+});
+
+test('accepted_failure_never_confirms_request', async (context) => {
+  enableDeletion(context);
+  const fakeDb = installDatabase(context);
+  const account = await fakeDb.createAccount();
+  const app = await makeApp({ acceptDeletionInJournal: async () => { throw new Error('journal_unavailable'); } });
+  context.after(() => app.close());
+  const accessToken = await bearerFor(app, account);
+  const verification = await app.inject({
+    method: 'POST', url: '/auth/account-deletion/verification',
+    headers: { authorization: `Bearer ${accessToken}` }, payload: { password: account.password }
+  });
+  const deletionToken = verification.json<{ deletionToken: string }>().deletionToken;
+
+  const response = await app.inject({
+    method: 'DELETE', url: '/auth/me',
+    headers: { authorization: `Bearer ${deletionToken}` }, payload: { confirm: true }
+  });
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.json().error, 'account_deletion_unavailable');
+  assert.equal(fakeDb.account(account.id)?.status, 'deleted');
+});
+
+test('status_returns_503_when_journal_cannot_confirm', async (context) => {
+  enableDeletion(context);
+  const fakeDb = installDatabase(context);
+  const account = await fakeDb.createAccount();
+  let journalUnavailable = false;
+  const app = await makeApp({ acceptDeletionInJournal: async () => {
+    if (journalUnavailable) throw new Error('journal_unavailable');
+  } });
+  context.after(() => app.close());
+  const accessToken = await bearerFor(app, account);
+  const verification = await app.inject({
+    method: 'POST', url: '/auth/account-deletion/verification',
+    headers: { authorization: `Bearer ${accessToken}` }, payload: { password: account.password }
+  });
+  const tokens = verification.json<{ deletionToken: string; statusToken: string }>();
+  const accepted = await app.inject({
+    method: 'DELETE', url: '/auth/me',
+    headers: { authorization: `Bearer ${tokens.deletionToken}` }, payload: { confirm: true }
+  });
+  assert.equal(accepted.statusCode, 202);
+
+  journalUnavailable = true;
+  const status = await app.inject({
+    method: 'GET', url: '/auth/account-deletion/status',
+    headers: { authorization: `Bearer ${tokens.statusToken}` }
+  });
+
+  assert.equal(status.statusCode, 503);
+  assert.deepEqual(status.json(), {
+    error: 'account_deletion_unavailable',
+    message: 'Account deletion status is temporarily unavailable.'
+  });
 });
 
 test('parallel_acceptance_returns_one_operation', async (context) => {

@@ -53,7 +53,14 @@ async function snapshotDeletionWork(client: PoolClient, operationId: string, use
 
 export async function acceptAccountDeletion(
   deletionToken: string,
-  confirm: true
+  confirm: true,
+  journal: {
+    writePrepared: typeof prepareDeletionInJournal;
+    writeAccepted: typeof acceptDeletionInJournal;
+  } = {
+    writePrepared: prepareDeletionInJournal,
+    writeAccepted: acceptDeletionInJournal
+  }
 ): Promise<AccountDeletionStatusResponse> {
   if (confirm !== true || !deletionToken) {
     throw new AccountDeletionAcceptanceError('unauthorized');
@@ -76,7 +83,7 @@ export async function acceptAccountDeletion(
       await client.query('COMMIT');
       transactionCommitted = true;
       if (!operation.acceptedAt || !operation.deadlineAt) throw new Error('account_deletion_accepted_timestamps_missing');
-      await acceptDeletionInJournal({
+      await journal.writeAccepted({
         operationId: operation.operationId,
         userId: permission.userId,
         acceptedAt: new Date(operation.acceptedAt),
@@ -136,12 +143,12 @@ export async function acceptAccountDeletion(
     };
     // Do not confirm acceptance until the DB commit and both external journal writes.
     await commitJournaledAcceptance({
-      writePrepared: () => prepareDeletionInJournal(journalAcceptance),
+      writePrepared: () => journal.writePrepared(journalAcceptance),
       async commitDatabase() {
         await client.query('COMMIT');
         transactionCommitted = true;
       },
-      writeAccepted: () => acceptDeletionInJournal(journalAcceptance)
+      writeAccepted: () => journal.writeAccepted(journalAcceptance)
     });
     try {
       disconnectUser(permission.userId, 'account_deleted', {

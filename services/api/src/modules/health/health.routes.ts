@@ -4,8 +4,25 @@ import { checkDatabaseConnection } from '../../config/database.js';
 import { checkRedisConnection } from '../../config/redis.js';
 import { checkStorageConnection } from '../../config/storage.js';
 import { getNotificationMetrics } from '../notifications/notifications.metrics.js';
+import { env } from '../../config/env.js';
+import { assertAccountDeletionJournalReady } from '../account-deletion/account-deletion.journal.js';
 
-export function registerHealthRoutes(app: FastifyInstance) {
+type HealthReadinessChecks = {
+  checkDatabaseConnection: typeof checkDatabaseConnection;
+  checkRedisConnection: typeof checkRedisConnection;
+  checkStorageConnection: typeof checkStorageConnection;
+  assertJournalReady: typeof assertAccountDeletionJournalReady;
+};
+
+export function registerHealthRoutes(app: FastifyInstance, checks: Partial<HealthReadinessChecks> = {}) {
+  const readiness = {
+    checkDatabaseConnection,
+    checkRedisConnection,
+    checkStorageConnection,
+    assertJournalReady: assertAccountDeletionJournalReady,
+    ...checks
+  };
+
   app.get('/health', async () => ({
     status: 'ok',
     service: 'api'
@@ -24,9 +41,10 @@ export function registerHealthRoutes(app: FastifyInstance) {
   app.get('/health/ready', async (request, reply) => {
     try {
       const [database, redis, storage] = await Promise.all([
-        checkDatabaseConnection(),
-        checkRedisConnection(),
-        checkStorageConnection()
+        readiness.checkDatabaseConnection(),
+        readiness.checkRedisConnection(),
+        readiness.checkStorageConnection(),
+        env.ACCOUNT_DELETION_ENABLED ? readiness.assertJournalReady() : Promise.resolve()
       ]);
 
       return {
@@ -37,7 +55,11 @@ export function registerHealthRoutes(app: FastifyInstance) {
         storage
       };
     } catch (error) {
-      request.log.error(error, 'API readiness check failed');
+      const errorCode = error && typeof error === 'object' && 'code' in error && typeof error.code === 'string'
+        ? error.code
+        : undefined;
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      request.log.error({ errorName, errorCode }, 'API readiness check failed');
 
       return reply.code(503).send({
         status: 'unavailable',

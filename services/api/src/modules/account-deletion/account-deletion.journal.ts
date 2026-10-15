@@ -299,6 +299,11 @@ export async function initializeAccountDeletionJournal() {
   return withConfiguredJournal((journal) => journal.initialize());
 }
 
+export async function assertAccountDeletionJournalReady() {
+  const journal = await configuredJournal();
+  await journal.assertReady();
+}
+
 export async function prepareDeletionInJournal(acceptance: AccountDeletionJournalAcceptance) {
   return withConfiguredJournal(async (journal) => {
     await journal.assertReady();

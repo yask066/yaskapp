@@ -23,7 +23,17 @@ test('a failed database commit never creates a replayable accepted record', asyn
   assert.deepEqual(events, ['prepared', 'database_commit']);
 });
 
-test('a failed accepted journal write does not confirm acceptance', async () => {
+test('prepare_failure_never_commits_application_transaction', async () => {
+  const events: string[] = [];
+  await assert.rejects(commitJournaledAcceptance({
+    async writePrepared() { events.push('prepared'); throw new Error('journal_unavailable'); },
+    async commitDatabase() { events.push('database_commit'); },
+    async writeAccepted() { events.push('accepted'); }
+  }), /journal_unavailable/);
+  assert.deepEqual(events, ['prepared']);
+});
+
+test('accepted_failure_never_confirms_request', async () => {
   const events: string[] = [];
   await assert.rejects(commitJournaledAcceptance({
     async writePrepared() { events.push('prepared'); },
