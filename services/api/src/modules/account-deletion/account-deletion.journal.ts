@@ -328,10 +328,13 @@ export async function readAcceptedDeletionsFromJournal() {
   return journal.readAll();
 }
 
-export async function exportAcceptedDeletionsToJournal(executor: {
-  query<T>(sql: string): Promise<{ rows: T[] }>;
-}) {
-  const cleanup = await cleanupExpiredCompletedDeletionJournal(executor);
+export async function reconcileAccountDeletionJournal(
+  executor: { query<T>(sql: string): Promise<{ rows: T[] }> },
+  injectedJournal?: Pick<AccountDeletionJournal, 'assertReady' | 'readAll' | 'writePrepared' | 'writeAccepted'>
+): Promise<{ reconciled: number; journalEntries: number }> {
+  const journal = injectedJournal ?? await configuredJournal();
+  await journal.assertReady();
+  const existingEntries = await journal.readAll();
   const accepted = await executor.query<{
     id: string;
     user_id: string;
@@ -341,24 +344,41 @@ export async function exportAcceptedDeletionsToJournal(executor: {
       WHERE accepted_at IS NOT NULL AND deadline_at IS NOT NULL
         AND (status <> 'completed' OR accepted_at > now() - interval '35 days')
       ORDER BY accepted_at, id`);
+  const existingById = new Map(existingEntries.map((entry) => [entry.operationId, entry]));
+  let reconciled = 0;
   for (const row of accepted.rows) {
-    await acceptDeletionInJournal({
+    const acceptance = {
       operationId: row.id,
       userId: row.user_id,
       acceptedAt: new Date(row.accepted_at),
       deadlineAt: new Date(row.deadline_at)
-    });
+    };
+    if (!Number.isFinite(acceptance.acceptedAt.getTime()) || !Number.isFinite(acceptance.deadlineAt.getTime()) ||
+      acceptance.deadlineAt < acceptance.acceptedAt) {
+      throw new Error('account_deletion_journal_invalid_timestamps');
+    }
+    const existing = existingById.get(row.id);
+    if (existing) {
+      if (existing.userId !== acceptance.userId || existing.acceptedAt !== acceptance.acceptedAt.toISOString() ||
+        existing.deadlineAt !== acceptance.deadlineAt.toISOString()) {
+        throw new Error('account_deletion_journal_conflict');
+      }
+      continue;
+    }
+    await journal.writePrepared(acceptance);
+    await journal.writeAccepted(acceptance);
+    reconciled++;
   }
-  const journalEntries = await readAcceptedDeletionsFromJournal();
+  const journalEntries = await journal.readAll();
   const journalById = new Map(journalEntries.map((entry) => [entry.operationId, entry]));
   for (const row of accepted.rows) {
     const entry = journalById.get(row.id);
     if (!entry || entry.userId !== row.user_id || entry.acceptedAt !== new Date(row.accepted_at).toISOString() ||
-        entry.deadlineAt !== new Date(row.deadline_at).toISOString()) {
-      throw new Error('account_deletion_journal_export_incomplete');
+        entry.deadlineAt !== new Date(row.deadline_at).toISOString() || entry.state !== 'accepted') {
+      throw new Error('account_deletion_journal_reconciliation_incomplete');
     }
   }
-  return { exported: accepted.rows.length, journalEntries: journalEntries.length, cleaned: cleanup.deleted };
+  return { reconciled, journalEntries: journalEntries.length };
 }
 
 export async function cleanupExpiredCompletedDeletionJournal(

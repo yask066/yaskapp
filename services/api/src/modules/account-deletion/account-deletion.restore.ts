@@ -1,5 +1,5 @@
 import { db } from '../../config/database.js';
-import type { AccountDeletionJournalEntry } from './account-deletion.journal.js';
+import { verifyJournalEntry, type AccountDeletionJournalEntry } from './account-deletion.journal.js';
 
 const cleanupSteps = ['discovery', 'notifications', 'moderation', 'content', 'relationships', 'media', 'completion'];
 
@@ -9,6 +9,10 @@ export async function reapplyAcceptedDeletions(
   entries: AccountDeletionJournalEntry[],
   database: RestoreDatabase = db
 ) {
+  const signingKey = process.env.ACCOUNT_DELETION_JOURNAL_HMAC_KEY;
+  if (!signingKey || entries.some((entry) => entry.state !== 'accepted' || !verifyJournalEntry(entry, signingKey))) {
+    throw new Error('account_deletion_journal_integrity_failed');
+  }
   const byOperation = new Map<string, AccountDeletionJournalEntry>();
   const operationByUser = new Map<string, string>();
   for (const entry of entries) {

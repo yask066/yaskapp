@@ -15,6 +15,8 @@ process.env.S3_SECRET_ACCESS_KEY ??= 'test';
 const { reapplyAcceptedDeletions } = await import('./account-deletion.restore.js');
 
 const testDatabaseUrl = process.env.ACCOUNT_DELETION_TEST_DATABASE_URL;
+const signingKey = 'integration-test-signing-key-is-not-secret';
+process.env.ACCOUNT_DELETION_JOURNAL_HMAC_KEY = signingKey;
 
 test('restore_old_backup_does_not_resurrect_account', { skip: !testDatabaseUrl }, async () => {
   const databaseUrl = new URL(testDatabaseUrl!);
@@ -28,7 +30,7 @@ test('restore_old_backup_does_not_resurrect_account', { skip: !testDatabaseUrl }
     userId,
     acceptedAt: new Date(now.getTime() - 60_000),
     deadlineAt: new Date(now.getTime() + 23 * 60 * 60_000)
-  }, 'integration-test-signing-key-is-not-secret');
+  }, signingKey);
   try {
     // Simulate a pre-deletion backup where the operation and user are active.
     await pool.query(
@@ -64,10 +66,14 @@ test('restore_old_backup_does_not_resurrect_account', { skip: !testDatabaseUrl }
       'SELECT count(*)::int AS count FROM account_deletion_steps WHERE operation_id = $1 AND status = \'pending\'',
       [operationId]
     );
+    const events = await pool.query<{ count: number }>(
+      'SELECT count(*)::int AS count FROM account_deletion_events WHERE operation_id = $1', [operationId]
+    );
     assert.equal(user.rows[0]?.status, 'deleted');
     assert.equal(operation.rows[0]?.status, 'pending');
     assert.equal(operation.rows[0]?.completed_at, null);
     assert.equal(steps.rows[0]?.count, 7);
+    assert.equal(events.rows[0]?.count, 2);
   } finally {
     await pool.query('DELETE FROM account_deletion_operations WHERE id = $1', [operationId]);
     await pool.query('DELETE FROM users WHERE id = $1', [userId]);

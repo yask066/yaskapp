@@ -1,4 +1,5 @@
 import { closeDatabaseConnection } from '../config/database.js';
+import { closeAccountDeletionJournalDatabase } from '../config/account-deletion-journal-database.js';
 import { readAcceptedDeletionsFromJournal } from '../modules/account-deletion/account-deletion.journal.js';
 import { reapplyAcceptedDeletions } from '../modules/account-deletion/account-deletion.restore.js';
 
@@ -6,7 +7,7 @@ export async function reapplyAccountDeletions() {
   const entries = await readAcceptedDeletionsFromJournal();
   const result = await reapplyAcceptedDeletions(entries);
   if (result.reapplied !== entries.length) throw new Error('account_deletion_restore_incomplete');
-  return result;
+  return { verified: entries.length, ...result };
 }
 
 reapplyAccountDeletions()
@@ -15,4 +16,4 @@ reapplyAccountDeletions()
     console.error(error instanceof Error ? error.message : 'Account deletion journal reapply failed.');
     process.exitCode = 1;
   })
-  .finally(closeDatabaseConnection);
+  .finally(async () => Promise.all([closeDatabaseConnection(), closeAccountDeletionJournalDatabase()]));
