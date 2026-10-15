@@ -19,6 +19,7 @@
     "account-deletion:journal-reconcile": "tsx src/jobs/export-account-deletion-journal.ts",
     "account-deletion:journal-export": "tsx src/jobs/export-account-deletion-journal.ts",
     "account-deletion:journal-init": "tsx src/jobs/initialize-account-deletion-journal.ts",
+    "account-deletion:journal-import-legacy": "tsx src/jobs/run-import-account-deletion-cloud-journal.ts",
     "account-deletion:staging-storage-check": "tsx src/jobs/account-deletion-staging-storage-check.ts",
     "staging:backup-upload": "tsx src/jobs/upload-staging-backup.ts",
     "account-deletion:journal-reapply": "tsx src/jobs/reapply-account-deletions.ts",

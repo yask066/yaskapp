@@ -105,6 +105,7 @@ export type AccountDeletionJournal = {
   assertReady(): Promise<void>;
   writePrepared(acceptance: AccountDeletionJournalAcceptance): Promise<void>;
   writeAccepted(acceptance: AccountDeletionJournalAcceptance): Promise<void>;
+  importEntry(entry: AccountDeletionJournalEntry): Promise<void>;
   cleanupStalePrepared(now: Date): Promise<number>;
   readAll(): Promise<AccountDeletionJournalEntry[]>;
   close(): void;
@@ -242,6 +243,13 @@ export function createAccountDeletionJournal(options: {
     async writeAccepted(acceptance) {
       await assertReady();
       await insert(createJournalEntry(acceptance, options.signingKey, 'accepted'));
+    },
+    async importEntry(entry) {
+      await assertReady();
+      if (!verifyJournalEntry(entry, options.signingKey)) {
+        throw new Error('account_deletion_journal_integrity_failed');
+      }
+      await insert(entry);
     },
     async cleanupStalePrepared(now) {
       if (!(now instanceof Date) || !Number.isFinite(now.getTime())) throw new Error('account_deletion_journal_invalid_cleanup_time');
