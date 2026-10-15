@@ -127,5 +127,12 @@ identity unit checks passed (3/3); the PostgreSQL E2E command was skipped becaus
 Redis, test media credentials, the HMAC key, journal ID, and
 `ACCOUNT_DELETION_ENABLED=true` were not configured. The staging restore drill
 and two-replica release acceptance remain NOT RUN.
+Full release-run attempt (2026-10-15): `npm run test -w @yaskapp/api` stopped
+before running tests because its migration step could not connect to the local
+application PostgreSQL (`ECONNREFUSED` on port 5432). Running the test harness
+without migrations reached the Redis rate-limit tests, which failed and stalled
+because Redis on port 6379 is unavailable; the run was interrupted. Docker
+Engine was unavailable, and `.env.staging` plus the dedicated journal env files
+were absent. No staging restore or two-replica acceptance was run.
 Final result: NOT RUN
 ```
