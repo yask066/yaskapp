@@ -1,0 +1,55 @@
+name: yaskapp-account-deletion-journal
+
+# Run this file only on the journal's separate physical host. Set
+# JOURNAL_PRIVATE_BIND_IP to that host's private interface address before deploy.
+# TLS files are provisioned by the operator; the server key must be readable by
+# the postgres container and the certificate must cover the API hostname.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: account_deletion_journal
+      POSTGRES_USER: ${JOURNAL_POSTGRES_ADMIN_USER:-journal_admin}
+      POSTGRES_PASSWORD: ${JOURNAL_POSTGRES_ADMIN_PASSWORD:-}
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/run/postgresql/tls/server.crt
+      - -c
+      - ssl_key_file=/run/postgresql/tls/server.key
+      - -c
+      - ssl_ca_file=/run/postgresql/tls/ca.crt
+      - -c
+      - hba_file=/etc/postgresql/pg_hba.conf
+    ports:
+      - "${JOURNAL_PRIVATE_BIND_IP:-127.0.0.1}:5432:5432"
+    volumes:
+      - journal-postgres-data:/var/lib/postgresql/data
+      - ./postgres/account-deletion-journal/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ${JOURNAL_TLS_CERT_PATH:-./secrets/account-deletion-journal/server.crt}:/run/postgresql/tls/server.crt:ro
+      - ${JOURNAL_TLS_KEY_PATH:-./secrets/account-deletion-journal/server.key}:/run/postgresql/tls/server.key:ro
+      - ${JOURNAL_TLS_CA_PATH:-./secrets/account-deletion-journal/ca.crt}:/run/postgresql/tls/ca.crt:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  journal-postgres-data:
+
+# One-time role bootstrap on the journal host:
+#   docker compose -f infra/docker/docker-compose.account-deletion-journal.yml exec postgres psql -U journal_admin -d account_deletion_journal
+#   CREATE ROLE account_deletion_journal_runtime LOGIN;
+#   \password account_deletion_journal_runtime
+#   CREATE ROLE account_deletion_journal_retention LOGIN;
+#   \password account_deletion_journal_retention
+# Then run the journal migration from services/api using an operator/admin
+# ACCOUNT_DELETION_JOURNAL_DATABASE_URL with sslmode=verify-full:
+#   npm run account-deletion:journal-migrate
+# The migration grants runtime access and restricts retention to its pruning
+# operation. Copy only runtime credentials to API hosts and the retention URL
+# only to the deletion worker.

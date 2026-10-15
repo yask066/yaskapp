@@ -14,9 +14,8 @@
 .env.*
 !.env.example
 !.env.staging.example
-!.env.account-deletion-retention.example
-!.env.account-deletion-cloud.staging.example
-!.env.grafana-cloud.staging.example
+!.env.account-deletion-journal.example
+!.env.account-deletion-journal-retention.example
 backups/
 infra/docker/secrets/
 .worktrees/

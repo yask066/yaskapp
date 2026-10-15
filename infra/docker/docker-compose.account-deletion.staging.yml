@@ -1,17 +1,11 @@
 name: yaskapp-staging
 
-x-logging: &default-logging
-  driver: json-file
-  options:
-    max-size: "10m"
-    max-file: "5"
-
 services:
-  # The base staging stack can run without cloud credentials while deletion is disabled.
-  # Include this overlay only after the independent journal and checkpoint are configured.
   api:
     env_file:
-      - ../../services/api/.env.account-deletion-cloud.staging
+      - ../../services/api/.env.account-deletion-journal
+    environment:
+      ACCOUNT_DELETION_ENABLED: "true"
 
   account-deletion-worker:
     image: yaskapp-api:staging
@@ -20,9 +14,15 @@ services:
       dockerfile: services/api/Dockerfile
     env_file:
       - ../../services/api/.env.staging
-      - ../../services/api/.env.account-deletion-cloud.staging
-      - ../../services/api/.env.account-deletion-retention.staging
-    logging: *default-logging
+      - ../../services/api/.env.account-deletion-journal
+      - ../../services/api/.env.account-deletion-journal-retention
+    environment:
+      ACCOUNT_DELETION_ENABLED: "true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     depends_on:
       postgres:
         condition: service_healthy
@@ -31,16 +31,21 @@ services:
     command: ["node", "services/api/dist/jobs/run-account-deletion-worker.js"]
     restart: unless-stopped
 
-  account-deletion-journal-exporter:
+  account-deletion-journal-reconciler:
     image: yaskapp-api:staging
     build:
       context: ../..
       dockerfile: services/api/Dockerfile
     env_file:
       - ../../services/api/.env.staging
-      - ../../services/api/.env.account-deletion-cloud.staging
-      - ../../services/api/.env.account-deletion-retention.staging
-    logging: *default-logging
+      - ../../services/api/.env.account-deletion-journal
+    environment:
+      ACCOUNT_DELETION_ENABLED: "true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,23 +57,10 @@ services:
       - >-
         while true; do
           if node services/api/dist/jobs/export-account-deletion-journal.js; then
-            echo '{"event":"account_deletion.journal_exporter.complete"}';
+            echo '{"event":"account_deletion.journal_reconciled"}';
           else
-            echo '{"event":"account_deletion.alert","component":"journal_exporter","error":"export_failed"}';
+            echo '{"event":"account_deletion.alert","component":"journal_reconciler","error":"reconcile_failed"}';
           fi;
           sleep 300;
         done
     restart: unless-stopped
-
-  backup-uploader:
-    image: yaskapp-api:staging
-    build:
-      context: ../..
-      dockerfile: services/api/Dockerfile
-    profiles: ["maintenance"]
-    env_file:
-      - ../../services/api/.env.staging
-      - ../../services/api/.env.account-deletion-cloud.staging
-    logging: *default-logging
-    entrypoint: ["node", "services/api/dist/jobs/upload-staging-backup.js"]
-    restart: "no"
