@@ -333,7 +333,7 @@ registries; реальные независимые S3 stores, Object Lock/lifec
 **Файлы:** создать `services/api/src/modules/account-deletion/account-deletion.e2e.integration.test.ts`, `docs/account-deletion-smoke-test.md`; обновить `docs/staging-smoke-test.md`. Вносить найденные исправления в соответствующие модули с их тестами.
 
 - [x] Подготовлены gated E2E harness и release smoke-test с fixture, матрицей AC-01–AC-17, отказами и rollout gate.
-- [x] AD-15 закрыт по прямому запросу пользователя без staging-приёмки (2026-10-14).
+- [x] AD-15 административно закрыт по прямому запросу пользователя (2026-10-14); закрытие не означает прохождение release-приёмки.
 
 **Не проверено и не считается пройденным:** полная fixture на двух отдельных API-процессах, AC-01–AC-17 evidence matrix, failure/concurrency/restore runs, общие API/web/mobile release checks, утверждение и публикация политики, Grafana/backup readiness, ограниченный rollout и расширение доступа. Smoke-test record остаётся `NOT RUN`; закрытие AD-15 административное и не разрешает включать функцию или считать выпуск принятым.
 
@@ -358,6 +358,8 @@ Staging exercise, отдельные процессы API, полная fixture 
 journal store и их credentials/HMAC key, а также `ACCOUNT_DELETION_ENABLED`.
 Подключённый SM A325F виден Flutter, но без staging API и fixture на нём нельзя
 выполнить end-to-end приёмку или rollout.
+
+**Повторная smoke-попытка (2026-10-14):** `node --import tsx --test --test-reporter spec src/modules/account-deletion/account-deletion.e2e.integration.test.ts` — 1 тест пропущен, 0 пройдено, 0 ошибок. Отсутствуют `ACCOUNT_DELETION_TEST_DATABASE_URL` и обязательные переменные Redis/S3/journal/checkpoint/`ACCOUNT_DELETION_ENABLED`; staging smoke и release acceptance не выполнены. Итоговый smoke record: `NOT RUN`.
 
 ## Команды проверки
 
