@@ -4,6 +4,9 @@ import { Pool, type PoolClient } from 'pg';
 import { test } from 'node:test';
 
 const databaseUrl = process.env.ACCOUNT_DELETION_JOURNAL_TEST_DATABASE_URL;
+const integrationSkipReason = databaseUrl
+  ? false
+  : 'set ACCOUNT_DELETION_JOURNAL_TEST_DATABASE_URL to a dedicated migrated journal test database';
 
 async function withJournalTestTransaction<T>(pool: Pick<Pool, 'connect'>, run: (client: PoolClient) => Promise<T>) {
   const client = await pool.connect();
@@ -32,7 +35,7 @@ test('journal_retention_test_transaction_pins_one_client', async () => {
   assert.deepEqual(calls, ['CONNECT', 'BEGIN', 'INSERT FIXTURE', 'ROLLBACK', 'RELEASE']);
 });
 
-test('runtime_role_cannot_update_or_delete_journal', { skip: !databaseUrl }, async () => {
+test('runtime_role_cannot_update_or_delete_journal', { skip: integrationSkipReason }, async () => {
   const url = new URL(databaseUrl!);
   assert.match(url.pathname, /test/i, 'integration tests require a dedicated journal test database');
   const pool = new Pool({ connectionString: databaseUrl });
@@ -62,7 +65,7 @@ test('runtime_role_cannot_update_or_delete_journal', { skip: !databaseUrl }, asy
   }
 });
 
-test('journal_retention_expires_entries_at_day_35_and_keeps_younger_entries', { skip: !databaseUrl }, async () => {
+test('journal_retention_expires_entries_at_day_35_and_keeps_younger_entries', { skip: integrationSkipReason }, async () => {
   const url = new URL(databaseUrl!);
   assert.match(url.pathname, /test/i, 'integration tests require a dedicated journal test database');
   const pool = new Pool({ connectionString: databaseUrl });
