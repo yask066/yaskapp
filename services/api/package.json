@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "db:migrate": "tsx src/db/migrate.ts",
+    "account-deletion:journal-migrate": "tsx src/db/migrate-account-deletion-journal.ts",
     "db:bootstrap-superadmin": "tsx src/db/bootstrap-superadmin.cli.ts",
     "db:check": "tsx src/db/check.ts",
     "avatars:cleanup": "tsx src/jobs/cleanup-avatar-objects.ts",

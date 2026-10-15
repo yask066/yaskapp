@@ -3,6 +3,10 @@ import 'dotenv/config';
 import { z } from 'zod';
 
 const developmentJwtSecret = 'development-only-secret';
+const journalDatabaseUrlSchema = z.string().url().refine((value) => {
+  const protocol = new URL(value).protocol;
+  return protocol === 'postgres:' || protocol === 'postgresql:';
+}, 'Must be a PostgreSQL connection URL.');
 
 const envSchema = z
   .object({
@@ -21,67 +25,57 @@ const envSchema = z
   S3_SECRET_ACCESS_KEY: z.string().min(1),
   S3_FORCE_PATH_STYLE: z.coerce.boolean().default(true),
   ACCOUNT_DELETION_ENABLED: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
-  ACCOUNT_DELETION_JOURNAL_ENDPOINT: z.string().url().optional(),
-  ACCOUNT_DELETION_JOURNAL_REGION: z.string().default('us-east-1'),
-  ACCOUNT_DELETION_JOURNAL_BUCKET: z.string().min(1).optional(),
+  ACCOUNT_DELETION_JOURNAL_DATABASE_URL: journalDatabaseUrlSchema.optional(),
+  ACCOUNT_DELETION_JOURNAL_RETENTION_DATABASE_URL: journalDatabaseUrlSchema.optional(),
   ACCOUNT_DELETION_JOURNAL_ID: z.string().min(1).optional(),
-  ACCOUNT_DELETION_JOURNAL_ACCESS_KEY_ID: z.string().min(1).optional(),
-  ACCOUNT_DELETION_JOURNAL_SECRET_ACCESS_KEY: z.string().min(1).optional(),
-  ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ENDPOINT: z.string().url().optional(),
-  ACCOUNT_DELETION_JOURNAL_CHECKPOINT_REGION: z.string().default('us-east-1'),
-  ACCOUNT_DELETION_JOURNAL_CHECKPOINT_BUCKET: z.string().min(1).optional(),
-  ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ACCESS_KEY_ID: z.string().min(1).optional(),
-  ACCOUNT_DELETION_JOURNAL_CHECKPOINT_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   ACCOUNT_DELETION_JOURNAL_HMAC_KEY: z.string().min(32).optional(),
   FIREBASE_PROJECT_ID: z.string().min(1).optional()
   })
   .superRefine((config, context) => {
-    const journalSettings = [
-      config.ACCOUNT_DELETION_JOURNAL_ENDPOINT,
-      config.ACCOUNT_DELETION_JOURNAL_BUCKET,
-      config.ACCOUNT_DELETION_JOURNAL_ID,
-      config.ACCOUNT_DELETION_JOURNAL_ACCESS_KEY_ID,
-      config.ACCOUNT_DELETION_JOURNAL_SECRET_ACCESS_KEY,
-      config.ACCOUNT_DELETION_JOURNAL_HMAC_KEY,
-      config.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ENDPOINT,
-      config.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_BUCKET,
-      config.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ACCESS_KEY_ID,
-      config.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_SECRET_ACCESS_KEY
-    ];
-    if (journalSettings.some(Boolean) && journalSettings.some((value) => !value)) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['ACCOUNT_DELETION_JOURNAL_ENDPOINT'],
-        message: 'All independent account deletion journal settings must be configured together.'
-      });
-    }
-    if (config.ACCOUNT_DELETION_ENABLED && journalSettings.some((value) => !value)) {
+    if (
+      config.ACCOUNT_DELETION_ENABLED &&
+      (!config.ACCOUNT_DELETION_JOURNAL_DATABASE_URL ||
+       !config.ACCOUNT_DELETION_JOURNAL_ID ||
+       !config.ACCOUNT_DELETION_JOURNAL_HMAC_KEY)
+    ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['ACCOUNT_DELETION_ENABLED'],
         message: 'Account deletion cannot be enabled without its independent durable journal.'
       });
     }
-    if (
-      config.ACCOUNT_DELETION_JOURNAL_ENDPOINT &&
-      config.ACCOUNT_DELETION_JOURNAL_ENDPOINT === config.S3_ENDPOINT
-    ) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['ACCOUNT_DELETION_JOURNAL_ENDPOINT'],
-        message: 'The account deletion journal must use an independent object-storage endpoint.'
-      });
-    }
-    if (
-      config.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ENDPOINT &&
-      (config.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ENDPOINT === config.S3_ENDPOINT ||
-       config.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ENDPOINT === config.ACCOUNT_DELETION_JOURNAL_ENDPOINT)
-    ) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ENDPOINT'],
-        message: 'The account deletion checkpoint must use a separate object-storage endpoint from media and the journal.'
-      });
+    const journalUrls = [
+      ['ACCOUNT_DELETION_JOURNAL_DATABASE_URL', config.ACCOUNT_DELETION_JOURNAL_DATABASE_URL],
+      ['ACCOUNT_DELETION_JOURNAL_RETENTION_DATABASE_URL', config.ACCOUNT_DELETION_JOURNAL_RETENTION_DATABASE_URL]
+    ] as const;
+    for (const [key, journalUrl] of journalUrls) {
+      if (!journalUrl) continue;
+      try {
+        const parsed = new URL(journalUrl);
+        const journalHost = parsed.hostname.toLowerCase();
+        const sslMode = parsed.searchParams.get('sslmode');
+        const isLocalHost = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(journalHost);
+        if (isLocalHost && config.NODE_ENV !== 'test') {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [key],
+            message: 'Local account deletion journal database URLs are allowed only in test configuration.'
+          });
+        }
+        if (config.NODE_ENV === 'production' && !isLocalHost && sslMode !== 'verify-full') {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [key],
+            message: 'Production account deletion journal connections must use sslmode=verify-full.'
+          });
+        }
+      } catch {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: 'The account deletion journal database URL is invalid.'
+        });
+      }
     }
     const isPlaceholder = config.JWT_SECRET.includes('replace-with');
 
@@ -97,4 +91,6 @@ const envSchema = z
     }
   });
 
-export const env = envSchema.parse(process.env);
+export const parseEnv = (values: NodeJS.ProcessEnv) => envSchema.parse(values);
+
+export const env = parseEnv(process.env);
