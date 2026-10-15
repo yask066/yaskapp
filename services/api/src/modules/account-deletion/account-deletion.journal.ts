@@ -105,9 +105,6 @@ export type AccountDeletionJournal = {
   assertReady(): Promise<void>;
   writePrepared(acceptance: AccountDeletionJournalAcceptance): Promise<void>;
   writeAccepted(acceptance: AccountDeletionJournalAcceptance): Promise<void>;
-  deletePrepared(operationId: string): Promise<void>;
-  deletePreparedIntent(operationId: string, intentId: string): Promise<void>;
-  deleteAccepted(operationId: string): Promise<void>;
   cleanupStalePrepared(now: Date): Promise<number>;
   readAll(): Promise<AccountDeletionJournalEntry[]>;
   close(): void;
@@ -246,19 +243,6 @@ export function createAccountDeletionJournal(options: {
       await assertReady();
       await insert(createJournalEntry(acceptance, options.signingKey, 'accepted'));
     },
-    async deletePrepared(operationId) {
-      await options.database.query(
-        "DELETE FROM account_deletion_journal_entries WHERE operation_id = $1 AND state = 'prepared'", [operationId]
-      );
-    },
-    async deletePreparedIntent(operationId, intentId) {
-      await options.database.query(
-        "DELETE FROM account_deletion_journal_entries WHERE operation_id = $1 AND intent_id = $2 AND state = 'prepared'", [operationId, intentId]
-      );
-    },
-    async deleteAccepted(operationId) {
-      await options.database.query('DELETE FROM account_deletion_journal_entries WHERE operation_id = $1', [operationId]);
-    },
     async cleanupStalePrepared(now) {
       if (!(now instanceof Date) || !Number.isFinite(now.getTime())) throw new Error('account_deletion_journal_invalid_cleanup_time');
       await readAll();
@@ -279,14 +263,12 @@ function sameAcceptance(left: AccountDeletionJournalEntry, right: AccountDeletio
     left.acceptedAt === right.acceptedAt && left.deadlineAt === right.deadlineAt;
 }
 
-async function configuredJournal(options: { retention?: boolean } = {}): Promise<AccountDeletionJournal> {
+async function configuredJournal(): Promise<AccountDeletionJournal> {
   const signingKey = process.env.ACCOUNT_DELETION_JOURNAL_HMAC_KEY;
   const journalId = process.env.ACCOUNT_DELETION_JOURNAL_ID;
   if (!signingKey || !journalId) throw new Error('account_deletion_journal_unavailable');
   const databaseConfig = await import('../../config/account-deletion-journal-database.js');
-  const database = options.retention
-    ? databaseConfig.getAccountDeletionJournalRetentionDatabase()
-    : databaseConfig.getAccountDeletionJournalDatabase();
+  const database = databaseConfig.getAccountDeletionJournalDatabase();
   return createAccountDeletionJournal({ database, signingKey, journalId });
 }
 
@@ -381,28 +363,13 @@ export async function reconcileAccountDeletionJournal(
   return { reconciled, journalEntries: journalEntries.length };
 }
 
-export async function cleanupExpiredCompletedDeletionJournal(
-  executor: { query<T>(sql: string, params?: unknown[]): Promise<{ rows: T[] }> },
-  now = new Date()
-) {
+export async function cleanupExpiredCompletedDeletionJournal(operationIds: string[]) {
   if (process.env.NODE_ENV === 'test' || process.env.NODE_TEST_CONTEXT) return { deleted: 0 };
-  const completed = await executor.query<{ id: string }>(
-    `SELECT id FROM account_deletion_operations
-     WHERE status = 'completed' AND accepted_at <= $1::timestamptz - interval '35 days'`, [now]
+  if (operationIds.length === 0) return { deleted: 0 };
+  const databaseConfig = await import('../../config/account-deletion-journal-database.js');
+  const database = databaseConfig.getAccountDeletionJournalRetentionDatabase();
+  const result = await database.query<{ deleted: string | number }>(
+    'SELECT prune_completed_account_deletion_journal($1::text[]) AS deleted', [operationIds]
   );
-  const prepared = await executor.query<{ id: string }>(
-    `SELECT operation.id FROM account_deletion_operations operation
-     WHERE operation.status = 'not_started' AND NOT EXISTS (
-       SELECT 1 FROM account_deletion_permissions permission
-       WHERE permission.operation_id = operation.id AND permission.expires_at > $1
-     )`, [now]
-  );
-  if (!completed.rows.length && !prepared.rows.length && !process.env.ACCOUNT_DELETION_JOURNAL_RETENTION_DATABASE_URL) {
-    return { deleted: 0 };
-  }
-
-  const journal = await configuredJournal({ retention: true });
-  await journal.cleanupStalePrepared(now);
-  for (const operation of completed.rows) await journal.deleteAccepted(operation.id);
-  return { deleted: completed.rows.length };
+  return { deleted: Number(result.rows[0]?.deleted ?? 0) };
 }

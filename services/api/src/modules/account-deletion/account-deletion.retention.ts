@@ -23,10 +23,16 @@ const JOURNAL_RETENTION_SQL = `
   DELETE FROM account_deletion_operations
   WHERE status = 'completed' AND accepted_at <= $1::timestamptz - interval '35 days'`;
 
+const ELIGIBLE_JOURNAL_OPERATIONS_SQL = `
+  SELECT id FROM account_deletion_operations
+  WHERE status = 'completed' AND accepted_at <= $1::timestamptz - interval '35 days'
+  ORDER BY accepted_at, id`;
+
 export type AccountDeletionRetentionRepository = {
   cleanupExpiredPermissions(now: Date): Promise<number>;
   cleanupExpiredPreparedOperations(now: Date): Promise<number>;
   cleanupExpiredModerationIdentifiers(now: Date): Promise<number>;
+  findExpiredCompletedJournalOperationIds(now: Date): Promise<string[]>;
   cleanupExpiredCompletedJournal(now: Date): Promise<number>;
 };
 
@@ -64,6 +70,12 @@ export function createAccountDeletionRetentionRepository(executor: typeof db = d
     async cleanupExpiredModerationIdentifiers(now) {
       return withTransaction((client) => execute(client, MODERATION_RETENTION_SQL, now));
     },
+    async findExpiredCompletedJournalOperationIds(now) {
+      return withTransaction(async (client) => {
+        const result = await client.query<{ id: string }>(ELIGIBLE_JOURNAL_OPERATIONS_SQL, [now]);
+        return result.rows.map((row) => row.id);
+      });
+    },
     async cleanupExpiredCompletedJournal(now) {
       return withTransaction((client) => execute(client, JOURNAL_RETENTION_SQL, now));
     }
@@ -72,12 +84,13 @@ export function createAccountDeletionRetentionRepository(executor: typeof db = d
 
 export function createAccountDeletionRetentionService(
   repository: AccountDeletionRetentionRepository,
-  cleanupExternalJournal: (now: Date) => Promise<unknown> = async () => undefined
+  cleanupExternalJournal: (now: Date, operationIds: string[]) => Promise<unknown> = async () => undefined
 ) {
   return {
     async cleanupDeletionRetention(now: Date): Promise<{ deleted: number }> {
       if (!Number.isFinite(now.getTime())) throw new Error('invalid_retention_time');
-      await cleanupExternalJournal(now);
+      const expiredOperationIds = await repository.findExpiredCompletedJournalOperationIds(now);
+      await cleanupExternalJournal(now, expiredOperationIds);
       const permissions = await repository.cleanupExpiredPermissions(now);
       const prepared = await repository.cleanupExpiredPreparedOperations(now);
       const moderation = await repository.cleanupExpiredModerationIdentifiers(now);
@@ -89,7 +102,7 @@ export function createAccountDeletionRetentionService(
 
 const retentionService = createAccountDeletionRetentionService(
   createAccountDeletionRetentionRepository(),
-  (now) => cleanupExpiredCompletedDeletionJournal(db, now)
+  (_now, operationIds) => cleanupExpiredCompletedDeletionJournal(operationIds)
 );
 
 export const cleanupDeletionRetention = retentionService.cleanupDeletionRetention;
