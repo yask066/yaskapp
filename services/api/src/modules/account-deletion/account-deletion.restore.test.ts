@@ -25,7 +25,13 @@ function fakeJournal(initialEntries: ReturnType<typeof createJournalEntry>[] = [
   let acceptedWrites = 0;
   const journal = {
     async assertReady() {},
-    async readAll() { return entries.filter((entry) => entry.state === 'accepted'); },
+    async readInventory() { return entries; },
+    async readAll() {
+      if (entries.some((entry) => entry.state === 'prepared' && !entries.some((accepted) => accepted.state === 'accepted' && accepted.operationId === entry.operationId))) {
+        throw new Error('account_deletion_journal_incomplete');
+      }
+      return entries.filter((entry) => entry.state === 'accepted');
+    },
     async writePrepared(value: typeof acceptance) {
       preparedWrites++;
       const entry = createJournalEntry(value, signingKey, 'prepared');
@@ -44,8 +50,8 @@ function acceptedOperationRows() {
   return [{ id: acceptance.operationId, user_id: acceptance.userId, accepted_at: acceptance.acceptedAt, deadline_at: acceptance.deadlineAt }];
 }
 
-function fakeExecutor(onQuery?: () => void) {
-  return { async query<T>() { onQuery?.(); return { rows: acceptedOperationRows() as T[] }; } };
+function fakeExecutor(onQuery?: () => void, rows = acceptedOperationRows()) {
+  return { async query<T>() { onQuery?.(); return { rows: rows as T[] }; } };
 }
 
 test('reconcile_restores_missing_accepted_entry', async () => {
@@ -56,10 +62,30 @@ test('reconcile_restores_missing_accepted_entry', async () => {
   assert.equal(journal.acceptedWrites, 1);
 });
 
+test('reconcile_repairs_prepared_only_for_committed_application_acceptance', async () => {
+  const prepared = createJournalEntry(acceptance, signingKey, 'prepared');
+  const journal = fakeJournal([prepared]);
+  const result = await reconcileAccountDeletionJournal(fakeExecutor(), journal.journal);
+  assert.deepEqual(result, { reconciled: 1, journalEntries: 1 });
+  assert.equal(journal.preparedWrites, 0);
+  assert.equal(journal.acceptedWrites, 1);
+});
+
+test('reconcile_keeps_unmatched_prepared_only_intent_unresolved', async () => {
+  const prepared = createJournalEntry(acceptance, signingKey, 'prepared');
+  const journal = fakeJournal([prepared]);
+  await assert.rejects(
+    reconcileAccountDeletionJournal(fakeExecutor(undefined, []), journal.journal),
+    /account_deletion_journal_incomplete/
+  );
+  assert.equal(journal.acceptedWrites, 0);
+  assert.equal(journal.entries.length, 1);
+});
+
 test('reconcile_fails_on_journal_outage', async () => {
   let queriedApplication = false;
   const journal = fakeJournal();
-  journal.journal.readAll = async () => { throw new Error('account_deletion_journal_unavailable'); };
+  journal.journal.readInventory = async () => { throw new Error('account_deletion_journal_unavailable'); };
   await assert.rejects(
     reconcileAccountDeletionJournal(fakeExecutor(() => { queriedApplication = true; }), journal.journal),
     /account_deletion_journal_unavailable/

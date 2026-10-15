@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { after, test } from 'node:test';
+import pg from 'pg';
+import type { FastifyInstance } from 'fastify';
 
 const testDatabaseUrl = process.env.ACCOUNT_DELETION_TEST_DATABASE_URL;
 const requiredEnvironment = [
@@ -8,32 +10,48 @@ const requiredEnvironment = [
   'S3_BUCKET',
   'S3_ACCESS_KEY_ID',
   'S3_SECRET_ACCESS_KEY',
-  'ACCOUNT_DELETION_JOURNAL_ENDPOINT',
-  'ACCOUNT_DELETION_JOURNAL_BUCKET',
+  'ACCOUNT_DELETION_JOURNAL_DATABASE_URL',
   'ACCOUNT_DELETION_JOURNAL_ID',
-  'ACCOUNT_DELETION_JOURNAL_ACCESS_KEY_ID',
-  'ACCOUNT_DELETION_JOURNAL_SECRET_ACCESS_KEY',
-  'ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ENDPOINT',
-  'ACCOUNT_DELETION_JOURNAL_CHECKPOINT_BUCKET',
-  'ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ACCESS_KEY_ID',
-  'ACCOUNT_DELETION_JOURNAL_CHECKPOINT_SECRET_ACCESS_KEY',
   'ACCOUNT_DELETION_JOURNAL_HMAC_KEY',
   'ACCOUNT_DELETION_ENABLED'
 ];
 const missingEnvironment = requiredEnvironment.filter((key) => !process.env[key]);
+const integrationSkip = !testDatabaseUrl || missingEnvironment.length > 0
+  ? `requires ACCOUNT_DELETION_TEST_DATABASE_URL and dedicated deletion integration services${missingEnvironment.length ? `; missing: ${missingEnvironment.join(', ')}` : ''}`
+  : false;
+let closeIntegrationConnections: (() => Promise<void>) | undefined;
 
-test('account_deletion_e2e_closes_sessions_across_api_instances_cleans_with_worker_and_allows_reregistration', {
-  skip: !testDatabaseUrl || missingEnvironment.length > 0
-    ? `requires ACCOUNT_DELETION_TEST_DATABASE_URL and deletion integration services${missingEnvironment.length ? `; missing: ${missingEnvironment.join(', ')}` : ''}`
-    : false
-}, async () => {
+after(async () => {
+  await closeIntegrationConnections?.();
+});
+
+async function registerAccountForDeletion(app: Pick<FastifyInstance, 'inject'>, suffix: string) {
+  const email = `ad15_${suffix}@yaskapp.test`;
+  const username = `ad15_${suffix}`;
+  const registration = await app.inject({
+    method: 'POST', url: '/auth/register',
+    payload: { email, username, password: 'Deletion-e2e-password-123', displayName: 'Account deletion E2E', countryCode: 'BY' }
+  });
+  assert.equal(registration.statusCode, 201, registration.body);
+  const account = registration.json<{ user: { id: string }; accessToken: string }>();
+  const verification = await app.inject({
+    method: 'POST', url: '/auth/account-deletion/verification',
+    headers: { authorization: `Bearer ${account.accessToken}` },
+    payload: { password: 'Deletion-e2e-password-123' }
+  });
+  assert.equal(verification.statusCode, 200, verification.body);
+  return { account, receipt: verification.json<{ operationId: string; deletionToken: string; statusToken: string }>() };
+}
+
+test('e2e_acceptance_persists_prepared_and_accepted_rows', { skip: integrationSkip }, async (t) => {
   const databaseUrl = new URL(testDatabaseUrl!);
+  const journalDatabaseUrl = new URL(process.env.ACCOUNT_DELETION_JOURNAL_DATABASE_URL!);
   assert.match(databaseUrl.pathname, /test/i, 'integration tests require a dedicated test database');
+  assert.match(journalDatabaseUrl.pathname, /test/i, 'integration tests require a dedicated journal test database');
+  assert.notEqual(journalDatabaseUrl.href, databaseUrl.href, 'application and journal test databases must be distinct');
   assert.equal(process.env.DATABASE_URL, testDatabaseUrl, 'DATABASE_URL must target the dedicated deletion test database');
   assert.equal(process.env.ACCOUNT_DELETION_ENABLED, 'true', 'the test environment must enable account deletion');
   assert.match(process.env.S3_BUCKET ?? '', /test/i, 'media storage must use a dedicated test bucket');
-  assert.match(process.env.ACCOUNT_DELETION_JOURNAL_BUCKET ?? '', /test/i, 'journal storage must use a dedicated test bucket');
-  assert.match(process.env.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_BUCKET ?? '', /test/i, 'checkpoint storage must use a dedicated test bucket');
 
   // The app's safety stub is active under NODE_ENV=test / NODE_TEST_CONTEXT.
   // This integration test deliberately opts into real journal I/O only after
@@ -41,36 +59,27 @@ test('account_deletion_e2e_closes_sessions_across_api_instances_cleans_with_work
   delete process.env.NODE_TEST_CONTEXT;
   process.env.NODE_ENV = 'development';
 
-  const [{ buildApp }, { db, closeDatabaseConnection }, { closeRedisConnection }, { closeStorageConnection }, { processDeletionBatch }, { S3Client, GetObjectCommand, ListObjectsV2Command }] = await Promise.all([
+  const [{ buildApp }, { db, closeDatabaseConnection }, { closeRedisConnection }, { closeStorageConnection }, { processDeletionBatch }, { closeAccountDeletionJournalDatabase }, { readAcceptedDeletionsFromJournal, reconcileAccountDeletionJournal }, { reapplyAcceptedDeletions }] = await Promise.all([
     import('../../app.js'),
     import('../../config/database.js'),
     import('../../config/redis.js'),
     import('../../config/storage.js'),
     import('./account-deletion.worker.js'),
-    import('@aws-sdk/client-s3')
+    import('../../config/account-deletion-journal-database.js'),
+    import('./account-deletion.journal.js'),
+    import('./account-deletion.restore.js')
   ]);
-  const apiNodeA = buildApp();
-  const apiNodeB = buildApp();
+  closeIntegrationConnections = async () => {
+    await Promise.all([
+      closeDatabaseConnection(), closeRedisConnection(), closeStorageConnection(),
+      closeAccountDeletionJournalDatabase()
+    ]);
+  };
+  let apiNodeA = buildApp();
+  let apiNodeB = buildApp();
   const createdUserIds = new Set<string>();
   const operationIds = new Set<string>();
-  const journalClient = new S3Client({
-    endpoint: process.env.ACCOUNT_DELETION_JOURNAL_ENDPOINT,
-    region: process.env.ACCOUNT_DELETION_JOURNAL_REGION ?? 'us-east-1',
-    forcePathStyle: true,
-    credentials: {
-      accessKeyId: process.env.ACCOUNT_DELETION_JOURNAL_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.ACCOUNT_DELETION_JOURNAL_SECRET_ACCESS_KEY!
-    }
-  });
-  const checkpointClient = new S3Client({
-    endpoint: process.env.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ENDPOINT,
-    region: process.env.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_REGION ?? 'us-east-1',
-    forcePathStyle: true,
-    credentials: {
-      accessKeyId: process.env.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_SECRET_ACCESS_KEY!
-    }
-  });
+  const journalDb = new pg.Pool({ connectionString: process.env.ACCOUNT_DELETION_JOURNAL_DATABASE_URL, max: 2 });
   const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const email = `ad15_${suffix}@yaskapp.test`;
   const username = `ad15_${suffix}`;
@@ -81,7 +90,6 @@ test('account_deletion_e2e_closes_sessions_across_api_instances_cleans_with_work
        LIMIT 1`
     );
     assert.equal(unprocessedOperations.rowCount, 0, 'the dedicated test database must not contain other accepted operations');
-
     const register = async (app: typeof apiNodeA, emailValue: string, usernameValue: string) => {
       const response = await app.inject({
         method: 'POST',
@@ -142,27 +150,28 @@ test('account_deletion_e2e_closes_sessions_across_api_instances_cleans_with_work
     assert.equal(accepted.statusCode, 202, accepted.body);
     assert.equal(accepted.json<{ operationId: string }>().operationId, receipt.operationId);
 
-    const acceptedObject = await journalClient.send(new GetObjectCommand({
-      Bucket: process.env.ACCOUNT_DELETION_JOURNAL_BUCKET,
-      Key: `account-deletions/accepted/${receipt.operationId}.json`
+    const journalRows = await journalDb.query<{
+      state: string;
+      operation_id: string;
+      user_id: string;
+      payload: unknown;
+      hmac: string;
+    }>(
+      `SELECT state, operation_id, user_id, payload, hmac
+       FROM account_deletion_journal_entries WHERE operation_id = $1 ORDER BY state`,
+      [receipt.operationId]
+    );
+    assert.deepEqual(journalRows.rows.map(({ state }) => state), ['accepted', 'prepared']);
+    assert.ok(journalRows.rows.every((row) => row.operation_id === receipt.operationId && row.user_id === account.user.id));
+    const { verifyJournalEntry } = await import('./account-deletion.journal.js');
+    assert.ok(journalRows.rows.every((row) => verifyJournalEntry(row.payload, process.env.ACCOUNT_DELETION_JOURNAL_HMAC_KEY!)));
+    assert.ok(journalRows.rows.every((row) => {
+      if (!row.payload || typeof row.payload !== 'object') return false;
+      const entry = row.payload as { operationId?: string; userId?: string; state?: string; hmac?: string };
+      return entry.operationId === receipt.operationId && entry.userId === account.user.id &&
+        entry.state === row.state && entry.hmac === row.hmac;
     }));
-    const acceptedEntry = JSON.parse(await acceptedObject.Body!.transformToString()) as { state: string; operationId: string };
-    assert.equal(acceptedEntry.state, 'accepted');
-    assert.equal(acceptedEntry.operationId, receipt.operationId);
-
-    const checkpointObject = await checkpointClient.send(new GetObjectCommand({
-      Bucket: process.env.ACCOUNT_DELETION_JOURNAL_CHECKPOINT_BUCKET,
-      Key: `account-deletions/checkpoint/${receipt.operationId}.json`
-    }));
-    const checkpointEntry = JSON.parse(await checkpointObject.Body!.transformToString()) as { state: string; operationId: string };
-    assert.equal(checkpointEntry.state, 'checkpoint');
-    assert.equal(checkpointEntry.operationId, receipt.operationId);
-
-    const preparedObjects = await journalClient.send(new ListObjectsV2Command({
-      Bucket: process.env.ACCOUNT_DELETION_JOURNAL_BUCKET,
-      Prefix: `account-deletions/prepared/${receipt.operationId}/`
-    }));
-    assert.ok(preparedObjects.Contents?.some((object) => object.Key?.endsWith('.json')), 'prepared intent must be durable');
+    assert.ok(journalRows.rows.every((row) => /^[a-f0-9]{64}$/.test(row.hmac)));
 
     const oldSessionOnSecondNode = await apiNodeB.inject({
       method: 'GET',
@@ -182,6 +191,85 @@ test('account_deletion_e2e_closes_sessions_across_api_instances_cleans_with_work
       'owned content must be hidden immediately on every API node'
     );
 
+    await t.test('e2e_journal_outage_rejects_acceptance', async () => {
+      const outageApp = buildApp({ accountDeletionJournal: {
+        prepareDeletionInJournal: async () => { throw new Error('account_deletion_journal_unavailable'); },
+        acceptDeletionInJournal: async () => { throw new Error('account_deletion_journal_unavailable'); }
+      } });
+      const outageSuffix = `o_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+      const { account: outageAccount, receipt: outageReceipt } = await registerAccountForDeletion(outageApp, outageSuffix);
+      createdUserIds.add(outageAccount.user.id);
+      operationIds.add(outageReceipt.operationId);
+      try {
+        const response = await outageApp.inject({
+          method: 'DELETE', url: '/auth/me',
+          headers: { authorization: `Bearer ${outageReceipt.deletionToken}` },
+          payload: { confirm: true }
+        });
+        assert.equal(response.statusCode, 503, response.body);
+        const state = await db.query<{ status: string; accepted_at: Date | null }>(
+          `SELECT operation.status, operation.accepted_at
+           FROM account_deletion_operations AS operation WHERE operation.id = $1`,
+          [outageReceipt.operationId]
+        );
+        assert.equal(state.rows[0]?.status, 'not_started');
+        assert.equal(state.rows[0]?.accepted_at, null, 'journal outage must not commit acceptance');
+      } finally {
+        await outageApp.close();
+      }
+
+      const postCommitApp = buildApp({ accountDeletionJournal: {
+        acceptDeletionInJournal: async () => { throw new Error('account_deletion_journal_unavailable'); }
+      } });
+      const postCommitSuffix = `r_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+      const { account: committedAccount, receipt: committedReceipt } = await registerAccountForDeletion(postCommitApp, postCommitSuffix);
+      createdUserIds.add(committedAccount.user.id);
+      operationIds.add(committedReceipt.operationId);
+      try {
+        const response = await postCommitApp.inject({
+          method: 'DELETE', url: '/auth/me',
+          headers: { authorization: `Bearer ${committedReceipt.deletionToken}` },
+          payload: { confirm: true }
+        });
+        assert.equal(response.statusCode, 503, response.body);
+        const state = await db.query<{ status: string; accepted_at: Date | null }>(
+          `SELECT status, accepted_at FROM account_deletion_operations WHERE id = $1`,
+          [committedReceipt.operationId]
+        );
+        assert.equal(state.rows[0]?.status, 'pending');
+        assert.ok(state.rows[0]?.accepted_at, 'application acceptance must commit before the accepted journal write fails');
+        await assert.rejects(readAcceptedDeletionsFromJournal(), /journal_incomplete/);
+        const reconciliation = await reconcileAccountDeletionJournal(db);
+        assert.equal(reconciliation.reconciled, 1, 'reconciler must repair a committed prepared-only operation');
+        const repaired = await readAcceptedDeletionsFromJournal();
+        assert.ok(repaired.some((entry) => entry.operationId === committedReceipt.operationId && entry.state === 'accepted'));
+      } finally {
+        await postCommitApp.close();
+      }
+    });
+
+    await t.test('e2e_restore_replays_deletion_before_readiness', async () => {
+      await apiNodeA.close();
+      await apiNodeB.close();
+      await db.query("UPDATE users SET status = 'active', deleted_at = NULL WHERE id = $1", [account.user.id]);
+      await db.query('DELETE FROM account_deletion_operations WHERE id = $1', [receipt.operationId]);
+      const acceptedEntries = await readAcceptedDeletionsFromJournal();
+      const replay = await reapplyAcceptedDeletions(
+        acceptedEntries.filter((entry) => entry.operationId === receipt.operationId)
+      );
+      assert.equal(replay.reapplied, 1, 'restore replay must apply the accepted journal entry');
+      const restoredOperation = await db.query<{ accepted_at: Date; status: string }>(
+        'SELECT accepted_at, status FROM account_deletion_operations WHERE id = $1', [receipt.operationId]
+      );
+      assert.ok(restoredOperation.rows[0]?.accepted_at, 'replay must recreate the missing operation from the journal');
+      const restoredAccount = await db.query<{ status: string }>('SELECT status FROM users WHERE id = $1', [account.user.id]);
+      assert.equal(restoredAccount.rows[0]?.status, 'deleted', 'the restored account must stay closed before readiness is checked');
+      apiNodeA = buildApp();
+      apiNodeB = buildApp();
+      const readyAfterReplay = await apiNodeA.inject({ method: 'GET', url: '/health/ready' });
+      assert.equal(readyAfterReplay.statusCode, 200, readyAfterReplay.body);
+    });
+
     let operationCompleted = false;
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const worker = await processDeletionBatch({ limit: 1, now: new Date(Date.now() + attempt * 60_000) });
@@ -196,13 +284,10 @@ test('account_deletion_e2e_closes_sessions_across_api_instances_cleans_with_work
     }
     assert.equal(operationCompleted, true, 'worker did not complete the fixture operation within 20 batches');
 
-    const status = await apiNodeB.inject({
-      method: 'GET',
-      url: '/auth/account-deletion/status',
-      headers: { authorization: `Bearer ${receipt.statusToken}` }
-    });
-    assert.equal(status.statusCode, 200, status.body);
-    assert.equal(status.json<{ status: string }>().status, 'completed');
+    const completedOperation = await db.query<{ status: string }>(
+      'SELECT status FROM account_deletion_operations WHERE id = $1', [receipt.operationId]
+    );
+    assert.equal(completedOperation.rows[0]?.status, 'completed');
 
     const oldIdentity = await db.query('SELECT id FROM users WHERE id = $1', [account.user.id]);
     const oldPoll = await db.query('SELECT id FROM polls WHERE id = $1', [pollId]);
@@ -236,11 +321,7 @@ test('account_deletion_e2e_closes_sessions_across_api_instances_cleans_with_work
         catch (error) { cleanupFailures.push(error); }
       }
     } finally {
-      const shutdown = await Promise.allSettled([
-        apiNodeA.close(), apiNodeB.close(),
-        closeDatabaseConnection(), closeRedisConnection(), closeStorageConnection(),
-        journalClient.destroy(), checkpointClient.destroy()
-      ]);
+      const shutdown = await Promise.allSettled([apiNodeA.close(), apiNodeB.close(), journalDb.end()]);
       for (const result of shutdown) if (result.status === 'rejected') cleanupFailures.push(result.reason);
     }
     if (cleanupFailures.length) throw new AggregateError(cleanupFailures, 'account deletion E2E cleanup failed');

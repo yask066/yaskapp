@@ -91,10 +91,12 @@ function replyRateLimited(reply: FastifyReply, retryAfterSeconds: number) {
   });
 }
 
-export function registerAccountDeletionRoutes(app: FastifyInstance, journal: {
+export type AccountDeletionJournalRouteOverrides = {
   prepareDeletionInJournal?: typeof prepareDeletionInJournal;
   acceptDeletionInJournal?: typeof acceptDeletionInJournal;
-} = {}) {
+};
+
+export function registerAccountDeletionRoutes(app: FastifyInstance, journal: AccountDeletionJournalRouteOverrides = {}) {
   const prepare = journal.prepareDeletionInJournal ?? prepareDeletionInJournal;
   const accept = journal.acceptDeletionInJournal ?? acceptDeletionInJournal;
   app.post('/auth/account-deletion/verification', {

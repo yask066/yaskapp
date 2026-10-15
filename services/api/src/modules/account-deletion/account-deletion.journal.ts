@@ -107,6 +107,7 @@ export type AccountDeletionJournal = {
   writeAccepted(acceptance: AccountDeletionJournalAcceptance): Promise<void>;
   importEntry(entry: AccountDeletionJournalEntry): Promise<void>;
   cleanupStalePrepared(now: Date): Promise<number>;
+  readInventory(): Promise<AccountDeletionJournalEntry[]>;
   readAll(): Promise<AccountDeletionJournalEntry[]>;
   close(): void;
 };
@@ -185,7 +186,7 @@ export function createAccountDeletionJournal(options: {
     }
   }
 
-  async function readAll(): Promise<AccountDeletionJournalEntry[]> {
+  async function readInventory(): Promise<AccountDeletionJournalEntry[]> {
     await assertReady();
     const result = await options.database.query<JournalRow>(`${JOURNAL_ENTRY_SELECT} ORDER BY operation_id, state, intent_id`);
     const entries = result.rows.map(parseRow);
@@ -214,9 +215,19 @@ export function createAccountDeletionJournal(options: {
     }
     for (const intent of prepared.values()) {
       const accepted = acceptedByOperation.get(intent.operationId);
-      if (!accepted || !sameAcceptance(intent, { ...accepted, state: 'prepared' })) {
+      if (accepted && !sameAcceptance(intent, { ...accepted, state: 'prepared' })) {
         throw new Error('account_deletion_journal_incomplete');
       }
+    }
+    return entries;
+  }
+
+  async function readAll(): Promise<AccountDeletionJournalEntry[]> {
+    const entries = await readInventory();
+    const acceptedByOperation = new Map(entries.filter((entry) => entry.state === 'accepted')
+      .map((entry) => [entry.operationId, entry]));
+    if (entries.some((entry) => entry.state === 'prepared' && !acceptedByOperation.has(entry.operationId))) {
+      throw new Error('account_deletion_journal_incomplete');
     }
     return [...acceptedByOperation.values()];
   }
@@ -256,6 +267,7 @@ export function createAccountDeletionJournal(options: {
       await readAll();
       return 0;
     },
+    readInventory,
     readAll,
     close() {
       if (closed) return;
@@ -320,11 +332,11 @@ export async function readAcceptedDeletionsFromJournal() {
 
 export async function reconcileAccountDeletionJournal(
   executor: { query<T>(sql: string): Promise<{ rows: T[] }> },
-  injectedJournal?: Pick<AccountDeletionJournal, 'assertReady' | 'readAll' | 'writePrepared' | 'writeAccepted'>
+  injectedJournal?: Pick<AccountDeletionJournal, 'assertReady' | 'readInventory' | 'readAll' | 'writePrepared' | 'writeAccepted'>
 ): Promise<{ reconciled: number; journalEntries: number }> {
   const journal = injectedJournal ?? await configuredJournal();
   await journal.assertReady();
-  const existingEntries = await journal.readAll();
+  const existingEntries = await journal.readInventory();
   const accepted = await executor.query<{
     id: string;
     user_id: string;
@@ -334,7 +346,12 @@ export async function reconcileAccountDeletionJournal(
       WHERE accepted_at IS NOT NULL AND deadline_at IS NOT NULL
         AND (status <> 'completed' OR accepted_at > now() - interval '35 days')
       ORDER BY accepted_at, id`);
-  const existingById = new Map(existingEntries.map((entry) => [entry.operationId, entry]));
+  const existingById = new Map<string, AccountDeletionJournalEntry[]>();
+  for (const entry of existingEntries) {
+    const entries = existingById.get(entry.operationId) ?? [];
+    entries.push(entry);
+    existingById.set(entry.operationId, entries);
+  }
   let reconciled = 0;
   for (const row of accepted.rows) {
     const acceptance = {
@@ -349,10 +366,14 @@ export async function reconcileAccountDeletionJournal(
     }
     const existing = existingById.get(row.id);
     if (existing) {
-      if (existing.userId !== acceptance.userId || existing.acceptedAt !== acceptance.acceptedAt.toISOString() ||
-        existing.deadlineAt !== acceptance.deadlineAt.toISOString()) {
+      if (existing.some((entry) => entry.userId !== acceptance.userId ||
+        entry.acceptedAt !== acceptance.acceptedAt.toISOString() || entry.deadlineAt !== acceptance.deadlineAt.toISOString())) {
         throw new Error('account_deletion_journal_conflict');
       }
+      if (existing.some((entry) => entry.state === 'accepted')) continue;
+      if (!existing.some((entry) => entry.state === 'prepared')) throw new Error('account_deletion_journal_incomplete');
+      await journal.writeAccepted(acceptance);
+      reconciled++;
       continue;
     }
     await journal.writePrepared(acceptance);

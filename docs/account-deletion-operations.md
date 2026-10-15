@@ -1,157 +1,143 @@
 # Account Deletion Operations
 
-## Runtime
+## Runtime and health
 
-`account-deletion-worker` is a separate, continuously running Compose service. It
-uses the API image and the same migrated PostgreSQL schema. Docker's
-`unless-stopped` restart policy starts it again after process failure or host
-reboot. Keep `ACCOUNT_DELETION_ENABLED=false` until the independent journal,
-worker, alerts, and backup lifecycle are configured. Disabling new requests does
-not stop this worker from finishing accepted operations.
+The application PostgreSQL stores live account state and the deletion work
+queue. A separate owner-operated PostgreSQL server on another physical host
+stores the signed account-deletion journal. The API and worker require the
+journal at runtime; journal failure blocks new acceptance. The journal is never
+stored in or substituted with the application database. Media remains on the
+existing self-hosted MinIO service.
 
-The default staging Compose stack does not include the account-deletion worker,
-journal exporter, or backup uploader, and does not require their cloud env files.
-This lets the rest of staging deploy while account deletion remains disabled.
-When the account-deletion services are configured, include
-`infra/docker/docker-compose.account-deletion.staging.yml` with the base Compose
-file. Until that overlay is running, accepted deletion operations remain queued;
-keep the feature disabled and do not accept new operations.
+Keep `ACCOUNT_DELETION_ENABLED=false` until the journal has been initialized,
+legacy records (if any) have been imported and checked, the backups are
+verified, and the restore drill has passed. The API's `/health/ready` endpoint
+checks the journal connection and identity when deletion is enabled. It also
+checks application PostgreSQL, Redis, and media storage. `/health` is a basic
+process liveness check; use `/health/ready` before routing traffic.
 
-The worker emits structured `account_deletion.metrics` records every minute.
-Alert on `account_deletion.alert`, journal exporter failures, worker container
-exits/restarts, and missing metrics for more than two minutes. Page the on-call
-operator for retrying work older than one hour or a deadline breach. Inspect the
-operation and step error code, repair the dependency, then allow the worker to
-retry; do not mark work completed manually. Preserve logs without request
-bodies, credentials, tokens, or journal payloads.
-
-## Independent acceptance journal
-
-The API writes a signed `prepared` entry before the database commit. After the
-commit succeeds, it writes an `accepted` entry to the journal and a matching
-checkpoint to a second S3-compatible service. The API confirms acceptance only
-after both writes have been read back. A `prepared` entry without an `accepted`
-entry is ambiguous because the database commit may have succeeded before the
-process failed. Restore fails closed while any such intent is within the
-35-day backup window. Both stores must be
-independent of PostgreSQL backups and each other (separate storage services,
-accounts, credentials, and failure domains).
-
-Configure these variables in the secret store used by both API and worker:
-
-```text
-ACCOUNT_DELETION_JOURNAL_ENDPOINT=https://<independent-object-store>
-ACCOUNT_DELETION_JOURNAL_REGION=<region>
-ACCOUNT_DELETION_JOURNAL_BUCKET=<private-journal-bucket>
-ACCOUNT_DELETION_JOURNAL_ACCESS_KEY_ID=<write-and-list credential>
-ACCOUNT_DELETION_JOURNAL_SECRET_ACCESS_KEY=<secret>
-ACCOUNT_DELETION_JOURNAL_ID=<stable-unique-deployment-identity>
-ACCOUNT_DELETION_JOURNAL_HMAC_KEY=<at-least-32-random-characters>
-ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ENDPOINT=https://<independent-checkpoint-store>
-ACCOUNT_DELETION_JOURNAL_CHECKPOINT_REGION=<region>
-ACCOUNT_DELETION_JOURNAL_CHECKPOINT_BUCKET=<private-checkpoint-bucket>
-ACCOUNT_DELETION_JOURNAL_CHECKPOINT_ACCESS_KEY_ID=<write-and-list credential>
-ACCOUNT_DELETION_JOURNAL_CHECKPOINT_SECRET_ACCESS_KEY=<secret>
-```
-
-For this staging deployment, use the non-secret key names and endpoint templates
-in `services/api/.env.account-deletion-cloud.staging.example`: Backblaze B2's
-S3-compatible endpoint for the journal, AWS S3 for the checkpoint, and a separate
-AWS backup bucket. Keep checkpoint and backups in separate AWS accounts when
-possible; they must not share a failure domain with the B2 journal. A bucket
-name or endpoint check cannot prove account ownership, so record the AWS account
-IDs during provisioning. Enable bucket versioning and Object Lock in COMPLIANCE
-mode with default retention of at least 35 days for both journal and checkpoint.
-Do not attach a lifecycle expiration rule to either journal prefix.
-
-After credentials and buckets are ready, run the read-only configuration check:
+The worker emits structured `account_deletion.metrics` records and
+`account_deletion.alert` errors to local container logs. Inspect the API,
+worker, and journal-reconciler logs locally. Alert on worker/reconciler exits,
+repeated retries, overdue work, and missing worker heartbeats using the host's
+Docker health and log monitoring. Do not put request bodies, credentials,
+tokens, user content, or journal payloads in logs or evidence.
 
 ```sh
+docker compose -f infra/docker/docker-compose.staging.yml ps
+docker compose -f infra/docker/docker-compose.staging.yml logs --since 15m api
 docker compose \
   -f infra/docker/docker-compose.staging.yml \
   -f infra/docker/docker-compose.account-deletion.staging.yml \
-  run --rm --build --no-deps api \
-  node services/api/dist/jobs/account-deletion-staging-storage-check.js
+  logs --since 15m account-deletion-worker account-deletion-journal-reconciler
+curl --fail-with-body http://127.0.0.1:3000/health/ready
+curl --fail-with-body http://127.0.0.1:3000/health/metrics
 ```
 
-It verifies S3 API access, versioning, default Object Lock retention, and backup
-lifecycle rules. It does not upload/delete probe objects, prove separate cloud
-accounts, or exercise recovery. Those still require the staging restore exercise.
+## First-time journal provisioning
 
-Initialize the stable identity markers once, before enabling account deletion:
+Run the journal Compose file only on its separate physical host. Bind PostgreSQL
+to that host's private interface, provision its TLS certificate/key/CA files,
+and restrict network access to the API, worker, and operator hosts. Do not add
+this PostgreSQL service to the application Compose stack.
 
 ```sh
-npm run account-deletion:journal-init -w @yaskapp/api
+docker compose -f infra/docker/docker-compose.account-deletion-journal.yml config --quiet
+docker compose -f infra/docker/docker-compose.account-deletion-journal.yml up -d
+docker compose -f infra/docker/docker-compose.account-deletion-journal.yml ps
 ```
 
-Do not reinitialize a missing marker during recovery. Its absence means the
-configured store is uninitialized, replaced, or incomplete and must block
-traffic until the intended store is restored.
+Create separate `account_deletion_journal_runtime` and
+`account_deletion_journal_retention` roles on the journal host. The runtime role
+can read and append entries but cannot update, delete, truncate, or prune them. The retention
+role can invoke only the 35-day completed-operation pruning function and has no
+direct table update/delete grants. The schema migration requires a controlled
+operator/admin database URL to create the schema and grants. The commands below
+use a POSIX shell from the repository root. Load the restricted connection
+settings into the process environment; the scripts use `dotenv/config`, which
+otherwise reads `.env` from the process working directory. Source the base
+staging environment too; `env.ts` requires application PostgreSQL, Redis, and
+media settings even for journal utilities. Before replay, verify that
+`DATABASE_URL` points to the restored application database; do not rely on a
+developer `.env` file. Keep the admin URL in a short-lived shell variable,
+never in a service env file:
 
-Give API credentials read, list, and write access to the journal and checkpoint
-prefixes, including Object Lock retention on writes. Copy
-`services/api/.env.account-deletion-retention.example` to
-`services/api/.env.account-deletion-retention.staging` and set separate
-read/list-versions/delete-versions credentials there; Compose passes that file
-to the deletion worker and retention exporter. The role must not write or alter
-retention.
-Enable versioning and S3 Object Lock in compliance mode on both buckets. Keep
-`prepared`, accepted, and checkpoint records locked for 35 days from acceptance.
-The retention worker removes unresolved prepared-only intents after the backup
-window and removes accepted/checkpoint records only for completed operations
-after the lock expires; it never removes unfinished accepted records. Do not add
-an unconditional lifecycle rule to these prefixes.
-Alert on any retention worker error. Preserve the HMAC key separately from both
-stores and rotate only with an overlap procedure. Never copy journal objects into
-the database backup.
+```sh
+set -a
+. services/api/.env.staging
+. services/api/.env.account-deletion-journal
+set +a
+export ACCOUNT_DELETION_JOURNAL_ADMIN_DATABASE_URL='postgres://...'
+ACCOUNT_DELETION_JOURNAL_DATABASE_URL="$ACCOUNT_DELETION_JOURNAL_ADMIN_DATABASE_URL" npm run account-deletion:journal-migrate -w @yaskapp/api
+npm run account-deletion:journal-init -w @yaskapp/api
+npm run build -w @yaskapp/api
+set -a
+. services/api/.env.account-deletion-journal-retention
+set +a
+node services/api/dist/jobs/account-deletion-staging-storage-check.js
+```
 
-`account-deletion-journal-exporter` runs every five minutes, including while
-new deletion requests are disabled. It reconciles completed PostgreSQL rows into
-both stores before applying the 35-day retention cleanup. Alert on its failure
-log. The
-`npm run account-deletion:journal-export -w @yaskapp/api` command reconciles
-every accepted PostgreSQL row with both stores on demand. Recovery verifies the
-entire journal/checkpoint inventory, so a pre-acceptance database backup still
-detects a missing journal record. This check assumes each store's compliance
-retention and independent failure domain remain intact.
+Set `ACCOUNT_DELETION_JOURNAL_DATABASE_URL`, a stable
+`ACCOUNT_DELETION_JOURNAL_ID`, and an HMAC key of at least 32 characters in
+`services/api/.env.account-deletion-journal`. The connection URL must use
+`sslmode=verify-full` and a hostname covered by the journal server certificate.
+Set `ACCOUNT_DELETION_JOURNAL_RETENTION_DATABASE_URL` only in
+`services/api/.env.account-deletion-journal-retention` on the worker host. Keep
+the HMAC key separate from both database hosts and backups. The staging check
+confirms connectivity, the stored identity, the append-only runtime role, and
+the restricted retention role/function. It does not initialize or repair a
+missing identity. Run it on the worker host, where both restricted connection
+files are available; do not copy the retention credential to API hosts. A
+missing or different identity requires operator recovery.
 
-## Staging Configuration
+The database migration creates the identity row. Do not rerun initialization
+with a new identity after journal data exists. An empty, newly provisioned
+journal may be initialized once with the intended stable ID.
 
-Copy `services/api/.env.staging.example` to
-`services/api/.env.staging`, replace every `replace-with-*` value, and keep the
-result out of Git. Provision PostgreSQL, Redis, and media credentials for the
-staging host. This file is sufficient for the base staging stack while
-`ACCOUNT_DELETION_ENABLED=false`; that stack has no dependency on AWS or B2.
+## Legacy journal import and cutover
 
-Only when the independent stores are ready, configure the journal and
-checkpoint endpoints as separate services/accounts/failure domains. Copy
-`services/api/.env.account-deletion-cloud.staging.example` to
-`services/api/.env.account-deletion-cloud.staging` and fill in the B2 journal,
-AWS checkpoint, and AWS backup credentials. Then use
-`services/api/.env.account-deletion-retention.example` to create
-`services/api/.env.account-deletion-retention.staging` with read/list/delete
-versions credentials that cannot write or change retention. Keep both files out
-of Git.
+If the previous cloud journal contains records, export/import them once before
+enabling new deletion requests. The importer reads legacy journal and checkpoint
+objects, validates their signatures and inventory, and writes to the new
+PostgreSQL journal. It is the only cutover command that needs the old S3
+credentials; those credentials are not used by the account-deletion API or
+worker after import.
 
-If configuring Grafana Cloud log shipping, copy
-`.env.grafana-cloud.staging.example` to `.env.grafana-cloud.staging` and set a
-Grafana Cloud Loki URL, stack/tenant ID, and a token restricted to log writes.
-Do not commit any of these files. AWS checkpoint and backup credentials should
-be scoped separately; record account IDs to demonstrate the configured failure
-domains.
+1. Keep `ACCOUNT_DELETION_ENABLED=false` and stop the old deletion worker,
+   exporter, and new acceptance traffic.
+2. Provision and migrate the new journal database, set the intended journal ID
+   and HMAC key, and run the staging storage check.
+3. For the one-time import process only, supply the legacy
+   `ACCOUNT_DELETION_JOURNAL_ENDPOINT`, bucket, access key, checkpoint endpoint,
+   checkpoint bucket, and read-only credentials alongside the new PostgreSQL
+   journal settings. Run:
 
-The ordinary staging stack can be deployed without account-deletion cloud
-credentials:
+   ```sh
+   set -a
+   . services/api/.env.staging
+   . services/api/.env.account-deletion-journal
+   set +a
+   npm run account-deletion:journal-import-legacy -w @yaskapp/api
+   ```
+
+4. Record the import counts and compare prepared/accepted counts and operation
+   IDs with the old inventory. An incomplete, tampered, duplicate-conflicting,
+   or checkpoint-only record aborts import and blocks cutover. Do not delete or
+   alter the legacy inventory until the new journal and restore drill are
+   verified.
+5. Remove the temporary cloud variables and old credentials from API/worker
+   hosts. The importer code remains migration-only; runtime journal reads use
+   PostgreSQL exclusively.
+
+Copy `services/api/.env.account-deletion-journal.example` to
+`services/api/.env.account-deletion-journal` on each API host, and copy the
+retention example only to the deletion worker. Keep both files out of Git. The
+base staging stack can run with deletion disabled. After import and all release
+checks pass, deploy the account-deletion overlay to start the worker and
+periodic journal reconciler, and enable the API feature:
 
 ```sh
 docker compose -f infra/docker/docker-compose.staging.yml config --quiet
-docker compose -f infra/docker/docker-compose.staging.yml up -d --build --remove-orphans
-```
-
-After the cloud and retention env files are configured, include the
-account-deletion overlay to start the worker and exporter:
-
-```sh
 docker compose \
   -f infra/docker/docker-compose.staging.yml \
   -f infra/docker/docker-compose.account-deletion.staging.yml config --quiet
@@ -160,136 +146,88 @@ docker compose \
   -f infra/docker/docker-compose.account-deletion.staging.yml up -d --build
 ```
 
-To add Grafana Cloud log shipping, include its overlay as well:
+The reconciler compares accepted application operations with the journal every
+five minutes. Check its local logs and `/health/ready` before enabling new
+acceptance. Do not add cloud backup credentials, cloud log shipping, or a
+checkpoint service to the runtime configuration. The application's
+S3-compatible media client continues to use the self-hosted MinIO endpoint.
 
-```sh
-docker compose \
-  -f infra/docker/docker-compose.staging.yml \
-  -f infra/docker/docker-compose.account-deletion.staging.yml \
-  -f infra/docker/docker-compose.account-deletion-observability.yml config --quiet
-docker compose \
-  -f infra/docker/docker-compose.staging.yml \
-  -f infra/docker/docker-compose.account-deletion.staging.yml \
-  -f infra/docker/docker-compose.account-deletion-observability.yml up -d
-```
+## Backups and retention
 
-The overlay sends only the account-deletion worker and journal-exporter stdout
-through the host-local syslog port to Alloy. Alloy has no Docker socket mount and
-only reads those two service streams. Configure a Grafana Cloud contact point
-and Grafana-managed Loki alert rules for:
+Back up the application database on the application host with
+`infra/docker/backup-postgres.sh`. Back up the journal database on its own host
+with `infra/docker/backup-account-deletion-journal.sh`. Each script creates a
+custom PostgreSQL dump, encrypts it with the operator-managed
+`BACKUP_ENCRYPTION_KEY_FILE`, verifies that the encrypted copy can be decrypted
+and listed by `pg_restore`, copies it to a mounted `BACKUP_REPLICA_DIR` on
+separate/offline storage, and verifies matching SHA-256 checksums. A missing
+replica mount, key, or valid dump fails the job and leaves the existing backup
+files in place. Keep local and replica database backup retention at 30 days or
+less. Store and recover the encryption key independently of the hosts and
+replicas.
 
-* Any failure event, evaluated every minute with no pending delay:
-  `sum(count_over_time({job="account-deletion"} |~ "account_deletion.alert|Account deletion journal export failed|Account deletion worker batch failed" [5m]))`
-  greater than zero.
-* Missing worker heartbeat, evaluated every minute with a 2-minute window:
-  `sum(count_over_time({job="account-deletion", service="account-deletion-worker"} |= "account_deletion.metrics" [2m]))`
-  below one. Set the rule's No Data behavior to Alerting so a stopped log
-  pipeline also raises an alert.
-* Any failure to finish an exporter run: use the failure query above. Missing
-  exporter heartbeat, evaluated every minute with a 10-minute window:
-  `sum(count_over_time({job="account-deletion", service="account-deletion-journal-exporter"} |= "account_deletion.journal_exporter.complete" [10m]))`
-  below one. The exporter writes a success marker every five minutes. Set No
-  Data behavior to Alerting and alert on worker/exporter container restarts at
-  the VPS level as well.
+Journal entries are retained for at least 35 days. The application retention
+worker removes journal entries only after the corresponding operation is
+completed and older than 35 days; unfinished operations and unresolved
+prepared-only intents require operator action and are retained. Never prune a
+journal entry manually to clear an alert.
 
-Route all three rules to the staging on-call contact point. Test the contact
-point from Grafana Cloud, then produce a staging-only worker alert and confirm
-receipt before enabling account deletion. Grafana Cloud's Loki endpoint/token
-does not create alert rules or contact points automatically; record their IDs
-and the test delivery result in the staging evidence.
-
-After installing the journal and checkpoint credentials, initialize the two
-identity markers once and confirm readiness while deletion remains disabled.
-Do not copy example credentials or placeholder URLs into a live staging
-deployment.
-
-## Retention
-
-`backup-postgres.sh` rejects a local backup retention setting above 30 days. Keep
-the staging dumps in protected storage outside the staging host as well as the
-validated local copy. After verifying the local dump, `backup-postgres.sh` sends
-it to the configured AWS S3 backup bucket and verifies uploaded size and SHA-256
-metadata before pruning local copies. A failed upload fails the backup job and
-leaves the local dump in place. Configure the external backup bucket's lifecycle
-to expire current and noncurrent dump versions no later than 30 days. Keep the latest
-seven daily and four weekly recovery points within that 30-day window.
-
-The media bucket must retain active current objects. For a versioned MinIO
-bucket, enable versioning and expire only noncurrent versions after 30 days; do
-not set current-object expiry on the live media bucket. For example, with an
-`mc` alias named `staging`, apply once and verify with `mc ilm rule ls`:
-
-```sh
-mc version enable staging/$S3_BUCKET
-mc ilm rule add staging/$S3_BUCKET --noncurrent-expire-days 30 --expire-delete-marker
-```
-
-For a separate backup bucket, configure expiry for both current dumps and
-noncurrent versions at 30 days. Verify lifecycle rules after applying them and
-include the result in the staging restore record. Both independent journal
-stores use Object Lock for accepted records and checkpoints; the retention worker
-removes them after 35 days only when the operation is completed.
-
-The worker removes expired permission hashes and completed operation records
-after their configured 35-day retention, and minimal moderation identifiers
-after 30 days. The independent journal outlives the 30-day backup window.
+Schedule and monitor both backup jobs independently. Record their timestamps,
+dump checks, replica checksums, and restore test results. A journal backup must
+be recoverable independently of the application database host and its local
+storage.
 
 ## Restore gate
 
-Treat every database or media restore as a traffic-blocking maintenance event.
-Do not expose API traffic while data is being restored or journal reapply is
-running. If either journal service or the HMAC key is unavailable, stop; do not start
-API/web traffic against the restored snapshot.
+Treat a restore as a traffic-blocking maintenance event. Keep public routing,
+API, web clients, and the account-deletion worker stopped until the journal has
+been verified and every accepted deletion has been replayed. If the journal,
+its backup, the expected identity, or the HMAC key is unavailable, stop and
+resolve that incident before opening traffic.
 
-1. Stop `https`, `web`, `moderation-web`, `api`, `notification-worker`,
-   `account-deletion-worker`, and `account-deletion-journal-exporter`. Keep
-   PostgreSQL and object storage available for the restore.
-2. Restore PostgreSQL and the matching media snapshot, then run migrations.
-3. Use the newly built API image and restored database to reconcile the
-   restored accepted rows against the journal, then replay the full journal:
+1. Stop API/web traffic and the account-deletion worker and reconciler. Leave
+   PostgreSQL services available for restore operations.
+2. Restore the application database and, if required, restore the journal
+   database from its separate owner-controlled backup. Restore journal roles
+   and TLS configuration first. Confirm the restored journal ID matches
+   `ACCOUNT_DELETION_JOURNAL_ID`; do not create a replacement identity during
+   recovery.
+3. With the API and worker still stopped, use the restored application DB and
+   the verified journal to replay all accepted deletions:
 
    ```sh
-   docker compose \
-     -f infra/docker/docker-compose.staging.yml \
-     -f infra/docker/docker-compose.account-deletion.staging.yml \
-     run --rm --no-deps --entrypoint node account-deletion-journal-exporter \
-     services/api/dist/jobs/export-account-deletion-journal.js
-   docker compose \
-     -f infra/docker/docker-compose.staging.yml \
-     -f infra/docker/docker-compose.account-deletion.staging.yml \
-     run --rm --no-deps api \
-     node services/api/dist/jobs/reapply-account-deletions.js
+   set -a
+   . services/api/.env.staging
+   . services/api/.env.account-deletion-journal
+   set +a
+   npm run account-deletion:journal-reapply -w @yaskapp/api
    ```
 
-   Export must exit zero before reapply may run. It checks accepted rows in the
-   restored database against the journal and compares the full journal ID set
-   against the independently stored checkpoint set. This detects records missing
-   from either store even when the restored database predates acceptance.
-   Independently verify Object Lock retention and the journal object inventory
-   before continuing. Reapply lists every journal object, checks its HMAC, key/ID agreement,
-   timestamps, checkpoint completeness, and duplicate IDs, and reopens every matching deletion as pending
-   cleanup. It marks any surviving account row deleted, resets cleanup steps,
-   and recreates the media manifest. It exits non-zero on missing credentials,
-   incomplete listing, malformed or tampered data, owner mismatch, or database
-   error. A zero exit and `reapplied` count equal to the verified journal entry
-   count are required before traffic is opened.
-4. Start `account-deletion-worker`, wait for it to become healthy in logs, then
-   start API and frontends. Run the staging smoke test and check that deleted
-   IDs remain invisible before removing the maintenance block.
+   The command verifies every journal row present and its HMAC before replay,
+   exits nonzero on conflicting or unresolved journal state, and reports
+   verified and reapplied counts. Compare that inventory with the independently
+   recorded accepted-operation inventory for the backup. A valid HMAC on the
+   remaining rows does not prove that a backup contains every accepted entry;
+   stop if the inventories differ. Require exit code zero and matching counts
+   before proceeding. Every restored account covered by an accepted
+   record must be closed and queued for cleanup before readiness is checked or
+   traffic is opened. An unresolved prepared-only record blocks recovery and
+   requires operator reconciliation.
+4. Start the deletion worker and reconciler, verify their health/logs and
+   `/health/ready`, then restore API and frontend traffic. Run the staging
+   smoke test and confirm deleted account IDs and content remain inaccessible.
 
-Reapplying completed operations is intentional: a backup can predate the
-cleanup, so every journal record is replayed as pending cleanup. The process is
-idempotent and never relies on the former deletion token's expiry. Roll back an
-application image by redeploying it against the restored/current database; do
-not restore an old database to roll back application code.
+Replaying completed records is intentional: an application backup may predate
+acceptance or cleanup. Replay is idempotent and resumes cleanup without using
+the expired deletion token.
 
-## Staging restore exercise
+## Staging restore drill
 
-Use a disposable account and a backup taken before its deletion. Accept deletion,
-verify the independent journal object exists, restore the old database and
-matching media snapshot while traffic is blocked, then run the reapply command.
-Confirm the account is inaccessible before and after worker completion, all
-cleanup steps complete, and repeating reapply does not create duplicate work.
-Record the backup time, journal entry ID, command exit code, counts, worker
-result, and smoke-test result. Never use a production account or open traffic
-between restore and reapply.
+Use a disposable account and an application backup captured before its
+acceptance. Keep API traffic and the worker stopped, restore the application
+backup, run `account-deletion:journal-reapply`, and verify the account remains
+closed before starting API traffic. Then start the worker, verify cleanup
+completes, and repeat replay to check idempotence. Record the backup time,
+operation ID, journal identity, command exit code and counts, worker result,
+and smoke-test result in `docs/account-deletion-smoke-test.md`. Never use a
+production account or open traffic between restore and replay.

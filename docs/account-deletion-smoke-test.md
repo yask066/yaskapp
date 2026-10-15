@@ -15,10 +15,10 @@ owner and recorded evidence:
   the moderation exceptions, and the poll/comment rules in
   `docs/prd-account-deletion.md`.
 - The approved policy text is published and matches the client warning.
-- AD-14 has passed on staging: the worker survives restart; the independent
-  acceptance journal and checkpoint are provisioned in separate failure
-  domains; bucket version/lifecycle rules and backup expiry are verified;
-  alerts are active; and a pre-deletion backup restore does not resurrect the
+- AD-14 has passed on staging: the worker survives restart; the dedicated
+  journal PostgreSQL is on a separate physical host; owner-controlled backups
+  and 35-day journal retention are verified; local health/log monitoring is
+  active; and a pre-deletion application backup restore does not resurrect the
   account. Record its runbook and restore exercise here:
   `____________________________`.
 - API, web, and mobile builds use the same migration level. New acceptance is
@@ -38,9 +38,9 @@ Create disposable accounts with unique credentials for each run:
 | Superadmins | Two active superadmins, so the test can prove that removing one does not remove the last one |
 
 Run two separate API processes (staging replicas) against the same staging
-database and Redis. Configure current media storage and both independent
-deletion-journal stores. The automated E2E test currently creates two Fastify
-instances in one process; the staging run must still verify separate replicas.
+application PostgreSQL, journal PostgreSQL, Redis, and test media storage. The
+automated E2E test currently creates two Fastify instances in one process; the
+staging run must still verify separate replicas.
 Record the build, migration version, worker version, and storage lifecycle
 configuration.
 
@@ -56,7 +56,7 @@ redacted logs or query results. A checked box without evidence is not a pass.
 | AC-03 | Old bearer and cookie on both API nodes; existing sockets close; new socket handshake rejected | |
 | AC-04 | Profile, search, feed, lists, direct media URLs and soft-deleted content are hidden immediately after acceptance | |
 | AC-05 | After completion, query for user/profile/content/device/notification/relationship rows and operation-scoped retained records | |
-| AC-06 | Verify current, replaced, orphaned and versioned media are gone; partial S3 delete must not report completion | |
+| AC-06 | Verify current, replaced, orphaned and versioned MinIO media objects are gone; a partial object-delete failure must not report completion | |
 | AC-07 | Compare votes, likes, poll revisions, follower/following totals, replies and unread counts before and after; no negative values | |
 | AC-08 | Closed-poll vote is removed; surviving members' replies remain connected and visible | |
 | AC-09 | Owned polls and full discussions are removed; notification payloads do not expose the deleted profile/content | |
@@ -79,8 +79,9 @@ Run each case with disposable data and restore the fixture between cases:
 
 1. Drop the verification response, acceptance response, and status response in
    turn. Retry using the original request/receipt and confirm one operation.
-2. Interrupt DB, media storage, journal storage, checkpoint storage, and Redis
-   separately. Confirm acceptance fails closed before its durable checkpoint;
+2. Interrupt application PostgreSQL, media storage, journal PostgreSQL, and
+   Redis separately. Confirm acceptance fails closed when any required service
+   is unavailable;
    after acceptance, access remains closed and the queue resumes.
 3. Make a batch media delete partially fail. Restart the worker between retries
    and verify it does not mark the operation complete until all versions and
@@ -89,9 +90,10 @@ Run each case with disposable data and restore the fixture between cases:
    Confirm the operation continues without a client session.
 5. Race upload finalization, vote, push delivery, and moderator role changes
    with acceptance. Verify late writes are rejected or included in cleanup.
-6. Restore a database and media backup captured before acceptance. Before
-   opening traffic, reapply the full independent journal and verify the account
-   and its content remain hidden and queued for cleanup.
+6. Restore application and media backups captured before acceptance. Before
+   opening traffic, verify the journal identity and replay the complete
+   PostgreSQL journal; confirm the account and its content remain hidden and
+   queued for cleanup.
 7. Set the fake clock across the 24-hour deadline and confirm retry metrics and
    the overdue alert. Do not wait 24 hours per test.
 
@@ -115,5 +117,15 @@ AD-14 restore exercise:
 Product/policy approval reference:
 Worker and journal health:
 Rollout cohort and result:
-Final result: NOT RUN / PASS / FAIL
+Smoke attempt (2026-10-14): the gated account-deletion E2E command was invoked
+from `services/api`; it was skipped because its dedicated test database and
+required Redis, media, cloud journal/checkpoint, and feature-enable environment
+variables were unavailable. No staging fixture or release acceptance was run.
+Local verification (2026-10-15, Europe/Minsk): the staging journal role and
+identity unit checks passed (3/3); the PostgreSQL E2E command was skipped because
+`ACCOUNT_DELETION_TEST_DATABASE_URL`, `ACCOUNT_DELETION_JOURNAL_DATABASE_URL`,
+Redis, test media credentials, the HMAC key, journal ID, and
+`ACCOUNT_DELETION_ENABLED=true` were not configured. The staging restore drill
+and two-replica release acceptance remain NOT RUN.
+Final result: NOT RUN
 ```

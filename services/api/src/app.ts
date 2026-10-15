@@ -7,7 +7,7 @@ import Fastify from 'fastify';
 import { env } from './config/env.js';
 import { rateLimit } from './config/rate-limit.js';
 import { registerAuthRoutes } from './modules/auth/auth.routes.js';
-import { registerAccountDeletionRoutes } from './modules/account-deletion/account-deletion.routes.js';
+import { registerAccountDeletionRoutes, type AccountDeletionJournalRouteOverrides } from './modules/account-deletion/account-deletion.routes.js';
 import { getCurrentUser } from './modules/auth/auth.utils.js';
 import { registerAdminRoutes } from './modules/admin/admin.routes.js';
 import {
@@ -30,7 +30,7 @@ import { dispatchPendingDeletionEvents } from './modules/account-deletion/accoun
 import { refreshNotificationCreatedEvent } from './modules/notifications/notifications.events.js';
 import { countUnreadNotifications, getNotificationForRecipient } from './modules/notifications/notifications.repository.js';
 
-export function buildApp() {
+export function buildApp(options: { accountDeletionJournal?: AccountDeletionJournalRouteOverrides } = {}) {
   let realtimeRetryTimer: ReturnType<typeof setInterval> | undefined;
   let deletionEventsTimer: ReturnType<typeof setInterval> | undefined;
   const app = Fastify({
@@ -179,7 +179,7 @@ export function buildApp() {
   });
 
   registerAuthRoutes(app);
-  registerAccountDeletionRoutes(app);
+  registerAccountDeletionRoutes(app, options.accountDeletionJournal);
   registerAdminRoutes(app);
   registerHealthRoutes(app);
   registerModerationRoutes(app);
