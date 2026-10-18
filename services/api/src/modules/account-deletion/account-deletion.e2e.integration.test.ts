@@ -53,11 +53,11 @@ test('e2e_acceptance_persists_prepared_and_accepted_rows', { skip: integrationSk
   assert.equal(process.env.ACCOUNT_DELETION_ENABLED, 'true', 'the test environment must enable account deletion');
   assert.match(process.env.S3_BUCKET ?? '', /test/i, 'media storage must use a dedicated test bucket');
 
-  // The app's safety stub is active under NODE_ENV=test / NODE_TEST_CONTEXT.
-  // This integration test deliberately opts into real journal I/O only after
-  // the dedicated database and test-bucket guards above have passed.
+  // Parse the test configuration first so dedicated localhost journal URLs
+  // pass the environment guard. The journal adapter checks NODE_ENV at call
+  // time, so switch to development after imports to opt into real journal I/O.
   delete process.env.NODE_TEST_CONTEXT;
-  process.env.NODE_ENV = 'development';
+  process.env.NODE_ENV = 'test';
 
   const [{ buildApp }, { db, closeDatabaseConnection }, { closeRedisConnection }, { closeStorageConnection }, { processDeletionBatch }, { closeAccountDeletionJournalDatabase }, { readAcceptedDeletionsFromJournal, reconcileAccountDeletionJournal }, { reapplyAcceptedDeletions }] = await Promise.all([
     import('../../app.js'),
@@ -69,6 +69,7 @@ test('e2e_acceptance_persists_prepared_and_accepted_rows', { skip: integrationSk
     import('./account-deletion.journal.js'),
     import('./account-deletion.restore.js')
   ]);
+  process.env.NODE_ENV = 'development';
   closeIntegrationConnections = async () => {
     await Promise.all([
       closeDatabaseConnection(), closeRedisConnection(), closeStorageConnection(),

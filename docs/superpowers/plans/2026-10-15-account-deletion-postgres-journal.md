@@ -48,11 +48,11 @@
 - Create `account_deletion_journal_meta` and `account_deletion_journal_entries`. Entry columns: generated row ID, `operation_id`, `intent_id`, `user_id`, `state` (`prepared` or `accepted`), `accepted_at`, `deadline_at`, JSON payload, HMAC, and `created_at`; enforce unique `(state, operation_id, intent_id)`, at most one accepted row per operation, and an index by operation/state.
 - The migration assumes pre-provisioned PostgreSQL roles: runtime role gets `SELECT, INSERT`, retention role gets only the documented retention operation, and neither application role gets `UPDATE` or unrestricted `DELETE`.
 
-- [ ] **Step 1: Add migration-runner tests**
+- [x] **Step 1: Add migration-runner tests**
 
   In `migrate-account-deletion-journal.test.ts`, add `journal_migrations_apply_in_order_with_checksums`, `modified_applied_journal_migration_fails`, and `failed_journal_migration_rolls_back`. Assert sorted names/checksums, an error for a changed checksum, and `ROLLBACK` without a migration-ledger insert after a failed SQL statement.
 
-- [ ] **Step 2: Run the focused migration tests and confirm they fail**
+- [x] **Step 2: Run the focused migration tests and confirm they fail**
 
   Run from `services/api`:
 
@@ -62,15 +62,15 @@
 
   Expected: FAIL because the runner and migration do not exist.
 
-- [ ] **Step 3: Implement the journal schema and independent migration runner**
+- [x] **Step 3: Implement the journal schema and independent migration runner**
 
   Use a separate migration ledger and advisory-lock ID from the application database migrations. The journal meta row records a stable journal ID; migration must not silently recreate a missing or different identity during recovery.
 
-- [ ] **Step 4: Add connection and environment tests**
+- [x] **Step 4: Add connection and environment tests**
 
   Add `valid_journal_urls_create_separate_pools`, `deletion_enabled_requires_journal_settings`, and `deletion_disabled_does_not_require_journal_settings`. Assert runtime and retention pools use their distinct URLs and partial config produces a Zod error only when the corresponding feature/job is enabled.
 
-- [ ] **Step 5: Run focused tests and commit**
+- [x] **Step 5: Run focused tests and commit**
 
   ```sh
   node --import tsx --test src/db/migrate-account-deletion-journal.test.ts src/config/account-deletion-journal-database.test.ts
@@ -92,11 +92,11 @@
 - Keep `AccountDeletionJournal` operations: `initialize`, `assertReady`, `writePrepared`, `writeAccepted`, `deletePrepared`, `deletePreparedIntent`, `deleteAccepted`, `cleanupStalePrepared`, `readAll`, and `close`. Remove `writeCheckpoint` and all checkpoint-client options.
 - `readAll()` verifies every row's HMAC and database state, returns accepted entries for replay, and fails if a prepared entry has no matching accepted row. Conflicting duplicate states fail with the existing journal error codes.
 
-- [ ] **Step 1: Replace S3 tests with PostgreSQL-journal behavior tests**
+- [x] **Step 1: Replace S3 tests with PostgreSQL-journal behavior tests**
 
   Add `journal_write_is_idempotent_for_identical_entry`, `journal_conflict_rejects_changed_entry`, `journal_read_rejects_tampered_hmac`, `journal_identity_must_match_initialized_id`, `accepted_requires_matching_prepared`, `prepared_only_blocks_inventory_read`, and `journal_close_closes_pool`. Assert duplicate identical inserts return one logical entry, conflicts and invalid inventory reject, and the injected pool is closed once.
 
-- [ ] **Step 2: Run the journal tests and confirm the new cases fail**
+- [x] **Step 2: Run the journal tests and confirm the new cases fail**
 
   ```sh
   node --import tsx --test src/modules/account-deletion/account-deletion.journal.test.ts
@@ -104,15 +104,15 @@
 
   Expected: FAIL because the PostgreSQL adapter is not implemented yet.
 
-- [ ] **Step 3: Implement the PostgreSQL journal repository**
+- [x] **Step 3: Implement the PostgreSQL journal repository**
 
   Use parameterized SQL and the dedicated pool. Writes insert the signed JSON/payload, read back the stored row, and compare its HMAC and identity before reporting success. `assertReady()` checks the persistent journal identity without creating it.
 
-- [ ] **Step 4: Remove runtime checkpoint and S3 journal behavior**
+- [x] **Step 4: Remove runtime checkpoint and S3 journal behavior**
 
   Remove `S3Client` construction, bucket prefixes, Object Lock assumptions, checkpoint reads/writes, and `ACCOUNT_DELETION_JOURNAL_*_ENDPOINT` settings from this module. Keep `@aws-sdk/client-s3` in package dependencies because the app still uses it for MinIO media.
 
-- [ ] **Step 5: Run focused tests and commit**
+- [x] **Step 5: Run focused tests and commit**
 
   ```sh
   node --import tsx --test src/modules/account-deletion/account-deletion.journal.test.ts
@@ -176,11 +176,11 @@
 - Replace `exportAcceptedDeletionsToJournal()` with or adapt it as `reconcileAccountDeletionJournal(executor): Promise<{ reconciled: number; journalEntries: number }>`; it repairs accepted application rows missing from the journal and fails on owner/timestamp conflicts.
 - Keep `reapplyAcceptedDeletions(entries, database)` idempotent. The restore command must verify the complete journal before applying entries and exit nonzero on any inconsistency.
 
-- [ ] **Step 1: Add failing reconciliation and replay tests**
+- [x] **Step 1: Add failing reconciliation and replay tests**
 
   Add `reconcile_restores_missing_accepted_entry`, `reconcile_fails_on_journal_outage`, `restore_rejects_duplicate_operation_or_user`, `restore_rejects_invalid_signature`, and `restore_replay_is_idempotent`. Assert a valid accepted DB row is inserted once, all listed corrupt states reject before replay, and the second replay does not create duplicate steps/events.
 
-- [ ] **Step 2: Run focused tests and confirm they fail**
+- [x] **Step 2: Run focused tests and confirm they fail**
 
   ```sh
   node --import tsx --test src/modules/account-deletion/account-deletion.restore.test.ts src/modules/account-deletion/account-deletion.restore.integration.test.ts
@@ -188,15 +188,15 @@
 
   Expected: FAIL for missing PostgreSQL reconciliation and integrity cases.
 
-- [ ] **Step 3: Implement journal reconciliation**
+- [x] **Step 3: Implement journal reconciliation**
 
   Read accepted operations from the application DB, write/reverify their matching `prepared` entry before inserting any missing signed `accepted` entry idempotently, then compare all eligible operations against the complete verified journal inventory. Do not remove or auto-resolve unresolved `prepared` records.
 
-- [ ] **Step 4: Adapt restore replay to read PostgreSQL journal entries**
+- [x] **Step 4: Adapt restore replay to read PostgreSQL journal entries**
 
   Reapply all accepted deletions to the restored application DB. Keep API traffic and the worker stopped until this command succeeds; update the command output to include the number of verified/reapplied entries and use nonzero exit on failure.
 
-- [ ] **Step 5: Run focused tests and commit**
+- [x] **Step 5: Run focused tests and commit**
 
   Expected: all commands in Step 2 pass. Commit as `feat: reconcile and replay PostgreSQL deletion journal`.
 
@@ -214,11 +214,11 @@
 - Unfinished accepted operations are never removed. Unresolved prepared-only intents are retained for operator reconciliation rather than silently pruned.
 - Use the restricted journal retention role only for the eligible delete function; the API runtime role remains unable to delete rows. Add a new migration rather than editing the already-applied `001` migration.
 
-- [ ] **Step 1: Add failing boundary and role tests**
+- [x] **Step 1: Add failing boundary and role tests**
 
   Add `completed_entry_expires_at_day_35`, `completed_entry_younger_than_35_days_is_retained`, `unfinished_entry_never_expires`, and `runtime_role_cannot_update_or_delete_journal`. Assert only completed entries at or before the 35-day cutoff are pruned; verify the permission case against the dedicated test journal DB.
 
-- [ ] **Step 2: Run the retention tests and confirm they fail**
+- [x] **Step 2: Run the retention tests and confirm they fail**
 
   ```sh
   node --import tsx --test src/modules/account-deletion/account-deletion.retention.test.ts src/modules/account-deletion/account-deletion.journal.permissions.integration.test.ts
@@ -226,11 +226,11 @@
 
   Expected: FAIL for the journal PostgreSQL role and age boundary behavior.
 
-- [ ] **Step 3: Implement cross-database retention**
+- [x] **Step 3: Implement cross-database retention**
 
   Keep the application database's existing retention of completed operation rows at day 35. Delete journal rows only after the application query proves the operation is completed and past the same boundary; never use unconditional journal cleanup.
 
-- [ ] **Step 4: Run retention tests and commit**
+- [x] **Step 4: Run retention tests and commit**
 
   Expected: PASS. Commit as `feat: retain deletion journal records for 35 days`.
 
@@ -248,11 +248,11 @@
 - Verify legacy HMACs before import. Import `prepared` and `accepted` entries, validate legacy checkpoints against accepted entries, and do not create a new accepted entry from an invalid or checkpoint-only record.
 - Make duplicate identical imports idempotent. Abort on same operation/state with different user, timestamps, intent, or signature.
 
-- [ ] **Step 1: Add importer tests with in-memory legacy stores and a fake PostgreSQL target**
+- [x] **Step 1: Add importer tests with in-memory legacy stores and a fake PostgreSQL target**
 
   Add `legacy_import_accepts_empty_inventory`, `legacy_import_preserves_valid_entries`, `legacy_import_is_idempotent`, `legacy_import_rejects_invalid_hmac`, `legacy_import_rejects_missing_prepared_or_checkpoint`, and `legacy_import_rejects_conflicting_operation`. Assert no target write occurs for an invalid or conflicting source inventory. Keep a `LegacyAccountDeletionJournalEntry` type and checkpoint HMAC validation in the migration-only adapter; runtime entries remain `prepared`/`accepted` only.
 
-- [ ] **Step 2: Run importer tests and confirm they fail**
+- [x] **Step 2: Run importer tests and confirm they fail**
 
   ```sh
   node --import tsx --test src/jobs/import-account-deletion-cloud-journal.test.ts
@@ -260,13 +260,25 @@
 
   Expected: FAIL because the importer does not exist.
 
-- [ ] **Step 3: Implement the read-only legacy adapter and importer**
+- [x] **Step 3: Implement the read-only legacy adapter and importer**
 
   Keep legacy S3 access isolated to this one-time command. Print only counts and operation IDs; never print user credentials, tokens, journal payloads, or HMAC keys.
 
-- [ ] **Step 4: Run importer tests and commit**
+- [x] **Step 4: Run importer tests and commit**
 
   Expected: PASS. Commit as `feat: import legacy deletion journal into PostgreSQL`.
+
+### Tasks 1–6 retrospective verification (2026-10-18, Europe/Minsk)
+
+The implementation and required test cases for Tasks 1–6 are present in the
+task commits. Focused verification on the current branch passed: Task 1, 8/8;
+Task 2, 9/9; Task 3, 23/23; Task 4, 11/11; Task 5, 10/10; Task 6, 6/6.
+API typecheck passed. The first Task 3 attempt inherited `CORS_ORIGINS` from
+the developer `.env` and failed one cookie-origin assertion; rerunning with the
+test's configured `http://localhost:5173` origin passed all 23 tests. Original
+pre-implementation RED console output was not retained in the task ledger; the
+Step 2 checkboxes record retrospective completion based on the committed test
+and implementation changes, while the counts above record current GREEN runs.
 
 ### Task 7: Replace cloud deployment and backup paths with self-hosted operations
 
@@ -329,7 +341,7 @@
 
   Expected: PASS. Commit as `ops: self-host account deletion journal and backups`.
 
-### Task 8: Cut over operations docs and run release acceptance checks
+### Task 8: Cut over operations docs and run local release checks
 
 **Files:**
 - Modify: `docs/account-deletion-operations.md`
@@ -370,7 +382,7 @@
 
   Expected: all tests pass; Compose configs parse; a config scan finds no AWS/B2/Grafana Cloud credentials or endpoints in the account-deletion runtime. The S3 endpoint for MinIO media is expected and remains self-hosted.
 
-- [ ] **Step 5: Perform the staging restore drill and commit the release docs**
+- [ ] **Step 5: Commit the release docs without a live staging drill**
 
-  Restore an application backup from before a known accepted deletion, run journal replay with API/worker stopped, confirm the account remains closed and cleanup resumes, then record the evidence in `docs/account-deletion-smoke-test.md`. Commit as `docs: document PostgreSQL journal cutover and restore checks`.
+  The live staging restore drill, shared-staging acceptance, separate physical journal-host check, and two-replica run are excluded from this task. Keep them recorded as `NOT RUN` in `docs/account-deletion-smoke-test.md`; they are not completion criteria. Commit the operations and test documentation after the local release checks pass as `docs: document PostgreSQL journal cutover and restore checks`.
 

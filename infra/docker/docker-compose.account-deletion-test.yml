@@ -1,0 +1,75 @@
+name: yaskapp-account-deletion-test
+
+# This project owns only dedicated test PostgreSQL, Redis, and S3-compatible
+# storage containers. It does not attach to the staging Compose project.
+services:
+  app-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${APP_POSTGRES_USER:?load services/api/.env.staging}
+      POSTGRES_PASSWORD: ${APP_POSTGRES_PASSWORD:?load services/api/.env.staging}
+      POSTGRES_DB: ${APP_POSTGRES_DB:?load services/api/.env.staging}
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - app-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  journal-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${JOURNAL_POSTGRES_ADMIN_USER:?load journal test credentials}
+      POSTGRES_PASSWORD: ${JOURNAL_POSTGRES_ADMIN_PASSWORD:?load journal test credentials}
+      POSTGRES_DB: ${JOURNAL_POSTGRES_DB:?load journal test credentials}
+      JOURNAL_RUNTIME_PASSWORD: ${JOURNAL_RUNTIME_PASSWORD:?load journal test credentials}
+      JOURNAL_RETENTION_PASSWORD: ${JOURNAL_RETENTION_PASSWORD:?load retention test credentials}
+    ports:
+      - "127.0.0.1:55433:5432"
+    volumes:
+      - journal-postgres-data:/var/lib/postgresql/data
+      - ./account-deletion-test/001-create-journal-roles.sql:/docker-entrypoint-initdb.d/001-create-journal-roles.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:56379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  s3:
+    image: rustfs/rustfs:latest
+    command: ["/data"]
+    environment:
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY_ID:?load services/api/.env.staging}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_ACCESS_KEY:?load services/api/.env.staging}
+      RUSTFS_OBS_LOGGER_LEVEL: error
+    ports:
+      - "127.0.0.1:59000:9000"
+      - "127.0.0.1:59001:9001"
+    volumes:
+      - s3-data:/data
+    restart: unless-stopped
+
+volumes:
+  app-postgres-data:
+  journal-postgres-data:
+  redis-data:
+  s3-data:

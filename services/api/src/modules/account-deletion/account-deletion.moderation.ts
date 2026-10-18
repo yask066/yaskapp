@@ -85,15 +85,15 @@ async function purgeModerationBatch(client: PoolClient, userId: string, pollIds:
          JOIN sanctions s ON s.id = a.sanction_id
         WHERE a.user_id <> $1 AND (
           s.user_id = $1 OR s.created_by_user_id = $1 OR s.revoked_by_user_id = $1
-          OR a.resolved_by_user_id = $1 OR s.case_id = ANY($4::uuid[])
-        ) AND (a.reason <> $5 OR a.decision_note IS NOT NULL OR a.resolved_by_user_id = $1)
-        ORDER BY a.created_at, a.id LIMIT $6 FOR UPDATE OF a
+          OR a.resolved_by_user_id = $1 OR s.case_id = ANY($2::uuid[])
+        ) AND (a.reason <> $3 OR a.decision_note IS NOT NULL OR a.resolved_by_user_id = $1)
+        ORDER BY a.created_at, a.id LIMIT $4 FOR UPDATE OF a
      )
      UPDATE appeals a
-        SET reason = $5, decision_note = NULL,
+        SET reason = $3, decision_note = NULL,
             resolved_by_user_id = CASE WHEN a.resolved_by_user_id = $1 THEN NULL ELSE a.resolved_by_user_id END
        FROM batch WHERE a.id = batch.id`,
-    [userId, pollIds, commentIds, caseIds, REDACTED_TEXT, PURGE_BATCH_SIZE]
+    [userId, caseIds, REDACTED_TEXT, PURGE_BATCH_SIZE]
   );
   changed += foreignAppeals.rowCount ?? 0;
 

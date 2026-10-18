@@ -32,11 +32,19 @@ export async function reapplyAcceptedDeletions(
     const client = await database.connect();
     try {
       await client.query('BEGIN');
-      const existing = await client.query<{ user_id: string }>(
-        'SELECT user_id FROM account_deletion_operations WHERE id = $1 FOR UPDATE', [entry.operationId]
+      const existing = await client.query<{ user_id: string; status: string }>(
+        'SELECT user_id, status FROM account_deletion_operations WHERE id = $1 FOR UPDATE', [entry.operationId]
       );
       if (existing.rows[0] && existing.rows[0].user_id !== entry.userId) {
         throw new Error('account_deletion_journal_operation_owner_mismatch');
+      }
+      if (existing.rows[0]?.status === 'completed') {
+        const user = await client.query('SELECT 1 FROM users WHERE id = $1', [entry.userId]);
+        if (user.rowCount === 0) {
+          await client.query('COMMIT');
+          reapplied += 1;
+          continue;
+        }
       }
 
       await client.query(

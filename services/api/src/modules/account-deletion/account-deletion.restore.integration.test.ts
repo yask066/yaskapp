@@ -45,6 +45,10 @@ test('restore_old_backup_does_not_resurrect_account', { skip: !testDatabaseUrl }
 
     assert.deepEqual(await reapplyAcceptedDeletions([entry], pool), { reapplied: 1 });
     const workerHandlers = Object.fromEntries(DELETION_STEP_ORDER.map((stepKey) => [stepKey, async () => ({ done: true })]));
+    workerHandlers.completion = async () => {
+      await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+      return { done: true };
+    };
     const batchResult = await processDeletionBatch({ limit: 1, now: new Date() }, {
       repository: createAccountDeletionWorkerRepository(pool as never),
       handlers: workerHandlers
@@ -56,6 +60,21 @@ test('restore_old_backup_does_not_resurrect_account', { skip: !testDatabaseUrl }
       `worker status: ${workerCompleted.rows[0]?.status ?? 'missing'}`);
     assert.equal(workerCompleted.rows[0]?.status, 'completed');
 
+    const beforeReplay = await pool.query<{ status: string; completed_at: Date | null }>(
+      'SELECT status, completed_at FROM account_deletion_operations WHERE id = $1', [operationId]
+    );
+    const stepsBeforeReplay = await pool.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM account_deletion_steps
+       WHERE operation_id = $1 AND status = 'completed'`, [operationId]
+    );
+    const eventsBeforeReplay = await pool.query(
+      `SELECT event_key, attempts, delivered_at, last_error_code
+       FROM account_deletion_events WHERE operation_id = $1 ORDER BY event_key`, [operationId]
+    );
+    assert.equal(beforeReplay.rows[0]?.status, 'completed');
+    assert.ok(beforeReplay.rows[0]?.completed_at);
+    assert.equal(stepsBeforeReplay.rows[0]?.count, 7);
+
     assert.deepEqual(await reapplyAcceptedDeletions([entry], pool), { reapplied: 1 });
 
     const user = await pool.query<{ status: string }>('SELECT status FROM users WHERE id = $1', [userId]);
@@ -63,17 +82,19 @@ test('restore_old_backup_does_not_resurrect_account', { skip: !testDatabaseUrl }
       'SELECT status, completed_at FROM account_deletion_operations WHERE id = $1', [operationId]
     );
     const steps = await pool.query<{ count: number }>(
-      'SELECT count(*)::int AS count FROM account_deletion_steps WHERE operation_id = $1 AND status = \'pending\'',
+      `SELECT count(*)::int AS count FROM account_deletion_steps
+       WHERE operation_id = $1 AND status = 'completed'`,
       [operationId]
     );
-    const events = await pool.query<{ count: number }>(
-      'SELECT count(*)::int AS count FROM account_deletion_events WHERE operation_id = $1', [operationId]
+    const events = await pool.query(
+      `SELECT event_key, attempts, delivered_at, last_error_code
+       FROM account_deletion_events WHERE operation_id = $1 ORDER BY event_key`, [operationId]
     );
-    assert.equal(user.rows[0]?.status, 'deleted');
-    assert.equal(operation.rows[0]?.status, 'pending');
-    assert.equal(operation.rows[0]?.completed_at, null);
+    assert.equal(user.rows.length, 0);
+    assert.equal(operation.rows[0]?.status, 'completed');
+    assert.equal(operation.rows[0]?.completed_at?.getTime(), beforeReplay.rows[0]?.completed_at?.getTime());
     assert.equal(steps.rows[0]?.count, 7);
-    assert.equal(events.rows[0]?.count, 2);
+    assert.deepEqual(events.rows, eventsBeforeReplay.rows);
   } finally {
     await pool.query('DELETE FROM account_deletion_operations WHERE id = $1', [operationId]);
     await pool.query('DELETE FROM users WHERE id = $1', [userId]);

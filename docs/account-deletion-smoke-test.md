@@ -134,5 +134,38 @@ without migrations reached the Redis rate-limit tests, which failed and stalled
 because Redis on port 6379 is unavailable; the run was interrupted. Docker
 Engine was unavailable, and `.env.staging` plus the dedicated journal env files
 were absent. No staging restore or two-replica acceptance was run.
-Final result: NOT RUN
+
+Local test infrastructure and verification (2026-10-16, Europe/Minsk): Docker
+Engine 29.6.1 is running a separate `yaskapp-account-deletion-test` Compose
+project with app PostgreSQL (`127.0.0.1:55432`), journal PostgreSQL
+(`127.0.0.1:55433`), Redis (`127.0.0.1:56379`), and RustFS S3-compatible test
+storage (`127.0.0.1:59000`; console `59001`). All three local env files are
+git-ignored and app/admin/runtime/retention/S3 secrets are distinct. App and
+journal migrations are current; the journal identity and runtime/retention
+privileges pass `account_deletion_storage_check:journal:ok`. RustFS health and
+S3 bucket/head/put/get/delete smoke checks passed. Focused account-deletion E2E
+passed 3/3, and journal permissions plus restore integration passed 4/4.
+
+Full API test suite (2026-10-16): the serial run completed 311 tests with 308
+passed and 3 failed: `logout clears the cookie session and mutating cookie
+requests require a trusted origin` (old cookie still authenticates after
+logout), `permanent ban requires superadmin and can be revoked through an
+appeal` (expected 201, received 401), and `follow graph hides deleted targets
+consistently` (expected 404, received 409). API typecheck, API build, staging
+Compose config, journal Compose config, and the journal storage check passed.
+The standard parallel `npm run test -w @yaskapp/api` invocation did not pass on
+the shared stateful integration services; use the serial run result above for
+the complete test count.
+
+The staging restore drill and two-replica release acceptance remain NOT RUN:
+there is no recorded staging application backup captured before a known
+accepted deletion and no disposable two-replica staging fixture. The passing
+local restore E2E uses only the isolated test databases and is not staging
+restore evidence.
+
+Staging release acceptance: NOT RUN
 ```
+
+Disposable local staging-clone run (2026-10-16, Europe/Minsk): dedicated app and journal test databases, Redis DB 2, and RustFS were used; two separate API Node processes listened on 3101/3102. Focused PostgreSQL E2E passed 3/3. Cross-process acceptance returned 202 on replica A; the prior bearer was rejected with 401 on replica B; journal contained prepared and accepted entries. A readable custom-format application dump was captured before acceptance. With both replicas stopped, restoring that dump returned the account to `active/not_started`; journal replay reported `verified=1, reapplied=1` and closed the account before API restart. Both replicas then passed readiness and a worker batch completed cleanup. **FAIL:** a second journal replay after completion changed the operation from `completed` back to `pending` (the account remained absent). This exposed a replay idempotence defect; the run is not accepted until resolved and repeated. This was an isolated local staging clone, not the shared staging environment; separate physical journal-host acceptance remains NOT RUN.
+
+Follow-up after replay idempotence fix (2026-10-16, Europe/Minsk): the restore integration regression first reproduced `completed → pending`, then passed after the fix (1/1). API build and typecheck passed. On a fresh disposable app/journal database pair, two independent API processes on ports 3101 and 3102 both passed readiness; deletion accepted on replica A returned 202 and the revoked bearer returned 401 through replica B. The pre-acceptance custom-format app dump restored the operation to `not_started`; replay verified and reapplied the accepted journal entry before either API restarted. The worker completed all 7 cleanup steps and removed the account. Both replicas returned ready; replaying the journal again kept the operation `completed`, preserved its completion timestamp and all completed steps, and left zero user rows. Focused PostgreSQL E2E passed 3/3. **Local staging-clone restore and two-replica drill: PASS.** This does not establish shared-staging acceptance or separate physical journal-host failure-domain acceptance; both remain NOT RUN.

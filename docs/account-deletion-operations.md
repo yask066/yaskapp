@@ -34,6 +34,38 @@ curl --fail-with-body http://127.0.0.1:3000/health/ready
 curl --fail-with-body http://127.0.0.1:3000/health/metrics
 ```
 
+## Local integration-test services
+
+The dedicated local stack provides the application test database, an independent
+journal test database, Redis, and RustFS as an S3-compatible media test server.
+It is not the staging stack: every service publishes ports only on `127.0.0.1`
+and uses volumes under the `yaskapp-account-deletion-test` Compose project.
+Production/staging media remains on the configured self-hosted MinIO service.
+
+The three `services/api/.env.*` files used below are local test credentials and
+are git-ignored. Do not copy them to staging or use their database URLs outside
+this Compose project.
+
+```sh
+docker compose \
+  --env-file services/api/.env.staging \
+  --env-file services/api/.env.account-deletion-journal \
+  --env-file services/api/.env.account-deletion-journal-retention \
+  -f infra/docker/docker-compose.account-deletion-test.yml up -d
+docker compose \
+  --env-file services/api/.env.staging \
+  --env-file services/api/.env.account-deletion-journal \
+  --env-file services/api/.env.account-deletion-journal-retention \
+  -f infra/docker/docker-compose.account-deletion-test.yml ps
+curl --fail-with-body http://127.0.0.1:59000/health
+```
+
+The mapped ports are app PostgreSQL `55432`, journal PostgreSQL `55433`, Redis
+`56379`, RustFS S3 API `59000`, and RustFS console `59001`. The test stack has
+separate app and journal credentials, plus independent journal runtime and
+retention roles. Run migrations and the journal role/identity check before the
+integration suite; create only the named test bucket in the local S3 service.
+
 ## First-time journal provisioning
 
 Run the journal Compose file only on its separate physical host. Bind PostgreSQL
