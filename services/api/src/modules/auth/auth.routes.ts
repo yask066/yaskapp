@@ -12,6 +12,7 @@ import {
 import { authenticate } from './auth.utils.js';
 import { isTrustedOrigin, serializeSessionCookie } from './auth.cookies.js';
 import { env } from '../../config/env.js';
+import { revokeUserSession } from './auth.repository.js';
 
 function setSessionCookie(request: FastifyRequest, reply: FastifyReply, accessToken: string) {
   // trustProxy resolves the public protocol when Caddy terminates TLS.
@@ -117,6 +118,14 @@ export function registerAuthRoutes(app: FastifyInstance) {
         error: 'csrf_origin_rejected',
         message: 'The request origin is not trusted.'
       });
+    }
+    try {
+      await request.jwtVerify();
+    } catch {
+      // Logout stays idempotent for missing, expired, or malformed sessions.
+    }
+    if (request.user?.sub) {
+      await revokeUserSession(request.user.sub, request.user.sessionVersion);
     }
     clearSessionCookie(request, reply);
     return reply.status(204).send();

@@ -87,7 +87,9 @@ export async function authenticateForAppeal(request: FastifyRequest, reply: Fast
     return reply.status(401).send({ error: 'unauthorized', message: 'Authentication is required.' });
   }
   const user = await request.getCurrentUser();
-  if (!user || user.status !== 'active' || await isSessionRevoked(user.id, request.user.sessionVersion)) {
+  // Ban and account-recovery flows revoke ordinary sessions. Keep the signed
+  // pre-revocation token usable only for the narrowly scoped appeal endpoint.
+  if (!user || user.status !== 'active') {
     return reply.status(401).send({ error: 'unauthorized', message: 'Authentication is required.' });
   }
 }

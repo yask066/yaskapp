@@ -287,3 +287,15 @@ export async function findUserById(userId: string) {
 export async function markUserSeen(userId: string) {
   await db.query("UPDATE users SET last_seen_at = now() WHERE id = $1 AND status = 'active' AND deleted_at IS NULL", [userId]);
 }
+
+export async function revokeUserSession(userId: string, sessionVersion: unknown) {
+  await db.query(
+    `UPDATE users
+     SET session_version = session_version + 1
+     WHERE id = $1
+       AND session_version = $2
+       AND status = 'active'
+       AND deleted_at IS NULL`,
+    [userId, Number(sessionVersion ?? 0)]
+  );
+}

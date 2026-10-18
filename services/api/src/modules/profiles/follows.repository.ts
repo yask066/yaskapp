@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
-import { lockActiveAccounts } from '../account-deletion/account-activity.guard.js';
+import { InactiveAccountError } from '../account-deletion/account-activity.guard.js';
 import { createNotification } from '../notifications/notifications.repository.js';
 import { publishNotificationAfterCommit } from '../notifications/notifications.publisher.js';
 
@@ -64,6 +64,22 @@ async function lockUserProfiles(
   return new Set(result.rows.map((row) => row.user_id));
 }
 
+async function lockFollowAccounts(client: PoolClient, followerId: string, followeeId: string) {
+  const userIds = [followerId, followeeId].sort();
+  for (const userId of userIds) {
+    const result = await client.query<{ status: string; deleted_at: Date | null }>(
+      'SELECT status, deleted_at FROM users WHERE id = $1 FOR UPDATE',
+      [userId]
+    );
+    const account = result.rows[0];
+    const active = account?.status === 'active' && account.deleted_at === null;
+    if (userId === followerId && !active) throw new InactiveAccountError();
+    if (userId === followeeId && !active) {
+      throw new FollowRepositoryError('The followee does not exist.', 'USER_NOT_FOUND');
+    }
+  }
+}
+
 async function readFollowCounts(
   client: PoolClient,
   followerId: string,
@@ -112,7 +128,7 @@ export async function followUserRecord(
   return withTransaction(async (client) => {
     let notificationId: string | null = null;
     const userIds = [input.followerId, input.followeeId].sort();
-    await lockActiveAccounts(client, userIds);
+    await lockFollowAccounts(client, input.followerId, input.followeeId);
     const existingUsers = await lockUserProfiles(client, userIds);
 
     if (existingUsers.size !== userIds.length) {
@@ -185,7 +201,7 @@ export async function unfollowUserRecord(
 
   return withTransaction(async (client) => {
     const userIds = [input.followerId, input.followeeId].sort();
-    await lockActiveAccounts(client, userIds);
+    await lockFollowAccounts(client, input.followerId, input.followeeId);
     const existingUsers = await lockUserProfiles(client, userIds);
 
     if (existingUsers.size !== userIds.length) {

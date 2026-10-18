@@ -490,6 +490,11 @@ test('permanent ban requires superadmin and can be revoked through an appeal', a
     payload: { caseId, reason: 'Moderator cannot issue permanent bans.' }
   });
   assert.equal(moderatorAttempt.statusCode, 403, moderatorAttempt.body);
+  const superadminSession = await app.inject({ method: 'GET', url: '/auth/me', headers: bearer(superadmin.accessToken) });
+  assert.equal(superadminSession.statusCode, 200, superadminSession.body);
+  assert.equal(superadminSession.json<{ user: { role: string } }>().user.role, 'superadmin');
+  const superadminCapabilities = await app.inject({ method: 'GET', url: '/moderation/capabilities', headers: bearer(superadmin.accessToken) });
+  assert.equal(superadminCapabilities.statusCode, 200, superadminCapabilities.body);
   const banned = await app.inject({
     method: 'POST', url: `/moderation/users/${target.user.id}/permanent-ban`,
     headers: { ...bearer(superadmin.accessToken), 'idempotency-key': `permanent-${suffix()}` },
@@ -498,6 +503,8 @@ test('permanent ban requires superadmin and can be revoked through an appeal', a
   assert.equal(banned.statusCode, 201, banned.body);
   const sanctionId = banned.json<{ sanction: { id: string; type: string } }>().sanction.id;
   assert.equal(banned.json<{ sanction: { type: string } }>().sanction.type, 'permanent_ban');
+  const revokedTargetSession = await app.inject({ method: 'GET', url: '/auth/me', headers: bearer(target.accessToken) });
+  assert.equal(revokedTargetSession.statusCode, 401, revokedTargetSession.body);
 
   const appeal = await app.inject({
     method: 'POST', url: '/appeals', headers: { ...bearer(target.accessToken), 'idempotency-key': `appeal-${suffix()}` },

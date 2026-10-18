@@ -22,10 +22,11 @@ test('self follow is rejected before a transaction or notification can be create
 test('closed_account_cannot_create_a_follow', async (context: TestContext) => {
   const statements: string[] = [];
   context.mock.method(db, 'connect', async () => ({
-    async query(sql: string) {
+    async query(sql: string, parameters: unknown[]) {
       statements.push(sql);
       if (sql.includes('SELECT status, deleted_at FROM users')) {
-        return { rows: [{ status: 'deleted', deleted_at: new Date() }] };
+        const userId = parameters[0];
+        return { rows: [{ status: userId === 'closed-user' ? 'deleted' : 'active', deleted_at: userId === 'closed-user' ? new Date() : null }] };
       }
       return { rows: [], rowCount: 0 };
     },
