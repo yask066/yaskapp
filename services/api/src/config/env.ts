@@ -24,7 +24,8 @@ const envSchema = z
   S3_ACCESS_KEY_ID: z.string().min(1),
   S3_SECRET_ACCESS_KEY: z.string().min(1),
   S3_FORCE_PATH_STYLE: z.coerce.boolean().default(true),
-  ACCOUNT_DELETION_ENABLED: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
+  ACCOUNT_DELETION_ENABLED: z.enum(['true', 'false']).default('true').transform((value) => value === 'true'),
+  ACCOUNT_DELETION_JOURNAL_ENABLED: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
   ACCOUNT_DELETION_JOURNAL_DATABASE_URL: journalDatabaseUrlSchema.optional(),
   ACCOUNT_DELETION_JOURNAL_RETENTION_DATABASE_URL: journalDatabaseUrlSchema.optional(),
   ACCOUNT_DELETION_JOURNAL_ID: z.string().min(1).optional(),
@@ -33,7 +34,7 @@ const envSchema = z
   })
   .superRefine((config, context) => {
     if (
-      config.ACCOUNT_DELETION_ENABLED &&
+      config.ACCOUNT_DELETION_JOURNAL_ENABLED &&
       (!config.ACCOUNT_DELETION_JOURNAL_DATABASE_URL ||
        !config.ACCOUNT_DELETION_JOURNAL_ID ||
        !config.ACCOUNT_DELETION_JOURNAL_HMAC_KEY)

@@ -148,8 +148,11 @@ if grep -Eq 'backup-uploader|upload-staging-backup|STAGING_BACKUP_(ENDPOINT|BUCK
   "$repo_root/infra/docker/docker-compose.account-deletion.staging.yml"; then
   fail 'AWS backup uploader remains in the self-hosted backup path'
 fi
-grep -Eq 'account-deletion-journal-reconciler:' "$repo_root/infra/docker/docker-compose.account-deletion.staging.yml" || fail 'staging overlay lacks the periodic journal reconciler'
-grep -Fq 'export-account-deletion-journal.js' "$repo_root/infra/docker/docker-compose.account-deletion.staging.yml" || fail 'journal reconciler command is missing'
+grep -Eq '^  account-deletion-worker:' "$repo_root/infra/docker/docker-compose.staging.yml" || fail 'base staging stack lacks the deletion worker'
+grep -Fq 'run-account-deletion-worker.js' "$repo_root/infra/docker/docker-compose.staging.yml" || fail 'deletion worker command is missing'
+if grep -Eq 'account-deletion-journal-reconciler:|\.env.account-deletion-journal' "$repo_root/infra/docker/docker-compose.account-deletion.staging.yml"; then
+  fail 'database-only deletion overlay still depends on the independent journal'
+fi
 grep -Fq -- '--pinentry-mode loopback' "$repo_root/infra/docker/backup-postgres.sh" || fail 'main backup does not configure noninteractive GPG pinentry'
 grep -Fq -- '--pinentry-mode loopback' "$repo_root/infra/docker/backup-account-deletion-journal.sh" || fail 'journal backup does not configure noninteractive GPG pinentry'
 if ! sed -n '/^  migrate:/,/^  api:/p' "$repo_root/infra/docker/docker-compose.staging.yml" | grep -Fq 'ACCOUNT_DELETION_ENABLED: "false"'; then
@@ -158,9 +161,9 @@ fi
 if ! sed -n '/^  notification-worker:/,/^  moderation-web:/p' "$repo_root/infra/docker/docker-compose.staging.yml" | grep -Fq 'ACCOUNT_DELETION_ENABLED: "false"'; then
   fail 'notification worker inherits the account-deletion feature flag'
 fi
-for service in api account-deletion-worker account-deletion-journal-reconciler; do
-  if ! sed -n "/^  $service:/,/^  [a-zA-Z-].*:/p" "$repo_root/infra/docker/docker-compose.account-deletion.staging.yml" | grep -Fq 'ACCOUNT_DELETION_ENABLED: "true"'; then
-    fail "$service does not enable account deletion with journal credentials"
+for service in api account-deletion-worker; do
+  if ! sed -n "/^  $service:/,/^  [a-zA-Z-].*:/p" "$repo_root/infra/docker/docker-compose.staging.yml" | grep -F 'ACCOUNT_DELETION_JOURNAL_ENABLED: "false"' > /dev/null; then
+    fail "$service does not use database-only deletion"
   fi
 done
 if grep -Eq 'backup-uploader|upload-staging-backup' "$DOCKER_LOG"; then

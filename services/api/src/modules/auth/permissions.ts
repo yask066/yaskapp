@@ -12,7 +12,9 @@ export const ADMIN_PERMISSIONS = [
   'admin.polls.read',
   'admin.polls.delete',
   'admin.comments.delete',
-  'admin.audit.read'
+  'admin.audit.read',
+  'admin.deleted_accounts.read',
+  'admin.ip_bans.manage'
 ] as const;
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];

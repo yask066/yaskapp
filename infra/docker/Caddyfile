@@ -13,8 +13,15 @@ http://{$STAGING_PUBLIC_IP:127.0.0.1} {
     handle /src/* {
         reverse_proxy moderation-web:80
     }
-    handle_path /admin/* {
-        reverse_proxy moderation-web:80
+    # Protected API routes must precede the /admin static panel mount.
+    @adminApi path /admin/capabilities /admin/users* /admin/polls* /admin/comments* /admin/audit* /admin/deleted-accounts* /admin/ip-bans*
+    route /admin/* {
+        handle @adminApi {
+            reverse_proxy api:3000
+        }
+        handle_path /admin/* {
+            reverse_proxy moderation-web:80
+        }
     }
     handle /auth/* {
         reverse_proxy api:3000

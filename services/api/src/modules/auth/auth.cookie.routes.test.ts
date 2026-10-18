@@ -34,6 +34,7 @@ test('a production login stays authenticated over HTTP and HTTPS cookie sessions
       return { rows: [account] };
     }
     assert.equal(parameters[0], account.id);
+    if (sql.includes('INSERT INTO account_ip_history')) return { rows: [], rowCount: 1 };
     if (sql.includes('SET session_version = session_version + 1')) return { rows: [], rowCount: 1 };
     if (sql.includes('FROM sanctions') || sql.startsWith('UPDATE users SET last_seen_at')) return { rows: [] };
     if (sql.startsWith('SELECT session_version FROM users')) return { rows: [{ session_version: 2 }] };

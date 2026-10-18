@@ -58,6 +58,7 @@ test('e2e_acceptance_persists_prepared_and_accepted_rows', { skip: integrationSk
   // time, so switch to development after imports to opt into real journal I/O.
   delete process.env.NODE_TEST_CONTEXT;
   process.env.NODE_ENV = 'test';
+  process.env.ACCOUNT_DELETION_JOURNAL_ENABLED = 'true';
 
   const [{ buildApp }, { db, closeDatabaseConnection }, { closeRedisConnection }, { closeStorageConnection }, { processDeletionBatch }, { closeAccountDeletionJournalDatabase }, { readAcceptedDeletionsFromJournal, reconcileAccountDeletionJournal }, { reapplyAcceptedDeletions }] = await Promise.all([
     import('../../app.js'),

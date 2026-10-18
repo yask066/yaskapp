@@ -284,7 +284,7 @@ test('exposes the confirmation controls with keyboard-accessible labels', async 
   expect(screen.getByRole('button', { name: 'Delete my account' })).toBeEnabled();
 });
 
-test('does not promise draft deletion or backup deadlines', async () => {
+test('explains moderation retention without promising draft deletion or backup deadlines', async () => {
   const user = userEvent.setup();
   mountPage();
   await user.type(screen.getByLabelText('Login'), 'member@example.com');
@@ -292,7 +292,9 @@ test('does not promise draft deletion or backup deadlines', async () => {
   await user.click(screen.getByRole('button', { name: 'Verify password' }));
 
   expect(await screen.findByText(/Deletion of active data continues after this request is accepted/)).toBeInTheDocument();
-  expect(screen.queryByText(/24 hours|30 days|35 days/)).not.toBeInTheDocument();
+  expect(screen.getByText(/private moderation archive.*30 days/)).toBeInTheDocument();
+  expect(screen.getByText(/Issued IP bans may remain/)).toBeInTheDocument();
+  expect(screen.queryByText(/24 hours|35 days/)).not.toBeInTheDocument();
 });
 
 test('browser back after acceptance cannot restore a protected profile', async () => {

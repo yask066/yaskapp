@@ -5,6 +5,7 @@ import type { UserRole, UserStatus } from '../auth/auth.repository.js';
 import { recordAdminAudit } from './audit.repository.js';
 import { decodeAdminCursor, pageWithCursor } from './pagination.js';
 import { lockSuperadminMutation } from '../account-deletion/account-activity.guard.js';
+import { snapshotDeletedAccount } from '../account-deletion/account-deletion.archive.js';
 
 export type AdminUser = {
   id: string;
@@ -207,6 +208,7 @@ export async function deleteAdminUser(actorId: string, targetId: string, audit: 
     if (target.role === 'superadmin' && await activeSuperadminCount(client) <= 1) return await rollback(client, 'last_superadmin');
     if (target.status === 'deleted' || target.deleted_at) return await commit(client, 'already_deleted');
 
+    await snapshotDeletedAccount(client, targetId, new Date(), 'admin');
     await client.query("UPDATE users SET status = 'deleted', deleted_at = now(), updated_at = now() WHERE id = $1", [targetId]);
     await recordAdminAudit(client, { ...audit, action: 'user.deleted', targetType: 'user', targetId });
     await client.query('COMMIT');

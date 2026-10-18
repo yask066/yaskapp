@@ -105,6 +105,8 @@ services:
       HOST: 0.0.0.0
       PORT: 3000
       REDIS_URL: redis://redis:6379
+      ACCOUNT_DELETION_ENABLED: ${ACCOUNT_DELETION_ENABLED:-true}
+      ACCOUNT_DELETION_JOURNAL_ENABLED: "false"
     deploy:
       replicas: 2
     restart: unless-stopped
@@ -122,6 +124,29 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+
+  account-deletion-worker:
+    image: yaskapp-api:staging
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    env_file:
+      - ../../services/api/.env.staging
+    environment:
+      REDIS_URL: redis://redis:6379
+      ACCOUNT_DELETION_JOURNAL_ENABLED: "false"
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+    command: ["node", "services/api/dist/jobs/run-account-deletion-worker.js"]
+    restart: unless-stopped
 
   notification-worker:
     image: yaskapp-api:staging

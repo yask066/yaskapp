@@ -169,3 +169,40 @@ Staging release acceptance: NOT RUN
 Disposable local staging-clone run (2026-10-16, Europe/Minsk): dedicated app and journal test databases, Redis DB 2, and RustFS were used; two separate API Node processes listened on 3101/3102. Focused PostgreSQL E2E passed 3/3. Cross-process acceptance returned 202 on replica A; the prior bearer was rejected with 401 on replica B; journal contained prepared and accepted entries. A readable custom-format application dump was captured before acceptance. With both replicas stopped, restoring that dump returned the account to `active/not_started`; journal replay reported `verified=1, reapplied=1` and closed the account before API restart. Both replicas then passed readiness and a worker batch completed cleanup. **FAIL:** a second journal replay after completion changed the operation from `completed` back to `pending` (the account remained absent). This exposed a replay idempotence defect; the run is not accepted until resolved and repeated. This was an isolated local staging clone, not the shared staging environment; separate physical journal-host acceptance remains NOT RUN.
 
 Follow-up after replay idempotence fix (2026-10-16, Europe/Minsk): the restore integration regression first reproduced `completed → pending`, then passed after the fix (1/1). API build and typecheck passed. On a fresh disposable app/journal database pair, two independent API processes on ports 3101 and 3102 both passed readiness; deletion accepted on replica A returned 202 and the revoked bearer returned 401 through replica B. The pre-acceptance custom-format app dump restored the operation to `not_started`; replay verified and reapplied the accepted journal entry before either API restarted. The worker completed all 7 cleanup steps and removed the account. Both replicas returned ready; replaying the journal again kept the operation `completed`, preserved its completion timestamp and all completed steps, and left zero user rows. Focused PostgreSQL E2E passed 3/3. **Local staging-clone restore and two-replica drill: PASS.** This does not establish shared-staging acceptance or separate physical journal-host failure-domain acceptance; both remain NOT RUN.
+
+Database-only self-service verification (2026-10-18, Europe/Minsk): the new
+`account-deletion.local.e2e.integration.test.ts` ran on a fresh dedicated local
+PostgreSQL database with all 32 migrations, existing local Redis and media test
+storage, with journal settings removed and real runtime adapters enabled. All
+4 tests passed (parent plus bearer, browser cookie and blocked-account cases).
+Each case accepted one durable operation, revoked bearer/cookie sessions across
+API instances, hid the owned poll, survived API restart, completed all 7 cleanup
+steps, removed user/poll rows, and rejected subsequent login. Retention also
+completed without journal credentials. This is local integration evidence;
+updated application containers have not been deployed to a shared server.
+
+Final validation for database-only deletion (2026-10-18): the serial full API
+suite passed 312/315 tests with zero failures and 3 independent-journal
+integration tests skipped because that optional infrastructure was not
+configured. API typecheck/build, both staging Compose configurations, 6 routing
+checks, the backup shell suite, 29 web deletion tests and 20 Flutter deletion
+tests passed. The completed-operation retention fixture was aged by 36 days
+and removed without journal credentials. Earlier attempts encountered shared
+rate-limit state in the new E2E fixture and a transient closed-poll voting
+assertion; fixture IPs are now isolated, and the final full run was clean. The
+closed-poll test also passed independently against an unmodified HEAD snapshot.
+
+Closed moderation archive validation (2026-10-18, Europe/Minsk): migration033
+was applied only to the isolated local test database. Full serial API passed
+313 tests, with3 independent-journal checks skipped and zero failures. The
+final focused archive, local deletion and admin integration run passed10/10.
+The archive test covers self/admin snapshots, rollback after snapshot but
+before acceptance commit, immutable expiry on retry, recent IP filtering,
+credential exclusion, regular/moderator denial, audited superadmin access,
+pagination/invalid cursors, own/foreign/CIDR IP rejection, mapped IPv6 and
+forwarding-header normalization, expiry boundary, archive/access-log purge,
+independent ban survival and audited revocation. Moderation DOM/smoke plus
+routing tests passed20/20, web deletion29/29, Flutter deletion20/20, and API
+typecheck/build plus Caddy adaptation/validation passed. Existing upgraded
+realtime connections are not forcibly disconnected by IP-ban creation; this
+change enforces bans on incoming requests. No shared-server deployment ran.

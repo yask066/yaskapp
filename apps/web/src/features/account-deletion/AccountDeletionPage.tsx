@@ -12,6 +12,7 @@ const DELETION_DETAILS = [
   'Discussions and activity in polls you created will also be deleted.',
   'Access closes immediately. Deletion of active data continues after this request is accepted.',
   'This action cannot be undone. Your account and content cannot be restored.',
+  'A private moderation archive of account identifiers, recent IP addresses and violation records is retained for 30 days. Issued IP bans may remain after that.',
 ];
 
 type Verification = Pick<AccountDeletionVerificationResponse, 'operationId' | 'deletionToken' | 'statusToken' | 'statusTokenExpiresAt'>;

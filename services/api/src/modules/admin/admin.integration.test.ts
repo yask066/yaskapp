@@ -290,6 +290,8 @@ test('admin mutation transactions roll back state when audit insertion fails', a
   const afterUserDelete = await db.query<{ status: string; deleted_at: Date | null }>('SELECT status, deleted_at FROM users WHERE id = $1', [target.user.id]);
   assert.equal(afterUserDelete.rows[0]?.status, 'active');
   assert.equal(afterUserDelete.rows[0]?.deleted_at, null);
+  assert.equal((await db.query('SELECT user_id FROM deleted_account_archives WHERE user_id=$1', [target.user.id])).rowCount, 0,
+    'failed admin deletion must roll back its private archive too');
 
   const poll = await createPoll(target);
   await assert.rejects(() => adminRepository.deleteAdminPoll(poll.id, {
@@ -319,6 +321,7 @@ test('admin mutation transactions roll back state when audit insertion fails', a
 
 after(async () => {
   if (createdUserIds.size > 0) {
+    await db.query('DELETE FROM deleted_account_archives WHERE user_id = ANY($1::uuid[])', [[...createdUserIds]]);
     await db.query('DELETE FROM users WHERE id = ANY($1::uuid[])', [[...createdUserIds]]);
   }
   await app.close();

@@ -1,66 +1,13 @@
+# Compatibility overlay. The base staging stack runs the cleanup worker and
+# stores deletion operations in the application PostgreSQL database.
 name: yaskapp-staging
 
 services:
   api:
-    env_file:
-      - ../../services/api/.env.account-deletion-journal
     environment:
       ACCOUNT_DELETION_ENABLED: "true"
+      ACCOUNT_DELETION_JOURNAL_ENABLED: "false"
 
   account-deletion-worker:
-    image: yaskapp-api:staging
-    build:
-      context: ../..
-      dockerfile: services/api/Dockerfile
-    env_file:
-      - ../../services/api/.env.staging
-      - ../../services/api/.env.account-deletion-journal
-      - ../../services/api/.env.account-deletion-journal-retention
     environment:
-      ACCOUNT_DELETION_ENABLED: "true"
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-    command: ["node", "services/api/dist/jobs/run-account-deletion-worker.js"]
-    restart: unless-stopped
-
-  account-deletion-journal-reconciler:
-    image: yaskapp-api:staging
-    build:
-      context: ../..
-      dockerfile: services/api/Dockerfile
-    env_file:
-      - ../../services/api/.env.staging
-      - ../../services/api/.env.account-deletion-journal
-    environment:
-      ACCOUNT_DELETION_ENABLED: "true"
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-    command:
-      - sh
-      - -c
-      - >-
-        while true; do
-          if node services/api/dist/jobs/export-account-deletion-journal.js; then
-            echo '{"event":"account_deletion.journal_reconciled"}';
-          else
-            echo '{"event":"account_deletion.alert","component":"journal_reconciler","error":"reconcile_failed"}';
-          fi;
-          sleep 300;
-        done
-    restart: unless-stopped
+      ACCOUNT_DELETION_JOURNAL_ENABLED: "false"

@@ -105,6 +105,7 @@ function installDatabase(context: TestContext) {
     };
     return {
     async query(sql: string, parameters: unknown[]) {
+      if (sql.includes('INSERT INTO account_ip_history') || sql.includes('INSERT INTO deleted_account_archives')) return { rows: [], rowCount: 1 };
       if (sql === 'BEGIN') {
         const previous = transactionTail;
         let release!: () => void;

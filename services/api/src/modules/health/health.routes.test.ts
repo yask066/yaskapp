@@ -25,7 +25,12 @@ function makeApp(options: { failJournal?: boolean; journalCalls: number }) {
 
 test('ready_requires_journal_only_when_deletion_enabled', async (context) => {
   const previous = env.ACCOUNT_DELETION_ENABLED;
-  context.after(() => { env.ACCOUNT_DELETION_ENABLED = previous; });
+  const previousJournal = env.ACCOUNT_DELETION_JOURNAL_ENABLED;
+  env.ACCOUNT_DELETION_JOURNAL_ENABLED = true;
+  context.after(() => {
+    env.ACCOUNT_DELETION_ENABLED = previous;
+    env.ACCOUNT_DELETION_JOURNAL_ENABLED = previousJournal;
+  });
 
   const disabledState = { failJournal: true, journalCalls: 0 };
   env.ACCOUNT_DELETION_ENABLED = false;
@@ -43,5 +48,21 @@ test('ready_requires_journal_only_when_deletion_enabled', async (context) => {
   assert.equal(enabledResponse.statusCode, 503);
   assert.deepEqual(enabledResponse.json(), { status: 'unavailable', service: 'api' });
   assert.equal(enabledState.journalCalls, 1);
+});
+
+test('database_only_deletion_does_not_depend_on_journal_readiness', async (context) => {
+  const previous = env.ACCOUNT_DELETION_ENABLED;
+  const previousJournal = env.ACCOUNT_DELETION_JOURNAL_ENABLED;
+  env.ACCOUNT_DELETION_ENABLED = true;
+  env.ACCOUNT_DELETION_JOURNAL_ENABLED = false;
+  context.after(() => {
+    env.ACCOUNT_DELETION_ENABLED = previous;
+    env.ACCOUNT_DELETION_JOURNAL_ENABLED = previousJournal;
+  });
+  const state = { failJournal: true, journalCalls: 0 };
+  const app = makeApp(state);
+  context.after(() => app.close());
+  assert.equal((await app.inject({ method: 'GET', url: '/health/ready' })).statusCode, 200);
+  assert.equal(state.journalCalls, 0);
 });
 

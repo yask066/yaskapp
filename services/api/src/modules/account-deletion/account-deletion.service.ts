@@ -2,6 +2,7 @@ import type { AccountDeletionStatusResponse } from '@yaskapp/shared';
 import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
+import { env } from '../../config/env.js';
 import {
   acceptDeletionOperation,
   consumeDeletionPermission,
@@ -14,6 +15,7 @@ import { dispatchPendingDeletionEvents } from './account-deletion.events.js';
 import { disconnectUser } from '../../realtime/realtime.hub.js';
 import { acceptDeletionInJournal, prepareDeletionInJournal } from './account-deletion.journal.js';
 import { commitJournaledAcceptance } from './account-deletion.acceptance-protocol.js';
+import { snapshotDeletedAccount } from './account-deletion.archive.js';
 
 const cleanupSteps = ['discovery', 'notifications', 'moderation', 'content', 'relationships', 'media', 'completion'];
 
@@ -57,10 +59,10 @@ export async function acceptAccountDeletion(
   journal: {
     writePrepared: typeof prepareDeletionInJournal;
     writeAccepted: typeof acceptDeletionInJournal;
-  } = {
+  } | undefined = env.ACCOUNT_DELETION_JOURNAL_ENABLED ? {
     writePrepared: prepareDeletionInJournal,
     writeAccepted: acceptDeletionInJournal
-  }
+  } : undefined
 ): Promise<AccountDeletionStatusResponse> {
   if (confirm !== true || !deletionToken) {
     throw new AccountDeletionAcceptanceError('unauthorized');
@@ -83,7 +85,7 @@ export async function acceptAccountDeletion(
       await client.query('COMMIT');
       transactionCommitted = true;
       if (!operation.acceptedAt || !operation.deadlineAt) throw new Error('account_deletion_accepted_timestamps_missing');
-      await journal.writeAccepted({
+      await journal?.writeAccepted({
         operationId: operation.operationId,
         userId: permission.userId,
         acceptedAt: new Date(operation.acceptedAt),
@@ -127,29 +129,34 @@ export async function acceptAccountDeletion(
       throw new AccountDeletionAcceptanceError('account_deletion_conflict');
     }
 
+    await snapshotDeletedAccount(client, permission.userId, acceptedAt, 'self_service');
     await client.query(
       `UPDATE users SET status = 'deleted', deleted_at = COALESCE(deleted_at, $2),
          session_version = session_version + 1, updated_at = $2 WHERE id = $1`,
       [permission.userId, acceptedAt]
     );
     await snapshotDeletionWork(client, permission.operationId, permission.userId);
-    // Record intent before committing, but only replay it after the durable
-    // accepted record is written below. A rollback leaves a harmless prepared entry.
     const journalAcceptance = {
       operationId: permission.operationId,
       userId: permission.userId,
       acceptedAt,
       deadlineAt
     };
-    // Do not confirm acceptance until the DB commit and both external journal writes.
-    await commitJournaledAcceptance({
-      writePrepared: () => journal.writePrepared(journalAcceptance),
-      async commitDatabase() {
-        await client.query('COMMIT');
-        transactionCommitted = true;
-      },
-      writeAccepted: () => journal.writeAccepted(journalAcceptance)
-    });
+    const commitDatabase = async () => {
+      await client.query('COMMIT');
+      transactionCommitted = true;
+    };
+    // The operation, access revocation, cleanup steps and outbox are committed
+    // together in the application database. Independent journaling is opt-in.
+    if (journal) {
+      await commitJournaledAcceptance({
+        writePrepared: () => journal.writePrepared(journalAcceptance),
+        commitDatabase,
+        writeAccepted: () => journal.writeAccepted(journalAcceptance)
+      });
+    } else {
+      await commitDatabase();
+    }
     try {
       disconnectUser(permission.userId, 'account_deleted', {
         type: 'account.deleted',

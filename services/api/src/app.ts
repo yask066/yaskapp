@@ -10,6 +10,8 @@ import { registerAuthRoutes } from './modules/auth/auth.routes.js';
 import { registerAccountDeletionRoutes, type AccountDeletionJournalRouteOverrides } from './modules/account-deletion/account-deletion.routes.js';
 import { getCurrentUser } from './modules/auth/auth.utils.js';
 import { registerAdminRoutes } from './modules/admin/admin.routes.js';
+import { registerDeletedAccountArchiveRoutes } from './modules/admin/admin.archive.routes.js';
+import { enforcePlatformIpBan } from './modules/account-deletion/account-deletion.ip.js';
 import {
   buildAdminFailureLog,
   isAdminFailureRequest
@@ -34,7 +36,7 @@ export function buildApp(options: { accountDeletionJournal?: AccountDeletionJour
   let realtimeRetryTimer: ReturnType<typeof setInterval> | undefined;
   let deletionEventsTimer: ReturnType<typeof setInterval> | undefined;
   const app = Fastify({
-    trustProxy: true,
+    trustProxy: ['loopback', 'linklocal', 'uniquelocal'],
     logger:
       env.NODE_ENV !== 'test'
         ? {
@@ -158,6 +160,8 @@ export function buildApp(options: { accountDeletionJournal?: AccountDeletionJour
     })
   );
 
+  app.addHook('onRequest', enforcePlatformIpBan);
+
   app.addHook('onResponse', (request, reply, done) => {
     if (isAdminFailureRequest(request.url, reply.statusCode)) {
       const logEntry = buildAdminFailureLog({
@@ -181,6 +185,7 @@ export function buildApp(options: { accountDeletionJournal?: AccountDeletionJour
   registerAuthRoutes(app);
   registerAccountDeletionRoutes(app, options.accountDeletionJournal);
   registerAdminRoutes(app);
+  registerDeletedAccountArchiveRoutes(app);
   registerHealthRoutes(app);
   registerModerationRoutes(app);
   registerNotificationRoutes(app);

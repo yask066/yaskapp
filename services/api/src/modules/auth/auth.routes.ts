@@ -13,6 +13,7 @@ import { authenticate } from './auth.utils.js';
 import { isTrustedOrigin, serializeSessionCookie } from './auth.cookies.js';
 import { env } from '../../config/env.js';
 import { revokeUserSession } from './auth.repository.js';
+import { recordAccountIp } from '../account-deletion/account-deletion.ip.js';
 
 function setSessionCookie(request: FastifyRequest, reply: FastifyReply, accessToken: string) {
   // trustProxy resolves the public protocol when Caddy terminates TLS.
@@ -84,6 +85,7 @@ export function registerAuthRoutes(app: FastifyInstance) {
 
     try {
       const result = await registerUser(app, parsedBody.data);
+      await recordAccountIp(result.user.id, request.ip);
 
       setSessionCookie(request, reply, result.accessToken);
       return reply.status(201).send(responseForClient(request, result));
@@ -105,6 +107,7 @@ export function registerAuthRoutes(app: FastifyInstance) {
 
     try {
       const result = await signInUser(app, parsedBody.data);
+      await recordAccountIp(result.user.id, request.ip);
       setSessionCookie(request, reply, result.accessToken);
       return responseForClient(request, result);
     } catch (error) {

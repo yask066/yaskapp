@@ -22,6 +22,7 @@ import {
 } from './account-deletion.verification.js';
 import { AccountDeletionAcceptanceError, acceptAccountDeletion } from './account-deletion.service.js';
 import { acceptDeletionInJournal, prepareDeletionInJournal } from './account-deletion.journal.js';
+import { recordAccountIp } from './account-deletion.ip.js';
 
 const verificationSchema = z.object({ password: z.string().min(1).max(128) }).strict();
 const loginVerificationSchema = z.object({
@@ -96,9 +97,10 @@ export type AccountDeletionJournalRouteOverrides = {
   acceptDeletionInJournal?: typeof acceptDeletionInJournal;
 };
 
-export function registerAccountDeletionRoutes(app: FastifyInstance, journal: AccountDeletionJournalRouteOverrides = {}) {
-  const prepare = journal.prepareDeletionInJournal ?? prepareDeletionInJournal;
-  const accept = journal.acceptDeletionInJournal ?? acceptDeletionInJournal;
+export function registerAccountDeletionRoutes(app: FastifyInstance, journal?: AccountDeletionJournalRouteOverrides) {
+  const useJournal = env.ACCOUNT_DELETION_JOURNAL_ENABLED || journal !== undefined;
+  const prepare = journal?.prepareDeletionInJournal ?? prepareDeletionInJournal;
+  const accept = journal?.acceptDeletionInJournal ?? acceptDeletionInJournal;
   app.post('/auth/account-deletion/verification', {
     preHandler: [
       rateLimit({ keyPrefix: 'account-deletion-verification-ip', limit: 30, windowMs: 15 * 60_000 }),
@@ -146,6 +148,7 @@ export function registerAccountDeletionRoutes(app: FastifyInstance, journal: Acc
         deletionTokenExpiresAt: tokenPair.deletionTokenExpiresAt,
         statusTokenExpiresAt: tokenPair.statusTokenExpiresAt
       }, client);
+      await recordAccountIp(verified.account.user.id, request.ip, client);
       await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK');
@@ -179,7 +182,7 @@ export function registerAccountDeletionRoutes(app: FastifyInstance, journal: Acc
 
     const operation = await getDeletionOperation(permission.operationId);
     if (!operation) return sendUnauthorized(reply);
-    if (operation.acceptedAt && operation.deadlineAt) {
+    if (useJournal && operation.acceptedAt && operation.deadlineAt) {
       try {
         await accept({
           operationId: operation.operationId,
@@ -205,10 +208,10 @@ export function registerAccountDeletionRoutes(app: FastifyInstance, journal: Acc
     if (!token) return sendUnauthorized(reply);
 
     try {
-      const operation = await acceptAccountDeletion(token, parsed.data.confirm, {
+      const operation = await acceptAccountDeletion(token, parsed.data.confirm, useJournal ? {
         writePrepared: prepare,
         writeAccepted: accept
-      });
+      } : undefined);
       reply.header('set-cookie', serializeSessionCookie(null, request.protocol === 'https'));
       return reply.status(202).send(operation satisfies AccountDeletionStatusResponse);
     } catch (error) {

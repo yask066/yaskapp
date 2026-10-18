@@ -1,7 +1,9 @@
 import type { PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
+import { env } from '../../config/env.js';
 import { cleanupExpiredCompletedDeletionJournal } from './account-deletion.journal.js';
+import { cleanupDeletedAccountArchives } from './account-deletion.archive.js';
 
 const PERMISSION_RETENTION_SQL = `
   DELETE FROM account_deletion_permissions
@@ -102,7 +104,15 @@ export function createAccountDeletionRetentionService(
 
 const retentionService = createAccountDeletionRetentionService(
   createAccountDeletionRetentionRepository(),
-  (_now, operationIds) => cleanupExpiredCompletedDeletionJournal(operationIds)
+  async (_now, operationIds) => {
+    if (env.ACCOUNT_DELETION_JOURNAL_ENABLED) await cleanupExpiredCompletedDeletionJournal(operationIds);
+  }
 );
 
-export const cleanupDeletionRetention = retentionService.cleanupDeletionRetention;
+export async function cleanupDeletionRetention(now: Date) {
+  // Archive retention must continue even if the optional legacy journal is down.
+  if (!Number.isFinite(now.getTime())) throw new Error('invalid_retention_time');
+  const archived = await cleanupDeletedAccountArchives(now);
+  const result = await retentionService.cleanupDeletionRetention(now);
+  return { deleted: archived + result.deleted };
+}

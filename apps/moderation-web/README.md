@@ -35,7 +35,8 @@ API requests from that IP to the private API container. Set
 development only; use a domain with HTTPS plus the production access controls
 before exposing the moderation panel publicly.
 
-The panel now contains capability-gated Cases, Appeals, Audit, and Policy
+The panel now contains capability-gated Cases, Appeals, Audit, Policy,
+Deleted accounts and IP bans
 sections. The browser keeps the access token in memory only, clears it on
 logout/session expiry, and treats `401`, `403`, `404`, `409`, and `429` as
 explicit session or operation errors. The API repeats every permission check.

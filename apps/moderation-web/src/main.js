@@ -1,3 +1,5 @@
+import { createArchivePanel } from './archive-panel.js';
+
 const apiBase = window.__MODERATION_API_BASE__ || '';
 let accessToken = null;
 let currentUserId = null;
@@ -11,6 +13,8 @@ let activeSection = 'cases';
 const $ = (id) => document.getElementById(id);
 const loginView = $('login-view');
 const panelView = $('panel-view');
+const archivePanel = createArchivePanel({ document, request, can, handleError,
+  confirm: (message) => window.confirm(message), requestReason: reason });
 
 async function request(path, options = {}) {
   const response = await fetch(`${apiBase}${path}`, {
@@ -28,7 +32,7 @@ async function request(path, options = {}) {
 }
 
 function showPanel() { loginView.hidden = true; panelView.hidden = false; }
-function showLogin(message = '') { panelView.hidden = true; loginView.hidden = false; $('login-error').textContent = message; }
+function showLogin(message = '') { archivePanel.reset(); showSection('cases'); panelView.hidden = true; loginView.hidden = false; $('login-error').textContent = message; }
 function can(permission) { return capabilities.has(permission); }
 function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char])); }
 function idempotencyKey() { return `${crypto.randomUUID()}-${Date.now()}`; }
@@ -59,6 +63,8 @@ function showSection(section) {
   if (section === 'appeals') loadAppeals();
   if (section === 'audit') loadAudit();
   if (section === 'policy') loadPolicy();
+  if (section === 'archive') void archivePanel.loadArchives();
+  if (section === 'ip-bans') void archivePanel.loadBans();
 }
 
 function configureNavigation() {

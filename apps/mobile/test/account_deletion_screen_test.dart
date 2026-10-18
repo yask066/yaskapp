@@ -14,10 +14,15 @@ void main() {
     var cancelled = false;
     await tester.pumpWidget(MaterialApp(
       home: AccountDeletionScreen(
+        receiptStore: MemoryAccountDeletionReceiptStore(),
         onCancel: () => cancelled = true,
       ),
     ));
 
+    await tester.pumpAndSettle();
+    expect(find.textContaining('archive for 30 days'), findsOneWidget);
+    await tester.ensureVisible(find.text('Cancel'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Cancel'));
     await tester.pump();
 

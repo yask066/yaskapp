@@ -44,7 +44,8 @@ export function registerHealthRoutes(app: FastifyInstance, checks: Partial<Healt
         readiness.checkDatabaseConnection(),
         readiness.checkRedisConnection(),
         readiness.checkStorageConnection(),
-        env.ACCOUNT_DELETION_ENABLED ? readiness.assertJournalReady() : Promise.resolve()
+        env.ACCOUNT_DELETION_ENABLED && env.ACCOUNT_DELETION_JOURNAL_ENABLED
+          ? readiness.assertJournalReady() : Promise.resolve()
       ]);
 
       return {

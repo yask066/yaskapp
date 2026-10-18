@@ -230,7 +230,9 @@ class _AccountDeletionScreenState extends State<AccountDeletionScreen> {
                   'Your profile, avatar, polls, comments, votes, likes, subscriptions, '
                   'and notification settings will be deleted. Discussions and actions '
                   'by other people inside polls you created will be deleted too. '
-                  'This action cannot be undone.',
+                  'This action cannot be undone. Account identifiers, recent IP '
+                  'addresses and violation records are kept in a private moderation '
+                  'archive for 30 days. Issued IP bans may remain after that.',
                   style: TextStyle(fontSize: 16, height: 1.5),
                 ),
                 const SizedBox(height: 20),

@@ -47,9 +47,9 @@ test('valid_journal_urls_create_separate_pools', async (context) => {
   assert.equal(retentionPool.options.connectionString, env.ACCOUNT_DELETION_JOURNAL_RETENTION_DATABASE_URL);
 });
 
-test('deletion_enabled_requires_journal_settings', () => {
+test('independent_journal_requires_settings_only_when_explicitly_enabled', () => {
   assert.throws(
-    () => parseEnv({ ...baseEnvironment, ACCOUNT_DELETION_ENABLED: 'true' }),
+    () => parseEnv({ ...baseEnvironment, ACCOUNT_DELETION_ENABLED: 'true', ACCOUNT_DELETION_JOURNAL_ENABLED: 'true' }),
     (error: unknown) => error instanceof Error && error.name === 'ZodError'
   );
   assert.throws(
@@ -65,11 +65,18 @@ test('deletion_enabled_requires_journal_settings', () => {
   );
 });
 
-test('deletion_disabled_does_not_require_journal_settings', () => {
+test('account_deletion_uses_application_database_by_default', () => {
   const config = parseEnv(baseEnvironment);
-  assert.equal(config.ACCOUNT_DELETION_ENABLED, false);
+  assert.equal(config.ACCOUNT_DELETION_ENABLED, true);
+  assert.equal(config.ACCOUNT_DELETION_JOURNAL_ENABLED, false);
   assert.equal(config.ACCOUNT_DELETION_JOURNAL_DATABASE_URL, undefined);
   assert.equal(config.ACCOUNT_DELETION_JOURNAL_ID, undefined);
+});
+
+test('deletion_can_be_enabled_without_an_independent_journal', () => {
+  const config = parseEnv({ ...baseEnvironment, ACCOUNT_DELETION_ENABLED: 'true' });
+  assert.equal(config.ACCOUNT_DELETION_ENABLED, true);
+  assert.equal(config.ACCOUNT_DELETION_JOURNAL_ENABLED, false);
 });
 
 test('journal_database_settings_require_postgresql_urls', () => {
