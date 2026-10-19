@@ -4,7 +4,7 @@ import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { AdminCursorError } from '../admin/pagination.js';
-import { PollPaginationCursorError } from './poll-pagination.js';
+import { PollPaginationCursorError, POLL_CURSOR_MAX_LENGTH } from './poll-pagination.js';
 import {
   broadcastPollVoteCreated,
   broadcastPollVoteUpdated,
@@ -93,7 +93,7 @@ const commentsQuerySchema = z.object({
 
 const commentRepliesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
-  cursor: z.string().max(512).optional()
+  cursor: z.string().max(POLL_CURSOR_MAX_LENGTH).optional()
 }).strict();
 
 const createCommentSchema = z.object({
@@ -428,7 +428,12 @@ export function registerPollRoutes(app: FastifyInstance) {
       if (!parsedParams.success) return validationError(reply, parsedParams.error);
 
       const parsedQuery = commentRepliesQuerySchema.safeParse(request.query);
-      if (!parsedQuery.success) return validationError(reply, parsedQuery.error);
+      if (!parsedQuery.success) {
+        if (parsedQuery.error.issues.some((issue) => issue.path[0] === 'cursor')) {
+          return pollError(reply, new PollPaginationCursorError());
+        }
+        return validationError(reply, parsedQuery.error);
+      }
 
       try {
         return await listPollCommentReplies({

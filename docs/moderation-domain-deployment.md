@@ -38,6 +38,11 @@ docker compose -f infra/docker/docker-compose.staging.yml ps
 docker compose -f infra/docker/docker-compose.staging.yml logs -f https moderation-web api
 ```
 
+Replace both `JWT_SECRET` and `PAGINATION_CURSOR_SECRET` with independently
+generated values before starting staging. Generate the cursor secret with at
+least 32 random bytes (for example, `openssl rand -base64 48`) and use the same
+value on every API replica. Rotating it invalidates active pagination cursors.
+
 Verify from outside the VPS:
 
 ```bash

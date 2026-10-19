@@ -62,3 +62,37 @@ test('invalid replies cursors use the pagination cursor error envelope', async (
     message: 'The pagination cursor is invalid.'
   });
 });
+
+test('overlong replies cursors use the pagination cursor error envelope', async (context) => {
+  const app = Fastify();
+  context.after(() => app.close());
+  registerPollRoutes(app);
+
+  for (const length of [513, 2049]) {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/polls/11111111-1111-4111-8111-111111111111/comments/33333333-3333-4333-8333-333333333333/replies?cursor=${'x'.repeat(length)}`
+    });
+
+    assert.equal(response.statusCode, 400);
+    assert.deepEqual(response.json(), {
+      error: 'pagination_cursor_invalid',
+      message: 'The pagination cursor is invalid.'
+    });
+  }
+});
+
+test('invalid replies limits remain ordinary validation errors', async (context) => {
+  const app = Fastify();
+  context.after(() => app.close());
+  registerPollRoutes(app);
+
+  const response = await app.inject({
+    method: 'GET',
+    url: '/polls/11111111-1111-4111-8111-111111111111/comments/33333333-3333-4333-8333-333333333333/replies?limit=0'
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(response.json().error, 'validation_error');
+  assert.ok(response.json().details.fieldErrors.limit);
+});

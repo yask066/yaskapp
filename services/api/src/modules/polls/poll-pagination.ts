@@ -80,7 +80,7 @@ const ownerKeyPattern = /^[A-Za-z0-9_-]{43}$/;
 const base64UrlPattern = /^[A-Za-z0-9_-]+$/;
 const timestampPattern = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d{6})Z$/;
 const cursorPrefix = 'c1';
-const maximumCursorLength = 2048;
+export const POLL_CURSOR_MAX_LENGTH = 2048;
 const maximumPayloadLength = 1536;
 const signatureLength = 32;
 
@@ -119,7 +119,7 @@ export function encodePollCursor(payload: PollCursorPayload): string {
 
 export function decodePollCursor(raw: string, expected: PollCursorContext): PollCursorPayload {
   try {
-    if (typeof raw !== 'string' || raw.length > maximumCursorLength) throw invalidCursor();
+    if (typeof raw !== 'string' || raw.length > POLL_CURSOR_MAX_LENGTH) throw invalidCursor();
 
     const parts = raw.split('.');
     if (parts.length !== 3 || parts[0] !== cursorPrefix) throw invalidCursor();

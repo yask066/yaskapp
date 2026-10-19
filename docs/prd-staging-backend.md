@@ -54,8 +54,10 @@ WebSocket endpoint.
 9. Staging services must not expose PostgreSQL, Redis, or object-storage admin
    ports publicly unless explicitly required for operations.
 10. The API must use a staging `DATABASE_URL`, `REDIS_URL`, and S3 settings.
-11. `JWT_SECRET` must be supplied through the staging secret store or protected
-    environment configuration and must not use the development default.
+11. `JWT_SECRET` and `PAGINATION_CURSOR_SECRET` must be supplied through the
+    staging secret store or protected environment configuration. The cursor
+    secret must be independent from `JWT_SECRET`, contain at least 32 random
+    bytes, and have the same value on every API replica.
 12. The deployment must run `npm run db:migrate` before starting a new API
     version.
 13. A migration failure must prevent the new API version from being considered

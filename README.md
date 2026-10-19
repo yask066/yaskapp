@@ -169,9 +169,12 @@ The API service receives its staging dependencies from
 points to `redis`, and the `S3_*` settings point to the private `minio`
 service and the configured staging bucket.
 
-`JWT_SECRET` must be replaced with a randomly generated value before starting
-staging. The `.env.staging` file is ignored by Git, and production mode rejects
-the development default or a `replace-with` placeholder.
+`JWT_SECRET` and `PAGINATION_CURSOR_SECRET` must be replaced with independently
+generated values before starting staging. Generate the cursor secret with at
+least 32 random bytes (for example, `openssl rand -base64 48`) and use the same
+value on every API replica. Rotating it invalidates active pagination cursors.
+The `.env.staging` file is ignored by Git, and production mode rejects the
+development default or a `replace-with` placeholder.
 
 ## Database
 
