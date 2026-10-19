@@ -2141,7 +2141,7 @@ test('newest feed traverses 125 polls without gaps across tied timestamps and a 
   const seeded = await seedPollPaginationFixtures(db, seed);
   const expanded = expandPollPaginationFixtures(readPollPaginationFixtures(), seed);
   const fixturePollIds = new Set(seeded.ids.polls);
-  const expectedPollIds = expanded.expectedIds.polls.filter((id) => fixturePollIds.has(id));
+  let expectedPollIds = expanded.expectedIds.polls.filter((id) => fixturePollIds.has(id));
   assert.equal(expectedPollIds.length, 125);
 
   try {
@@ -2150,6 +2150,31 @@ test('newest feed traverses 125 polls without gaps across tied timestamps and a 
       "UPDATE polls SET created_at = created_at + interval '10 years' WHERE id = ANY($1::uuid[])",
       [seeded.ids.polls]
     );
+
+    // Put a tied timestamp group across the first page boundary, and another
+    // fractional tied group across the second page boundary.
+    for (const [start, fractionalMicroseconds] of [[18, 0], [38, 100]] as const) {
+      const tiedIds = expectedPollIds.slice(start, start + 3);
+      await db.query(
+        `UPDATE polls
+         SET created_at = (
+           SELECT created_at + ($3::integer * interval '1 microsecond')
+           FROM polls
+           WHERE id = $1
+         )
+         WHERE id = ANY($2::uuid[])`,
+        [tiedIds[0], tiedIds, fractionalMicroseconds]
+      );
+      const tiedIdsInDescendingIdOrder = [...tiedIds].sort((left, right) =>
+        left === right ? 0 : left > right ? -1 : 1
+      );
+      expectedPollIds = [
+        ...expectedPollIds.slice(0, start),
+        ...tiedIdsInDescendingIdOrder,
+        ...expectedPollIds.slice(start + tiedIds.length)
+      ];
+    }
+
     await db.query(
       'DELETE FROM polls WHERE id = ANY($1::uuid[])',
       [[...seeded.ids.targetPolls, ...seeded.ids.contextPolls]]
@@ -2212,8 +2237,12 @@ test('newest feed traverses 125 polls without gaps across tied timestamps and a 
       .filter((id) => fixturePollIds.has(id));
     let cursor: string | undefined = guestFirstPage.nextCursor;
     let pageStart = 20;
+    let pageRequests = 0;
+    let terminalPage: ListPollsResponse | undefined;
 
-    while (fixtureIdsSeen.length < expectedPollIds.length) {
+    while (cursor) {
+      assert.ok(pageRequests < 100, 'feed traversal reaches a terminal page within the safety bound');
+      pageRequests += 1;
       assert.ok(cursor, 'every non-final fixture page must provide a continuation cursor');
       const pageResponse: Awaited<ReturnType<typeof app.inject>> = await app.inject({
         method: 'GET',
@@ -2230,11 +2259,13 @@ test('newest feed traverses 125 polls without gaps across tied timestamps and a 
       assert.deepEqual(fixtureIdsOnPage, expectedPageIds, `fixture window beginning at ${pageStart}`);
       fixtureIdsSeen.push(...fixtureIdsOnPage);
       pageStart += 20;
+      terminalPage = page;
       cursor = page.nextCursor ?? undefined;
     }
 
     assert.deepEqual(fixtureIdsSeen, expectedPollIds);
     assert.equal(new Set(fixtureIdsSeen).size, 125);
+    assert.equal(terminalPage?.nextCursor, null, 'the complete feed walk observes the terminal page');
 
     const popularResponse = await app.inject({ method: 'GET', url: '/polls?sort=popular' });
     assert.equal(popularResponse.statusCode, 200, popularResponse.body);
@@ -2268,6 +2299,25 @@ test('subscriptions paginate only followed public authors and bind cursors to th
     });
     assert.equal(response.statusCode, 201, response.body);
     return response.json<PollResponse>().poll;
+  }
+
+  async function seedPublicPolls(authorId: string, count: number, questionPrefix: string): Promise<string[]> {
+    const result = await db.query<{ poll_id: string }>(
+      `WITH inserted_polls AS (
+         INSERT INTO polls (id, author_id, question, visibility, options_count, comments_count, created_at)
+         SELECT gen_random_uuid(), $1::uuid, $2 || poll_number::text, 'public', 2, 0,
+                '2050-01-01T00:00:00Z'::timestamptz - poll_number * interval '1 second'
+         FROM generate_series(1, $3::integer) AS series(poll_number)
+         RETURNING id
+       )
+       INSERT INTO poll_options (id, poll_id, text, position)
+       SELECT gen_random_uuid(), inserted_polls.id, 'Boundary option ' || option_number::text, option_number - 1
+       FROM inserted_polls
+       CROSS JOIN generate_series(1, 2) AS option_series(option_number)
+       RETURNING poll_id`,
+      [authorId, questionPrefix, count]
+    );
+    return [...new Set(result.rows.map(({ poll_id }) => poll_id))];
   }
 
   const authorAPoll1 = await createPoll(authorA, 'A poll before private poll');
@@ -2315,6 +2365,7 @@ test('subscriptions paginate only followed public authors and bind cursors to th
   assert.equal(secondAResponse.statusCode, 200, secondAResponse.body);
   const secondA = secondAResponse.json<ListPollsResponse>();
   assert.deepEqual(secondA.items.map((poll) => poll.id), [authorAPoll1.id]);
+  assert.equal(secondA.nextCursor, null);
   assert.ok(!secondA.items.some((poll) => poll.id === authorAPrivatePoll.id || poll.authorId === authorB.user.id));
 
   const secondBResponse = await app.inject({
@@ -2323,7 +2374,53 @@ test('subscriptions paginate only followed public authors and bind cursors to th
     headers: bearer(viewerB.accessToken)
   });
   assert.equal(secondBResponse.statusCode, 200, secondBResponse.body);
-  assert.deepEqual(secondBResponse.json<ListPollsResponse>().items.map((poll) => poll.id), [authorBPoll1.id]);
+  const secondB = secondBResponse.json<ListPollsResponse>();
+  assert.deepEqual(secondB.items.map((poll) => poll.id), [authorBPoll1.id]);
+  assert.equal(secondB.nextCursor, null);
+
+  const boundaryPollIds: string[] = [];
+  try {
+    boundaryPollIds.push(...await seedPublicPolls(authorB.user.id, 18, 'Exactly 20 public polls: '));
+    const exactly20Response = await app.inject({
+      method: 'GET',
+      url: '/polls/subscriptions?limit=20',
+      headers: bearer(viewerB.accessToken)
+    });
+    assert.equal(exactly20Response.statusCode, 200, exactly20Response.body);
+    const exactly20 = exactly20Response.json<ListPollsResponse>();
+    assert.equal(exactly20.items.length, 20);
+    assert.equal(new Set(exactly20.items.map((poll) => poll.id)).size, 20);
+    assert.equal(exactly20.nextCursor, null, 'exactly 20 available polls end on the first page');
+
+    boundaryPollIds.push(...await seedPublicPolls(authorA.user.id, 38, 'Exactly 40 public polls: '));
+    const exactly40FirstResponse = await app.inject({
+      method: 'GET',
+      url: '/polls/subscriptions?limit=20',
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(exactly40FirstResponse.statusCode, 200, exactly40FirstResponse.body);
+    const exactly40First = exactly40FirstResponse.json<ListPollsResponse>();
+    assert.equal(exactly40First.items.length, 20);
+    assert.ok(exactly40First.nextCursor);
+
+    const exactly40SecondResponse = await app.inject({
+      method: 'GET',
+      url: `/polls/subscriptions?limit=20&cursor=${encodeURIComponent(exactly40First.nextCursor!)}`,
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(exactly40SecondResponse.statusCode, 200, exactly40SecondResponse.body);
+    const exactly40Second = exactly40SecondResponse.json<ListPollsResponse>();
+    assert.equal(exactly40Second.items.length, 20);
+    assert.equal(exactly40Second.nextCursor, null, 'exactly 40 available polls end on the second page');
+    assert.equal(
+      new Set([...exactly40First.items, ...exactly40Second.items].map((poll) => poll.id)).size,
+      40
+    );
+  } finally {
+    if (boundaryPollIds.length > 0) {
+      await db.query('DELETE FROM polls WHERE id = ANY($1::uuid[])', [boundaryPollIds]);
+    }
+  }
 });
 
 test('current user can list their own polls and see poll counter', async () => {
