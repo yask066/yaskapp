@@ -4,7 +4,11 @@ import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { AdminCursorError } from '../admin/pagination.js';
-import { PollPaginationCursorError, POLL_CURSOR_MAX_LENGTH } from './poll-pagination.js';
+import {
+  createPollCursorOwnerKey,
+  PollPaginationCursorError,
+  POLL_CURSOR_MAX_LENGTH
+} from './poll-pagination.js';
 import {
   broadcastPollVoteCreated,
   broadcastPollVoteUpdated,
@@ -39,6 +43,7 @@ import {
   listSubscriptionPolls,
   unlikePoll,
   unlikeComment,
+  listNewestPublicPolls,
   voteOnPoll
 } from './polls.service.js';
 
@@ -46,7 +51,8 @@ const uuidSchema = z.string().uuid();
 
 const listPollsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
-  sort: z.enum(['newest', 'popular']).default('newest')
+  sort: z.enum(['newest', 'popular']).default('newest'),
+  cursor: z.string().max(POLL_CURSOR_MAX_LENGTH).optional()
 }).strict();
 
 const createPollSchema = z.object({
@@ -261,18 +267,34 @@ export function registerPollRoutes(app: FastifyInstance) {
     const parsedQuery = listPollsQuerySchema.safeParse(request.query);
 
     if (!parsedQuery.success) {
+      if (parsedQuery.error.issues.some((issue) => issue.path[0] === 'cursor')) {
+        return pollError(reply, new PollPaginationCursorError());
+      }
       return validationError(reply, parsedQuery.error);
     }
 
-    const items = await listPublicPolls(
-      parsedQuery.data.limit,
-      request.user?.sub,
-      parsedQuery.data.sort
-    );
+    if (parsedQuery.data.sort === 'popular') {
+      if (parsedQuery.data.cursor !== undefined) {
+        return pollError(reply, new PollPaginationCursorError());
+      }
 
-    return {
-      items
-    };
+      const items = await listPublicPolls(parsedQuery.data.limit, request.user?.sub, 'popular');
+      return { items };
+    }
+
+    try {
+      const owner = request.user?.sub
+        ? createPollCursorOwnerKey({ type: 'user', userId: request.user.sub })
+        : createPollCursorOwnerKey({ type: 'guest', ip: request.ip });
+      return await listNewestPublicPolls({
+        limit: parsedQuery.data.limit,
+        viewerId: request.user?.sub,
+        cursor: parsedQuery.data.cursor,
+        owner
+      });
+    } catch (error) {
+      return pollError(reply, error);
+    }
     }
   );
 
@@ -382,17 +404,23 @@ export function registerPollRoutes(app: FastifyInstance) {
       const parsedQuery = listPollsQuerySchema.safeParse(request.query);
 
       if (!parsedQuery.success) {
+        if (parsedQuery.error.issues.some((issue) => issue.path[0] === 'cursor')) {
+          return pollError(reply, new PollPaginationCursorError());
+        }
         return validationError(reply, parsedQuery.error);
       }
 
-      const items = await listSubscriptionPolls(
-        request.user.sub,
-        parsedQuery.data.limit
-      );
-
-      return {
-        items
-      };
+      try {
+        const owner = createPollCursorOwnerKey({ type: 'user', userId: request.user.sub });
+        return await listSubscriptionPolls(
+          request.user.sub,
+          parsedQuery.data.limit,
+          parsedQuery.data.cursor,
+          owner
+        );
+      } catch (error) {
+        return pollError(reply, error);
+      }
     }
   );
 

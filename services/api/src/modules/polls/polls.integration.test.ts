@@ -4,6 +4,12 @@ import {
   countryCatalogVersion,
   supportedCountryCodes
 } from '../countries.js';
+import {
+  cleanupPollPaginationFixtures,
+  expandPollPaginationFixtures,
+  readPollPaginationFixtures,
+  seedPollPaginationFixtures
+} from './poll-pagination.fixtures.js';
 
 process.env.NODE_ENV = 'test';
 
@@ -62,6 +68,7 @@ type ProfileResponse = {
 type PollResponse = {
   poll: {
     id: string;
+    authorId: string;
     question: string;
     imageUrl?: string | null;
     options: Array<{
@@ -80,6 +87,7 @@ type PollResponse = {
 
 type ListPollsResponse = {
   items: Array<PollResponse['poll']>;
+  nextCursor?: string | null;
 };
 
 type ListCommentsResponse = {
@@ -2126,6 +2134,293 @@ test('subscription feed returns only public polls from followed users', async ()
     headers: bearer(viewer.accessToken)
   });
   assert.equal(invalidLimitResponse.statusCode, 400, invalidLimitResponse.body);
+});
+
+test('newest feed traverses 125 polls without gaps across tied timestamps and a deleted boundary', async () => {
+  const seed = `t05-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  const seeded = await seedPollPaginationFixtures(db, seed);
+  const expanded = expandPollPaginationFixtures(readPollPaginationFixtures(), seed);
+  const fixturePollIds = new Set(seeded.ids.polls);
+  let expectedPollIds = expanded.expectedIds.polls.filter((id) => fixturePollIds.has(id));
+  assert.equal(expectedPollIds.length, 125);
+
+  try {
+    // Keep this fixture ahead of unrelated rows in a shared test database.
+    await db.query(
+      "UPDATE polls SET created_at = created_at + interval '10 years' WHERE id = ANY($1::uuid[])",
+      [seeded.ids.polls]
+    );
+
+    // Put a tied timestamp group across the first page boundary, and another
+    // fractional tied group across the second page boundary.
+    for (const [start, fractionalMicroseconds] of [[18, 0], [38, 100]] as const) {
+      const tiedIds = expectedPollIds.slice(start, start + 3);
+      await db.query(
+        `UPDATE polls
+         SET created_at = (
+           SELECT created_at + ($3::integer * interval '1 microsecond')
+           FROM polls
+           WHERE id = $1
+         )
+         WHERE id = ANY($2::uuid[])`,
+        [tiedIds[0], tiedIds, fractionalMicroseconds]
+      );
+      const tiedIdsInDescendingIdOrder = [...tiedIds].sort((left, right) =>
+        left === right ? 0 : left > right ? -1 : 1
+      );
+      expectedPollIds = [
+        ...expectedPollIds.slice(0, start),
+        ...tiedIdsInDescendingIdOrder,
+        ...expectedPollIds.slice(start + tiedIds.length)
+      ];
+    }
+
+    await db.query(
+      'DELETE FROM polls WHERE id = ANY($1::uuid[])',
+      [[...seeded.ids.targetPolls, ...seeded.ids.contextPolls]]
+    );
+
+    const guestFirstResponse = await app.inject({ method: 'GET', url: '/polls' });
+    assert.equal(guestFirstResponse.statusCode, 200, guestFirstResponse.body);
+    const guestFirstPage = guestFirstResponse.json<ListPollsResponse>();
+    assert.equal(guestFirstPage.items.length, 20, 'cursorless newest keeps the legacy default limit');
+    assert.deepEqual(guestFirstPage.items.map((poll) => poll.id), expectedPollIds.slice(0, 20));
+    assert.equal(typeof guestFirstPage.nextCursor, 'string');
+    assert.ok(guestFirstPage.nextCursor);
+    assert.equal(guestFirstPage.items[0]?.viewerHasLiked, false);
+
+    const viewer = await registerTestUser();
+    const likeResponse = await app.inject({
+      method: 'POST',
+      url: `/polls/${expectedPollIds[0]}/likes`,
+      headers: bearer(viewer.accessToken)
+    });
+    assert.equal(likeResponse.statusCode, 201, likeResponse.body);
+
+    const viewerFirstResponse = await app.inject({
+      method: 'GET',
+      url: '/polls?limit=20',
+      headers: bearer(viewer.accessToken)
+    });
+    assert.equal(viewerFirstResponse.statusCode, 200, viewerFirstResponse.body);
+    const viewerFirstPage = viewerFirstResponse.json<ListPollsResponse>();
+    assert.equal(viewerFirstPage.items[0]?.id, expectedPollIds[0]);
+    assert.equal(viewerFirstPage.items[0]?.viewerHasLiked, true);
+
+    const guestRefreshResponse = await app.inject({ method: 'GET', url: '/polls?limit=1' });
+    assert.equal(guestRefreshResponse.statusCode, 200, guestRefreshResponse.body);
+    assert.equal(guestRefreshResponse.json<ListPollsResponse>().items[0]?.viewerHasLiked, false);
+
+    const foreignCursorResponse = await app.inject({
+      method: 'GET',
+      url: `/polls?cursor=${encodeURIComponent(guestFirstPage.nextCursor)}`,
+      headers: bearer(viewer.accessToken)
+    });
+    assert.equal(foreignCursorResponse.statusCode, 400, foreignCursorResponse.body);
+    assert.equal(foreignCursorResponse.json<{ error: string }>().error, 'pagination_cursor_invalid');
+
+    const newPollResponse = await app.inject({
+      method: 'POST',
+      url: '/polls',
+      headers: bearer(viewer.accessToken),
+      payload: { question: 'Created after the first feed page', options: ['Yes', 'No'] }
+    });
+    assert.equal(newPollResponse.statusCode, 201, newPollResponse.body);
+    const newPollId = newPollResponse.json<PollResponse>().poll.id;
+    await db.query("UPDATE polls SET created_at = '2040-01-01T00:00:00Z' WHERE id = $1", [newPollId]);
+
+    const deletedBoundaryId = expectedPollIds[19]!;
+    await db.query('DELETE FROM polls WHERE id = $1', [deletedBoundaryId]);
+
+    let fixtureIdsSeen = guestFirstPage.items
+      .map((poll) => poll.id)
+      .filter((id) => fixturePollIds.has(id));
+    let cursor: string | undefined = guestFirstPage.nextCursor;
+    let pageStart = 20;
+    let pageRequests = 0;
+    let terminalPage: ListPollsResponse | undefined;
+
+    while (cursor) {
+      assert.ok(pageRequests < 100, 'feed traversal reaches a terminal page within the safety bound');
+      pageRequests += 1;
+      assert.ok(cursor, 'every non-final fixture page must provide a continuation cursor');
+      const pageResponse: Awaited<ReturnType<typeof app.inject>> = await app.inject({
+        method: 'GET',
+        url: `/polls?limit=20&cursor=${encodeURIComponent(cursor)}`
+      });
+      assert.equal(pageResponse.statusCode, 200, pageResponse.body);
+      const page = pageResponse.json() as ListPollsResponse;
+      assert.ok(!page.items.some((poll) => poll.id === newPollId), 'new rows above the captured watermark stay out of this traversal');
+
+      const fixtureIdsOnPage = page.items
+        .map((poll) => poll.id)
+        .filter((id) => fixturePollIds.has(id));
+      const expectedPageIds = expectedPollIds.slice(pageStart, pageStart + 20);
+      assert.deepEqual(fixtureIdsOnPage, expectedPageIds, `fixture window beginning at ${pageStart}`);
+      fixtureIdsSeen.push(...fixtureIdsOnPage);
+      pageStart += 20;
+      terminalPage = page;
+      cursor = page.nextCursor ?? undefined;
+    }
+
+    assert.deepEqual(fixtureIdsSeen, expectedPollIds);
+    assert.equal(new Set(fixtureIdsSeen).size, 125);
+    assert.equal(terminalPage?.nextCursor, null, 'the complete feed walk observes the terminal page');
+
+    const popularResponse = await app.inject({ method: 'GET', url: '/polls?sort=popular' });
+    assert.equal(popularResponse.statusCode, 200, popularResponse.body);
+    assert.equal('nextCursor' in popularResponse.json<Record<string, unknown>>(), false);
+  } finally {
+    await cleanupPollPaginationFixtures(db, seeded);
+  }
+});
+
+test('subscriptions paginate only followed public authors and bind cursors to the viewer', async () => {
+  const viewerA = await registerTestUser();
+  const viewerB = await registerTestUser();
+  const authorA = await registerTestUser();
+  const authorB = await registerTestUser();
+
+  for (const [viewer, author] of [[viewerA, authorA], [viewerB, authorB]] as const) {
+    const followResponse = await app.inject({
+      method: 'POST',
+      url: `/users/${author.user.id}/follow`,
+      headers: bearer(viewer.accessToken)
+    });
+    assert.equal(followResponse.statusCode, 201, followResponse.body);
+  }
+
+  async function createPoll(author: AuthResponse, question: string, visibility?: 'public' | 'private') {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/polls',
+      headers: bearer(author.accessToken),
+      payload: { question, options: ['Yes', 'No'], ...(visibility ? { visibility } : {}) }
+    });
+    assert.equal(response.statusCode, 201, response.body);
+    return response.json<PollResponse>().poll;
+  }
+
+  async function seedPublicPolls(authorId: string, count: number, questionPrefix: string): Promise<string[]> {
+    const result = await db.query<{ poll_id: string }>(
+      `WITH inserted_polls AS (
+         INSERT INTO polls (id, author_id, question, visibility, options_count, comments_count, created_at)
+         SELECT gen_random_uuid(), $1::uuid, $2 || poll_number::text, 'public', 2, 0,
+                '2050-01-01T00:00:00Z'::timestamptz - poll_number * interval '1 second'
+         FROM generate_series(1, $3::integer) AS series(poll_number)
+         RETURNING id
+       )
+       INSERT INTO poll_options (id, poll_id, text, position)
+       SELECT gen_random_uuid(), inserted_polls.id, 'Boundary option ' || option_number::text, option_number - 1
+       FROM inserted_polls
+       CROSS JOIN generate_series(1, 2) AS option_series(option_number)
+       RETURNING poll_id`,
+      [authorId, questionPrefix, count]
+    );
+    return [...new Set(result.rows.map(({ poll_id }) => poll_id))];
+  }
+
+  const authorAPoll1 = await createPoll(authorA, 'A poll before private poll');
+  const authorAPoll2 = await createPoll(authorA, 'A newer public A poll');
+  const authorAPrivatePoll = await createPoll(authorA, 'Private A poll stays hidden', 'private');
+  const authorBPoll1 = await createPoll(authorB, 'B poll one');
+  const authorBPoll2 = await createPoll(authorB, 'B poll two');
+
+  const firstAResponse = await app.inject({
+    method: 'GET',
+    url: '/polls/subscriptions?limit=1',
+    headers: bearer(viewerA.accessToken)
+  });
+  assert.equal(firstAResponse.statusCode, 200, firstAResponse.body);
+  const firstA = firstAResponse.json<ListPollsResponse>();
+  assert.equal(firstA.items.length, 1);
+  assert.equal(firstA.items[0]?.authorId, authorA.user.id);
+  assert.equal(firstA.items[0]?.id, authorAPoll2.id);
+  assert.equal(typeof firstA.nextCursor, 'string');
+  assert.ok(firstA.nextCursor);
+
+  const firstBResponse = await app.inject({
+    method: 'GET',
+    url: '/polls/subscriptions?limit=1',
+    headers: bearer(viewerB.accessToken)
+  });
+  assert.equal(firstBResponse.statusCode, 200, firstBResponse.body);
+  const firstB = firstBResponse.json<ListPollsResponse>();
+  assert.equal(firstB.items[0]?.authorId, authorB.user.id);
+  assert.equal(firstB.items[0]?.id, authorBPoll2.id);
+
+  const foreignCursorResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/subscriptions?limit=1&cursor=${encodeURIComponent(firstA.nextCursor)}`,
+    headers: bearer(viewerB.accessToken)
+  });
+  assert.equal(foreignCursorResponse.statusCode, 400, foreignCursorResponse.body);
+  assert.equal(foreignCursorResponse.json<{ error: string }>().error, 'pagination_cursor_invalid');
+
+  const secondAResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/subscriptions?limit=1&cursor=${encodeURIComponent(firstA.nextCursor)}`,
+    headers: bearer(viewerA.accessToken)
+  });
+  assert.equal(secondAResponse.statusCode, 200, secondAResponse.body);
+  const secondA = secondAResponse.json<ListPollsResponse>();
+  assert.deepEqual(secondA.items.map((poll) => poll.id), [authorAPoll1.id]);
+  assert.equal(secondA.nextCursor, null);
+  assert.ok(!secondA.items.some((poll) => poll.id === authorAPrivatePoll.id || poll.authorId === authorB.user.id));
+
+  const secondBResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/subscriptions?limit=1&cursor=${encodeURIComponent(firstB.nextCursor!)}`,
+    headers: bearer(viewerB.accessToken)
+  });
+  assert.equal(secondBResponse.statusCode, 200, secondBResponse.body);
+  const secondB = secondBResponse.json<ListPollsResponse>();
+  assert.deepEqual(secondB.items.map((poll) => poll.id), [authorBPoll1.id]);
+  assert.equal(secondB.nextCursor, null);
+
+  const boundaryPollIds: string[] = [];
+  try {
+    boundaryPollIds.push(...await seedPublicPolls(authorB.user.id, 18, 'Exactly 20 public polls: '));
+    const exactly20Response = await app.inject({
+      method: 'GET',
+      url: '/polls/subscriptions?limit=20',
+      headers: bearer(viewerB.accessToken)
+    });
+    assert.equal(exactly20Response.statusCode, 200, exactly20Response.body);
+    const exactly20 = exactly20Response.json<ListPollsResponse>();
+    assert.equal(exactly20.items.length, 20);
+    assert.equal(new Set(exactly20.items.map((poll) => poll.id)).size, 20);
+    assert.equal(exactly20.nextCursor, null, 'exactly 20 available polls end on the first page');
+
+    boundaryPollIds.push(...await seedPublicPolls(authorA.user.id, 38, 'Exactly 40 public polls: '));
+    const exactly40FirstResponse = await app.inject({
+      method: 'GET',
+      url: '/polls/subscriptions?limit=20',
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(exactly40FirstResponse.statusCode, 200, exactly40FirstResponse.body);
+    const exactly40First = exactly40FirstResponse.json<ListPollsResponse>();
+    assert.equal(exactly40First.items.length, 20);
+    assert.ok(exactly40First.nextCursor);
+
+    const exactly40SecondResponse = await app.inject({
+      method: 'GET',
+      url: `/polls/subscriptions?limit=20&cursor=${encodeURIComponent(exactly40First.nextCursor!)}`,
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(exactly40SecondResponse.statusCode, 200, exactly40SecondResponse.body);
+    const exactly40Second = exactly40SecondResponse.json<ListPollsResponse>();
+    assert.equal(exactly40Second.items.length, 20);
+    assert.equal(exactly40Second.nextCursor, null, 'exactly 40 available polls end on the second page');
+    assert.equal(
+      new Set([...exactly40First.items, ...exactly40Second.items].map((poll) => poll.id)).size,
+      40
+    );
+  } finally {
+    if (boundaryPollIds.length > 0) {
+      await db.query('DELETE FROM polls WHERE id = ANY($1::uuid[])', [boundaryPollIds]);
+    }
+  }
 });
 
 test('current user can list their own polls and see poll counter', async () => {
