@@ -10,6 +10,7 @@ import {
   listPollCommentRecords,
   listPollCommentReplyRecords,
   findViewablePollCommentRecordById,
+  listNewestPublicPollPageRecords,
   listPublicPollRecords,
   listSubscriptionPollRecords,
   findViewablePollRecordById,
@@ -122,6 +123,15 @@ export async function listPublicPolls(
   return listPublicPollRecords(limit, viewerId, sort);
 }
 
+export async function listNewestPublicPolls(input: {
+  limit: number;
+  viewerId?: string;
+  cursor?: string;
+  owner: string;
+}) {
+  return listNewestPublicPollPageRecords(input);
+}
+
 export async function getViewablePoll(pollId: string, viewerId?: string) {
   const poll = await findViewablePollRecordById(pollId, viewerId);
   if (!poll) throw new PollNotFoundError('Poll was not found.');
@@ -144,8 +154,13 @@ export async function deletePoll(input: { pollId: string; authorId: string }) {
   }
 }
 
-export async function listSubscriptionPolls(followerId: string, limit: number) {
-  return listSubscriptionPollRecords(followerId, limit);
+export async function listSubscriptionPolls(
+  followerId: string,
+  limit: number,
+  cursor: string | undefined,
+  owner: string
+) {
+  return listSubscriptionPollRecords({ followerId, limit, cursor, owner });
 }
 
 export async function listPollComments(input: ListPollCommentsInput & { viewerId?: string }) {

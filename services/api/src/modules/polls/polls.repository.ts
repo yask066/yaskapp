@@ -7,6 +7,14 @@ import { AdminCursorError, encodeAdminCursor } from '../admin/pagination.js';
 import { avatarUrlForUser } from '../profiles/avatar-url.js';
 import { createNotification } from '../notifications/notifications.repository.js';
 import { publishNotificationAfterCommit } from '../notifications/notifications.publisher.js';
+import {
+  decodePollCursor,
+  encodePollCursor,
+  PollPaginationCursorError,
+  type PollCursorContext,
+  type PollCursorPayload,
+  type PollCursorTuple
+} from './poll-pagination.js';
 
 export type PollVisibility = 'public' | 'followers' | 'private';
 
@@ -118,6 +126,11 @@ type PollOptionRow = {
 };
 
 type PollCommentReplyRow = PollCommentRow & {
+  cursor_created_at: string;
+};
+
+type PollPageCursorRow = {
+  id: string;
   cursor_created_at: string;
 };
 
@@ -595,36 +608,173 @@ export async function listPublicPollRecords(
   }
 }
 
-export async function listSubscriptionPollRecords(
-  followerId: string,
-  limit: number
+function decodeChronologicalPollCursor(
+  rawCursor: string | undefined,
+  context: PollCursorContext
+): Extract<PollCursorPayload, { boundary: PollCursorTuple }> | undefined {
+  if (rawCursor === undefined) return undefined;
+
+  const payload = decodePollCursor(rawCursor, context);
+  if (!('boundary' in payload)) throw new PollPaginationCursorError();
+  return payload;
+}
+
+function nextPollPageCursor(
+  kind: 'polls' | 'subscriptions',
+  owner: string,
+  sort: 'newest',
+  hasNextPage: boolean,
+  pageRows: PollPageCursorRow[],
+  highWatermark: PollCursorTuple | undefined
 ) {
+  const lastRow = pageRows.at(-1);
+  if (!hasNextPage || !lastRow) return null;
+
+  const watermark = highWatermark ?? {
+    createdAt: pageRows[0]!.cursor_created_at,
+    id: pageRows[0]!.id
+  };
+
+  return encodePollCursor({
+    kind,
+    sort,
+    owner,
+    boundary: { createdAt: lastRow.cursor_created_at, id: lastRow.id },
+    highWatermark: watermark
+  });
+}
+
+export async function listNewestPublicPollPageRecords(input: {
+  limit: number;
+  viewerId?: string;
+  cursor?: string;
+  owner: string;
+}) {
+  const context = { kind: 'polls', sort: 'newest', owner: input.owner } as const;
+  const cursor = decodeChronologicalPollCursor(input.cursor, context);
   const client = await db.connect();
 
   try {
     return await withPollReadSnapshot(client, async () => {
-    const result = await client.query<{ id: string }>(
-      `
-        SELECT p.id
-        FROM polls p
-        JOIN follows f ON f.followee_id = p.author_id
-        JOIN users u ON u.id = p.author_id
-        WHERE f.follower_id = $1
-          AND p.visibility = 'public'
-          AND p.deleted_at IS NULL
-          AND u.status = 'active'
-          AND u.deleted_at IS NULL
-        ORDER BY p.created_at DESC, p.id DESC
-        LIMIT $2
-      `,
-      [followerId, limit]
-    );
+      const result = await client.query<PollPageCursorRow>(
+        `
+          WITH available_polls AS (
+            SELECT p.id, p.created_at
+            FROM polls p
+            JOIN users u ON u.id = p.author_id
+            WHERE p.visibility = 'public'
+              AND p.deleted_at IS NULL
+              AND u.status = 'active'
+              AND u.deleted_at IS NULL
+          ),
+          page_candidates AS (
+            SELECT
+              id,
+              created_at,
+              to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
+            FROM available_polls
+            WHERE ($2::timestamptz IS NULL OR (created_at, id) < ($2::timestamptz, $3::uuid))
+              AND ($4::timestamptz IS NULL OR (created_at, id) <= ($4::timestamptz, $5::uuid))
+            ORDER BY created_at DESC, id DESC
+            LIMIT $1
+          )
+          SELECT id, cursor_created_at
+          FROM page_candidates
+          ORDER BY created_at DESC, id DESC
+        `,
+        [
+          input.limit + 1,
+          cursor?.boundary.createdAt ?? null,
+          cursor?.boundary.id ?? null,
+          cursor?.highWatermark.createdAt ?? null,
+          cursor?.highWatermark.id ?? null
+        ]
+      );
 
-    return hydratePolls(
-      client,
-      result.rows.map((row) => row.id),
-      followerId
-    );
+      const hasNextPage = result.rows.length > input.limit;
+      const pageRows = hasNextPage ? result.rows.slice(0, input.limit) : result.rows;
+      return {
+        items: await hydratePolls(client, pageRows.map(({ id }) => id), input.viewerId),
+        nextCursor: nextPollPageCursor(
+          'polls',
+          input.owner,
+          'newest',
+          hasNextPage,
+          pageRows,
+          cursor?.highWatermark
+        )
+      };
+    });
+  } finally {
+    client.release();
+  }
+}
+
+export async function listSubscriptionPollRecords(
+  input: {
+    followerId: string;
+    limit: number;
+    cursor?: string;
+    owner: string;
+  }
+) {
+  const context = { kind: 'subscriptions', sort: 'newest', owner: input.owner } as const;
+  const cursor = decodeChronologicalPollCursor(input.cursor, context);
+  const client = await db.connect();
+
+  try {
+    return await withPollReadSnapshot(client, async () => {
+      const result = await client.query<PollPageCursorRow>(
+        `
+          WITH available_polls AS (
+            SELECT p.id, p.created_at
+            FROM polls p
+            JOIN follows f ON f.followee_id = p.author_id
+            JOIN users u ON u.id = p.author_id
+            WHERE f.follower_id = $1
+              AND p.visibility = 'public'
+              AND p.deleted_at IS NULL
+              AND u.status = 'active'
+              AND u.deleted_at IS NULL
+          ),
+          page_candidates AS (
+            SELECT
+              id,
+              created_at,
+              to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
+            FROM available_polls
+            WHERE ($3::timestamptz IS NULL OR (created_at, id) < ($3::timestamptz, $4::uuid))
+              AND ($5::timestamptz IS NULL OR (created_at, id) <= ($5::timestamptz, $6::uuid))
+            ORDER BY created_at DESC, id DESC
+            LIMIT $2
+          )
+          SELECT id, cursor_created_at
+          FROM page_candidates
+          ORDER BY created_at DESC, id DESC
+        `,
+        [
+          input.followerId,
+          input.limit + 1,
+          cursor?.boundary.createdAt ?? null,
+          cursor?.boundary.id ?? null,
+          cursor?.highWatermark.createdAt ?? null,
+          cursor?.highWatermark.id ?? null
+        ]
+      );
+
+      const hasNextPage = result.rows.length > input.limit;
+      const pageRows = hasNextPage ? result.rows.slice(0, input.limit) : result.rows;
+      return {
+        items: await hydratePolls(client, pageRows.map(({ id }) => id), input.followerId),
+        nextCursor: nextPollPageCursor(
+          'subscriptions',
+          input.owner,
+          'newest',
+          hasNextPage,
+          pageRows,
+          cursor?.highWatermark
+        )
+      };
     });
   } finally {
     client.release();
