@@ -4,6 +4,7 @@ import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { AdminCursorError } from '../admin/pagination.js';
+import { PollPaginationCursorError } from './poll-pagination.js';
 import {
   broadcastPollVoteCreated,
   broadcastPollVoteUpdated,
@@ -113,14 +114,15 @@ function validationError(reply: FastifyReply, error: z.ZodError) {
 }
 
 function pollError(reply: FastifyReply, error: unknown) {
-  if (error instanceof AdminCursorError) {
-    return reply.status(400).send({
-      error: 'validation_error',
-      message: 'Request input is invalid.',
-      details: { formErrors: ['The comment pagination cursor is invalid.'], fieldErrors: {} }
+  if (error instanceof PollPaginationCursorError || error instanceof AdminCursorError) {
+    const cursorError = error instanceof PollPaginationCursorError
+      ? error
+      : new PollPaginationCursorError();
+    return reply.status(cursorError.statusCode).send({
+      error: cursorError.code,
+      message: cursorError.message
     });
   }
-
   if (error instanceof PollNotFoundError) {
     return reply.status(404).send({
       error: 'not_found',

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import Fastify from 'fastify';
 
-import { cleanupUploadedPollImage } from './polls.routes.js';
+import { cleanupUploadedPollImage, registerPollRoutes } from './polls.routes.js';
 
 test('poll image cleanup does not replace the original create error', async () => {
   let cleanupError: unknown;
@@ -43,4 +44,21 @@ test('failed poll image cleanup reports when durable enqueue also fails', async 
 
   assert.equal(recorded, false);
   assert.deepEqual(cleanupErrors, ['storage cleanup failed', 'database unavailable']);
+});
+
+test('invalid replies cursors use the pagination cursor error envelope', async (context) => {
+  const app = Fastify();
+  context.after(() => app.close());
+  registerPollRoutes(app);
+
+  const response = await app.inject({
+    method: 'GET',
+    url: '/polls/11111111-1111-4111-8111-111111111111/comments/33333333-3333-4333-8333-333333333333/replies?cursor=not-base64'
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.deepEqual(response.json(), {
+    error: 'pagination_cursor_invalid',
+    message: 'The pagination cursor is invalid.'
+  });
 });

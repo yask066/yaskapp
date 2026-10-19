@@ -3,6 +3,7 @@ import 'dotenv/config';
 import { z } from 'zod';
 
 const developmentJwtSecret = 'development-only-secret';
+const developmentPaginationCursorSecret = 'development-only-pagination-cursor-secret-replace-before-production';
 const journalDatabaseUrlSchema = z.string().url().refine((value) => {
   const protocol = new URL(value).protocol;
   return protocol === 'postgres:' || protocol === 'postgresql:';
@@ -18,6 +19,11 @@ const envSchema = z
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
   JWT_SECRET: z.string().min(16).default(developmentJwtSecret),
+  PAGINATION_CURSOR_SECRET: z
+    .string()
+    .min(32)
+    .refine((value) => Buffer.byteLength(value, 'utf8') >= 32)
+    .default(developmentPaginationCursorSecret),
   S3_ENDPOINT: z.string().url(),
   S3_REGION: z.string().default('us-east-1'),
   S3_BUCKET: z.string().min(1),
@@ -88,6 +94,25 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['JWT_SECRET'],
         message: 'A real staging or production JWT_SECRET is required.'
+      });
+    }
+    const paginationSecretIsPlaceholder =
+      config.PAGINATION_CURSOR_SECRET === developmentPaginationCursorSecret ||
+      config.PAGINATION_CURSOR_SECRET.includes('replace-with');
+
+    if (config.NODE_ENV === 'production' && paginationSecretIsPlaceholder) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['PAGINATION_CURSOR_SECRET'],
+        message: 'A real PAGINATION_CURSOR_SECRET is required in production.'
+      });
+    }
+
+    if (config.PAGINATION_CURSOR_SECRET === config.JWT_SECRET) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['PAGINATION_CURSOR_SECRET'],
+        message: 'PAGINATION_CURSOR_SECRET must be independent from JWT_SECRET.'
       });
     }
   });
