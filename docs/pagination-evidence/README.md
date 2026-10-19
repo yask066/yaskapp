@@ -18,7 +18,7 @@ This directory records the pre-pagination baseline for T02. It includes source-l
 
 ## Fixture layout
 
-`test/fixtures/feed-comments-pagination.json` is the source of stable IDs, UTC timestamps, ordered IDs, and first-page windows. Seed with a unique lowercase seed to namespace all UUIDs. The normal data set has 125 polls, 125 root comments, and 65 replies. Its separate target poll has 225 roots and 225 replies under one root, so root and reply positions beyond page 10 at limit 20 can be requested against persisted rows. Context records cover follows, private/followers-only visibility, and soft deletion. The database helper inserts within a transaction and cleanup deletes only the poll and account IDs derived from that seed.
+`test/fixtures/feed-comments-pagination.json` is the source of stable IDs, UTC timestamps, ordered IDs, and first-page windows. Seed with a unique lowercase seed to namespace all UUIDs. The normal data set has 125 polls and puts all 125 roots on the first poll, with 65 replies under the first root; this lets a comments endpoint traverse the entire expected root order on one poll. Its separate target poll has 225 roots and 225 replies under one root, so root and reply positions beyond page 10 at limit 20 can be requested against persisted rows. Context records cover follows, private/followers-only visibility, and soft deletion. The database helper inserts within a transaction and cleanup deletes only the poll and account IDs derived from that seed.
 
 Run the fixture helper checks from the API workspace:
 

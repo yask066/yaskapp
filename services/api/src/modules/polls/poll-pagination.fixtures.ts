@@ -117,7 +117,7 @@ export function expandPollPaginationFixtures(
   const roots = expandCollection(fixture.chronological.roots, seed, (sourceId, index, createdAt) => ({
     sourceId,
     id: id(sourceId),
-    poll_id: polls[index]!.id,
+    poll_id: polls[0]!.id,
     author_id: authorId(index % 2 === 0 ? 'authorA' : 'authorB'),
     parent_comment_id: null,
     body: `Pagination fixture root ${index + 1}`,

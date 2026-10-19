@@ -18,6 +18,12 @@ test('poll_pagination_fixture_expands_expected_orders_and_boundary_windows', () 
   assert.equal(expanded.target.roots.length, 225);
   assert.equal(expanded.target.replies.length, 225);
   assert.equal(expanded.feedPolls.length, 126);
+  assert.equal(
+    new Set(expanded.roots.map(({ poll_id }) => poll_id)).size,
+    1,
+    'all chronological roots must belong to one poll for a comments API traversal'
+  );
+  assert.equal(expanded.roots[0]?.poll_id, expanded.polls[0]?.id);
   assert.deepEqual(orderByTuple(expanded.feedPolls, true), expanded.expectedIds.polls);
   assert.deepEqual(orderByTuple(expanded.roots, true), expanded.expectedIds.roots);
   assert.deepEqual(orderByTuple(expanded.replies, false), expanded.expectedIds.replies);
@@ -61,7 +67,7 @@ test('poll_pagination_fixture_seed_is_deterministic_and_cleanup_is_seed_scoped',
   assert.deepEqual(alpha.ids.polls, expandedAlpha.polls.map(({ id }) => id));
   assert.notDeepEqual(alpha.ids.polls, beta.ids.polls);
   const pollRows = database.rows.get('polls')!;
-  assert.equal(pollRows.get(expandedAlpha.polls[0]!.id)?.comments_count, 66);
+  assert.equal(pollRows.get(expandedAlpha.polls[0]!.id)?.comments_count, 190);
   assert.equal(pollRows.get(alpha.ids.targetPolls[0]!)?.comments_count, 450);
   const viewerA = expandedAlpha.accounts.find(({ key }) => key === 'viewerA')!.id;
   const viewerB = expandedAlpha.accounts.find(({ key }) => key === 'viewerB')!.id;
