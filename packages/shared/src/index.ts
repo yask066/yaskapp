@@ -1,3 +1,7 @@
+import type { CursorPage } from './pagination.js';
+
+export type { CursorPage } from './pagination.js';
+
 export type {
   AccountDeletionStatus,
   AccountDeletionStatusResponse,
@@ -33,16 +37,19 @@ export type PollComment = {
   author: PollAuthor;
   body: string;
   likesCount: number;
+  viewerHasLiked: boolean;
+  parentCommentId: string | null;
+  repliesCount: number;
   createdAt: string;
   updatedAt: string;
 };
 
-export type ListPollCommentsResponse = {
-  items: PollComment[];
-};
+export type ListPollCommentsResponse = CursorPage<PollComment>;
+export type ListPollCommentRepliesResponse = CursorPage<PollComment>;
 
 export type CreatePollCommentRequest = {
   body: string;
+  parentCommentId?: string;
 };
 
 export type CreatePollCommentResponse = {
@@ -85,9 +92,7 @@ export type CreatePollResponse = {
   poll: Poll;
 };
 
-export type ListPollsResponse = {
-  items: Poll[];
-};
+export type ListPollsResponse = CursorPage<Poll>;
 
 export type CreatePollVoteRequest = {
   optionId: string;
