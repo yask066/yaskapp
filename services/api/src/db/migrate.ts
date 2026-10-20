@@ -1,10 +1,10 @@
-import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { PoolClient } from 'pg';
 
 import { closeDatabaseConnection, db } from '../config/database.js';
+import { calculateMigrationChecksum, matchesMigrationChecksum } from './migration-checksum.js';
 
 const migrationsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'migrations');
 
@@ -57,7 +57,7 @@ async function listMigrationFiles(): Promise<MigrationFile[]> {
       const sql = await readFile(path.join(migrationsDir, name), 'utf8');
       return {
         name,
-        checksum: createHash('sha256').update(sql).digest('hex'),
+        checksum: calculateMigrationChecksum(sql),
         sql
       };
     })
@@ -104,7 +104,7 @@ async function migrate() {
         continue;
       }
 
-      if (appliedChecksum !== migration.checksum) {
+      if (!matchesMigrationChecksum(migration.sql, appliedChecksum)) {
         throw new Error(
           `Applied migration ${migration.name} was modified. Restore the original file or create a new migration.`
         );
