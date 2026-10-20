@@ -35,16 +35,16 @@ test('comment lists and replies exclude deleted poll owners and comment authors'
   Object.defineProperty(db, 'connect', { configurable: true, value: async () => client as never });
 
   try {
-    await listPollCommentRecords({ pollId: 'poll-1', limit: 20 });
-    await listPollCommentReplyRecords({ pollId: 'poll-1', commentId: 'root-1', limit: 20 });
+    await listPollCommentRecords({ pollId: 'poll-1', limit: 20, order: 'oldest', owner: 'test-owner' });
+    await listPollCommentReplyRecords({ pollId: 'poll-1', commentId: 'root-1', limit: 20, owner: 'test-owner' });
   } finally {
     Object.defineProperty(db, 'connect', { configurable: true, value: originalConnect });
   }
 
-  const pollVisibilityQuery = queries[0] ?? '';
-  const rootListQuery = queries[1] ?? '';
-  const rootVisibilityQuery = queries[2] ?? '';
-  const replyListQuery = queries[3] ?? '';
+  const pollVisibilityQuery = queries[1] ?? '';
+  const rootListQuery = queries[2] ?? '';
+  const rootVisibilityQuery = queries[5] ?? '';
+  const replyListQuery = queries[6] ?? '';
   assert.match(pollVisibilityQuery, /poll_author\.status = 'active'/);
   assert.match(pollVisibilityQuery, /poll_author\.deleted_at IS NULL/);
   assert.match(rootListQuery, /u\.status = 'active'/);
@@ -54,6 +54,18 @@ test('comment lists and replies exclude deleted poll owners and comment authors'
   assert.match(rootVisibilityQuery, /poll_author\.deleted_at IS NULL/);
   assert.match(replyListQuery, /u\.status = 'active'/);
   assert.match(replyListQuery, /u\.deleted_at IS NULL/);
+
+  for (const [name, query] of [['roots', rootListQuery], ['replies', replyListQuery]] as const) {
+    assert.match(query, /available_(?:comments|replies) AS NOT MATERIALIZED/);
+    const pageCandidates = query.match(/page_candidates AS MATERIALIZED \(([\s\S]*?)\n\s*\),\s*page_rows AS/)?.[1] ?? '';
+    const pageRows = query.match(/page_rows AS \(([\s\S]*?)\n\s*\)\s*SELECT/)?.[1] ?? '';
+    assert.ok(pageCandidates, `${name} query materializes only its bounded page candidates`);
+    assert.ok(pageRows, `${name} query hydrates selected rows after the page limit`);
+    assert.match(pageCandidates, /LIMIT \$\d+/);
+    assert.doesNotMatch(pageCandidates, /viewer_has_liked|SELECT count|FROM likes/i);
+    assert.match(pageRows, /viewer_has_liked|FROM likes/i);
+    if (name === 'roots') assert.match(pageRows, /SELECT count\(\*\)::int/);
+  }
 });
 
 test('comment deletion locks the poll before locking comments', async () => {

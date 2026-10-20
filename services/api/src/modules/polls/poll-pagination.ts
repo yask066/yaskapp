@@ -157,6 +157,38 @@ export function decodePollCursor(raw: string, expected: PollCursorContext): Poll
   }
 }
 
+export function decodeLegacyReplyCursor(
+  raw: string,
+  options: Readonly<{ expiresAt?: string; now?: number }> = {}
+): PollCursorTuple {
+  try {
+    if (typeof raw !== 'string' || raw.length > POLL_CURSOR_MAX_LENGTH) throw invalidCursor();
+    if (options.expiresAt !== undefined) {
+      const expiresAt = Date.parse(options.expiresAt);
+      const now = options.now ?? Date.now();
+      if (!Number.isFinite(expiresAt) || !Number.isFinite(now) || now >= expiresAt) throw invalidCursor();
+    }
+
+    const payloadBytes = decodeBase64Url(raw);
+    const payloadText = payloadBytes.toString('utf8');
+    if (!Buffer.from(payloadText, 'utf8').equals(payloadBytes)) throw invalidCursor();
+
+    const parsedPayload: unknown = JSON.parse(payloadText);
+    if (!isRecord(parsedPayload) || Object.keys(parsedPayload).length !== 2 ||
+        !Object.prototype.hasOwnProperty.call(parsedPayload, 'createdAt') ||
+        !Object.prototype.hasOwnProperty.call(parsedPayload, 'id')) {
+      throw invalidCursor();
+    }
+
+    const tuple = normalizeTuple({ createdAt: parsedPayload.createdAt, id: parsedPayload.id });
+    if (JSON.stringify(tuple) !== payloadText) throw invalidCursor();
+    return tuple;
+  } catch (error) {
+    if (error instanceof PollPaginationCursorError) throw error;
+    throw invalidCursor();
+  }
+}
+
 function toWirePayload(payload: unknown): CursorWirePayload {
   if (!isRecord(payload)) throw invalidCursor();
 

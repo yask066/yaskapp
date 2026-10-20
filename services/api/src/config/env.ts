@@ -24,6 +24,7 @@ const envSchema = z
     .min(32)
     .refine((value) => Buffer.byteLength(value, 'utf8') >= 32)
     .default(developmentPaginationCursorSecret),
+  LEGACY_REPLIES_CURSOR_V0_EXPIRES_AT: z.string().datetime({ offset: true }).optional(),
   S3_ENDPOINT: z.string().url(),
   S3_REGION: z.string().default('us-east-1'),
   S3_BUCKET: z.string().min(1),

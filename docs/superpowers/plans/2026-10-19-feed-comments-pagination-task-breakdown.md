@@ -187,10 +187,10 @@
 
 **Файлы:** polls routes/service/repository, `polls.integration.test.ts`, `polls.routes.test.ts`.
 
-- [ ] Добавить тесты 125 roots в newest/oldest, 65 replies ASC, legacy roots default 50, исключения replies из roots, текущих reply counts и viewer likes.
-- [ ] Добавить `order`, cursor и high watermark для roots; replies перевести на новый scoped cursor/high watermark, сохранив окно старых cursors. В обоих направлениях использовать строгие tuple comparisons.
-- [ ] Проверить смену poll/root/account, удаление корня между страницами, скрытие/удаление автора и boundary; unavailable возвращает действующий 404 без раскрытия содержимого.
-- [ ] Выполнить целевые API tests и API typecheck.
+- [x] Добавить тесты 125 roots в newest/oldest, 65 replies ASC, legacy roots default 50, исключения replies из roots, текущих reply counts и viewer likes.
+- [x] Добавить `order`, cursor и high watermark для roots; replies перевести на новый scoped cursor/high watermark, сохранив окно старых cursors. В обоих направлениях использовать строгие tuple comparisons.
+- [x] Проверить смену poll/root/account, удаление корня между страницами, скрытие/удаление автора и boundary; unavailable возвращает действующий 404 без раскрытия содержимого.
+- [x] Выполнить целевые API tests и API typecheck.
 
 **Готово, когда:** roots/replies соответствуют page contract и legacy defaults; все test IDs обходятся в ожидаемом порядке; cursor другой ветки отвергается.
 

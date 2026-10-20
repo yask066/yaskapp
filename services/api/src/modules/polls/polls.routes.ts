@@ -94,7 +94,9 @@ const commentLikeParamsSchema = z.object({
 }).strict();
 
 const commentsQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(50).default(50)
+  limit: z.coerce.number().int().min(1).max(50).default(50),
+  order: z.enum(['oldest', 'newest']).default('oldest'),
+  cursor: z.string().max(POLL_CURSOR_MAX_LENGTH).optional()
 }).strict();
 
 const commentRepliesQuerySchema = z.object({
@@ -171,6 +173,12 @@ function pollError(reply: FastifyReply, error: unknown) {
 
 
   throw error;
+}
+
+function pollCursorOwnerForRequest(request: FastifyRequest): string {
+  return request.user?.sub
+    ? createPollCursorOwnerKey({ type: 'user', userId: request.user.sub })
+    : createPollCursorOwnerKey({ type: 'guest', ip: request.ip });
 }
 
 export async function cleanupUploadedPollImage(
@@ -434,6 +442,9 @@ export function registerPollRoutes(app: FastifyInstance) {
     const parsedQuery = commentsQuerySchema.safeParse(request.query);
 
     if (!parsedQuery.success) {
+      if (parsedQuery.error.issues.some((issue) => issue.path[0] === 'cursor')) {
+        return pollError(reply, new PollPaginationCursorError());
+      }
       return validationError(reply, parsedQuery.error);
     }
 
@@ -441,6 +452,9 @@ export function registerPollRoutes(app: FastifyInstance) {
       return await listPollComments({
         pollId: parsedParams.data.pollId,
         limit: parsedQuery.data.limit,
+        order: parsedQuery.data.order,
+        cursor: parsedQuery.data.cursor,
+        owner: pollCursorOwnerForRequest(request),
         viewerId: request.user?.sub
       });
     } catch (error) {
@@ -469,6 +483,7 @@ export function registerPollRoutes(app: FastifyInstance) {
           commentId: parsedParams.data.commentId,
           limit: parsedQuery.data.limit,
           cursor: parsedQuery.data.cursor,
+          owner: pollCursorOwnerForRequest(request),
           viewerId: request.user?.sub
         });
       } catch (error) {

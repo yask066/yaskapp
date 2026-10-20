@@ -2,12 +2,13 @@ import type { PoolClient } from 'pg';
 import type { PollStateRevisions } from '@yaskapp/shared';
 
 import { db } from '../../config/database.js';
+import { env } from '../../config/env.js';
 import { lockActiveAccount } from '../account-deletion/account-activity.guard.js';
-import { AdminCursorError, encodeAdminCursor } from '../admin/pagination.js';
 import { avatarUrlForUser } from '../profiles/avatar-url.js';
 import { createNotification } from '../notifications/notifications.repository.js';
 import { publishNotificationAfterCommit } from '../notifications/notifications.publisher.js';
 import {
+  decodeLegacyReplyCursor,
   decodePollCursor,
   encodePollCursor,
   PollPaginationCursorError,
@@ -92,6 +93,7 @@ export type ListPollCommentRepliesRecordInput = {
   limit: number;
   cursor?: string;
   viewerId?: string;
+  owner: string;
 };
 
 type PollRow = {
@@ -125,8 +127,10 @@ type PollOptionRow = {
   votes_count: number;
 };
 
-type PollCommentReplyRow = PollCommentRow & {
+type PollCommentPageRow = PollCommentRow & {
   cursor_created_at: string;
+  high_watermark_created_at: string;
+  high_watermark_id: string;
 };
 
 type PollPageCursorRow = {
@@ -938,180 +942,309 @@ export async function findViewablePollImageRecord(
   return result.rows[0] ?? null;
 }
 
-export async function listPollCommentRecords(input: { pollId: string; limit: number; viewerId?: string }) {
+type CommentCursorPageContext =
+  | Extract<PollCursorContext, { kind: 'comment-roots' }>
+  | Extract<PollCursorContext, { kind: 'comment-replies' }>;
+
+function nextCommentPageCursor(input: {
+  context: CommentCursorPageContext;
+  pageRows: PollCommentPageRow[];
+  hasNextPage: boolean;
+  highWatermark?: PollCursorTuple;
+}): string | null {
+  const lastRow = input.pageRows.at(-1);
+  if (!input.hasNextPage || !lastRow) return null;
+
+  const highWatermark = input.highWatermark ?? {
+    createdAt: lastRow.high_watermark_created_at,
+    id: lastRow.high_watermark_id
+  };
+  return encodePollCursor({
+    ...input.context,
+    boundary: { createdAt: lastRow.cursor_created_at, id: lastRow.id },
+    highWatermark
+  } as PollCursorPayload);
+}
+
+export async function listPollCommentRecords(input: {
+  pollId: string;
+  limit: number;
+  order: 'newest' | 'oldest';
+  cursor?: string;
+  owner: string;
+  viewerId?: string;
+}) {
+  const context = {
+    kind: 'comment-roots',
+    order: input.order,
+    pollId: input.pollId,
+    owner: input.owner
+  } as const;
+  const cursor = decodeChronologicalPollCursor(input.cursor, context);
   const client = await db.connect();
 
   try {
-    const pollResult = await client.query<{ id: string }>(
-      `
-        SELECT p.id
-        FROM polls p
-        JOIN users poll_author ON poll_author.id = p.author_id
-        WHERE p.id = $1
-          AND poll_author.status = 'active'
-          AND poll_author.deleted_at IS NULL
-          AND p.visibility = 'public'
-          AND p.deleted_at IS NULL
-      `,
-      [input.pollId]
-    );
+    return await withPollReadSnapshot(client, async () => {
+      const pollResult = await client.query<{ id: string }>(
+        `
+          SELECT p.id
+          FROM polls p
+          JOIN users poll_author ON poll_author.id = p.author_id
+          WHERE p.id = $1
+            AND poll_author.status = 'active'
+            AND poll_author.deleted_at IS NULL
+            AND p.visibility = 'public'
+            AND p.deleted_at IS NULL
+        `,
+        [input.pollId]
+      );
 
-    if (pollResult.rowCount === 0) {
-      return { status: 'not_found' as const };
-    }
+      if (pollResult.rowCount === 0) return { status: 'not_found' as const };
 
-    const commentsResult = await client.query<PollCommentRow>(
-      `
-        SELECT
-          c.id,
-          c.poll_id,
-          c.author_id,
-          u.username::text AS author_username,
-          pr.display_name AS author_display_name,
-          pr.avatar_object_key AS author_avatar_object_key,
-          c.body,
-          c.likes_count,
-          EXISTS (
-            SELECT 1 FROM likes l
-            WHERE l.comment_id = c.id AND l.user_id = $3
-          ) AS viewer_has_liked,
-          c.parent_comment_id,
-          (
-            SELECT count(*)::int
-            FROM comments r
-            JOIN users reply_author ON reply_author.id = r.author_id
-            WHERE r.parent_comment_id = c.id
-              AND r.deleted_at IS NULL
-              AND reply_author.status = 'active'
-              AND reply_author.deleted_at IS NULL
-          ) AS replies_count,
-          c.created_at,
-          c.updated_at
-        FROM comments c
-        JOIN users u ON u.id = c.author_id
-        JOIN profiles pr ON pr.user_id = c.author_id
-        WHERE c.poll_id = $1
-          AND c.parent_comment_id IS NULL
-          AND c.deleted_at IS NULL
-          AND u.status = 'active'
-          AND u.deleted_at IS NULL
-        ORDER BY c.created_at ASC, c.id ASC
-        LIMIT $2
-      `,
-      [input.pollId, input.limit, input.viewerId ?? null]
-    );
+      const direction = input.order === 'newest' ? 'DESC' : 'ASC';
+      const boundaryComparison = input.order === 'newest' ? '<' : '>';
+      const commentsResult = await client.query<PollCommentPageRow>(
+        `
+          WITH available_comments AS NOT MATERIALIZED (
+            SELECT c.id, c.created_at
+            FROM comments c
+            JOIN users u ON u.id = c.author_id
+            WHERE c.poll_id = $1
+              AND c.parent_comment_id IS NULL
+              AND c.deleted_at IS NULL
+              AND u.status = 'active'
+              AND u.deleted_at IS NULL
+          ),
+          high_watermark AS (
+            SELECT
+              id,
+              created_at AS raw_created_at,
+              to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
+            FROM available_comments
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+          ),
+          page_candidates AS MATERIALIZED (
+            SELECT
+              available_comments.id,
+              available_comments.created_at,
+              to_char(available_comments.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
+              high_watermark.created_at AS high_watermark_created_at,
+              high_watermark.id AS high_watermark_id
+            FROM available_comments
+            CROSS JOIN high_watermark
+            WHERE ($2::timestamptz IS NULL OR (available_comments.created_at, available_comments.id) ${boundaryComparison} ($2::timestamptz, $3::uuid))
+              AND (available_comments.created_at, available_comments.id) <= (
+                COALESCE($4::timestamptz, high_watermark.raw_created_at),
+                COALESCE($5::uuid, high_watermark.id)
+              )
+            ORDER BY available_comments.created_at ${direction}, available_comments.id ${direction}
+            LIMIT $6
+          ),
+          page_rows AS (
+            SELECT
+              c.id,
+              c.poll_id,
+              c.author_id,
+              u.username::text AS author_username,
+              pr.display_name AS author_display_name,
+              pr.avatar_object_key AS author_avatar_object_key,
+              c.body,
+              c.likes_count,
+              EXISTS (
+                SELECT 1 FROM likes l
+                WHERE l.comment_id = c.id AND l.user_id = $7
+              ) AS viewer_has_liked,
+              c.parent_comment_id,
+              (
+                SELECT count(*)::int
+                FROM comments r
+                JOIN users reply_author ON reply_author.id = r.author_id
+                WHERE r.parent_comment_id = c.id
+                  AND r.deleted_at IS NULL
+                  AND reply_author.status = 'active'
+                  AND reply_author.deleted_at IS NULL
+              ) AS replies_count,
+              c.created_at,
+              c.updated_at,
+              page_candidates.cursor_created_at,
+              page_candidates.high_watermark_created_at,
+              page_candidates.high_watermark_id
+            FROM page_candidates
+            JOIN comments c ON c.id = page_candidates.id
+            JOIN users u ON u.id = c.author_id
+            JOIN profiles pr ON pr.user_id = c.author_id
+          )
+          SELECT *
+          FROM page_rows
+          ORDER BY created_at ${direction}, id ${direction}
+        `,
+        [
+          input.pollId,
+          cursor?.boundary.createdAt ?? null,
+          cursor?.boundary.id ?? null,
+          cursor?.highWatermark.createdAt ?? null,
+          cursor?.highWatermark.id ?? null,
+          input.limit + 1,
+          input.viewerId ?? null
+        ]
+      );
 
-    return {
-      status: 'found' as const,
-      items: commentsResult.rows.map(mapComment)
-    };
+      const hasNextPage = commentsResult.rows.length > input.limit;
+      const pageRows = hasNextPage ? commentsResult.rows.slice(0, input.limit) : commentsResult.rows;
+      return {
+        status: 'found' as const,
+        items: pageRows.map(mapComment),
+        nextCursor: nextCommentPageCursor({
+          context,
+          pageRows,
+          hasNextPage,
+          highWatermark: cursor?.highWatermark
+        })
+      };
+    });
   } finally {
     client.release();
   }
 }
 
 export async function listPollCommentReplyRecords(input: ListPollCommentRepliesRecordInput) {
-  const cursor = input.cursor === undefined ? undefined : decodeCommentCursor(input.cursor);
+  const context = {
+    kind: 'comment-replies',
+    order: 'oldest',
+    pollId: input.pollId,
+    rootId: input.commentId,
+    owner: input.owner
+  } as const;
+  const cursor = input.cursor?.startsWith('c1.')
+    ? decodeChronologicalPollCursor(input.cursor, context)
+    : undefined;
+  const legacyBoundary = input.cursor !== undefined && cursor === undefined
+    ? decodeLegacyReplyCursor(input.cursor, { expiresAt: env.LEGACY_REPLIES_CURSOR_V0_EXPIRES_AT })
+    : undefined;
+  const boundary = cursor?.boundary ?? legacyBoundary;
   const client = await db.connect();
 
   try {
-    const rootResult = await client.query<{ id: string }>(
-      `
-        SELECT c.id
-        FROM comments c
-        JOIN polls p ON p.id = c.poll_id
-        JOIN users poll_author ON poll_author.id = p.author_id
-        JOIN users root_author ON root_author.id = c.author_id
-        WHERE c.id = $1
-          AND c.poll_id = $2
-          AND c.parent_comment_id IS NULL
-          AND c.deleted_at IS NULL
-          AND root_author.status = 'active'
-          AND root_author.deleted_at IS NULL
-          AND p.visibility = 'public'
-          AND p.deleted_at IS NULL
-          AND poll_author.status = 'active'
-          AND poll_author.deleted_at IS NULL
-      `,
-      [input.commentId, input.pollId]
-    );
+    return await withPollReadSnapshot(client, async () => {
+      const rootResult = await client.query<{ id: string }>(
+        `
+          SELECT c.id
+          FROM comments c
+          JOIN polls p ON p.id = c.poll_id
+          JOIN users poll_author ON poll_author.id = p.author_id
+          JOIN users root_author ON root_author.id = c.author_id
+          WHERE c.id = $1
+            AND c.poll_id = $2
+            AND c.parent_comment_id IS NULL
+            AND c.deleted_at IS NULL
+            AND root_author.status = 'active'
+            AND root_author.deleted_at IS NULL
+            AND p.visibility = 'public'
+            AND p.deleted_at IS NULL
+            AND poll_author.status = 'active'
+            AND poll_author.deleted_at IS NULL
+        `,
+        [input.commentId, input.pollId]
+      );
 
-    if (rootResult.rowCount === 0) {
-      return { status: 'not_found' as const };
-    }
+      if (rootResult.rowCount === 0) return { status: 'not_found' as const };
 
-    const repliesResult = await client.query<PollCommentReplyRow>(
-      `
-        SELECT
-          c.id,
-          c.poll_id,
-          c.author_id,
-          u.username::text AS author_username,
-          pr.display_name AS author_display_name,
-          pr.avatar_object_key AS author_avatar_object_key,
-          c.body,
-          c.likes_count,
-          EXISTS (
-            SELECT 1 FROM likes l
-            WHERE l.comment_id = c.id AND l.user_id = $6
-          ) AS viewer_has_liked,
-          c.parent_comment_id,
-          0::int AS replies_count,
-          c.created_at,
-          c.updated_at,
-          to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
-        FROM comments c
-        JOIN users u ON u.id = c.author_id
-        JOIN profiles pr ON pr.user_id = c.author_id
-        WHERE c.poll_id = $1
-          AND c.parent_comment_id = $2
-          AND c.deleted_at IS NULL
-          AND u.status = 'active'
-          AND u.deleted_at IS NULL
-          AND (
-            $3::timestamptz IS NULL
-            OR (c.created_at, c.id) > ($3::timestamptz, $4::uuid)
+      const repliesResult = await client.query<PollCommentPageRow>(
+        `
+          WITH available_replies AS NOT MATERIALIZED (
+            SELECT c.id, c.created_at
+            FROM comments c
+            JOIN users u ON u.id = c.author_id
+            WHERE c.poll_id = $1
+              AND c.parent_comment_id = $2
+              AND c.deleted_at IS NULL
+              AND u.status = 'active'
+              AND u.deleted_at IS NULL
+          ),
+          high_watermark AS (
+            SELECT
+              id,
+              created_at AS raw_created_at,
+              to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
+            FROM available_replies
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+          ),
+          page_candidates AS MATERIALIZED (
+            SELECT
+              available_replies.id,
+              available_replies.created_at,
+              to_char(available_replies.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
+              high_watermark.created_at AS high_watermark_created_at,
+              high_watermark.id AS high_watermark_id
+            FROM available_replies
+            CROSS JOIN high_watermark
+            WHERE ($3::timestamptz IS NULL OR (available_replies.created_at, available_replies.id) > ($3::timestamptz, $4::uuid))
+              AND (available_replies.created_at, available_replies.id) <= (
+                COALESCE($5::timestamptz, high_watermark.raw_created_at),
+                COALESCE($6::uuid, high_watermark.id)
+              )
+            ORDER BY available_replies.created_at ASC, available_replies.id ASC
+            LIMIT $7
+          ),
+          page_rows AS (
+            SELECT
+              c.id,
+              c.poll_id,
+              c.author_id,
+              u.username::text AS author_username,
+              pr.display_name AS author_display_name,
+              pr.avatar_object_key AS author_avatar_object_key,
+              c.body,
+              c.likes_count,
+              EXISTS (
+                SELECT 1 FROM likes l
+                WHERE l.comment_id = c.id AND l.user_id = $8
+              ) AS viewer_has_liked,
+              c.parent_comment_id,
+              0::int AS replies_count,
+              c.created_at,
+              c.updated_at,
+              page_candidates.cursor_created_at,
+              page_candidates.high_watermark_created_at,
+              page_candidates.high_watermark_id
+            FROM page_candidates
+            JOIN comments c ON c.id = page_candidates.id
+            JOIN users u ON u.id = c.author_id
+            JOIN profiles pr ON pr.user_id = c.author_id
           )
-        ORDER BY c.created_at ASC, c.id ASC
-        LIMIT $5
-      `,
-      [input.pollId, input.commentId, cursor?.createdAt ?? null, cursor?.id ?? null, input.limit + 1, input.viewerId ?? null]
-    );
+          SELECT *
+          FROM page_rows
+          ORDER BY created_at ASC, id ASC
+        `,
+        [
+          input.pollId,
+          input.commentId,
+          boundary?.createdAt ?? null,
+          boundary?.id ?? null,
+          cursor?.highWatermark.createdAt ?? null,
+          cursor?.highWatermark.id ?? null,
+          input.limit + 1,
+          input.viewerId ?? null
+        ]
+      );
 
-    const hasNextPage = repliesResult.rows.length > input.limit;
-    const pageRows = hasNextPage ? repliesResult.rows.slice(0, input.limit) : repliesResult.rows;
-    const items = pageRows.map(mapComment);
-    const lastRow = pageRows.at(-1);
-
-    return {
-      status: 'found' as const,
-      items,
-      nextCursor: hasNextPage && lastRow
-        ? encodeAdminCursor({ createdAt: lastRow.cursor_created_at, id: lastRow.id })
-        : null
-    };
+      const hasNextPage = repliesResult.rows.length > input.limit;
+      const pageRows = hasNextPage ? repliesResult.rows.slice(0, input.limit) : repliesResult.rows;
+      return {
+        status: 'found' as const,
+        items: pageRows.map(mapComment),
+        nextCursor: nextCommentPageCursor({
+          context,
+          pageRows,
+          hasNextPage,
+          highWatermark: cursor?.highWatermark
+        })
+      };
+    });
   } finally {
     client.release();
-  }
-}
-
-function decodeCommentCursor(value: string) {
-  try {
-    const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as {
-      createdAt?: unknown;
-      id?: unknown;
-    };
-    if (
-      typeof parsed.createdAt !== 'string' ||
-      Number.isNaN(Date.parse(parsed.createdAt)) ||
-      typeof parsed.id !== 'string' ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parsed.id)
-    ) {
-      throw new Error('Invalid comment cursor.');
-    }
-    return { createdAt: parsed.createdAt, id: parsed.id };
-  } catch {
-    throw new AdminCursorError('The pagination cursor is invalid.');
   }
 }
 

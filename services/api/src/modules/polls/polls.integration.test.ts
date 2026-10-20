@@ -13,6 +13,8 @@ import {
 
 process.env.NODE_ENV = 'test';
 
+const { env } = await import('../../config/env.js');
+
 const [
   { buildApp },
   { closeDatabaseConnection, db },
@@ -101,9 +103,11 @@ type ListCommentsResponse = {
     };
     body: string;
     likesCount: number;
+    viewerHasLiked: boolean;
     parentCommentId: string | null;
     repliesCount: number;
   }>;
+  nextCursor: string | null;
 };
 
 type CreateCommentResponse = {
@@ -2581,6 +2585,335 @@ test('poll comments are listed from oldest to newest', async () => {
     comments.items.map((comment) => comment.body),
     ['Oldest comment.', 'Middle comment.', 'Newest comment.']
   );
+});
+
+test('comment roots paginate newest and oldest across 125 fixture roots and keep the legacy default', async () => {
+  const seed = `t06-roots-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  const seeded = await seedPollPaginationFixtures(db, seed);
+  const expanded = expandPollPaginationFixtures(readPollPaginationFixtures(), seed);
+  const pollId = seeded.ids.polls[0]!;
+  const expectedNewest = expanded.expectedIds.roots;
+  const expectedOldest = [...expectedNewest].reverse();
+  const viewer = await registerTestUser();
+
+  try {
+    const defaultResponse = await app.inject({
+      method: 'GET',
+      url: `/polls/${pollId}/comments`
+    });
+    assert.equal(defaultResponse.statusCode, 200, defaultResponse.body);
+    const defaultPage = defaultResponse.json<ListCommentsResponse>();
+    assert.equal(Object.hasOwn(defaultPage, 'status'), false);
+    assert.equal(defaultPage.items.length, 50);
+    assert.deepEqual(defaultPage.items.map(({ id }) => id), expectedOldest.slice(0, 50));
+    assert.ok(defaultPage.nextCursor);
+
+    const likedRootId = expectedOldest[0]!;
+    const likeRootResponse = await app.inject({
+      method: 'POST',
+      url: `/polls/${pollId}/comments/${likedRootId}/likes`,
+      headers: bearer(viewer.accessToken)
+    });
+    assert.equal(likeRootResponse.statusCode, 201, likeRootResponse.body);
+
+    async function collectRootPages(order: 'newest' | 'oldest', accessToken?: string) {
+      const seen: string[] = [];
+      let cursor: string | null = null;
+      let pageCount = 0;
+
+      do {
+        const query = new URLSearchParams({ order, limit: '20' });
+        if (cursor) query.set('cursor', cursor);
+        const response = await app.inject({
+          method: 'GET',
+          url: `/polls/${pollId}/comments?${query}`,
+          ...(accessToken ? { headers: bearer(accessToken) } : {})
+        });
+        assert.equal(response.statusCode, 200, response.body);
+        const page = response.json<ListCommentsResponse>();
+        assert.ok(page.items.every(({ parentCommentId }) => parentCommentId === null));
+        seen.push(...page.items.map(({ id }) => id));
+        if (pageCount === 0 && order === 'oldest' && accessToken) {
+          assert.equal(page.items[0]?.id, likedRootId);
+          assert.equal(page.items[0]?.viewerHasLiked, true);
+          assert.equal(page.items[0]?.repliesCount, 65);
+        }
+        cursor = page.nextCursor;
+        if (cursor) assert.match(cursor, /^c1\./);
+        pageCount += 1;
+        assert.ok(pageCount <= 7, 'the 125 roots terminate within seven pages');
+      } while (cursor);
+
+      return seen;
+    }
+
+    assert.deepEqual(await collectRootPages('newest'), expectedNewest);
+    assert.deepEqual(await collectRootPages('oldest', viewer.accessToken), expectedOldest);
+  } finally {
+    await cleanupPollPaginationFixtures(db, seeded);
+  }
+});
+
+test('replies paginate 65 rows in ASC order with scoped v1 and compatible legacy cursors', async () => {
+  const seed = `t06-replies-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  const seeded = await seedPollPaginationFixtures(db, seed);
+  const expanded = expandPollPaginationFixtures(readPollPaginationFixtures(), seed);
+  const pollId = seeded.ids.polls[0]!;
+  const rootId = expanded.roots[0]!.id;
+  const viewerA = await registerTestUser();
+  const viewerB = await registerTestUser();
+
+  try {
+    const likeReplyResponse = await app.inject({
+      method: 'POST',
+      url: `/polls/${pollId}/comments/${expanded.expectedIds.replies[0]}/likes`,
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(likeReplyResponse.statusCode, 201, likeReplyResponse.body);
+
+    const firstPageResponse = await app.inject({
+      method: 'GET',
+      url: `/polls/${pollId}/comments/${rootId}/replies?limit=20`,
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(firstPageResponse.statusCode, 200, firstPageResponse.body);
+    const firstPage = firstPageResponse.json<ListCommentsResponse>();
+    assert.equal(Object.hasOwn(firstPage, 'status'), false);
+    assert.equal(firstPage.items.length, 20);
+    assert.equal(firstPage.items[0]?.viewerHasLiked, true);
+    const firstPageCursor = firstPage.nextCursor;
+    assert.ok(firstPageCursor);
+    assert.match(firstPageCursor, /^c1\./);
+    assert.ok(firstPage.items.every((reply) => reply.parentCommentId === rootId));
+    const seen = firstPage.items.map(({ id }) => id);
+
+    await db.query(
+      `INSERT INTO comments (poll_id, author_id, body, parent_comment_id, created_at, updated_at)
+       VALUES ($1, $2, 'Reply created after the first page', $3, '2055-01-01T00:00:00Z', '2055-01-01T00:00:00Z')`,
+      [pollId, expanded.accounts[0]!.id, rootId]
+    );
+
+    let cursor: string | null = firstPageCursor;
+    let pageCount = 1;
+    while (cursor) {
+      const query: URLSearchParams = new URLSearchParams({ limit: '20', cursor });
+      const response: Awaited<ReturnType<typeof app.inject>> = await app.inject({
+        method: 'GET',
+        url: `/polls/${pollId}/comments/${rootId}/replies?${query}`,
+        headers: bearer(viewerA.accessToken)
+      });
+      assert.equal(response.statusCode, 200, response.body);
+      const page: ListCommentsResponse = response.json<ListCommentsResponse>();
+      assert.ok(page.items.every((reply) => reply.parentCommentId === rootId));
+      seen.push(...page.items.map(({ id }) => id));
+      cursor = page.nextCursor;
+      pageCount += 1;
+      assert.ok(pageCount <= 4, 'the 65 replies terminate within four pages');
+    }
+
+    assert.deepEqual(seen, expanded.expectedIds.replies);
+
+    const defaultLimitResponse = await app.inject({
+      method: 'GET',
+      url: `/polls/${pollId}/comments/${rootId}/replies`,
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(defaultLimitResponse.statusCode, 200, defaultLimitResponse.body);
+    assert.equal(defaultLimitResponse.json<ListCommentsResponse>().items.length, 20);
+
+    const otherAccountResponse = await app.inject({
+      method: 'GET',
+      url: `/polls/${pollId}/comments/${rootId}/replies?limit=20&cursor=${encodeURIComponent(firstPageCursor!)}`,
+      headers: bearer(viewerB.accessToken)
+    });
+    assert.equal(otherAccountResponse.statusCode, 400, otherAccountResponse.body);
+    assert.equal(otherAccountResponse.json<{ error: string }>().error, 'pagination_cursor_invalid');
+
+    const otherRootId = expanded.roots[1]!.id;
+    const otherRootResponse = await app.inject({
+      method: 'GET',
+      url: `/polls/${pollId}/comments/${otherRootId}/replies?limit=20&cursor=${encodeURIComponent(firstPageCursor!)}`,
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(otherRootResponse.statusCode, 400, otherRootResponse.body);
+    assert.equal(otherRootResponse.json<{ error: string }>().error, 'pagination_cursor_invalid');
+
+    const otherPollId = seeded.ids.targetPolls[0]!;
+    const otherPollRootId = expanded.target.roots[0]!.id;
+    const otherPollResponse = await app.inject({
+      method: 'GET',
+      url: `/polls/${otherPollId}/comments/${otherPollRootId}/replies?limit=20&cursor=${encodeURIComponent(firstPageCursor!)}`,
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(otherPollResponse.statusCode, 400, otherPollResponse.body);
+    assert.equal(otherPollResponse.json<{ error: string }>().error, 'pagination_cursor_invalid');
+
+    const legacyCursor = Buffer.from(JSON.stringify({
+      createdAt: expanded.replies[0]!.createdAt,
+      id: expanded.replies[0]!.id
+    }), 'utf8').toString('base64url');
+    const legacyResponse = await app.inject({
+      method: 'GET',
+      url: `/polls/${pollId}/comments/${rootId}/replies?limit=20&cursor=${encodeURIComponent(legacyCursor)}`,
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(legacyResponse.statusCode, 200, legacyResponse.body);
+    const legacyPage = legacyResponse.json<ListCommentsResponse>();
+    assert.deepEqual(legacyPage.items.map(({ id }) => id), expanded.expectedIds.replies.slice(1, 21));
+    assert.match(legacyPage.nextCursor ?? '', /^c1\./);
+
+    const originalLegacyCursorExpiry = env.LEGACY_REPLIES_CURSOR_V0_EXPIRES_AT;
+    env.LEGACY_REPLIES_CURSOR_V0_EXPIRES_AT = '2026-10-19T00:00:00.000Z';
+    try {
+      const expiredLegacyResponse = await app.inject({
+        method: 'GET',
+        url: `/polls/${pollId}/comments/${rootId}/replies?limit=20&cursor=${encodeURIComponent(legacyCursor)}`,
+        headers: bearer(viewerA.accessToken)
+      });
+      assert.equal(expiredLegacyResponse.statusCode, 400, expiredLegacyResponse.body);
+      assert.equal(expiredLegacyResponse.json<{ error: string }>().error, 'pagination_cursor_invalid');
+    } finally {
+      env.LEGACY_REPLIES_CURSOR_V0_EXPIRES_AT = originalLegacyCursorExpiry;
+    }
+  } finally {
+    await cleanupPollPaginationFixtures(db, seeded);
+  }
+});
+
+test('root cursor continuation survives deleted boundaries and filters hidden authors', async () => {
+  const seed = `t06-availability-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  const seeded = await seedPollPaginationFixtures(db, seed);
+  const expanded = expandPollPaginationFixtures(readPollPaginationFixtures(), seed);
+  const pollId = seeded.ids.polls[0]!;
+  const viewerA = await registerTestUser();
+  const viewerB = await registerTestUser();
+
+  try {
+    const firstResponse = await app.inject({
+      method: 'GET',
+      url: `/polls/${pollId}/comments?order=oldest&limit=1`,
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(firstResponse.statusCode, 200, firstResponse.body);
+    const firstPage = firstResponse.json<ListCommentsResponse>();
+    assert.ok(firstPage.nextCursor);
+
+    const wrongOrderResponse = await app.inject({
+      method: 'GET',
+      url: `/polls/${pollId}/comments?order=newest&limit=1&cursor=${encodeURIComponent(firstPage.nextCursor)}`,
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(wrongOrderResponse.statusCode, 400, wrongOrderResponse.body);
+    assert.equal(wrongOrderResponse.json<{ error: string }>().error, 'pagination_cursor_invalid');
+
+    const otherPollId = seeded.ids.targetPolls[0]!;
+    const wrongPollResponse = await app.inject({
+      method: 'GET',
+      url: `/polls/${otherPollId}/comments?order=oldest&limit=1&cursor=${encodeURIComponent(firstPage.nextCursor)}`,
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(wrongPollResponse.statusCode, 400, wrongPollResponse.body);
+    assert.equal(wrongPollResponse.json<{ error: string }>().error, 'pagination_cursor_invalid');
+
+    const otherAccountResponse = await app.inject({
+      method: 'GET',
+      url: `/polls/${pollId}/comments?order=oldest&limit=1&cursor=${encodeURIComponent(firstPage.nextCursor)}`,
+      headers: bearer(viewerB.accessToken)
+    });
+    assert.equal(otherAccountResponse.statusCode, 400, otherAccountResponse.body);
+    assert.equal(otherAccountResponse.json<{ error: string }>().error, 'pagination_cursor_invalid');
+
+    const boundaryId = firstPage.items[0]!.id;
+    const hiddenAuthorId = expanded.accounts.find(({ key }) => key === 'authorB')!.id;
+    await db.query('UPDATE comments SET deleted_at = now() WHERE id = $1', [boundaryId]);
+    const newRootResult = await db.query<{ id: string }>(
+      `INSERT INTO comments (poll_id, author_id, body, created_at, updated_at)
+       VALUES ($1, $2, 'Root created after the first page', '2055-01-01T00:00:00Z', '2055-01-01T00:00:00Z')
+       RETURNING id`,
+      [pollId, expanded.polls[0]!.author_id]
+    );
+    const newRootId = newRootResult.rows[0]!.id;
+    await db.query('UPDATE users SET deleted_at = now() WHERE id = $1', [hiddenAuthorId]);
+
+    const nextResponse = await app.inject({
+      method: 'GET',
+      url: `/polls/${pollId}/comments?order=oldest&limit=20&cursor=${encodeURIComponent(firstPage.nextCursor)}`,
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(nextResponse.statusCode, 200, nextResponse.body);
+    const nextPage = nextResponse.json<ListCommentsResponse>();
+    const rootAuthors = new Map(expanded.roots.map(({ id, author_id }) => [id, author_id]));
+    const visibleRoots = [...expanded.expectedIds.roots].reverse().filter((id) =>
+      rootAuthors.get(id) !== hiddenAuthorId
+    );
+    const seenRoots = [...firstPage.items.map(({ id }) => id), ...nextPage.items.map(({ id }) => id)];
+    assert.ok(nextPage.items.every(({ author }) => author.id !== hiddenAuthorId));
+    let rootCursor = nextPage.nextCursor;
+    let rootPageCount = 1;
+    while (rootCursor) {
+      const query = new URLSearchParams({
+        order: 'oldest',
+        limit: '20',
+        cursor: rootCursor
+      });
+      const response = await app.inject({
+        method: 'GET',
+        url: `/polls/${pollId}/comments?${query}`,
+        headers: bearer(viewerA.accessToken)
+      });
+      assert.equal(response.statusCode, 200, response.body);
+      const page = response.json<ListCommentsResponse>();
+      assert.ok(page.items.every(({ author }) => author.id !== hiddenAuthorId));
+      seenRoots.push(...page.items.map(({ id }) => id));
+      rootCursor = page.nextCursor;
+      rootPageCount += 1;
+      assert.ok(rootPageCount <= 5, 'the remaining roots terminate within five pages');
+    }
+    assert.deepEqual(seenRoots, visibleRoots);
+    assert.ok(!seenRoots.includes(newRootId));
+
+    const replyAuthors = new Map(expanded.target.replies.map(({ id, author_id }) => [id, author_id]));
+    const visibleReplies = expanded.expectedIds.targetReplies.filter((id) => replyAuthors.get(id) !== hiddenAuthorId);
+    const visibleRepliesResponse = await app.inject({
+      method: 'GET',
+      url: `/polls/${expanded.target.poll.id}/comments/${expanded.target.roots[0]!.id}/replies?limit=50`,
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(visibleRepliesResponse.statusCode, 200, visibleRepliesResponse.body);
+    const visibleRepliesPage = visibleRepliesResponse.json<ListCommentsResponse>();
+    assert.deepEqual(visibleRepliesPage.items.map(({ id }) => id), visibleReplies.slice(0, 50));
+    assert.ok(visibleRepliesPage.items.every(({ author }) => author.id !== hiddenAuthorId));
+
+    const unavailableRepliesRootId = expanded.target.roots[0]!.id;
+    const unavailableRepliesPollId = expanded.target.poll.id;
+    const repliesFirstResponse = await app.inject({
+      method: 'GET',
+      url: `/polls/${unavailableRepliesPollId}/comments/${unavailableRepliesRootId}/replies?limit=1`,
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(repliesFirstResponse.statusCode, 200, repliesFirstResponse.body);
+    const repliesFirstPage = repliesFirstResponse.json<ListCommentsResponse>();
+    assert.ok(repliesFirstPage.nextCursor);
+    await db.query('UPDATE comments SET deleted_at = now() WHERE id = $1', [unavailableRepliesRootId]);
+
+    const unavailableRootResponse = await app.inject({
+      method: 'GET',
+      url: `/polls/${unavailableRepliesPollId}/comments/${unavailableRepliesRootId}/replies?limit=1&cursor=${encodeURIComponent(repliesFirstPage.nextCursor)}`,
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(unavailableRootResponse.statusCode, 404, unavailableRootResponse.body);
+
+    const pollAuthorId = expanded.polls[0]!.author_id as string;
+    await db.query('UPDATE users SET deleted_at = now() WHERE id = $1', [pollAuthorId]);
+    const unavailablePollResponse = await app.inject({
+      method: 'GET',
+      url: `/polls/${pollId}/comments?order=oldest&limit=20&cursor=${encodeURIComponent(firstPage.nextCursor)}`,
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(unavailablePollResponse.statusCode, 404, unavailablePollResponse.body);
+  } finally {
+    await cleanupPollPaginationFixtures(db, seeded);
+  }
 });
 
 test('creating a poll comment requires authentication', async () => {

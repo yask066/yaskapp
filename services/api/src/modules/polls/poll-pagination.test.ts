@@ -5,6 +5,7 @@ import test from 'node:test';
 import { env, parseEnv } from '../../config/env.js';
 import {
   createPollCursorOwnerKey,
+  decodeLegacyReplyCursor,
   decodePollCursor,
   encodePollCursor,
   PollPaginationCursorError,
@@ -191,6 +192,37 @@ test('keeps legacy unsigned replies cursors out of the signed cursor decoder', (
   assertInvalidCursor(() => decodePollCursor(legacy, replyContext));
 });
 
+test('decodes a legacy replies cursor with exact PostgreSQL timestamp precision during its compatibility window', () => {
+  const legacy = Buffer.from(JSON.stringify({
+    createdAt: boundary.createdAt,
+    id: boundary.id
+  }), 'utf8').toString('base64url');
+
+  assert.deepEqual(decodeLegacyReplyCursor(legacy, {
+    expiresAt: '2026-10-21T00:00:00.000Z',
+    now: Date.parse('2026-10-20T00:00:00.000Z')
+  }), boundary);
+});
+
+test('rejects malformed and expired legacy replies cursors', () => {
+  const legacy = Buffer.from(JSON.stringify({
+    createdAt: boundary.createdAt,
+    id: boundary.id
+  }), 'utf8').toString('base64url');
+  const withExtraField = Buffer.from(JSON.stringify({
+    createdAt: boundary.createdAt,
+    id: boundary.id,
+    owner: accountOwner
+  }), 'utf8').toString('base64url');
+
+  assertInvalidCursor(() => decodeLegacyReplyCursor(legacy, {
+    expiresAt: '2026-10-20T00:00:00.000Z',
+    now: Date.parse('2026-10-20T00:00:00.000Z')
+  }));
+  assertInvalidCursor(() => decodeLegacyReplyCursor(withExtraField));
+  assertInvalidCursor(() => decodeLegacyReplyCursor('not-base64'));
+});
+
 test('requires a dedicated production cursor secret of at least 32 bytes', () => {
   const productionEnv: NodeJS.ProcessEnv = {
     NODE_ENV: 'production',
@@ -215,5 +247,15 @@ test('requires a dedicated production cursor secret of at least 32 bytes', () =>
   assert.doesNotThrow(() => parseEnv({
     ...productionEnv,
     PAGINATION_CURSOR_SECRET: 'cursor-secret-with-at-least-32-random-looking-bytes'
+  }));
+  assert.doesNotThrow(() => parseEnv({
+    ...productionEnv,
+    PAGINATION_CURSOR_SECRET: 'cursor-secret-with-at-least-32-random-looking-bytes',
+    LEGACY_REPLIES_CURSOR_V0_EXPIRES_AT: '2027-06-01T00:00:00.000Z'
+  }));
+  assert.throws(() => parseEnv({
+    ...productionEnv,
+    PAGINATION_CURSOR_SECRET: 'cursor-secret-with-at-least-32-random-looking-bytes',
+    LEGACY_REPLIES_CURSOR_V0_EXPIRES_AT: 'not-a-date'
   }));
 });

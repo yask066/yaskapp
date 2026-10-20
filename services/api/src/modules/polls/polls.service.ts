@@ -72,6 +72,9 @@ export type UnlikeCommentInput = LikeCommentInput;
 export type ListPollCommentsInput = {
   pollId: string;
   limit: number;
+  order: 'newest' | 'oldest';
+  cursor?: string;
+  owner: string;
 };
 
 export type CreatePollCommentInput = {
@@ -87,6 +90,7 @@ export type ListPollCommentRepliesInput = {
   limit: number;
   cursor?: string;
   viewerId?: string;
+  owner: string;
 };
 
 export type DeletePollCommentInput = {
@@ -171,7 +175,8 @@ export async function listPollComments(input: ListPollCommentsInput & { viewerId
   }
 
   return {
-    items: result.items
+    items: result.items,
+    nextCursor: result.nextCursor
   };
 }
 
