@@ -2140,6 +2140,29 @@ test('subscription feed returns only public polls from followed users', async ()
   assert.equal(invalidLimitResponse.statusCode, 400, invalidLimitResponse.body);
 });
 
+test('pagination indexes cover the chronological tuple orders and availability predicates', async () => {
+  const indexNames = [
+    'polls_public_created_at_id_idx',
+    'comments_poll_root_created_at_id_idx',
+    'comments_parent_reply_created_at_id_idx'
+  ];
+  const result = await db.query<{ indexname: string; indexdef: string }>(
+    `SELECT indexname, indexdef
+     FROM pg_indexes
+     WHERE schemaname = current_schema() AND indexname = ANY($1::text[])`,
+    [indexNames]
+  );
+  const indexes = new Map(result.rows.map(({ indexname, indexdef }) => [indexname, indexdef]));
+
+  assert.deepEqual([...indexes.keys()].sort(), [...indexNames].sort());
+  assert.match(indexes.get('polls_public_created_at_id_idx') ?? '', /\(created_at DESC, id DESC\)/i);
+  assert.match(indexes.get('polls_public_created_at_id_idx') ?? '', /WHERE .*visibility.*public.*deleted_at IS NULL/i);
+  assert.match(indexes.get('comments_poll_root_created_at_id_idx') ?? '', /\(poll_id, created_at DESC, id DESC\)/i);
+  assert.match(indexes.get('comments_poll_root_created_at_id_idx') ?? '', /WHERE .*parent_comment_id IS NULL.*deleted_at IS NULL/i);
+  assert.match(indexes.get('comments_parent_reply_created_at_id_idx') ?? '', /\(parent_comment_id, created_at, id\)/i);
+  assert.match(indexes.get('comments_parent_reply_created_at_id_idx') ?? '', /WHERE .*parent_comment_id IS NOT NULL.*deleted_at IS NULL/i);
+});
+
 test('newest feed traverses 125 polls without gaps across tied timestamps and a deleted boundary', async () => {
   const seed = `t05-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
   const seeded = await seedPollPaginationFixtures(db, seed);
@@ -2420,11 +2443,96 @@ test('subscriptions paginate only followed public authors and bind cursors to th
       new Set([...exactly40First.items, ...exactly40Second.items].map((poll) => poll.id)).size,
       40
     );
+
+    const defaultLimitResponse = await app.inject({
+      method: 'GET',
+      url: '/polls/subscriptions',
+      headers: bearer(viewerA.accessToken)
+    });
+    assert.equal(defaultLimitResponse.statusCode, 200, defaultLimitResponse.body);
+    const defaultLimitPage = defaultLimitResponse.json<ListPollsResponse>();
+    assert.equal(defaultLimitPage.items.length, 20);
+    assert.ok(defaultLimitPage.nextCursor);
   } finally {
     if (boundaryPollIds.length > 0) {
       await db.query('DELETE FROM polls WHERE id = ANY($1::uuid[])', [boundaryPollIds]);
     }
   }
+});
+
+test('newest feed continuation rechecks visibility and deletion against its high-watermark', async () => {
+  const activeAuthor = await registerTestUser();
+  const hiddenAuthor = await registerTestUser();
+
+  async function createPoll(author: AuthResponse, question: string) {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/polls',
+      headers: bearer(author.accessToken),
+      payload: { question, options: ['Yes', 'No'] }
+    });
+    assert.equal(response.statusCode, 201, response.body);
+    return response.json<PollResponse>().poll;
+  }
+
+  const newest = await createPoll(activeAuthor, 'Newest T07 availability poll');
+  const hidden = await createPoll(hiddenAuthor, 'T07 poll from a hidden author');
+  const next = await createPoll(activeAuthor, 'T07 next visible poll');
+  const privatePoll = await createPoll(activeAuthor, 'T07 poll that becomes private');
+  const deletedPoll = await createPoll(activeAuthor, 'T07 poll that is deleted');
+  const timestamps = [
+    '2050-04-05T00:00:00Z',
+    '2050-04-04T00:00:00Z',
+    '2050-04-03T00:00:00Z',
+    '2050-04-02T00:00:00Z',
+    '2050-04-01T00:00:00Z'
+  ];
+  for (const [poll, createdAt] of [
+    [newest, timestamps[0]],
+    [hidden, timestamps[1]],
+    [next, timestamps[2]],
+    [privatePoll, timestamps[3]],
+    [deletedPoll, timestamps[4]]
+  ] as const) {
+    await db.query('UPDATE polls SET created_at = $2::timestamptz WHERE id = $1', [poll.id, createdAt]);
+  }
+
+  const firstResponse = await app.inject({ method: 'GET', url: '/polls?limit=2' });
+  assert.equal(firstResponse.statusCode, 200, firstResponse.body);
+  const firstPage = firstResponse.json<ListPollsResponse>();
+  assert.deepEqual(firstPage.items.map(({ id }) => id), [newest.id, hidden.id]);
+  assert.ok(firstPage.nextCursor);
+
+  await db.query('UPDATE users SET deleted_at = now() WHERE id = $1', [hiddenAuthor.user.id]);
+  await db.query('UPDATE polls SET visibility = $2 WHERE id = $1', [privatePoll.id, 'private']);
+  await db.query('UPDATE polls SET deleted_at = now() WHERE id = $1', [deletedPoll.id]);
+  const latePoll = await createPoll(activeAuthor, 'T07 poll above the captured high-watermark');
+  await db.query("UPDATE polls SET created_at = '2050-04-06T00:00:00Z' WHERE id = $1", [latePoll.id]);
+
+  const nextResponse = await app.inject({
+    method: 'GET',
+    url: `/polls?limit=2&cursor=${encodeURIComponent(firstPage.nextCursor)}`
+  });
+  assert.equal(nextResponse.statusCode, 200, nextResponse.body);
+  const nextPage = nextResponse.json<ListPollsResponse>();
+  const fixturePollIds = new Set([
+    newest.id,
+    hidden.id,
+    next.id,
+    privatePoll.id,
+    deletedPoll.id,
+    latePoll.id
+  ]);
+  assert.deepEqual(
+    nextPage.items.map(({ id }) => id).filter((id) => fixturePollIds.has(id)),
+    [next.id],
+    `unexpected continuation rows: ${nextPage.items.map(({ question }) => question).join(', ')}`
+  );
+  assert.ok(
+    !nextPage.items.some(({ id }) =>
+      [hidden.id, privatePoll.id, deletedPoll.id, latePoll.id].includes(id)
+    )
+  );
 });
 
 test('current user can list their own polls and see poll counter', async () => {
@@ -2778,6 +2886,144 @@ test('replies paginate 65 rows in ASC order with scoped v1 and compatible legacy
   } finally {
     await cleanupPollPaginationFixtures(db, seeded);
   }
+});
+
+test('root and reply cursors preserve PostgreSQL microseconds across page boundaries', async () => {
+  const author = await registerTestUser();
+  const createPollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(author.accessToken),
+    payload: { question: 'T07 timestamp precision poll', options: ['Yes', 'No'] }
+  });
+  assert.equal(createPollResponse.statusCode, 201, createPollResponse.body);
+  const pollId = createPollResponse.json<PollResponse>().poll.id;
+
+  const rootRows = await db.query<{ id: string; body: string }>(
+    `INSERT INTO comments (poll_id, author_id, body, created_at, updated_at)
+     VALUES
+       ($1, $2, 'root microsecond 1', '2050-01-01T00:00:00.000001Z', '2050-01-01T00:00:00.000001Z'),
+       ($1, $2, 'root microsecond 2', '2050-01-01T00:00:00.000002Z', '2050-01-01T00:00:00.000002Z'),
+       ($1, $2, 'root microsecond 3', '2050-01-01T00:00:00.000003Z', '2050-01-01T00:00:00.000003Z')
+     RETURNING id, body`,
+    [pollId, author.user.id]
+  );
+  const rootIds = new Map(rootRows.rows.map(({ id, body }) => [body, id]));
+  const expectedRoots = [
+    rootIds.get('root microsecond 3')!,
+    rootIds.get('root microsecond 2')!,
+    rootIds.get('root microsecond 1')!
+  ];
+  const replyRootId = rootIds.get('root microsecond 1');
+  assert.ok(replyRootId);
+
+  const replyRows = await db.query<{ id: string; body: string }>(
+    `INSERT INTO comments (poll_id, author_id, parent_comment_id, body, created_at, updated_at)
+     VALUES
+       ($1, $2, $3, 'reply microsecond 1', '2051-01-01T00:00:00.000001Z', '2051-01-01T00:00:00.000001Z'),
+       ($1, $2, $3, 'reply microsecond 2', '2051-01-01T00:00:00.000002Z', '2051-01-01T00:00:00.000002Z'),
+       ($1, $2, $3, 'reply microsecond 3', '2051-01-01T00:00:00.000003Z', '2051-01-01T00:00:00.000003Z')
+     RETURNING id, body`,
+    [pollId, author.user.id, replyRootId]
+  );
+  const replyIds = new Map(replyRows.rows.map(({ id, body }) => [body, id]));
+  const expectedReplies = [
+    replyIds.get('reply microsecond 1')!,
+    replyIds.get('reply microsecond 2')!,
+    replyIds.get('reply microsecond 3')!
+  ];
+
+  async function collectIds(url: string, order?: 'newest') {
+    const ids: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const query = new URLSearchParams({ limit: '1' });
+      if (order) query.set('order', order);
+      if (cursor) query.set('cursor', cursor);
+      const response = await app.inject({
+        method: 'GET',
+        url: `${url}?${query}`
+      });
+      assert.equal(response.statusCode, 200, response.body);
+      const page = response.json<ListCommentsResponse>();
+      ids.push(...page.items.map(({ id }) => id));
+      cursor = page.nextCursor;
+    } while (cursor);
+    return ids;
+  }
+
+  assert.deepEqual(
+    await collectIds(`/polls/${pollId}/comments`, 'newest'),
+    expectedRoots
+  );
+  assert.deepEqual(
+    await collectIds(`/polls/${pollId}/comments/${replyRootId}/replies`),
+    expectedReplies
+  );
+});
+
+test('reply continuation survives a deleted boundary and rechecks author visibility', async () => {
+  const author = await registerTestUser();
+  const hiddenAuthor = await registerTestUser();
+  const createPollResponse = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(author.accessToken),
+    payload: { question: 'T07 reply availability poll', options: ['Yes', 'No'] }
+  });
+  assert.equal(createPollResponse.statusCode, 201, createPollResponse.body);
+  const pollId = createPollResponse.json<PollResponse>().poll.id;
+  const rootResult = await db.query<{ id: string }>(
+    `INSERT INTO comments (poll_id, author_id, body, created_at, updated_at)
+     VALUES ($1, $2, 'T07 reply availability root', '2050-04-01T00:00:00Z', '2050-04-01T00:00:00Z')
+     RETURNING id`,
+    [pollId, author.user.id]
+  );
+  const rootId = rootResult.rows[0]!.id;
+  const replies = await db.query<{ id: string; body: string }>(
+    `INSERT INTO comments (poll_id, author_id, parent_comment_id, body, created_at, updated_at)
+     VALUES
+       ($1, $2, $4, 'visible reply 1', '2050-04-01T01:00:01Z', '2050-04-01T01:00:01Z'),
+       ($1, $2, $4, 'cursor boundary reply', '2050-04-01T01:00:02Z', '2050-04-01T01:00:02Z'),
+       ($1, $3, $4, 'reply from hidden author', '2050-04-01T01:00:03Z', '2050-04-01T01:00:03Z'),
+       ($1, $2, $4, 'visible reply after hidden author', '2050-04-01T01:00:04Z', '2050-04-01T01:00:04Z')
+     RETURNING id, body`,
+    [pollId, author.user.id, hiddenAuthor.user.id, rootId]
+  );
+  const replyIds = new Map(replies.rows.map(({ id, body }) => [body, id]));
+
+  const firstResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${pollId}/comments/${rootId}/replies?limit=2`
+  });
+  assert.equal(firstResponse.statusCode, 200, firstResponse.body);
+  const firstPage = firstResponse.json<ListCommentsResponse>();
+  assert.deepEqual(firstPage.items.map(({ id }) => id), [
+    replyIds.get('visible reply 1'),
+    replyIds.get('cursor boundary reply')
+  ]);
+  assert.ok(firstPage.nextCursor);
+
+  await db.query('UPDATE comments SET deleted_at = now() WHERE id = $1', [
+    replyIds.get('cursor boundary reply')
+  ]);
+  await db.query('UPDATE users SET deleted_at = now() WHERE id = $1', [hiddenAuthor.user.id]);
+  await db.query(
+    `INSERT INTO comments (poll_id, author_id, parent_comment_id, body, created_at, updated_at)
+     VALUES ($1, $2, $3, 'reply above the captured high-watermark', '2050-04-02T00:00:00Z', '2050-04-02T00:00:00Z')`,
+    [pollId, author.user.id, rootId]
+  );
+
+  const nextResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${pollId}/comments/${rootId}/replies?limit=2&cursor=${encodeURIComponent(firstPage.nextCursor)}`
+  });
+  assert.equal(nextResponse.statusCode, 200, nextResponse.body);
+  const nextPage = nextResponse.json<ListCommentsResponse>();
+  assert.deepEqual(nextPage.items.map(({ id }) => id), [
+    replyIds.get('visible reply after hidden author')
+  ]);
+  assert.equal(nextPage.nextCursor, null);
 });
 
 test('root cursor continuation survives deleted boundaries and filters hidden authors', async () => {

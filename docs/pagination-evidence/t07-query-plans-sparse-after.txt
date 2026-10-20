@@ -1,0 +1,513 @@
+## newest / first page
+
+```text
+Subquery Scan on page_candidates  (cost=0.70..4.62 rows=21 width=56) (actual rows=21 loops=1)
+  Buffers: shared hit=46
+  ->  Limit  (cost=0.70..4.41 rows=21 width=56) (actual rows=21 loops=1)
+        Buffers: shared hit=46
+        ->  Nested Loop  (cost=0.70..17657.15 rows=100001 width=56) (actual rows=21 loops=1)
+              Buffers: shared hit=46
+              ->  Index Scan using polls_public_created_at_id_idx on polls p  (cost=0.42..14362.31 rows=100001 width=40) (actual rows=21 loops=1)
+                    Buffers: shared hit=43
+              ->  Memoize  (cost=0.29..0.31 rows=1 width=16) (actual rows=1 loops=21)
+                    Cache Key: p.author_id
+                    Cache Mode: logical
+                    Hits: 20  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                    Buffers: shared hit=3
+                    ->  Index Scan using users_pkey on users u  (cost=0.28..0.30 rows=1 width=16) (actual rows=1 loops=1)
+                          Index Cond: (id = p.author_id)
+                          Filter: ((deleted_at IS NULL) AND (status = 'active'::user_status))
+                          Buffers: shared hit=3
+Planning:
+  Buffers: shared hit=523 dirtied=25
+Planning Time: 2.983 ms
+Execution Time: 0.195 ms
+```
+
+## newest / deep page
+
+```text
+Subquery Scan on page_candidates  (cost=0.70..4.73 rows=21 width=56) (actual rows=21 loops=1)
+  Buffers: shared hit=48
+  ->  Limit  (cost=0.70..4.52 rows=21 width=56) (actual rows=21 loops=1)
+        Buffers: shared hit=48
+        ->  Nested Loop  (cost=0.70..18155.95 rows=99977 width=56) (actual rows=21 loops=1)
+              Buffers: shared hit=48
+              ->  Index Scan using polls_public_created_at_id_idx on polls p  (cost=0.42..14861.83 rows=99977 width=40) (actual rows=21 loops=1)
+                    Index Cond: ((ROW(created_at, id) < ROW('2054-12-30 23:59:41+00'::timestamp with time zone, '1223ba69-0932-4c41-9939-8eac445fd9cd'::uuid)) AND (ROW(created_at, id) <= ROW('2055-01-01 00:00:00+00'::timestamp with time zone, 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'::uuid)))
+                    Buffers: shared hit=45
+              ->  Memoize  (cost=0.29..0.31 rows=1 width=16) (actual rows=1 loops=21)
+                    Cache Key: p.author_id
+                    Cache Mode: logical
+                    Hits: 20  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                    Buffers: shared hit=3
+                    ->  Index Scan using users_pkey on users u  (cost=0.28..0.30 rows=1 width=16) (actual rows=1 loops=1)
+                          Index Cond: (id = p.author_id)
+                          Filter: ((deleted_at IS NULL) AND (status = 'active'::user_status))
+                          Buffers: shared hit=3
+Planning:
+  Buffers: shared hit=301 dirtied=26
+Planning Time: 1.897 ms
+Execution Time: 0.182 ms
+```
+
+## subscriptions / first page
+
+```text
+Subquery Scan on page_candidates  (cost=278.13..278.39 rows=21 width=56) (actual rows=21 loops=1)
+  Buffers: shared hit=88
+  ->  Limit  (cost=278.13..278.18 rows=21 width=56) (actual rows=21 loops=1)
+        Buffers: shared hit=88
+        ->  Sort  (cost=278.13..280.63 rows=1000 width=56) (actual rows=21 loops=1)
+              Sort Key: p.created_at DESC, p.id DESC
+              Sort Method: top-N heapsort  Memory: 27kB
+              Buffers: shared hit=88
+              ->  Nested Loop  (cost=1.67..251.17 rows=1000 width=56) (actual rows=1000 loops=1)
+                    Join Filter: (f.followee_id = p.author_id)
+                    Buffers: shared hit=88
+                    ->  Hash Join  (cost=1.25..36.40 rows=10 width=32) (actual rows=10 loops=1)
+                          Hash Cond: (u.id = f.followee_id)
+                          Buffers: shared hit=21
+                          ->  Seq Scan on users u  (cost=0.00..32.51 rows=1001 width=16) (actual rows=1001 loops=1)
+                                Filter: ((deleted_at IS NULL) AND (status = 'active'::user_status))
+                                Buffers: shared hit=20
+                          ->  Hash  (cost=1.12..1.12 rows=10 width=16) (actual rows=10 loops=1)
+                                Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                                Buffers: shared hit=1
+                                ->  Seq Scan on follows f  (cost=0.00..1.12 rows=10 width=16) (actual rows=10 loops=1)
+                                      Filter: (follower_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid)
+                                      Buffers: shared hit=1
+                    ->  Index Scan using polls_author_created_at_idx on polls p  (cost=0.42..19.73 rows=100 width=40) (actual rows=100 loops=10)
+                          Index Cond: (author_id = u.id)
+                          Filter: ((deleted_at IS NULL) AND (visibility = 'public'::poll_visibility))
+                          Buffers: shared hit=67
+Planning:
+  Buffers: shared hit=1334 dirtied=77
+Planning Time: 3.525 ms
+Execution Time: 1.289 ms
+```
+
+## subscriptions / deep page
+
+```text
+Subquery Scan on page_candidates  (cost=28.02..28.03 rows=1 width=56) (actual rows=21 loops=1)
+  Buffers: shared hit=4923
+  ->  Limit  (cost=28.02..28.02 rows=1 width=56) (actual rows=21 loops=1)
+        Buffers: shared hit=4923
+        ->  Sort  (cost=28.02..28.02 rows=1 width=56) (actual rows=21 loops=1)
+              Sort Key: p.created_at DESC, p.id DESC
+              Sort Method: top-N heapsort  Memory: 27kB
+              Buffers: shared hit=4923
+              ->  Nested Loop  (cost=1.94..28.01 rows=1 width=56) (actual rows=980 loops=1)
+                    Buffers: shared hit=4923
+                    ->  Hash Join  (cost=1.67..22.10 rows=1 width=56) (actual rows=980 loops=1)
+                          Hash Cond: (p.author_id = f.followee_id)
+                          Buffers: shared hit=1983
+                          ->  Index Scan using polls_public_created_at_id_idx on polls p  (cost=0.42..20.83 rows=8 width=40) (actual rows=980 loops=1)
+                                Index Cond: ((ROW(created_at, id) < ROW('2054-12-29 20:29:40+00'::timestamp with time zone, 'c73b7853-3c0e-4499-830d-5d975eeca8ab'::uuid)) AND (ROW(created_at, id) <= ROW('2054-12-29 20:29:59+00'::timestamp with time zone, '1d184ea2-c5b7-4c36-af75-55dfa0699d3a'::uuid)))
+                                Buffers: shared hit=1982
+                          ->  Hash  (cost=1.12..1.12 rows=10 width=16) (actual rows=10 loops=1)
+                                Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                                Buffers: shared hit=1
+                                ->  Seq Scan on follows f  (cost=0.00..1.12 rows=10 width=16) (actual rows=10 loops=1)
+                                      Filter: (follower_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid)
+                                      Buffers: shared hit=1
+                    ->  Index Scan using users_pkey on users u  (cost=0.28..5.90 rows=1 width=16) (actual rows=1 loops=980)
+                          Index Cond: (id = f.followee_id)
+                          Filter: ((deleted_at IS NULL) AND (status = 'active'::user_status))
+                          Buffers: shared hit=2940
+Planning:
+  Buffers: shared hit=1636 dirtied=29
+Planning Time: 2.806 ms
+Execution Time: 2.283 ms
+```
+
+## roots / first page
+
+```text
+Sort  (cost=7599.58..7599.63 rows=21 width=270) (actual rows=21 loops=1)
+  Sort Key: c.created_at DESC, c.id DESC
+  Sort Method: quicksort  Memory: 29kB
+  Buffers: shared hit=175
+  CTE page_candidates
+    ->  Limit  (cost=1.14..8.67 rows=21 width=104) (actual rows=21 loops=1)
+          Buffers: shared hit=12
+          ->  Nested Loop  (cost=1.14..1195.48 rows=3333 width=104) (actual rows=21 loops=1)
+                Buffers: shared hit=12
+                ->  Nested Loop  (cost=0.86..1094.93 rows=3333 width=88) (actual rows=21 loops=1)
+                      Join Filter: (ROW(c_1.created_at, c_1.id) <= ROW(COALESCE(high_watermark.raw_created_at), COALESCE(high_watermark.id)))
+                      Buffers: shared hit=9
+                      ->  Index Scan using comments_poll_root_created_at_id_idx on comments c_1  (cost=0.29..919.22 rows=10000 width=40) (actual rows=21 loops=1)
+                            Index Cond: (poll_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'::uuid)
+                            Buffers: shared hit=3
+                      ->  Materialize  (cost=0.57..0.71 rows=1 width=56) (actual rows=1 loops=21)
+                            Buffers: shared hit=6
+                            ->  Subquery Scan on high_watermark  (cost=0.57..0.70 rows=1 width=56) (actual rows=1 loops=1)
+                                  Buffers: shared hit=6
+                                  ->  Limit  (cost=0.57..0.69 rows=1 width=56) (actual rows=1 loops=1)
+                                        Buffers: shared hit=6
+                                        ->  Nested Loop  (cost=0.57..1219.68 rows=10000 width=56) (actual rows=1 loops=1)
+                                              Buffers: shared hit=6
+                                              ->  Index Scan using comments_poll_root_created_at_id_idx on comments c_2  (cost=0.29..919.22 rows=10000 width=40) (actual rows=1 loops=1)
+                                                    Index Cond: (poll_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'::uuid)
+                                                    Buffers: shared hit=3
+                                              ->  Memoize  (cost=0.29..0.32 rows=1 width=16) (actual rows=1 loops=1)
+                                                    Cache Key: c_2.author_id
+                                                    Cache Mode: logical
+                                                    Hits: 0  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                                                    Buffers: shared hit=3
+                                                    ->  Index Scan using users_pkey on users u_2  (cost=0.28..0.31 rows=1 width=16) (actual rows=1 loops=1)
+                                                          Index Cond: (id = c_2.author_id)
+                                                          Filter: ((deleted_at IS NULL) AND (status = 'active'::user_status))
+                                                          Buffers: shared hit=3
+                ->  Memoize  (cost=0.29..0.32 rows=1 width=16) (actual rows=1 loops=21)
+                      Cache Key: c_1.author_id
+                      Cache Mode: logical
+                      Hits: 20  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                      Buffers: shared hit=3
+                      ->  Index Scan using users_pkey on users u_1  (cost=0.28..0.31 rows=1 width=16) (actual rows=1 loops=1)
+                            Index Cond: (id = c_1.author_id)
+                            Filter: ((deleted_at IS NULL) AND (status = 'active'::user_status))
+                            Buffers: shared hit=3
+  ->  Nested Loop  (cost=0.86..7590.46 rows=21 width=270) (actual rows=21 loops=1)
+        Buffers: shared hit=175
+        ->  Nested Loop  (cost=0.57..163.88 rows=21 width=249) (actual rows=21 loops=1)
+              Buffers: shared hit=78
+              ->  Nested Loop  (cost=0.29..162.77 rows=21 width=182) (actual rows=21 loops=1)
+                    Buffers: shared hit=75
+                    ->  CTE Scan on page_candidates  (cost=0.00..0.42 rows=21 width=96) (actual rows=21 loops=1)
+                          Buffers: shared hit=12
+                    ->  Index Scan using comments_pkey on comments c  (cost=0.29..7.73 rows=1 width=102) (actual rows=1 loops=21)
+                          Index Cond: (id = page_candidates.id)
+                          Buffers: shared hit=63
+              ->  Memoize  (cost=0.29..0.31 rows=1 width=67) (actual rows=1 loops=21)
+                    Cache Key: c.author_id
+                    Cache Mode: logical
+                    Hits: 20  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                    Buffers: shared hit=3
+                    ->  Index Scan using profiles_pkey on profiles pr  (cost=0.28..0.30 rows=1 width=67) (actual rows=1 loops=1)
+                          Index Cond: (user_id = c.author_id)
+                          Buffers: shared hit=3
+        ->  Memoize  (cost=0.29..0.31 rows=1 width=41) (actual rows=1 loops=21)
+              Cache Key: c.author_id
+              Cache Mode: logical
+              Hits: 20  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+              Buffers: shared hit=3
+              ->  Index Scan using users_pkey on users u  (cost=0.28..0.30 rows=1 width=41) (actual rows=1 loops=1)
+                    Index Cond: (id = c.author_id)
+                    Buffers: shared hit=3
+        SubPlan 3
+          ->  Bitmap Heap Scan on likes l  (cost=4.18..12.64 rows=4 width=16) (actual rows=0 loops=1)
+                Recheck Cond: (user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid)
+                Buffers: shared hit=2
+                ->  Bitmap Index Scan on likes_user_created_at_idx  (cost=0.00..4.18 rows=4 width=0) (actual rows=0 loops=1)
+                      Index Cond: (user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid)
+                      Buffers: shared hit=2
+        SubPlan 4
+          ->  Aggregate  (cost=345.44..345.45 rows=1 width=4) (actual rows=1 loops=21)
+                Buffers: shared hit=92
+                ->  Nested Loop  (cost=64.06..340.44 rows=2000 width=0) (actual rows=95 loops=21)
+                      Buffers: shared hit=92
+                      ->  Bitmap Heap Scan on comments r  (cost=63.78..289.78 rows=2000 width=16) (actual rows=95 loops=21)
+                            Recheck Cond: (parent_comment_id = c.id)
+                            Filter: (deleted_at IS NULL)
+                            Heap Blocks: exact=38
+                            Buffers: shared hit=89
+                            ->  Bitmap Index Scan on comments_parent_created_at_idx  (cost=0.00..63.28 rows=2000 width=0) (actual rows=95 loops=21)
+                                  Index Cond: (parent_comment_id = c.id)
+                                  Buffers: shared hit=51
+                      ->  Memoize  (cost=0.29..0.36 rows=1 width=16) (actual rows=1 loops=2000)
+                            Cache Key: r.author_id
+                            Cache Mode: logical
+                            Hits: 1999  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                            Buffers: shared hit=3
+                            ->  Index Scan using users_pkey on users reply_author  (cost=0.28..0.35 rows=1 width=16) (actual rows=1 loops=1)
+                                  Index Cond: (id = r.author_id)
+                                  Filter: ((deleted_at IS NULL) AND (status = 'active'::user_status))
+                                  Buffers: shared hit=3
+Planning:
+  Buffers: shared hit=210
+Planning Time: 2.086 ms
+Execution Time: 1.432 ms
+```
+
+## roots / deep page
+
+```text
+Sort  (cost=7595.14..7595.19 rows=21 width=270) (actual rows=21 loops=1)
+  Sort Key: c.created_at DESC, c.id DESC
+  Sort Method: quicksort  Memory: 29kB
+  Buffers: shared hit=125
+  CTE page_candidates
+    ->  Limit  (cost=1.14..4.23 rows=21 width=104) (actual rows=21 loops=1)
+          Buffers: shared hit=12
+          ->  Nested Loop  (cost=1.14..1220.47 rows=8298 width=104) (actual rows=21 loops=1)
+                Buffers: shared hit=12
+                ->  Nested Loop  (cost=0.57..1074.56 rows=8298 width=24) (actual rows=21 loops=1)
+                      Buffers: shared hit=6
+                      ->  Index Scan using comments_poll_root_created_at_id_idx on comments c_1  (cost=0.29..866.62 rows=8298 width=40) (actual rows=21 loops=1)
+                            Index Cond: ((poll_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'::uuid) AND (ROW(created_at, id) < ROW('2039-12-31 23:59:41+00'::timestamp with time zone, '0583b81d-5106-46b3-bfb2-276ff02c001e'::uuid)) AND (ROW(created_at, id) <= ROW('2060-01-01 00:00:00+00'::timestamp with time zone, 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'::uuid)))
+                            Buffers: shared hit=3
+                      ->  Memoize  (cost=0.29..0.32 rows=1 width=16) (actual rows=1 loops=21)
+                            Cache Key: c_1.author_id
+                            Cache Mode: logical
+                            Hits: 20  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                            Buffers: shared hit=3
+                            ->  Index Scan using users_pkey on users u_1  (cost=0.28..0.31 rows=1 width=16) (actual rows=1 loops=1)
+                                  Index Cond: (id = c_1.author_id)
+                                  Filter: ((deleted_at IS NULL) AND (status = 'active'::user_status))
+                                  Buffers: shared hit=3
+                ->  Materialize  (cost=0.57..0.71 rows=1 width=48) (actual rows=1 loops=21)
+                      Buffers: shared hit=6
+                      ->  Subquery Scan on high_watermark  (cost=0.57..0.70 rows=1 width=48) (actual rows=1 loops=1)
+                            Buffers: shared hit=6
+                            ->  Limit  (cost=0.57..0.69 rows=1 width=56) (actual rows=1 loops=1)
+                                  Buffers: shared hit=6
+                                  ->  Nested Loop  (cost=0.57..1219.68 rows=10000 width=56) (actual rows=1 loops=1)
+                                        Buffers: shared hit=6
+                                        ->  Index Scan using comments_poll_root_created_at_id_idx on comments c_2  (cost=0.29..919.22 rows=10000 width=40) (actual rows=1 loops=1)
+                                              Index Cond: (poll_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'::uuid)
+                                              Buffers: shared hit=3
+                                        ->  Memoize  (cost=0.29..0.32 rows=1 width=16) (actual rows=1 loops=1)
+                                              Cache Key: c_2.author_id
+                                              Cache Mode: logical
+                                              Hits: 0  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                                              Buffers: shared hit=3
+                                              ->  Index Scan using users_pkey on users u_2  (cost=0.28..0.31 rows=1 width=16) (actual rows=1 loops=1)
+                                                    Index Cond: (id = c_2.author_id)
+                                                    Filter: ((deleted_at IS NULL) AND (status = 'active'::user_status))
+                                                    Buffers: shared hit=3
+  ->  Nested Loop  (cost=0.86..7590.46 rows=21 width=270) (actual rows=21 loops=1)
+        Buffers: shared hit=125
+        ->  Nested Loop  (cost=0.57..163.88 rows=21 width=249) (actual rows=21 loops=1)
+              Buffers: shared hit=78
+              ->  Nested Loop  (cost=0.29..162.77 rows=21 width=182) (actual rows=21 loops=1)
+                    Buffers: shared hit=75
+                    ->  CTE Scan on page_candidates  (cost=0.00..0.42 rows=21 width=96) (actual rows=21 loops=1)
+                          Buffers: shared hit=12
+                    ->  Index Scan using comments_pkey on comments c  (cost=0.29..7.73 rows=1 width=102) (actual rows=1 loops=21)
+                          Index Cond: (id = page_candidates.id)
+                          Buffers: shared hit=63
+              ->  Memoize  (cost=0.29..0.31 rows=1 width=67) (actual rows=1 loops=21)
+                    Cache Key: c.author_id
+                    Cache Mode: logical
+                    Hits: 20  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                    Buffers: shared hit=3
+                    ->  Index Scan using profiles_pkey on profiles pr  (cost=0.28..0.30 rows=1 width=67) (actual rows=1 loops=1)
+                          Index Cond: (user_id = c.author_id)
+                          Buffers: shared hit=3
+        ->  Memoize  (cost=0.29..0.31 rows=1 width=41) (actual rows=1 loops=21)
+              Cache Key: c.author_id
+              Cache Mode: logical
+              Hits: 20  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+              Buffers: shared hit=3
+              ->  Index Scan using users_pkey on users u  (cost=0.28..0.30 rows=1 width=41) (actual rows=1 loops=1)
+                    Index Cond: (id = c.author_id)
+                    Buffers: shared hit=3
+        SubPlan 3
+          ->  Bitmap Heap Scan on likes l  (cost=4.18..12.64 rows=4 width=16) (actual rows=0 loops=1)
+                Recheck Cond: (user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid)
+                Buffers: shared hit=2
+                ->  Bitmap Index Scan on likes_user_created_at_idx  (cost=0.00..4.18 rows=4 width=0) (actual rows=0 loops=1)
+                      Index Cond: (user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid)
+                      Buffers: shared hit=2
+        SubPlan 4
+          ->  Aggregate  (cost=345.44..345.45 rows=1 width=4) (actual rows=1 loops=21)
+                Buffers: shared hit=42
+                ->  Nested Loop  (cost=64.06..340.44 rows=2000 width=0) (actual rows=0 loops=21)
+                      Buffers: shared hit=42
+                      ->  Bitmap Heap Scan on comments r  (cost=63.78..289.78 rows=2000 width=16) (actual rows=0 loops=21)
+                            Recheck Cond: (parent_comment_id = c.id)
+                            Filter: (deleted_at IS NULL)
+                            Buffers: shared hit=42
+                            ->  Bitmap Index Scan on comments_parent_created_at_idx  (cost=0.00..63.28 rows=2000 width=0) (actual rows=0 loops=21)
+                                  Index Cond: (parent_comment_id = c.id)
+                                  Buffers: shared hit=42
+                      ->  Memoize  (cost=0.29..0.36 rows=1 width=16) (never executed)
+                            Cache Key: r.author_id
+                            Cache Mode: logical
+                            ->  Index Scan using users_pkey on users reply_author  (cost=0.28..0.35 rows=1 width=16) (never executed)
+                                  Index Cond: (id = r.author_id)
+                                  Filter: ((deleted_at IS NULL) AND (status = 'active'::user_status))
+Planning:
+  Buffers: shared hit=57
+Planning Time: 1.012 ms
+Execution Time: 0.458 ms
+```
+
+## replies / first page
+
+```text
+Sort  (cost=354.50..354.55 rows=21 width=270) (actual rows=21 loops=1)
+  Sort Key: c.created_at, c.id
+  Sort Method: quicksort  Memory: 30kB
+  Buffers: shared hit=84
+  CTE page_candidates
+    ->  Limit  (cost=1.12..18.01 rows=21 width=104) (actual rows=21 loops=1)
+          Buffers: shared hit=13
+          ->  Nested Loop  (cost=1.12..537.37 rows=667 width=104) (actual rows=21 loops=1)
+                Buffers: shared hit=13
+                ->  Nested Loop  (cost=0.84..516.69 rows=667 width=88) (actual rows=21 loops=1)
+                      Join Filter: (ROW(c_1.created_at, c_1.id) <= ROW(COALESCE(high_watermark.raw_created_at), COALESCE(high_watermark.id)))
+                      Buffers: shared hit=10
+                      ->  Index Scan using comments_parent_reply_created_at_id_idx on comments c_1  (cost=0.28..480.84 rows=2000 width=40) (actual rows=21 loops=1)
+                            Index Cond: (parent_comment_id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'::uuid)
+                            Filter: (poll_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'::uuid)
+                            Buffers: shared hit=4
+                      ->  Materialize  (cost=0.56..0.85 rows=1 width=56) (actual rows=1 loops=21)
+                            Buffers: shared hit=6
+                            ->  Subquery Scan on high_watermark  (cost=0.56..0.84 rows=1 width=56) (actual rows=1 loops=1)
+                                  Buffers: shared hit=6
+                                  ->  Limit  (cost=0.56..0.83 rows=1 width=56) (actual rows=1 loops=1)
+                                        Buffers: shared hit=6
+                                        ->  Nested Loop  (cost=0.56..541.50 rows=2000 width=56) (actual rows=1 loops=1)
+                                              Buffers: shared hit=6
+                                              ->  Index Scan Backward using comments_parent_reply_created_at_id_idx on comments c_2  (cost=0.28..480.84 rows=2000 width=40) (actual rows=1 loops=1)
+                                                    Index Cond: (parent_comment_id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'::uuid)
+                                                    Filter: (poll_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'::uuid)
+                                                    Buffers: shared hit=3
+                                              ->  Memoize  (cost=0.29..0.36 rows=1 width=16) (actual rows=1 loops=1)
+                                                    Cache Key: c_2.author_id
+                                                    Cache Mode: logical
+                                                    Hits: 0  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                                                    Buffers: shared hit=3
+                                                    ->  Index Scan using users_pkey on users u_2  (cost=0.28..0.35 rows=1 width=16) (actual rows=1 loops=1)
+                                                          Index Cond: (id = c_2.author_id)
+                                                          Filter: ((deleted_at IS NULL) AND (status = 'active'::user_status))
+                                                          Buffers: shared hit=3
+                ->  Memoize  (cost=0.29..0.36 rows=1 width=16) (actual rows=1 loops=21)
+                      Cache Key: c_1.author_id
+                      Cache Mode: logical
+                      Hits: 20  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                      Buffers: shared hit=3
+                      ->  Index Scan using users_pkey on users u_1  (cost=0.28..0.35 rows=1 width=16) (actual rows=1 loops=1)
+                            Index Cond: (id = c_1.author_id)
+                            Filter: ((deleted_at IS NULL) AND (status = 'active'::user_status))
+                            Buffers: shared hit=3
+  ->  Nested Loop  (cost=0.86..336.03 rows=21 width=270) (actual rows=21 loops=1)
+        Buffers: shared hit=84
+        ->  Nested Loop  (cost=0.57..163.88 rows=21 width=249) (actual rows=21 loops=1)
+              Buffers: shared hit=79
+              ->  Nested Loop  (cost=0.29..162.77 rows=21 width=182) (actual rows=21 loops=1)
+                    Buffers: shared hit=76
+                    ->  CTE Scan on page_candidates  (cost=0.00..0.42 rows=21 width=96) (actual rows=21 loops=1)
+                          Buffers: shared hit=13
+                    ->  Index Scan using comments_pkey on comments c  (cost=0.29..7.73 rows=1 width=102) (actual rows=1 loops=21)
+                          Index Cond: (id = page_candidates.id)
+                          Buffers: shared hit=63
+              ->  Memoize  (cost=0.29..0.31 rows=1 width=67) (actual rows=1 loops=21)
+                    Cache Key: c.author_id
+                    Cache Mode: logical
+                    Hits: 20  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                    Buffers: shared hit=3
+                    ->  Index Scan using profiles_pkey on profiles pr  (cost=0.28..0.30 rows=1 width=67) (actual rows=1 loops=1)
+                          Index Cond: (user_id = c.author_id)
+                          Buffers: shared hit=3
+        ->  Memoize  (cost=0.29..0.31 rows=1 width=41) (actual rows=1 loops=21)
+              Cache Key: c.author_id
+              Cache Mode: logical
+              Hits: 20  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+              Buffers: shared hit=3
+              ->  Index Scan using users_pkey on users u  (cost=0.28..0.30 rows=1 width=41) (actual rows=1 loops=1)
+                    Index Cond: (id = c.author_id)
+                    Buffers: shared hit=3
+        SubPlan 3
+          ->  Bitmap Heap Scan on likes l  (cost=4.18..12.64 rows=4 width=16) (actual rows=0 loops=1)
+                Recheck Cond: (user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid)
+                Buffers: shared hit=2
+                ->  Bitmap Index Scan on likes_user_created_at_idx  (cost=0.00..4.18 rows=4 width=0) (actual rows=0 loops=1)
+                      Index Cond: (user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid)
+                      Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=50
+Planning Time: 0.887 ms
+Execution Time: 0.337 ms
+```
+
+## replies / deep page
+
+```text
+Sort  (cost=360.88..360.93 rows=21 width=270) (actual rows=21 loops=1)
+  Sort Key: c.created_at, c.id
+  Sort Method: quicksort  Memory: 30kB
+  Buffers: shared hit=83
+  CTE page_candidates
+    ->  Limit  (cost=1.12..24.39 rows=21 width=104) (actual rows=21 loops=1)
+          Buffers: shared hit=12
+          ->  Nested Loop  (cost=1.12..352.32 rows=317 width=104) (actual rows=21 loops=1)
+                Buffers: shared hit=12
+                ->  Nested Loop  (cost=0.56..345.93 rows=317 width=24) (actual rows=21 loops=1)
+                      Buffers: shared hit=6
+                      ->  Index Scan using comments_parent_reply_created_at_id_idx on comments c_1  (cost=0.28..336.76 rows=317 width=40) (actual rows=21 loops=1)
+                            Index Cond: ((parent_comment_id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'::uuid) AND (ROW(created_at, id) > ROW('2050-01-01 00:00:20+00'::timestamp with time zone, '45045858-f0c1-46d1-8032-036c915d906e'::uuid)) AND (ROW(created_at, id) <= ROW('2050-01-01 00:33:20+00'::timestamp with time zone, 'dbce3797-00d4-445c-93c0-78b56bf27562'::uuid)))
+                            Filter: (poll_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'::uuid)
+                            Buffers: shared hit=3
+                      ->  Memoize  (cost=0.29..0.63 rows=1 width=16) (actual rows=1 loops=21)
+                            Cache Key: c_1.author_id
+                            Cache Mode: logical
+                            Hits: 20  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                            Buffers: shared hit=3
+                            ->  Index Scan using users_pkey on users u_1  (cost=0.28..0.62 rows=1 width=16) (actual rows=1 loops=1)
+                                  Index Cond: (id = c_1.author_id)
+                                  Filter: ((deleted_at IS NULL) AND (status = 'active'::user_status))
+                                  Buffers: shared hit=3
+                ->  Materialize  (cost=0.56..0.85 rows=1 width=48) (actual rows=1 loops=21)
+                      Buffers: shared hit=6
+                      ->  Subquery Scan on high_watermark  (cost=0.56..0.84 rows=1 width=48) (actual rows=1 loops=1)
+                            Buffers: shared hit=6
+                            ->  Limit  (cost=0.56..0.83 rows=1 width=56) (actual rows=1 loops=1)
+                                  Buffers: shared hit=6
+                                  ->  Nested Loop  (cost=0.56..541.50 rows=2000 width=56) (actual rows=1 loops=1)
+                                        Buffers: shared hit=6
+                                        ->  Index Scan Backward using comments_parent_reply_created_at_id_idx on comments c_2  (cost=0.28..480.84 rows=2000 width=40) (actual rows=1 loops=1)
+                                              Index Cond: (parent_comment_id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'::uuid)
+                                              Filter: (poll_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'::uuid)
+                                              Buffers: shared hit=3
+                                        ->  Memoize  (cost=0.29..0.36 rows=1 width=16) (actual rows=1 loops=1)
+                                              Cache Key: c_2.author_id
+                                              Cache Mode: logical
+                                              Hits: 0  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                                              Buffers: shared hit=3
+                                              ->  Index Scan using users_pkey on users u_2  (cost=0.28..0.35 rows=1 width=16) (actual rows=1 loops=1)
+                                                    Index Cond: (id = c_2.author_id)
+                                                    Filter: ((deleted_at IS NULL) AND (status = 'active'::user_status))
+                                                    Buffers: shared hit=3
+  ->  Nested Loop  (cost=0.86..336.03 rows=21 width=270) (actual rows=21 loops=1)
+        Buffers: shared hit=83
+        ->  Nested Loop  (cost=0.57..163.88 rows=21 width=249) (actual rows=21 loops=1)
+              Buffers: shared hit=78
+              ->  Nested Loop  (cost=0.29..162.77 rows=21 width=182) (actual rows=21 loops=1)
+                    Buffers: shared hit=75
+                    ->  CTE Scan on page_candidates  (cost=0.00..0.42 rows=21 width=96) (actual rows=21 loops=1)
+                          Buffers: shared hit=12
+                    ->  Index Scan using comments_pkey on comments c  (cost=0.29..7.73 rows=1 width=102) (actual rows=1 loops=21)
+                          Index Cond: (id = page_candidates.id)
+                          Buffers: shared hit=63
+              ->  Memoize  (cost=0.29..0.31 rows=1 width=67) (actual rows=1 loops=21)
+                    Cache Key: c.author_id
+                    Cache Mode: logical
+                    Hits: 20  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                    Buffers: shared hit=3
+                    ->  Index Scan using profiles_pkey on profiles pr  (cost=0.28..0.30 rows=1 width=67) (actual rows=1 loops=1)
+                          Index Cond: (user_id = c.author_id)
+                          Buffers: shared hit=3
+        ->  Memoize  (cost=0.29..0.31 rows=1 width=41) (actual rows=1 loops=21)
+              Cache Key: c.author_id
+              Cache Mode: logical
+              Hits: 20  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+              Buffers: shared hit=3
+              ->  Index Scan using users_pkey on users u  (cost=0.28..0.30 rows=1 width=41) (actual rows=1 loops=1)
+                    Index Cond: (id = c.author_id)
+                    Buffers: shared hit=3
+        SubPlan 3
+          ->  Bitmap Heap Scan on likes l  (cost=4.18..12.64 rows=4 width=16) (actual rows=0 loops=1)
+                Recheck Cond: (user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid)
+                Buffers: shared hit=2
+                ->  Bitmap Index Scan on likes_user_created_at_idx  (cost=0.00..4.18 rows=4 width=0) (actual rows=0 loops=1)
+                      Index Cond: (user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid)
+                      Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=59
+Planning Time: 0.894 ms
+Execution Time: 0.469 ms
+```

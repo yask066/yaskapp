@@ -1019,9 +1019,9 @@ export async function listPollCommentRecords(input: {
             SELECT
               id,
               created_at AS raw_created_at,
-              to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
+              to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
             FROM available_comments
-            ORDER BY created_at DESC, id DESC
+            ORDER BY raw_created_at DESC, id DESC
             LIMIT 1
           ),
           page_candidates AS MATERIALIZED (
@@ -1029,7 +1029,7 @@ export async function listPollCommentRecords(input: {
               available_comments.id,
               available_comments.created_at,
               to_char(available_comments.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
-              high_watermark.created_at AS high_watermark_created_at,
+              high_watermark.cursor_created_at AS high_watermark_created_at,
               high_watermark.id AS high_watermark_id
             FROM available_comments
             CROSS JOIN high_watermark
@@ -1166,9 +1166,9 @@ export async function listPollCommentReplyRecords(input: ListPollCommentRepliesR
             SELECT
               id,
               created_at AS raw_created_at,
-              to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
+              to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
             FROM available_replies
-            ORDER BY created_at DESC, id DESC
+            ORDER BY raw_created_at DESC, id DESC
             LIMIT 1
           ),
           page_candidates AS MATERIALIZED (
@@ -1176,7 +1176,7 @@ export async function listPollCommentReplyRecords(input: ListPollCommentRepliesR
               available_replies.id,
               available_replies.created_at,
               to_char(available_replies.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
-              high_watermark.created_at AS high_watermark_created_at,
+              high_watermark.cursor_created_at AS high_watermark_created_at,
               high_watermark.id AS high_watermark_id
             FROM available_replies
             CROSS JOIN high_watermark

@@ -1,5 +1,7 @@
 # Feed and comment pagination baseline
 
+T07's chronological query-plan evidence is documented in [t07-query-plans.md](t07-query-plans.md), with full plans captured before and after the new indexes and a supplemental sparse-subscriptions plan.
+
 This directory records the pre-pagination baseline for T02. It includes source-level behavior and runtime measurements from an isolated test environment. Values in the source baseline below describe request/rendering behavior; they are not latency or scroll measurements.
 
 ## Reproduction environment

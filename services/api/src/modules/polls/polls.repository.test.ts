@@ -57,8 +57,12 @@ test('comment lists and replies exclude deleted poll owners and comment authors'
 
   for (const [name, query] of [['roots', rootListQuery], ['replies', replyListQuery]] as const) {
     assert.match(query, /available_(?:comments|replies) AS NOT MATERIALIZED/);
+    const highWatermark = query.match(/high_watermark AS \(([\s\S]*?)\n\s*\),\s*page_candidates AS/)?.[1] ?? '';
     const pageCandidates = query.match(/page_candidates AS MATERIALIZED \(([\s\S]*?)\n\s*\),\s*page_rows AS/)?.[1] ?? '';
     const pageRows = query.match(/page_rows AS \(([\s\S]*?)\n\s*\)\s*SELECT/)?.[1] ?? '';
+    assert.ok(highWatermark, `${name} query has a bounded high-watermark lookup`);
+    assert.match(highWatermark, /AS cursor_created_at/);
+    assert.match(highWatermark, /ORDER BY raw_created_at DESC,\s*id DESC/i);
     assert.ok(pageCandidates, `${name} query materializes only its bounded page candidates`);
     assert.ok(pageRows, `${name} query hydrates selected rows after the page limit`);
     assert.match(pageCandidates, /LIMIT \$\d+/);
@@ -66,6 +70,11 @@ test('comment lists and replies exclude deleted poll owners and comment authors'
     assert.match(pageRows, /viewer_has_liked|FROM likes/i);
     if (name === 'roots') assert.match(pageRows, /SELECT count\(\*\)::int/);
   }
+  assert.equal(
+    queries.filter((query) => /page_candidates AS MATERIALIZED/.test(query)).length,
+    2,
+    'each comments page is selected with one bounded SQL query, not one query per row'
+  );
 });
 
 test('comment deletion locks the poll before locking comments', async () => {

@@ -80,6 +80,23 @@ test('invalid root cursors use the pagination cursor error envelope', async (con
   });
 });
 
+test('invalid newest-feed cursors use the pagination cursor error envelope', async (context) => {
+  const app = Fastify();
+  context.after(() => app.close());
+  registerPollRoutes(app);
+
+  const response = await app.inject({
+    method: 'GET',
+    url: '/polls?cursor=not-a-cursor'
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.deepEqual(response.json(), {
+    error: 'pagination_cursor_invalid',
+    message: 'The pagination cursor is invalid.'
+  });
+});
+
 test('overlong replies cursors use the pagination cursor error envelope', async (context) => {
   const app = Fastify();
   context.after(() => app.close());
