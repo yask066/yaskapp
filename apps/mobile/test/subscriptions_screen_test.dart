@@ -6,6 +6,9 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:yaskapp_mobile/src/core/config/api_config.dart';
 import 'package:yaskapp_mobile/src/features/auth/auth_session.dart';
+import 'package:yaskapp_mobile/src/features/polls/poll_card.dart';
+import 'package:yaskapp_mobile/src/features/polls/poll_state_scope.dart';
+import 'package:yaskapp_mobile/src/features/polls/poll_state_store.dart';
 import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
 import 'package:yaskapp_mobile/src/features/realtime/realtime_client.dart';
 import 'package:yaskapp_mobile/src/features/subscriptions/subscriptions_screen.dart';
@@ -61,6 +64,53 @@ void main() {
 
     expect(find.text('No subscription polls yet'), findsOneWidget);
     expect(find.text('Follow users to see their polls here.'), findsOneWidget);
+  });
+
+  testWidgets('M12 removes a tombstoned poll row from subscriptions',
+      (tester) async {
+    final store = PollStateStore(viewerId: _session.user.id);
+    addTearDown(store.dispose);
+    final client = PollsApiClient(
+      config: const ApiConfig(baseUrl: 'http://api.test'),
+      httpClient: MockClient((request) async => http.Response(
+            jsonEncode({
+              'items': [_pollJson()],
+              'nextCursor': null,
+            }),
+            200,
+          )),
+    )..bindPollStateStore(store, accessToken: _session.accessToken);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollStateScope(
+          store: store,
+          child: SubscriptionsScreen(
+            session: _session,
+            pollsApiClient: client,
+            realtimeClient: _FakeRealtimeClient(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('poll-poll-1')), findsOneWidget);
+
+    store.markDeleted(
+      'poll-1',
+      PollIngress(
+        origin: PollOrigin.realtime,
+        sessionEpoch: store.sessionEpoch,
+        viewerId: null,
+        expectedPollId: 'poll-1',
+        requestId: 'subscriptions-test-delete',
+        startedGeneration: store.generationFor('poll-1'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PollCard), findsNothing);
+    expect(find.text('No subscription polls yet'), findsOneWidget);
   });
 
   testWidgets('appends Following pages and retries without replacing page one',

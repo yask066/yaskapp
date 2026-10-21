@@ -714,6 +714,66 @@ void main() {
     expect(find.text('1'), findsOneWidget);
   });
 
+  testWidgets('keeps a created root above server pages without moving cursor',
+      (tester) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final requests = <String?>[];
+    final roots = [
+      for (var index = 1; index <= 20; index++)
+        _rootComment(id: 'root-$index', body: 'Root comment $index.'),
+    ];
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([]),
+      commentsPageLoader: (
+          {required pollId, required limit, required order, cursor}) async {
+        requests.add(cursor);
+        if (cursor == null) {
+          return CursorPage(items: roots, nextCursor: 'opaque-roots-cursor');
+        }
+        return CursorPage(
+          items: [_comment, _rootComment(id: 'root-21')],
+          nextCursor: null,
+        );
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          currentUserId: 'viewer-1',
+          pollsApiClient: pollsApiClient,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(requests, [null]);
+
+    await tester.enterText(find.byType(TextField), 'A useful comment.');
+    await tester.tap(find.byTooltip('Post comment'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('A useful comment.'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('A useful comment.')).dy,
+      lessThan(tester.getTopLeft(find.text('Root comment 1.')).dy),
+    );
+
+    await tester.scrollUntilVisible(
+      find.text('Root comment 20.'),
+      500,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(requests, [null, 'opaque-roots-cursor']);
+    expect(find.text('A useful comment.'), findsOneWidget);
+  });
+
   testWidgets('tracks the latest updated poll summary after comment creation', (
     tester,
   ) async {
@@ -905,6 +965,108 @@ void main() {
     expect(find.text('A reply to the root.'), findsOneWidget);
     expect(find.text('2 comments'), findsOneWidget);
     expect(find.text('Hide replies (1)'), findsOneWidget);
+  });
+
+  testWidgets('reply failure keeps draft and does not retry the POST', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final createReply = Completer<CreatePollCommentResult>();
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([_rootComment()]),
+      createCommentFuture: createReply.future,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _pollWithComment,
+          accessToken: 'access-token',
+          currentUserId: 'viewer-1',
+          pollsApiClient: pollsApiClient,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('reply-comment-root-1')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('reply-composer-root-1')),
+      'Keep this reply draft.',
+    );
+    await tester.tap(find.byTooltip('Post reply'));
+    await tester.pump();
+    createReply.completeError(const PollsApiException('Could not post reply.'));
+    await tester.pumpAndSettle();
+
+    expect(pollsApiClient.createCommentCalls, 1);
+    expect(find.text('Could not post reply.'), findsOneWidget);
+    expect(find.text('Keep this reply draft.'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    expect(pollsApiClient.createCommentCalls, 1);
+  });
+
+  testWidgets('marks a new reply gap until its page arrives, then deduplicates',
+      (tester) async {
+    tester.view.physicalSize = const Size(400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([_rootComment(repliesCount: 1)]),
+      createCommentFuture: Future.value(_createReplyResult),
+      replyPageLoader: ({required rootCommentId, cursor, limit = 20}) async {
+        if (cursor == null) {
+          return PollCommentRepliesPage(
+            items: [_reply],
+            nextCursor: 'page-with-own-reply',
+          );
+        }
+        return PollCommentRepliesPage(
+          items: [_reply, _createdReply],
+          nextCursor: null,
+        );
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _pollWithComment,
+          accessToken: 'access-token',
+          currentUserId: 'viewer-1',
+          pollsApiClient: pollsApiClient,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Show replies (1)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('reply-comment-root-1')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('reply-composer-root-1')),
+      'A reply to the root.',
+    );
+    await tester.tap(find.byTooltip('Post reply'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Your reply'), findsOneWidget);
+    expect(find.text('Newer replies are not loaded.'), findsOneWidget);
+    expect(find.text('A reply to the root.'), findsOneWidget);
+
+    await tester.tap(find.text('Load more replies'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Your reply'), findsNothing);
+    expect(find.text('Newer replies are not loaded.'), findsNothing);
+    expect(find.text('A reply to the root.'), findsOneWidget);
+    expect(pollsApiClient.replyPageCalls, 2);
   });
 
   testWidgets('allows anonymous visitors to read replies but not compose one', (

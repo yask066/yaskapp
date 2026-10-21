@@ -330,6 +330,178 @@ void main() {
     expect(find.byType(PollCard), findsNothing);
   });
 
+  testWidgets('M12 removes a tombstoned poll row from the feed',
+      (tester) async {
+    final poll = motionRacePoll();
+    final api = _FakePollsApiClient(initialPolls: [poll]);
+    final realtime = _FakeRealtimeClient();
+    final store = _seedPollStore(poll);
+    addTearDown(realtime.close);
+    addTearDown(store.dispose);
+
+    await tester.pumpWidget(_feedWithStore(api, realtime, store));
+    await tester.pumpAndSettle();
+    expect(find.byKey(ValueKey('poll-${poll.id}')), findsOneWidget);
+
+    store.markDeleted(
+      poll.id,
+      PollIngress(
+        origin: PollOrigin.realtime,
+        sessionEpoch: store.sessionEpoch,
+        viewerId: null,
+        expectedPollId: poll.id,
+        requestId: 'feed-test-delete',
+        startedGeneration: store.generationFor(poll.id),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PollCard), findsNothing);
+    expect(find.text('No polls yet'), findsOneWidget);
+  });
+
+  testWidgets(
+      'M12 third-page reactions keep realtime state and delete beats pending append',
+      (tester) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final polls = [for (var index = 1; index <= 80; index++) _pagedPoll(index)];
+    final target = polls[40];
+    final voteResponse = Completer<PollSummary>();
+    final likeResponse = Completer<PollSummary>();
+    final deleteResponse = Completer<void>();
+    final fourthPage = Completer<CursorPage<PollSummary>>();
+    final requestedCursors = <String?>[];
+    var fourthPageStarted = false;
+    final store = PollStateStore(viewerId: _session.user.id);
+    store.ingest(
+      target,
+      PollIngress(
+        origin: PollOrigin.http,
+        sessionEpoch: store.sessionEpoch,
+        viewerId: _session.user.id,
+        expectedPollId: target.id,
+        requestId: 'seed-third-page',
+        startedGeneration: store.generationFor(target.id),
+      ),
+    );
+    final api = _FakePollsApiClient(
+      initialPolls: polls,
+      stateStore: store,
+      voteResponse: voteResponse.future,
+      likeResponse: likeResponse.future,
+      deleteResponse: deleteResponse.future,
+      pageLoader: ({required limit, required sort, cursor, accessToken}) {
+        requestedCursors.add(cursor);
+        switch (cursor) {
+          case null:
+            return Future.value(CursorPage(
+              items: polls.sublist(0, 20),
+              nextCursor: 'page-2',
+            ));
+          case 'page-2':
+            return Future.value(CursorPage(
+              items: polls.sublist(20, 40),
+              nextCursor: 'page-3',
+            ));
+          case 'page-3':
+            return Future.value(CursorPage(
+              items: polls.sublist(40, 60),
+              nextCursor: 'page-4',
+            ));
+          case 'page-4':
+            fourthPageStarted = true;
+            return fourthPage.future;
+          default:
+            throw StateError('Unexpected page cursor: $cursor');
+        }
+      },
+    );
+    final realtime = _FakeRealtimeClient();
+    addTearDown(realtime.close);
+    addTearDown(store.dispose);
+
+    await tester.pumpWidget(_feedWithStore(api, realtime, store));
+    await tester.pumpAndSettle();
+    final scrollable = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(
+      find.text('Paged poll 41'),
+      500,
+      scrollable: scrollable,
+    );
+    expect(requestedCursors, [null, 'page-2', 'page-3']);
+    expect(find.byKey(ValueKey('poll-${target.id}')), findsOneWidget);
+
+    tester
+        .widget<PollCard>(find.byKey(ValueKey('poll-${target.id}')))
+        .onVote!(target.options.first);
+    await tester.pump();
+    realtime.injectVote(_pagedPoll(41, votes: 5, votesRevision: '3'));
+    await tester.pump();
+    voteResponse.complete(_pagedPoll(41, votes: 2, votesRevision: '2'));
+    await tester.pumpAndSettle();
+    expect(store.pollById(target.id)?.votesCount, 5);
+
+    tester
+        .widget<PollCard>(find.byKey(ValueKey('poll-${target.id}')))
+        .onToggleLike!();
+    await tester.pump();
+    realtime.injectVote(
+      _pagedPoll(41, votes: 6, votesRevision: '4', likesRevision: '1'),
+    );
+    await tester.pump();
+    likeResponse.complete(_pagedPoll(
+      41,
+      votes: 2,
+      votesRevision: '2',
+      likes: 1,
+      liked: true,
+      likesRevision: '2',
+    ));
+    await tester.pumpAndSettle();
+    expect(store.pollById(target.id)?.votesCount, 6);
+    expect(store.pollById(target.id)?.likesCount, 1);
+
+    await tester.scrollUntilVisible(
+      find.text('Paged poll 60'),
+      500,
+      scrollable: scrollable,
+    );
+    expect(fourthPageStarted, isTrue);
+    final targetFinder = find.byKey(ValueKey('poll-${target.id}'));
+    final position = tester.state<ScrollableState>(scrollable).position;
+    for (var attempt = 0;
+        attempt < 20 && targetFinder.evaluate().isEmpty;
+        attempt++) {
+      position.jumpTo(
+        (position.pixels - 600)
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble(),
+      );
+      await tester.pump();
+    }
+    expect(targetFinder, findsOneWidget);
+    tester.widget<PollCard>(targetFinder).onDeletePoll!();
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pump();
+    expect(api.deletePollCalls, 1);
+    deleteResponse.complete();
+    await tester.pump();
+    expect(store.isDeleted(target.id), isTrue);
+    expect(find.byKey(ValueKey('poll-${target.id}')), findsNothing);
+
+    fourthPage.complete(CursorPage(
+      items: [target, ...polls.sublist(60)],
+      nextCursor: null,
+    ));
+    await tester.pumpAndSettle();
+    expect(store.isDeleted(target.id), isTrue);
+    expect(find.byKey(ValueKey('poll-${target.id}')), findsNothing);
+  });
+
   testWidgets('shows one feed without category tabs', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -794,6 +966,48 @@ PollStateStore _seedPollStore(PollSummary poll) {
   return store;
 }
 
+PollSummary _pagedPoll(
+  int index, {
+  int votes = 1,
+  int likes = 0,
+  bool liked = false,
+  String votesRevision = '1',
+  String likesRevision = '1',
+}) =>
+    PollSummary(
+      id: 'poll-$index',
+      author: const PollAuthorSummary(
+        id: 'user-1',
+        username: 'ada',
+        displayName: 'Ada',
+      ),
+      question: 'Paged poll $index',
+      options: [
+        PollOptionSummary(
+          id: 'paged-option-$index-1',
+          text: 'First',
+          position: 0,
+          votesCount: votes,
+        ),
+        PollOptionSummary(
+          id: 'paged-option-$index-2',
+          text: 'Second',
+          position: 1,
+          votesCount: 0,
+        ),
+      ],
+      votesCount: votes,
+      commentsCount: 0,
+      likesCount: likes,
+      viewerHasLiked: liked,
+      createdAt: DateTime.utc(2026, 1, index),
+      stateRevisions: PollStateRevisions(
+        votes: votesRevision,
+        likes: likesRevision,
+        comments: '1',
+      ),
+    );
+
 Widget _feedWithStore(
   PollsApiClient api,
   RealtimeClient realtime,
@@ -934,6 +1148,8 @@ class _FakePollsApiClient extends PollsApiClient {
     this.voteResponse,
     this.refreshResponse,
     this.stateStore,
+    this.pageLoader,
+    this.deleteResponse,
   });
 
   final List<PollSummary> initialPolls;
@@ -946,9 +1162,17 @@ class _FakePollsApiClient extends PollsApiClient {
   final Future<PollSummary>? voteResponse;
   final Future<List<PollSummary>>? refreshResponse;
   final PollStateStore? stateStore;
+  final Future<CursorPage<PollSummary>> Function({
+    required int limit,
+    required String sort,
+    String? cursor,
+    String? accessToken,
+  })? pageLoader;
+  final Future<void>? deleteResponse;
   final responseOrder = <String>[];
   int likeCalls = 0;
   int voteCalls = 0;
+  int deletePollCalls = 0;
   int listPollsCalls = 0;
 
   @override
@@ -963,6 +1187,20 @@ class _FakePollsApiClient extends PollsApiClient {
   }
 
   @override
+  Future<CursorPage<PollCommentSummary>> listCommentsPage({
+    required String pollId,
+    int limit = 20,
+    String order = 'newest',
+    String? cursor,
+    String? accessToken,
+  }) async =>
+      CursorPage(
+        items: comments,
+        nextCursor: null,
+        paginationSupported: false,
+      );
+
+  @override
   Future<CursorPage<PollSummary>> listPollsPage({
     int limit = 20,
     String sort = 'newest',
@@ -970,10 +1208,28 @@ class _FakePollsApiClient extends PollsApiClient {
     String? accessToken,
   }) async {
     listPollsCalls++;
+    final loader = pageLoader;
+    if (loader != null) {
+      return loader(
+        limit: limit,
+        sort: sort,
+        cursor: cursor,
+        accessToken: accessToken,
+      );
+    }
     final polls = listPollsCalls > 1 && refreshResponse != null
         ? await refreshResponse!
         : initialPolls;
     return CursorPage(items: polls, nextCursor: null);
+  }
+
+  @override
+  Future<void> deletePoll({
+    required String pollId,
+    required String accessToken,
+  }) {
+    deletePollCalls++;
+    return deleteResponse ?? Future<void>.value();
   }
 
   @override

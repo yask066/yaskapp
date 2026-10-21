@@ -71,6 +71,7 @@ class FeedScreenState extends State<FeedScreen> {
   late final bool _ownsReportsApiClient;
   StreamSubscription<PollVoteRealtimeEvent>? _pollVoteSubscription;
   StreamSubscription<PollDeletedRealtimeEvent>? _pollDeletedSubscription;
+  PollStateStore? _pollStateStore;
   List<PollSummary> _polls = [];
   final Map<String, PollSummary> _localPollOverlays = {};
   final _scrollController = ScrollController();
@@ -102,6 +103,28 @@ class FeedScreenState extends State<FeedScreen> {
     _pollDeletedSubscription =
         _realtimeClient.pollDeletions.listen(_handleRealtimeDeletion);
     _realtimeClient.connect();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final nextStore = PollStateScope.readOf(context);
+    if (identical(nextStore, _pollStateStore)) return;
+    _pollStateStore?.removeListener(_handlePollStateChanged);
+    _pollStateStore = nextStore;
+    _pollStateStore?.addListener(_handlePollStateChanged);
+    _handlePollStateChanged();
+  }
+
+  void _handlePollStateChanged() {
+    if (!mounted) return;
+    final store = _pollStateStore;
+    if (store == null) return;
+    _localPollOverlays.removeWhere((id, _) => store.isDeleted(id));
+    final visible = _polls.where((poll) => !store.isDeleted(poll.id)).toList();
+    if (visible.length == _polls.length) return;
+    setState(() => _polls = visible);
+    _scheduleViewportAppend();
   }
 
   @override
@@ -169,7 +192,7 @@ class FeedScreenState extends State<FeedScreen> {
   }
 
   List<PollSummary> _visiblePolls() {
-    final store = PollStateScope.readOf(context);
+    final store = _pollStateStore;
     final serverIds =
         _pollsController.state.items.map((poll) => poll.id).toSet();
     _localPollOverlays.removeWhere((id, _) => serverIds.contains(id));
@@ -218,6 +241,7 @@ class FeedScreenState extends State<FeedScreen> {
   void dispose() {
     unawaited(_pollVoteSubscription?.cancel());
     unawaited(_pollDeletedSubscription?.cancel());
+    _pollStateStore?.removeListener(_handlePollStateChanged);
 
     if (_ownsRealtimeClient) {
       unawaited(_realtimeClient.close());
@@ -306,6 +330,20 @@ class FeedScreenState extends State<FeedScreen> {
 
   void _handleRealtimeDeletion(PollDeletedRealtimeEvent event) {
     if (!mounted) return;
+    final store = _pollStateStore;
+    if (store != null && !store.isDeleted(event.pollId)) {
+      store.markDeleted(
+        event.pollId,
+        PollIngress(
+          origin: PollOrigin.realtime,
+          sessionEpoch: store.sessionEpoch,
+          viewerId: null,
+          expectedPollId: event.pollId,
+          requestId: 'feed-realtime-delete-${event.pollId}',
+          startedGeneration: store.generationFor(event.pollId),
+        ),
+      );
+    }
     setState(() {
       _polls.removeWhere((poll) => poll.id == event.pollId);
       _localPollOverlays.remove(event.pollId);
@@ -391,12 +429,35 @@ class FeedScreenState extends State<FeedScreen> {
 
     if (confirmed != true || !mounted) return;
 
+    final stateStore = _pollStateStore;
+    final startedEpoch = stateStore?.sessionEpoch;
+    final startedViewerId = stateStore?.viewerId;
+
     try {
       await _pollsApiClient.deletePoll(
         pollId: poll.id,
         accessToken: widget.session.accessToken,
       );
-      if (!mounted) return;
+      if (!mounted ||
+          !identical(stateStore, _pollStateStore) ||
+          stateStore != null &&
+              (stateStore.sessionEpoch != startedEpoch ||
+                  stateStore.viewerId != startedViewerId)) {
+        return;
+      }
+      if (stateStore != null && !stateStore.isDeleted(poll.id)) {
+        stateStore.markDeleted(
+          poll.id,
+          PollIngress(
+            origin: PollOrigin.mutation,
+            sessionEpoch: startedEpoch!,
+            viewerId: startedViewerId,
+            expectedPollId: poll.id,
+            requestId: 'feed-delete-${poll.id}',
+            startedGeneration: stateStore.generationFor(poll.id),
+          ),
+        );
+      }
       setState(() {
         _polls.removeWhere((item) => item.id == poll.id);
         _localPollOverlays.remove(poll.id);

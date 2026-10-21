@@ -1095,6 +1095,7 @@ class _CommentThreadState extends State<_CommentThread>
   final _replyController = TextEditingController();
   final _targetReplyFocusNode = FocusNode(debugLabel: 'notification reply');
   List<PollCommentSummary> _replies = [];
+  PollCommentSummary? _ownReplyOverlay;
   String? _nextCursor;
   String? _failedCursor;
   String? _loadError;
@@ -1186,8 +1187,13 @@ class _CommentThreadState extends State<_CommentThread>
       );
       if (!mounted) return;
       final mergedReplies = _mergeReplies(_replies, page.items);
+      final ownReplyId = _ownReplyOverlay?.id;
       setState(() {
         _replies = mergedReplies;
+        if (ownReplyId != null &&
+            page.items.any((reply) => reply.id == ownReplyId)) {
+          _ownReplyOverlay = null;
+        }
         _nextCursor = page.nextCursor;
         _paginationSupported = page.paginationSupported;
         _hasLoaded = true;
@@ -1276,9 +1282,11 @@ class _CommentThreadState extends State<_CommentThread>
       );
       if (!mounted) return;
       widget.onReplyCreated(result.poll);
+      if (!_replies.any((reply) => reply.id == result.comment.id)) {
+        _ownReplyOverlay = result.comment;
+      }
       _replyController.clear();
       setState(() {
-        _replies = _mergeReplies(_replies, [result.comment]);
         _isExpanded = true;
         _isComposing = false;
       });
@@ -1371,6 +1379,26 @@ class _CommentThreadState extends State<_CommentThread>
               child: Text('No replies yet.'),
             ),
           for (final reply in _replies) _buildReply(reply),
+          if (_ownReplyOverlay != null) ...[
+            const Padding(
+              padding: EdgeInsets.fromLTRB(8, 12, 8, 4),
+              child: Text(
+                'Your reply',
+                style: TextStyle(
+                  color: _commentsNavy,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                'Newer replies are not loaded.',
+                style: TextStyle(color: _commentsSecondaryText),
+              ),
+            ),
+            _buildReply(_ownReplyOverlay!),
+          ],
           if (_paginationSupported && _nextCursor != null && _loadError == null)
             TextButton(
               onPressed: _isLoadingMore

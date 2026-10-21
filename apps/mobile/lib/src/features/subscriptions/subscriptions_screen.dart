@@ -204,8 +204,15 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
 
   void _handlePollStateChanged() {
     final nextGeneration = _pollStateStore?.followingGeneration ?? 0;
-    if (nextGeneration == _observedFollowingGeneration) return;
+    final followingChanged = nextGeneration != _observedFollowingGeneration;
     _observedFollowingGeneration = nextGeneration;
+    final store = _pollStateStore;
+    if (mounted && store != null) {
+      final visible =
+          _polls.where((poll) => !store.isDeleted(poll.id)).toList();
+      if (visible.length != _polls.length) setState(() => _polls = visible);
+    }
+    if (!followingChanged) return;
     if (widget.isActive) {
       unawaited(_refreshFollowing());
     } else {
@@ -274,6 +281,21 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
 
   void _replacePoll(PollVoteRealtimeEvent event) {
     if (!mounted) return;
+    final store = _pollStateStore;
+    if (store != null) {
+      store.ingest(
+        event.poll,
+        PollIngress(
+          origin: PollOrigin.realtime,
+          sessionEpoch: store.sessionEpoch,
+          viewerId: null,
+          expectedPollId: event.poll.id,
+          requestId: 'subscriptions-realtime-${event.poll.id}',
+          startedGeneration: store.generationFor(event.poll.id),
+        ),
+      );
+      return;
+    }
     final index = _polls.indexWhere((poll) => poll.id == event.poll.id);
     if (index < 0) return;
     setState(() {
@@ -285,6 +307,21 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
 
   void _removePoll(PollDeletedRealtimeEvent event) {
     if (!mounted) return;
+    final store = _pollStateStore;
+    if (store != null && !store.isDeleted(event.pollId)) {
+      store.markDeleted(
+        event.pollId,
+        PollIngress(
+          origin: PollOrigin.realtime,
+          sessionEpoch: store.sessionEpoch,
+          viewerId: null,
+          expectedPollId: event.pollId,
+          requestId: 'subscriptions-realtime-delete-${event.pollId}',
+          startedGeneration: store.generationFor(event.pollId),
+        ),
+      );
+      return;
+    }
     setState(() {
       _polls.removeWhere((poll) => poll.id == event.pollId);
     });
@@ -352,12 +389,35 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
 
     if (confirmed != true || !mounted) return;
 
+    final stateStore = _pollStateStore;
+    final startedEpoch = stateStore?.sessionEpoch;
+    final startedViewerId = stateStore?.viewerId;
+
     try {
       await _pollsApiClient.deletePoll(
         pollId: poll.id,
         accessToken: widget.session.accessToken,
       );
-      if (!mounted) return;
+      if (!mounted ||
+          !identical(stateStore, _pollStateStore) ||
+          stateStore != null &&
+              (stateStore.sessionEpoch != startedEpoch ||
+                  stateStore.viewerId != startedViewerId)) {
+        return;
+      }
+      if (stateStore != null && !stateStore.isDeleted(poll.id)) {
+        stateStore.markDeleted(
+          poll.id,
+          PollIngress(
+            origin: PollOrigin.mutation,
+            sessionEpoch: startedEpoch!,
+            viewerId: startedViewerId,
+            expectedPollId: poll.id,
+            requestId: 'subscriptions-delete-${poll.id}',
+            startedGeneration: stateStore.generationFor(poll.id),
+          ),
+        );
+      }
       setState(() => _polls.removeWhere((item) => item.id == poll.id));
     } on PollsApiException catch (error) {
       _showError(error.userMessage);

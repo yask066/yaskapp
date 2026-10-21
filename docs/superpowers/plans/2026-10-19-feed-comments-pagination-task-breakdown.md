@@ -10,7 +10,7 @@
 
 **Spec:** [PRD: Полная пагинация ленты и комментариев](../../prd-feed-comments-pagination.md).
 
-**Статус:** Backlog, 28 задач; T01–T03 и T05–T09 отмечены выполненными. Остальные задачи открыты. Декомпозиция сохраняет scope PRD; решения для реализации зафиксированы в ADR T01. Документ можно переносить в трекер по одной задаче на карточку.
+**Статус:** Backlog, 28 задач; T01–T03 и T05–T12 отмечены выполненными. Остальные задачи открыты. Декомпозиция сохраняет scope PRD; решения для реализации зафиксированы в ADR T01. Документ можно переносить в трекер по одной задаче на карточку.
 
 ## Global Constraints
 
@@ -252,10 +252,10 @@
 
 **Файлы:** `poll_comments_screen.dart`, `poll_comments_screen_test.dart`; footer T10.
 
-- [ ] Проверить roots `order=newest`, append за 50 записей и две одновременно раскрытые ветки с раздельными cursor/error/pending.
-- [ ] Перевести обсуждение с построения всего дерева в `SingleChildScrollView` на lazy list/slivers, сохранив composer, poll header и stable keys.
-- [ ] Подключить roots auto/manual append, replies только по кнопке; добавить refresh, terminal/empty/legacy states без полной перезагрузки экрана при footer error.
-- [ ] Выполнить FLUTTER-COMMENTS, включая раскрытие/сворачивание ветки во время запроса и удаление её корня.
+- [x] Проверить roots `order=newest`, append за 50 записей и две одновременно раскрытые ветки с раздельными cursor/error/pending.
+- [x] Перевести обсуждение с построения всего дерева в `SingleChildScrollView` на lazy list/slivers, сохранив composer, poll header и stable keys.
+- [x] Подключить roots auto/manual append, replies только по кнопке; добавить refresh, terminal/empty/legacy states без полной перезагрузки экрана при footer error.
+- [x] Выполнить FLUTTER-COMMENTS, включая раскрытие/сворачивание ветки во время запроса и удаление её корня.
 
 **Готово, когда:** корневые страницы и ветки независимы, ответы сохраняют ASC, структура экрана готова к длинным спискам.
 
@@ -265,10 +265,10 @@
 
 **Файлы:** Feed/subscriptions/comments screens, `poll_state_store.dart` только при необходимости; `poll_state_integration_test.dart`, `poll_comments_screen_test.dart`.
 
-- [ ] Проверить vote/like/delete на третьей странице при позднем HTTP/realtime, logout/login другим аккаунтом и удаление перед завершением append.
-- [ ] Пропускать входящие Poll через существующие revisions/epoch guards; tombstones и overlays не меняют server pages/cursors. Обновить все видимые экземпляры и корректно вернуть Poll родителю.
-- [ ] Добавить подтверждённый root в начало overlay, а далёкий собственный reply — в отдельный «Ваш ответ»; пометить хронологический разрыв и объединить по ID при достижении страницы. Сохранить draft при ошибке публикации, не повторять POST автоматически.
-- [ ] Выполнить целевые state integration и FLUTTER-COMMENTS/FEED tests.
+- [x] Проверить vote/like/delete на третьей странице при позднем HTTP/realtime, logout/login другим аккаунтом и удаление перед завершением append.
+- [x] Пропускать входящие Poll через существующие revisions/epoch guards; tombstones и overlays не меняют server pages/cursors. Обновить все видимые экземпляры и корректно вернуть Poll родителю.
+- [x] Добавить подтверждённый root в начало overlay, а далёкий собственный reply — в отдельный «Ваш ответ»; пометить хронологический разрыв и объединить по ID при достижении страницы. Сохранить draft при ошибке публикации, не повторять POST автоматически.
+- [x] Выполнить целевые state integration и FLUTTER-COMMENTS/FEED tests.
 
 **Готово, когда:** ни одна страница не откатывает свежую реакцию, публикации не дублируются, счётчики не выводятся из длины локального списка.
 
