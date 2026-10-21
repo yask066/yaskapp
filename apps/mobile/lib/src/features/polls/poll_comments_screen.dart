@@ -294,7 +294,11 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
       _targetCommentLoadMessage = null;
       _targetLookupComplete = widget.initialCommentId == null;
     });
-    unawaited(_commentsController.loadInitial());
+    if (_commentsController.state.refresh.error != null) {
+      unawaited(_commentsController.refresh());
+    } else {
+      unawaited(_commentsController.loadInitial());
+    }
   }
 
   void _handleRootScroll() {
@@ -576,7 +580,16 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
       );
     }
     final comments = _comments;
+    final rootIndexByKey = <Key, int>{
+      for (var index = 0; index < comments.length; index++)
+        ValueKey('comment-row-${comments[index].id}'): index,
+    };
     final paginationState = _commentsController.state;
+    final isFirstPagePending = paginationState.pages.isEmpty &&
+        (paginationState.initial.pending || paginationState.refresh.pending);
+    final hasFirstPageError = paginationState.pages.isEmpty &&
+        (paginationState.initial.error != null ||
+            paginationState.refresh.error != null);
     _scheduleTargetCommentFocus(comments);
 
     return PopScope(
@@ -717,16 +730,14 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                                   ),
                                 ),
                               ),
-                              if (paginationState.pages.isEmpty &&
-                                  paginationState.initial.pending)
+                              if (isFirstPagePending)
                                 const SliverPadding(
                                   padding: EdgeInsets.symmetric(horizontal: 20),
                                   sliver: SliverToBoxAdapter(
                                     child: _CommentsLoadingState(),
                                   ),
                                 )
-                              else if (paginationState.pages.isEmpty &&
-                                  paginationState.initial.error != null)
+                              else if (hasFirstPageError)
                                 SliverPadding(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 20),
@@ -749,6 +760,8 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                                       const EdgeInsets.fromLTRB(20, 0, 20, 24),
                                   sliver: SliverList.builder(
                                     itemCount: comments.length,
+                                    findChildIndexCallback: (key) =>
+                                        rootIndexByKey[key],
                                     itemBuilder: (context, index) {
                                       final comment = comments[index];
                                       final isReplyTargetRoot =

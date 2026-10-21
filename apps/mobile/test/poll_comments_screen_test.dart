@@ -256,6 +256,110 @@ void main() {
     expect(find.text('Refresh root 20.'), findsOneWidget);
   });
 
+  testWidgets('keeps an expanded reply branch when a new root is prepended', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([
+        _rootComment(id: 'root-a'),
+        _rootComment(id: 'root-b', repliesCount: 1),
+      ]),
+      replyPageLoader: ({required rootCommentId, cursor, limit = 20}) async =>
+          PollCommentRepliesPage(
+        items: [_replyFor('reply-b1', 'root-b', 'First reply B.')],
+        nextCursor: 'b-more',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          currentUserId: 'viewer-1',
+          pollsApiClient: pollsApiClient,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('toggle-replies-root-b')));
+    await tester.pumpAndSettle();
+    expect(find.text('First reply B.'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'A useful comment.');
+    await tester.tap(find.byTooltip('Post comment'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('A useful comment.'), findsOneWidget);
+    expect(find.text('First reply B.'), findsOneWidget);
+    expect(find.text('Load more replies'), findsOneWidget);
+    expect(find.byKey(const ValueKey('toggle-replies-root-b')), findsOneWidget);
+    expect(find.text('Hide replies (1)'), findsOneWidget);
+  });
+
+  testWidgets('keeps retry after refresh also fails before the first page', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    var attempts = 0;
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([]),
+      commentsPageLoader: ({
+        required pollId,
+        required limit,
+        required order,
+        cursor,
+      }) async {
+        attempts++;
+        if (attempts < 3) {
+          throw const PollsApiException('Comments are unavailable.');
+        }
+        return CursorPage(
+          items: [_rootComment(body: 'Comments recovered.')],
+          nextCursor: null,
+        );
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          pollsApiClient: pollsApiClient,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(attempts, 1);
+    expect(find.text('Could not load comments'), findsOneWidget);
+
+    final scrollable = find.byType(Scrollable).first;
+    tester.state<ScrollableState>(scrollable).position.jumpTo(0);
+    await tester.pumpAndSettle();
+    await tester.drag(scrollable, const Offset(0, 350));
+    await tester.pumpAndSettle();
+
+    expect(attempts, 2);
+    expect(find.text('Could not load comments'), findsOneWidget);
+    expect(find.text('No comments yet'), findsNothing);
+    expect(find.text('Retry'), findsOneWidget);
+
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+
+    expect(attempts, 3);
+    expect(find.text('Comments recovered.'), findsOneWidget);
+  });
+
   testWidgets(
       'keeps cursor, pending and error state independent per reply branch', (
     tester,
