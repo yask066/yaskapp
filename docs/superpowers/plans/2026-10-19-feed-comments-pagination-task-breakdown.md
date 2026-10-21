@@ -10,7 +10,7 @@
 
 **Spec:** [PRD: Полная пагинация ленты и комментариев](../../prd-feed-comments-pagination.md).
 
-**Статус:** Backlog, 28 задач; T01–T03 и T05–T08 отмечены выполненными. Остальные задачи открыты. Декомпозиция сохраняет scope PRD; решения для реализации зафиксированы в ADR T01. Документ можно переносить в трекер по одной задаче на карточку.
+**Статус:** Backlog, 28 задач; T01–T03 и T05–T09 отмечены выполненными. Остальные задачи открыты. Декомпозиция сохраняет scope PRD; решения для реализации зафиксированы в ADR T01. Документ можно переносить в трекер по одной задаче на карточку.
 
 ## Global Constraints
 
@@ -226,10 +226,10 @@
 
 **Файлы:** создать `core/pagination/cursor_list_controller.dart`, `test/cursor_list_controller_test.dart`.
 
-- [ ] Проверить dedup по ID без изменения server cursor; один append, повтор cursor A→A и цикл A→B→A, пустую страницу с новым cursor, тройной automatic-load budget.
-- [ ] Проверить обе очередности append/refresh и refresh failure: старые страницы и cursor сохраняются, старые pending completions не применяются; dispose/session change запрещают применение ответа.
-- [ ] Реализовать controller/state из общей секции, отдельные initial/refresh/append errors и retry только соответствующего чтения; отделить transport cancellation от generation guard.
-- [ ] Выполнить FLUTTER-STATE; после каждой проверенной гонки assert pending снят и новый ручной запрос возможен.
+- [x] Проверить dedup по ID без изменения server cursor; один append, повтор cursor A→A и цикл A→B→A, пустую страницу с новым cursor, тройной automatic-load budget.
+- [x] Проверить обе очередности append/refresh и refresh failure: старые страницы и cursor сохраняются, старые pending completions не применяются; dispose/session change запрещают применение ответа.
+- [x] Реализовать controller/state из общей секции, отдельные initial/refresh/append errors и retry только соответствующего чтения; отделить transport cancellation от generation guard.
+- [x] Выполнить FLUTTER-STATE; после каждой проверенной гонки assert pending снят и новый ручной запрос возможен.
 
 **Готово, когда:** controller проходит таблицу состояний PRD и не хранит второй Poll revisions store.
 
