@@ -38,6 +38,38 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Following reads beyond its first 20 items', (tester) async {
+    final firstPage = List.generate(20, (index) => _poll(101 + index));
+    final twentyFirst = _poll(121);
+    final api = _PageApi(
+      subscriptionPages: [
+        Future.value(CursorPage(items: firstPage, nextCursor: 'cursor-21')),
+        Future.value(CursorPage(items: [twentyFirst], nextCursor: null)),
+      ],
+    );
+    final realtime = _FakeRealtimeClient();
+    addTearDown(realtime.close);
+
+    await tester.pumpWidget(MaterialApp(
+      home: SubscriptionsScreen(
+        session: _session,
+        pollsApiClient: api,
+        realtimeClient: realtime,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(api.subscriptionCursors, [null]);
+    await tester.scrollUntilVisible(
+      find.byKey(ValueKey('poll-${firstPage.last.id}')),
+      400,
+    );
+    await tester.pumpAndSettle();
+
+    expect(api.subscriptionCursors, [null, 'cursor-21']);
+    expect(find.byKey(ValueKey('poll-${twentyFirst.id}')), findsOneWidget);
+  });
+
   testWidgets('a failed append keeps page one visible and retries its cursor',
       (tester) async {
     final failedAppend = Completer<CursorPage<PollSummary>>();
