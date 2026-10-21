@@ -371,6 +371,52 @@ void main() {
     controller.dispose();
   });
 
+  test('failed refresh keeps an append failure paused until manual retry',
+      () async {
+    final requests = <String?>[];
+    var appendCalls = 0;
+    var refreshCalls = 0;
+    final controller = CursorListController<_Item>(
+      contextKey: 'feed:session-1:newest',
+      loader: ({cursor, required limit}) async {
+        requests.add(cursor);
+        if (cursor == null) {
+          refreshCalls++;
+          if (refreshCalls == 1) {
+            return _page('one', nextCursor: 'cursor-1');
+          }
+          throw StateError('refresh offline');
+        }
+
+        appendCalls++;
+        if (appendCalls == 1) throw StateError('append offline');
+        return _page('two');
+      },
+      extractId: (item) => item.id,
+    );
+
+    await controller.loadInitial();
+    await controller.loadMore();
+    expect(controller.state.append.error, isA<StateError>());
+    expect(controller.state.automaticLoadPaused, isTrue);
+
+    await controller.refresh();
+    expect(controller.state.refresh.error, isA<StateError>());
+    expect(controller.state.append.error, isA<StateError>());
+    expect(controller.state.automaticLoadPaused, isTrue);
+
+    await controller.loadMore(automatic: true);
+    expect(requests, [null, 'cursor-1', null]);
+    expect(appendCalls, 1);
+
+    await controller.loadMore();
+    expect(requests, [null, 'cursor-1', null, 'cursor-1']);
+    expect(appendCalls, 2);
+    expect(controller.state.append.error, isNull);
+    expect(controller.state.ids, ['one', 'two']);
+    controller.dispose();
+  });
+
   test('refresh error preserves the chain and a refresh retry replaces it',
       () async {
     var firstPageCalls = 0;

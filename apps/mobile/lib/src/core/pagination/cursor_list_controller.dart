@@ -161,9 +161,8 @@ class CursorListController<T> extends ChangeNotifier {
       generation: generation,
       initial: const CursorReadState(),
       refresh: const CursorReadState(pending: true),
-      append: const CursorReadState(),
+      append: _state.append.pending ? const CursorReadState() : _state.append,
       automaticLoadsUsed: 0,
-      automaticLoadPaused: false,
     ));
 
     try {
@@ -174,6 +173,7 @@ class CursorListController<T> extends ChangeNotifier {
         pages: <CursorPage<T>>[page],
         refresh: const CursorReadState(),
         append: const CursorReadState(),
+        automaticLoadPaused: false,
       ));
     } catch (error) {
       if (!_isCurrent(generation)) return;
