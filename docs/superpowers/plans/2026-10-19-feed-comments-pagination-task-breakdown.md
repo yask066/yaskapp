@@ -10,7 +10,7 @@
 
 **Spec:** [PRD: Полная пагинация ленты и комментариев](../../prd-feed-comments-pagination.md).
 
-**Статус:** Backlog, 28 задач; T01–T03 и T05–T07 отмечены выполненными. Остальные задачи открыты. Декомпозиция сохраняет scope PRD; решения для реализации зафиксированы в ADR T01. Документ можно переносить в трекер по одной задаче на карточку.
+**Статус:** Backlog, 28 задач; T01–T03 и T05–T08 отмечены выполненными. Остальные задачи открыты. Декомпозиция сохраняет scope PRD; решения для реализации зафиксированы в ADR T01. Документ можно переносить в трекер по одной задаче на карточку.
 
 ## Global Constraints
 
@@ -214,9 +214,9 @@
 
 **Файлы:** `polls_api_client.dart`, `poll_summary.dart`, `polls_api_client_test.dart`, `poll_summary_test.dart`; создать `core/pagination/cursor_page.dart`.
 
-- [ ] Проверить query params, URL encoding cursor, nullable конец, отсутствие legacy metadata и неверные типы; покрыть timeout/close через существующий `ReadRequestScope`.
-- [ ] Реализовать новые page methods из общей секции. Existing array methods оставить совместимыми адаптерами для профиля и других старых consumers; replies адаптировать без потери metadata.
-- [ ] Выполнить FLUTTER-API; регрессионно проверить `profile_screen_test.dart` и `public_profile_screen_test.dart`.
+- [x] Проверить query params, URL encoding cursor, nullable конец, отсутствие legacy metadata и неверные типы; покрыть timeout/close через существующий `ReadRequestScope`.
+- [x] Реализовать новые page methods из общей секции. Existing array methods оставить совместимыми адаптерами для профиля и других старых consumers; replies адаптировать без потери metadata.
+- [x] Выполнить FLUTTER-API; регрессионно проверить `profile_screen_test.dart` и `public_profile_screen_test.dart`.
 
 **Готово, когда:** metadata не теряется, legacy response не запускает append и не объявляется полным концом; профиль продолжает работать.
 

@@ -30,6 +30,8 @@ Map<String, dynamic> pollJson({int likes = 0, String revision = '1'}) => {
 void main() {
   final reads = <String, Future<Object?> Function(http.Client)>{
     'feed': (httpClient) => PollsApiClient(httpClient: httpClient).listPolls(),
+    'feed page': (httpClient) =>
+        PollsApiClient(httpClient: httpClient).listPollsPage(),
     'poll detail': (httpClient) =>
         PollsApiClient(httpClient: httpClient).getPoll(pollId: 'poll-1'),
     'own polls': (httpClient) => PollsApiClient(httpClient: httpClient)
@@ -38,8 +40,12 @@ void main() {
         PollsApiClient(httpClient: httpClient).listUserPolls(userId: 'author'),
     'subscriptions': (httpClient) => PollsApiClient(httpClient: httpClient)
         .listSubscriptions(accessToken: 'token'),
+    'subscriptions page': (httpClient) => PollsApiClient(httpClient: httpClient)
+        .listSubscriptionsPage(accessToken: 'token'),
     'comments': (httpClient) =>
         PollsApiClient(httpClient: httpClient).listComments(pollId: 'poll-1'),
+    'comments page': (httpClient) => PollsApiClient(httpClient: httpClient)
+        .listCommentsPage(pollId: 'poll-1'),
     'replies': (httpClient) => PollsApiClient(httpClient: httpClient)
         .listCommentReplies(pollId: 'poll-1', rootCommentId: 'comment-1'),
     'comment detail': (httpClient) => PollsApiClient(httpClient: httpClient)
@@ -148,6 +154,28 @@ void main() {
     expect(store.pollById('poll-1'), isNull);
     expect(error, isNotNull);
     store.dispose();
+  });
+
+  testWidgets('closing poll client terminates paginated reads', (tester) async {
+    final response = Completer<http.Response>();
+    final client =
+        PollsApiClient(httpClient: MockClient((_) => response.future));
+    final pending = <Future<dynamic>>[
+      client.listPollsPage(),
+      client.listSubscriptionsPage(accessToken: 'token'),
+      client.listCommentsPage(pollId: 'poll-1'),
+      client.listCommentReplies(pollId: 'poll-1', rootCommentId: 'root-1'),
+    ];
+    var failures = 0;
+    for (final request in pending) {
+      request.then<void>((_) {}, onError: (Object _) => failures++);
+    }
+
+    await tester.pump();
+    client.close();
+    await tester.pump();
+
+    expect(failures, pending.length);
   });
 
   for (final failure in ['network', 'server', 'malformed', 'rejected']) {

@@ -155,4 +155,18 @@ void main() {
     expect(reply.parentCommentId, 'root-1');
     expect(reply.repliesCount, 2);
   });
+
+  test('reply pages preserve pagination support separately from cursor', () {
+    const legacy = PollCommentRepliesPage(
+      items: [],
+      nextCursor: null,
+      paginationSupported: false,
+    );
+    const supportedEnd = PollCommentRepliesPage(items: [], nextCursor: null);
+
+    expect(legacy.nextCursor, isNull);
+    expect(legacy.paginationSupported, isFalse);
+    expect(supportedEnd.nextCursor, isNull);
+    expect(supportedEnd.paginationSupported, isTrue);
+  });
 }

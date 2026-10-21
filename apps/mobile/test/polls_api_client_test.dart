@@ -349,6 +349,145 @@ void main() {
     expect(polls.single.id, 'poll-1');
   });
 
+  test('loads a cursor-paginated feed and URL-encodes the opaque cursor',
+      () async {
+    late http.Request request;
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(
+          jsonEncode({
+            'items': [_pollJson(commentsCount: 2)],
+            'nextCursor': 'cursor-next',
+          }),
+          200,
+        );
+      }),
+    );
+
+    final page = await client.listPollsPage(
+      limit: 5,
+      sort: 'popular',
+      cursor: 'opaque cursor/?&',
+      accessToken: 'access-token',
+    );
+
+    expect(request.method, 'GET');
+    expect(request.url.path, '/polls');
+    expect(request.url.queryParameters, {
+      'limit': '5',
+      'sort': 'popular',
+      'cursor': 'opaque cursor/?&',
+    });
+    expect(request.headers['authorization'], 'Bearer access-token');
+    expect(page.items.single.id, 'poll-1');
+    expect(page.nextCursor, 'cursor-next');
+    expect(page.paginationSupported, isTrue);
+  });
+
+  test('loads cursor-paginated subscriptions and preserves supported end',
+      () async {
+    late http.Request request;
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(
+          jsonEncode({
+            'items': [_pollJson(commentsCount: 2)],
+            'nextCursor': null,
+          }),
+          200,
+        );
+      }),
+    );
+
+    final page = await client.listSubscriptionsPage(
+      accessToken: 'access-token',
+      limit: 7,
+      cursor: 'after / first',
+    );
+
+    expect(request.url.path, '/polls/subscriptions');
+    expect(request.url.queryParameters, {
+      'limit': '7',
+      'cursor': 'after / first',
+    });
+    expect(request.headers['authorization'], 'Bearer access-token');
+    expect(page.items.single.id, 'poll-1');
+    expect(page.nextCursor, isNull);
+    expect(page.paginationSupported, isTrue);
+  });
+
+  test('loads root comment pages in newest order', () async {
+    late http.Request request;
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(
+          jsonEncode({
+            'items': [_commentJson()],
+            'nextCursor': 'root-cursor',
+          }),
+          200,
+        );
+      }),
+    );
+
+    final page = await client.listCommentsPage(
+      pollId: 'poll-1',
+      limit: 4,
+      cursor: 'root cursor',
+      accessToken: 'access-token',
+    );
+
+    expect(request.url.path, '/polls/poll-1/comments');
+    expect(request.url.queryParameters, {
+      'limit': '4',
+      'order': 'newest',
+      'cursor': 'root cursor',
+    });
+    expect(request.headers['authorization'], 'Bearer access-token');
+    expect(page.items.single.id, 'comment-1');
+    expect(page.nextCursor, 'root-cursor');
+    expect(page.paginationSupported, isTrue);
+  });
+
+  test('marks a legacy feed response as unsupported pagination', () async {
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((_) async => http.Response(
+            jsonEncode({
+              'items': [_pollJson(commentsCount: 0)]
+            }),
+            200,
+          )),
+    );
+
+    final page = await client.listPollsPage();
+
+    expect(page.items, hasLength(1));
+    expect(page.nextCursor, isNull);
+    expect(page.paginationSupported, isFalse);
+  });
+
+  test('rejects a non-string next cursor in a page response', () async {
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((_) async => http.Response(
+            jsonEncode({'items': [], 'nextCursor': 42}),
+            200,
+          )),
+    );
+
+    await expectLater(
+      client.listPollsPage(),
+      throwsA(isA<PollsApiException>()),
+    );
+  });
+
   test('lists popular public polls with sort parameter', () async {
     late http.Request request;
     final client = PollsApiClient(
@@ -470,6 +609,49 @@ void main() {
     expect(sentRequest.headers['authorization'], 'Bearer access-token');
     expect(page.items.single.parentCommentId, 'root-1');
     expect(page.nextCursor, 'next-page');
+    expect(page.paginationSupported, isTrue);
+  });
+
+  test('reply page marks missing pagination metadata as unsupported', () async {
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((_) async => http.Response(
+            jsonEncode({
+              'items': [
+                {
+                  ..._commentJson(),
+                  'id': 'reply-1',
+                  'parentCommentId': 'root-1',
+                },
+              ],
+            }),
+            200,
+          )),
+    );
+
+    final page = await client.listCommentReplies(
+      pollId: 'poll-1',
+      rootCommentId: 'root-1',
+    );
+
+    expect(page.items.single.id, 'reply-1');
+    expect(page.nextCursor, isNull);
+    expect(page.paginationSupported, isFalse);
+  });
+
+  test('rejects a reply page with a non-string next cursor', () async {
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((_) async => http.Response(
+            jsonEncode({'items': [], 'nextCursor': false}),
+            200,
+          )),
+    );
+
+    await expectLater(
+      client.listCommentReplies(pollId: 'poll-1', rootCommentId: 'root-1'),
+      throwsA(isA<PollsApiException>()),
+    );
   });
 
   test('creates poll comment', () async {

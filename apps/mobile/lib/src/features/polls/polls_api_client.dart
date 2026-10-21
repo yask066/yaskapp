@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
 import '../../core/config/api_config.dart';
+import '../../core/pagination/cursor_page.dart';
 import '../../core/read_request_scope.dart';
 import 'poll_summary.dart';
 import 'poll_state_store.dart';
@@ -232,12 +233,27 @@ class PollsApiClient {
     String? accessToken,
     String sort = 'newest',
   }) async {
+    final page = await listPollsPage(
+      limit: limit,
+      sort: sort,
+      accessToken: accessToken,
+    );
+    return page.items;
+  }
+
+  Future<CursorPage<PollSummary>> listPollsPage({
+    int limit = 20,
+    String sort = 'newest',
+    String? cursor,
+    String? accessToken,
+  }) async {
     final readContext = _captureRead();
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls',
       queryParameters: {
         'limit': limit.toString(),
         if (sort != 'newest') 'sort': sort,
+        if (cursor != null) 'cursor': cursor,
       },
     );
     final response = await _readRequests.get(
@@ -248,20 +264,16 @@ class PollsApiClient {
       },
     );
     final body = _decodeObject(response);
-
-    final items = body['items'];
-
-    if (items is! List<dynamic>) {
-      throw const PollsApiException('Poll feed response is invalid.');
-    }
-
-    return _ingestReadList(
-        items
-            .map(
-              (item) => PollSummary.fromJson(item as Map<String, dynamic>),
-            )
-            .toList(),
-        readContext);
+    final page = _decodeCursorPage<PollSummary>(
+      body,
+      'Poll feed response is invalid.',
+      PollSummary.fromJson,
+    );
+    return CursorPage<PollSummary>(
+      items: _ingestReadList(page.items, readContext),
+      nextCursor: page.nextCursor,
+      paginationSupported: page.paginationSupported,
+    );
   }
 
   Future<PollSummary> getPoll({
@@ -358,11 +370,24 @@ class PollsApiClient {
     required String accessToken,
     int limit = 20,
   }) async {
+    final page = await listSubscriptionsPage(
+      accessToken: accessToken,
+      limit: limit,
+    );
+    return page.items;
+  }
+
+  Future<CursorPage<PollSummary>> listSubscriptionsPage({
+    required String accessToken,
+    int limit = 20,
+    String? cursor,
+  }) async {
     final readContext = _captureRead();
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls/subscriptions',
       queryParameters: {
         'limit': limit.toString(),
+        if (cursor != null) 'cursor': cursor,
       },
     );
     final response = await _readRequests.get(
@@ -373,19 +398,16 @@ class PollsApiClient {
       },
     );
     final body = _decodeObject(response);
-    final items = body['items'];
-
-    if (items is! List<dynamic>) {
-      throw const PollsApiException('Subscriptions response is invalid.');
-    }
-
-    return _ingestReadList(
-        items
-            .map(
-              (item) => PollSummary.fromJson(item as Map<String, dynamic>),
-            )
-            .toList(),
-        readContext);
+    final page = _decodeCursorPage<PollSummary>(
+      body,
+      'Subscriptions response is invalid.',
+      PollSummary.fromJson,
+    );
+    return CursorPage<PollSummary>(
+      items: _ingestReadList(page.items, readContext),
+      nextCursor: page.nextCursor,
+      paginationSupported: page.paginationSupported,
+    );
   }
 
   Future<PollSummary> createPoll({
@@ -674,10 +696,43 @@ class PollsApiClient {
     int limit = 50,
     String? accessToken,
   }) async {
+    final page = await _listCommentsPage(
+      pollId: pollId,
+      limit: limit,
+      accessToken: accessToken,
+    );
+    return page.items;
+  }
+
+  Future<CursorPage<PollCommentSummary>> listCommentsPage({
+    required String pollId,
+    int limit = 20,
+    String order = 'newest',
+    String? cursor,
+    String? accessToken,
+  }) {
+    return _listCommentsPage(
+      pollId: pollId,
+      limit: limit,
+      order: order,
+      cursor: cursor,
+      accessToken: accessToken,
+    );
+  }
+
+  Future<CursorPage<PollCommentSummary>> _listCommentsPage({
+    required String pollId,
+    required int limit,
+    String? order,
+    String? cursor,
+    String? accessToken,
+  }) async {
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls/$pollId/comments',
       queryParameters: {
         'limit': limit.toString(),
+        if (order != null) 'order': order,
+        if (cursor != null) 'cursor': cursor,
       },
     );
     final response = await _readRequests.get(
@@ -688,18 +743,11 @@ class PollsApiClient {
       },
     );
     final body = _decodeObject(response);
-
-    final items = body['items'];
-
-    if (items is! List<dynamic>) {
-      throw const PollsApiException('Poll comments response is invalid.');
-    }
-
-    return items
-        .map(
-          (item) => PollCommentSummary.fromJson(item as Map<String, dynamic>),
-        )
-        .toList();
+    return _decodeCursorPage<PollCommentSummary>(
+      body,
+      'Poll comments response is invalid.',
+      PollCommentSummary.fromJson,
+    );
   }
 
   Future<PollCommentRepliesPage> listCommentReplies({
@@ -724,25 +772,16 @@ class PollsApiClient {
       },
     );
     final body = _decodeObject(response);
-    final items = body['items'];
-
-    if (items is! List<dynamic>) {
-      throw const PollsApiException(
-          'Poll comment replies response is invalid.');
-    }
-    final nextCursor = body['nextCursor'];
-    if (nextCursor != null && nextCursor is! String) {
-      throw const PollsApiException(
-          'Poll comment replies response is invalid.');
-    }
+    final page = _decodeCursorPage<PollCommentSummary>(
+      body,
+      'Poll comment replies response is invalid.',
+      PollCommentSummary.fromJson,
+    );
 
     return PollCommentRepliesPage(
-      items: items
-          .map(
-            (item) => PollCommentSummary.fromJson(item as Map<String, dynamic>),
-          )
-          .toList(),
-      nextCursor: nextCursor as String?,
+      items: page.items,
+      nextCursor: page.nextCursor,
+      paginationSupported: page.paginationSupported,
     );
   }
 
@@ -931,6 +970,31 @@ class PollsApiClient {
     }
 
     return decoded;
+  }
+
+  CursorPage<T> _decodeCursorPage<T>(
+    Map<String, dynamic> body,
+    String errorMessage,
+    T Function(Map<String, dynamic>) decodeItem,
+  ) {
+    final rawItems = body['items'];
+    final hasPaginationMetadata = body.containsKey('nextCursor');
+    final rawNextCursor = body['nextCursor'];
+    if (rawItems is! List<dynamic> ||
+        (hasPaginationMetadata &&
+            rawNextCursor != null &&
+            rawNextCursor is! String) ||
+        rawItems.any((item) => item is! Map<String, dynamic>)) {
+      throw PollsApiException(errorMessage);
+    }
+
+    return CursorPage<T>(
+      items: rawItems
+          .map((item) => decodeItem(item as Map<String, dynamic>))
+          .toList(),
+      nextCursor: rawNextCursor as String?,
+      paginationSupported: hasPaginationMetadata,
+    );
   }
 }
 

@@ -1,3 +1,5 @@
+import '../../core/pagination/cursor_page.dart';
+
 class PollAuthorSummary {
   const PollAuthorSummary({
     required this.id,
@@ -126,14 +128,12 @@ class PollCommentSummary {
   }
 }
 
-class PollCommentRepliesPage {
+class PollCommentRepliesPage extends CursorPage<PollCommentSummary> {
   const PollCommentRepliesPage({
-    required this.items,
-    required this.nextCursor,
+    required super.items,
+    required super.nextCursor,
+    super.paginationSupported = true,
   });
-
-  final List<PollCommentSummary> items;
-  final String? nextCursor;
 }
 
 class PollSummary {
