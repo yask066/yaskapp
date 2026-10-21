@@ -15,6 +15,7 @@ class ListScrollAnchorHost extends StatefulWidget {
     required this.itemIds,
     required this.child,
     this.hasExplicitTarget = false,
+    this.onVisibleItemsChanged,
     super.key,
   });
 
@@ -24,6 +25,7 @@ class ListScrollAnchorHost extends StatefulWidget {
   final List<String> itemIds;
   final Widget child;
   final bool hasExplicitTarget;
+  final ValueChanged<List<String>>? onVisibleItemsChanged;
 
   @override
   State<ListScrollAnchorHost> createState() => _ListScrollAnchorHostState();
@@ -94,7 +96,10 @@ class _ListScrollAnchorHostState extends State<ListScrollAnchorHost> {
   }
 
   void _capture() {
-    if (!widget.controller.hasClients || widget.itemIds.isEmpty) return;
+    if (!widget.controller.hasClients || widget.itemIds.isEmpty) {
+      widget.onVisibleItemsChanged?.call(const []);
+      return;
+    }
     final position = widget.controller.position;
     final visible = <ListAnchor>[];
     for (final id in widget.itemIds) {
@@ -106,6 +111,9 @@ class _ListScrollAnchorHostState extends State<ListScrollAnchorHost> {
       final height = box is RenderBox ? box.size.height : 0;
       if (top + height > 0) visible.add(ListAnchor(id: id, top: top));
     }
+    widget.onVisibleItemsChanged?.call(
+      visible.map((anchor) => anchor.id).toList(growable: false),
+    );
     if (visible.isEmpty) return;
     widget.store.capture(
       widget.context,

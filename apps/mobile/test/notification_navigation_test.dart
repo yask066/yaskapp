@@ -92,7 +92,9 @@ void main() {
         expect(find.text('alice'), findsWidgets);
       } else {
         expect(find.byType(PollCommentsScreen), findsOneWidget);
-        expect(find.text('Which feature should be next?'), findsOneWidget);
+        if (item.commentId == null) {
+          expect(find.text('Which feature should be next?'), findsOneWidget);
+        }
         if (item.commentId != null) {
           expect(
             find.byKey(
@@ -128,7 +130,10 @@ void main() {
           200,
         );
       }
-      return http.Response(jsonEncode({'items': _longCommentsJson}), 200);
+      return http.Response(
+        jsonEncode({'items': _longCommentsJson, 'nextCursor': 'root-page-2'}),
+        200,
+      );
     });
     final profilesApiClient = _profilesClient();
     addTearDown(pollsApiClient.close);
@@ -164,6 +169,16 @@ void main() {
     expect(target, findsOneWidget);
     expect(find.text('Comment outside the first page'), findsOneWidget);
     expect(requestedPaths, contains('/polls/poll-1/comments/comment-80'));
+    expect(
+      requestedPaths
+          .where((path) => path == '/polls/poll-1/comments/comment-80')
+          .length,
+      1,
+    );
+    expect(
+      requestedPaths.where((path) => path == '/polls/poll-1/comments').length,
+      1,
+    );
     expect(tester.getTopLeft(target).dy, greaterThanOrEqualTo(0));
     expect(tester.getBottomRight(target).dy,
         lessThan(tester.view.physicalSize.height));
@@ -181,39 +196,28 @@ void main() {
       body: 'The exact reply notification target.',
       parentCommentId: 'root-1',
     );
-    final earlierReply = _commentJson(
-      'reply-0',
-      body: 'An earlier reply on the first page.',
-      parentCommentId: 'root-1',
-    );
     final pollsApiClient = _pollsClient((request) async {
       requestedPaths.add(request.url.path);
       if (request.url.path == '/polls/poll-1') {
         return http.Response(jsonEncode({'poll': _pollJson}), 200);
       }
       if (request.url.path == '/polls/poll-1/comments') {
-        return http.Response('{"items":[]}', 200);
+        return http.Response(
+          jsonEncode({
+            'items': [
+              for (var index = 0; index < 20; index++)
+                _commentJson('root-page-$index'),
+            ],
+            'nextCursor': 'root-page-2',
+          }),
+          200,
+        );
       }
       if (request.url.path == '/polls/poll-1/comments/reply-1') {
         return http.Response(jsonEncode({'comment': reply}), 200);
       }
       if (request.url.path == '/polls/poll-1/comments/root-1') {
         return http.Response(jsonEncode({'comment': root}), 200);
-      }
-      if (request.url.path == '/polls/poll-1/comments/root-1/replies') {
-        final cursor = request.url.queryParameters['cursor'];
-        return http.Response(
-          jsonEncode(cursor == null
-              ? {
-                  'items': [earlierReply],
-                  'nextCursor': 'reply-page-2',
-                }
-              : {
-                  'items': [reply],
-                  'nextCursor': null,
-                }),
-          200,
-        );
       }
       return http.Response('{"message":"not found"}', 404);
     });
@@ -251,18 +255,26 @@ void main() {
     expect(find.byType(PollCommentsScreen), findsOneWidget);
     expect(find.text('The root comment.'), findsOneWidget);
     expect(find.text('The exact reply notification target.'), findsOneWidget);
+    expect(find.text('Comment context'), findsOneWidget);
     expect(target, findsOneWidget);
     expect(requestedPaths, contains('/polls/poll-1/comments/reply-1'));
     expect(requestedPaths, contains('/polls/poll-1/comments/root-1'));
     expect(
-      requestedPaths,
-      contains('/polls/poll-1/comments/root-1/replies'),
+      requestedPaths.where(
+          (path) => path.startsWith('/polls/poll-1/comments/root-1/replies')),
+      isEmpty,
     );
     expect(
       requestedPaths
-          .where((path) => path == '/polls/poll-1/comments/root-1/replies')
+          .where((path) => path == '/polls/poll-1/comments/reply-1')
           .length,
-      2,
+      1,
+    );
+    expect(
+      requestedPaths
+          .where((path) => path == '/polls/poll-1/comments/root-1')
+          .length,
+      1,
     );
     expect(tester.getTopLeft(target).dy, greaterThanOrEqualTo(0));
     final targetFocus = find.descendant(
@@ -307,9 +319,14 @@ void main() {
     expect(store.state.itemsById, contains('item-1'));
   });
 
-  testWidgets('missing comment targets keep the poll open and show a fallback',
+  testWidgets('missing targets have a separate retry from root loading',
       (tester) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final requestedPaths = <String>[];
     final pollsApiClient = _pollsClient((request) async {
+      requestedPaths.add(request.url.path);
       if (request.url.path == '/polls/poll-1') {
         return http.Response(jsonEncode({'poll': _pollJson}), 200);
       }
@@ -351,6 +368,25 @@ void main() {
 
     expect(find.byType(PollCommentsScreen), findsOneWidget);
     expect(find.text('This comment is no longer available.'), findsOneWidget);
+    final targetReads = () => requestedPaths
+        .where((path) => path == '/polls/poll-1/comments/comment-missing')
+        .length;
+    expect(targetReads(), 1);
+
+    final retryTarget = find.byKey(const ValueKey('retry-comment-target'));
+    await tester.scrollUntilVisible(
+      retryTarget,
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(retryTarget);
+    await tester.pumpAndSettle();
+
+    expect(targetReads(), 2);
+    expect(
+      requestedPaths.where((path) => path == '/polls/poll-1/comments').length,
+      1,
+    );
   });
 
   testWidgets('failed read mutation reconciles without removing the card',

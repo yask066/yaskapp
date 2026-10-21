@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderBox, ScrollDirection;
 
 import '../../core/pagination/cursor_list_controller.dart';
 import '../../core/pagination/cursor_page.dart';
@@ -50,16 +51,21 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
   final _scrollController = ScrollController();
   final _targetCommentKey = GlobalKey();
   final _targetReplyKey = GlobalKey();
+  final _targetContextKey = GlobalKey();
+  final Map<String, Set<String>> _mainReplyIdsByRoot = {};
+  Set<String> _visibleRootCommentAnchorIds = {};
   late final CursorListController<PollCommentSummary> _commentsController;
   late PollSummary _poll;
   final Map<String, PollCommentSummary> _createdRootOverlays = {};
-  final Map<String, PollCommentSummary> _targetRootOverlays = {};
   final Map<String, PollCommentSummary> _commentOverrides = {};
   final Set<String> _deletedRootIds = {};
   int _displayGeneration = -1;
   int? _targetLoadedGeneration;
   int _targetRequestGeneration = 0;
   bool _targetLookupComplete = false;
+  bool _userScrolledComments = false;
+  bool _targetReplyMergedIntoMainThread = false;
+  bool _pendingTargetContextScrollCorrection = false;
   bool _isSubmittingComment = false;
   bool _isDeletingComment = false;
   bool _isLikingPoll = false;
@@ -91,6 +97,8 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
   String? _targetRootCommentId;
   String? _targetReplyId;
   String? _targetCommentLoadMessage;
+  PollCommentSummary? _targetComment;
+  PollCommentSummary? _targetRootComment;
   late final ReportsApiClient _reportsApiClient;
   late final bool _ownsReportsApiClient;
 
@@ -144,13 +152,38 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
     );
   }
 
+  ListScrollContext get _commentListScrollContext => ListScrollContext(
+        userId: widget.currentUserId,
+        route: '/polls/${_poll.id}/comments',
+        list: 'comments',
+        query: '',
+        filter: '',
+        sort: 'newest',
+      );
+
+  List<String> get _commentListItemIds => [
+        if (_hasTargetContext && _targetRootComment != null)
+          'comment-context-${_targetRootComment!.id}',
+        ..._comments.map((comment) => 'comment-${comment.id}'),
+      ];
+
+  bool _hasVisibleRootAnchor() {
+    return _visibleRootCommentAnchorIds.isNotEmpty;
+  }
+
+  void _handleVisibleCommentAnchorsChanged(List<String> itemIds) {
+    _visibleRootCommentAnchorIds = itemIds
+        .where((id) =>
+            id.startsWith('comment-') && !id.startsWith('comment-context-'))
+        .toSet();
+  }
+
   List<PollCommentSummary> get _comments {
     final pageItems = _commentsController.state.items;
     final pageIds = pageItems.map((comment) => comment.id).toSet();
     final candidates = <PollCommentSummary>[
       for (final comment in _createdRootOverlays.values)
         if (!pageIds.contains(comment.id)) comment,
-      ..._targetRootOverlays.values,
       ...pageItems,
     ];
     final byId = <String, PollCommentSummary>{};
@@ -176,6 +209,19 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
       }
       final pageIds = state.ids.toSet();
       _createdRootOverlays.removeWhere((id, _) => pageIds.contains(id));
+      final target = _targetComment;
+      if (target != null && target.parentCommentId == null) {
+        final refreshedTarget = _findComment(state.items, target.id);
+        if (refreshedTarget != null) {
+          _targetComment = refreshedTarget;
+          _targetRootComment = refreshedTarget;
+        }
+      }
+      final rootId = _targetRootComment?.id;
+      if (rootId != null && _targetReplyId != null) {
+        _targetRootComment =
+            _findComment(state.items, rootId) ?? _targetRootComment;
+      }
     }
 
     if (mounted) setState(() {});
@@ -202,7 +248,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
     if (targetId == null) return;
 
     var target = _findComment(roots, targetId);
-    var rootOverlay = target?.parentCommentId == null ? target : null;
+    var rootContext = target?.parentCommentId == null ? target : null;
     var rootCommentId =
         target?.parentCommentId == null ? target?.id : target?.parentCommentId;
     String? replyId;
@@ -226,7 +272,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
 
     if (target != null && target.pollId == _poll.id) {
       if (target.parentCommentId == null) {
-        rootOverlay = target;
+        rootContext = target;
         rootCommentId = target.id;
       } else {
         replyId = target.id;
@@ -250,7 +296,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
         if (root != null &&
             root.pollId == _poll.id &&
             root.parentCommentId == null) {
-          rootOverlay = root;
+          rootContext = root;
         } else {
           replyId = null;
           loadMessage ??= 'This comment is no longer available.';
@@ -266,18 +312,68 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
       return;
     }
 
-    final resolvedRoot = rootOverlay;
+    final willShowContext = loadMessage == null &&
+        target != null &&
+        rootContext != null &&
+        (replyId != null ||
+            !_commentsController.state.ids.contains(target.id)) &&
+        !(replyId != null &&
+            _commentsController.state.ids.contains(rootContext.id) &&
+            (_mainReplyIdsByRoot[rootContext.id]?.contains(replyId) ?? false));
+    final preserveUserScroll =
+        _userScrolledComments && willShowContext && _hasVisibleRootAnchor();
+    final previousContextExtent = _measureTargetContextExtent() ?? 0;
+    if (preserveUserScroll) {
+      _pendingTargetContextScrollCorrection = true;
+    }
+
     setState(() {
       _targetCommentLoadMessage = loadMessage;
       _targetRootCommentId = rootCommentId;
       _targetReplyId = replyId;
-      _targetRootOverlays.clear();
-      if (resolvedRoot != null) {
-        _targetRootOverlays[resolvedRoot.id] = resolvedRoot;
-      }
+      _targetComment = target;
+      _targetRootComment = rootContext;
+      _targetReplyMergedIntoMainThread = replyId != null &&
+          _commentsController.state.ids.contains(rootContext?.id) &&
+          (_mainReplyIdsByRoot[rootContext?.id]?.contains(replyId) ?? false);
       _targetLookupComplete = true;
     });
+    if (preserveUserScroll) {
+      _correctForTargetContextChange(previousContextExtent);
+    }
     _scheduleTargetCommentFocus(_comments);
+  }
+
+  double? _measureTargetContextExtent() {
+    final renderObject = _targetContextKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.attached) return null;
+    // The context card sits in a SliverPadding with 20px of bottom space.
+    return renderObject.size.height + 20;
+  }
+
+  void _correctForTargetContextChange(double previousExtent) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      final currentExtent = _measureTargetContextExtent();
+      final extentDelta = (currentExtent ?? previousExtent) - previousExtent;
+      if (extentDelta != 0 && _scrollController.hasClients) {
+        // Compensate only for the context card's actual change in height. This
+        // preserves the anchor for long insertions without jumping when a
+        // refresh resolves to the same already-visible context.
+        final position = _scrollController.position;
+        final nextOffset = (position.pixels + extentDelta)
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble();
+        if (nextOffset != position.pixels) {
+          _scrollController.jumpTo(nextOffset);
+        }
+      }
+
+      if (_pendingTargetContextScrollCorrection) {
+        setState(() => _pendingTargetContextScrollCorrection = false);
+      }
+    });
   }
 
   Future<void> _refreshComments() async {
@@ -292,6 +388,11 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
     setState(() {
       _targetCommentFocusScheduled = false;
       _targetCommentLoadMessage = null;
+      _targetComment = null;
+      _targetRootComment = null;
+      _targetRootCommentId = null;
+      _targetReplyId = null;
+      _targetReplyMergedIntoMainThread = false;
       _targetLookupComplete = widget.initialCommentId == null;
     });
     if (_commentsController.state.refresh.error != null) {
@@ -319,6 +420,14 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
     return false;
   }
 
+  bool _handleUserCommentScroll(UserScrollNotification notification) {
+    if (notification.direction != ScrollDirection.idle &&
+        !_userScrolledComments) {
+      setState(() => _userScrolledComments = true);
+    }
+    return false;
+  }
+
   void _scheduleTargetCommentFocus(List<PollCommentSummary> comments) {
     final targetId = widget.initialCommentId;
     if (targetId == null ||
@@ -327,37 +436,87 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
       return;
     }
     _targetCommentFocusScheduled = true;
-    if (_targetCommentLoadMessage != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _showSnackBar(
-            _targetCommentLoadMessage ?? 'This comment is no longer available.',
-          );
-        }
-      });
-      return;
-    }
-    if (_targetReplyId != null) return;
-    final rootId = _targetRootCommentId ?? targetId;
-    if (!comments.any((comment) => comment.id == rootId)) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _showSnackBar('This comment is no longer available.');
-      });
+    if (_targetCommentLoadMessage != null || _userScrolledComments) {
       return;
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final targetContext = _targetCommentKey.currentContext;
-      if (!mounted || targetContext == null) return;
-      unawaited(Scrollable.ensureVisible(
-        targetContext,
-        alignment: 0.25,
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 280),
-        curve: Curves.easeOut,
-      ));
+      unawaited(_revealTargetComment(comments));
     });
+  }
+
+  Future<void> _revealTargetComment(List<PollCommentSummary> comments) async {
+    for (var attempt = 0; attempt < 100; attempt++) {
+      if (!mounted || _userScrolledComments) return;
+
+      final targetContext = _targetReplyId == null
+          ? _targetCommentKey.currentContext
+          : _targetReplyKey.currentContext;
+      if (targetContext != null) {
+        await Scrollable.ensureVisible(
+          targetContext,
+          alignment: 0.25,
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 280),
+          curve: Curves.easeOut,
+        );
+        return;
+      }
+
+      final targetId = widget.initialCommentId;
+      if (_targetReplyId != null ||
+          targetId == null ||
+          !comments.any((comment) => comment.id == targetId) ||
+          !_scrollController.hasClients) {
+        return;
+      }
+
+      final position = _scrollController.position;
+      final nextOffset = (position.pixels + position.viewportDimension * 0.75)
+          .clamp(position.minScrollExtent, position.maxScrollExtent)
+          .toDouble();
+      if (nextOffset <= position.pixels) return;
+      _scrollController.jumpTo(nextOffset);
+      await WidgetsBinding.instance.endOfFrame;
+    }
+  }
+
+  bool get _hasTargetContext {
+    final target = _targetComment;
+    final root = _targetRootComment;
+    final state = _commentsController.state;
+    final retainingPagesAfterRefreshFailure = state.pages.isNotEmpty &&
+        (state.refresh.pending || state.refresh.error != null);
+    if (!_targetLookupComplete ||
+        _targetCommentLoadMessage != null ||
+        target == null ||
+        root == null ||
+        (_targetLoadedGeneration != state.generation &&
+            !retainingPagesAfterRefreshFailure)) {
+      return false;
+    }
+    if (target.parentCommentId != null) {
+      return !_targetReplyMergedIntoMainThread;
+    }
+    return !state.ids.contains(target.id);
+  }
+
+  void _retryTargetComment() {
+    final targetId = widget.initialCommentId;
+    if (targetId == null || _commentsController.state.pages.isEmpty) return;
+    final state = _commentsController.state;
+    setState(() {
+      _targetCommentFocusScheduled = false;
+      _targetCommentLoadMessage = null;
+      _targetComment = null;
+      _targetRootComment = null;
+      _targetRootCommentId = null;
+      _targetReplyId = null;
+      _targetReplyMergedIntoMainThread = false;
+      _targetLookupComplete = false;
+    });
+    unawaited(_loadTargetComment(state.generation, state.items));
   }
 
   PollCommentSummary? _findComment(
@@ -375,14 +534,29 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
     PollSummary updatedPoll,
   ) {
     if (!mounted) return;
-    final root = _findComment(_comments, rootCommentId);
+    final root = _findComment(_comments, rootCommentId) ??
+        (_targetRootComment?.id == rootCommentId ? _targetRootComment : null);
     if (root != null) {
-      _commentOverrides[rootCommentId] =
-          root.copyWith(repliesCount: root.repliesCount + 1);
+      final updatedRoot = root.copyWith(repliesCount: root.repliesCount + 1);
+      _commentOverrides[rootCommentId] = updatedRoot;
+      if (_targetRootComment?.id == rootCommentId) {
+        _targetRootComment = updatedRoot;
+      }
     }
     setState(() {
       _poll = updatedPoll;
     });
+  }
+
+  void _handleMainRootRepliesChanged(String rootCommentId, Set<String> ids) {
+    _mainReplyIdsByRoot[rootCommentId] = ids;
+    if (_targetRootCommentId != rootCommentId ||
+        _targetReplyId == null ||
+        !ids.contains(_targetReplyId) ||
+        _targetReplyMergedIntoMainThread) {
+      return;
+    }
+    setState(() => _targetReplyMergedIntoMainThread = true);
   }
 
   Future<void> _submitComment() async {
@@ -534,8 +708,15 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
 
       _deletedRootIds.add(comment.id);
       _createdRootOverlays.remove(comment.id);
-      _targetRootOverlays.remove(comment.id);
       _commentOverrides.remove(comment.id);
+      if (_targetRootComment?.id == comment.id) {
+        _targetComment = null;
+        _targetRootComment = null;
+        _targetRootCommentId = null;
+        _targetReplyId = null;
+        _targetCommentLoadMessage = 'This comment is no longer available.';
+        _targetLookupComplete = true;
+      }
       final updatedPoll = _poll.copyWith(
         commentsCount: (_poll.commentsCount - comment.repliesCount - 1)
             .clamp(0, _poll.commentsCount),
@@ -580,11 +761,19 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
       );
     }
     final comments = _comments;
+    final hasTargetContext = _hasTargetContext;
+    final hasTargetError =
+        _targetLookupComplete && _targetCommentLoadMessage != null;
+    final targetContextRoot = hasTargetContext ? _targetRootComment : null;
     final rootIndexByKey = <Key, int>{
       for (var index = 0; index < comments.length; index++)
         ValueKey('comment-row-${comments[index].id}'): index,
     };
     final paginationState = _commentsController.state;
+    final showReplyOnlyContext = _targetReplyId != null &&
+        targetContextRoot != null &&
+        paginationState.ids.contains(targetContextRoot.id) &&
+        !_targetReplyMergedIntoMainThread;
     final isFirstPagePending = paginationState.pages.isEmpty &&
         (paginationState.initial.pending || paginationState.refresh.pending);
     final hasFirstPageError = paginationState.pages.isEmpty &&
@@ -643,161 +832,143 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                 ),
                 Expanded(
                   child: ListScrollAnchorHost(
-                    context: ListScrollContext(
-                      userId: widget.currentUserId,
-                      route: '/polls/${_poll.id}/comments',
-                      list: 'comments',
-                      query: '',
-                      filter: '',
-                      sort: 'newest',
-                    ),
+                    context: _commentListScrollContext,
                     store: listScrollStateStore,
                     controller: _scrollController,
-                    itemIds: comments
-                        .map((comment) => 'comment-${comment.id}')
-                        .toList(),
-                    hasExplicitTarget: widget.initialCommentId != null ||
-                        _targetRootCommentId != null,
+                    itemIds: _commentListItemIds,
+                    onVisibleItemsChanged: _handleVisibleCommentAnchorsChanged,
+                    hasExplicitTarget: _pendingTargetContextScrollCorrection ||
+                        (widget.initialCommentId != null &&
+                            (!_targetLookupComplete ||
+                                !_userScrolledComments ||
+                                _hasTargetContext)),
                     child: EntryMotionRegistryScope(
                       contextKey:
                           'comments:${widget.currentUserId ?? 'anonymous'}:${_poll.id}',
                       child: RefreshIndicator(
                         onRefresh: _refreshComments,
-                        child: NotificationListener<ScrollMetricsNotification>(
-                          onNotification: _handleRootScrollMetrics,
-                          child: CustomScrollView(
-                            controller: _scrollController,
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            slivers: [
-                              SliverPadding(
-                                padding:
-                                    const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                                sliver: SliverToBoxAdapter(
-                                  child: EntryMotion(
-                                    contextKey:
-                                        'comments:${widget.currentUserId ?? 'anonymous'}:${_poll.id}',
-                                    itemId: 'poll:${_poll.id}',
-                                    visible: true,
-                                    indexInBatch: 0,
-                                    child: PollCard(
-                                      key: ValueKey('poll-${_poll.id}'),
-                                      poll: _poll,
-                                      accessToken: widget.accessToken,
-                                      onToggleLike: _isLikingPoll
-                                          ? null
-                                          : _togglePollLike,
-                                      isLiking: _isLikingPoll,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              SliverPadding(
-                                padding:
-                                    const EdgeInsets.fromLTRB(20, 26, 20, 0),
-                                sliver: SliverToBoxAdapter(
-                                  child: Column(
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Text(
-                                            '${_poll.commentsCount} comments',
-                                            style: const TextStyle(
-                                              color: _commentsSecondaryText,
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                          const Spacer(),
-                                          const Text(
-                                            'Newest',
-                                            style: TextStyle(
-                                              color: _commentsSecondaryText,
-                                              fontSize: 15,
-                                            ),
-                                          ),
-                                          const Icon(
-                                            Icons.keyboard_arrow_down,
-                                            color: _commentsSecondaryText,
-                                            size: 18,
-                                          ),
-                                        ],
-                                      ),
-                                      const Divider(
-                                        height: 32,
-                                        color: _commentsDivider,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              if (isFirstPagePending)
-                                const SliverPadding(
-                                  padding: EdgeInsets.symmetric(horizontal: 20),
-                                  sliver: SliverToBoxAdapter(
-                                    child: _CommentsLoadingState(),
-                                  ),
-                                )
-                              else if (hasFirstPageError)
-                                SliverPadding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 20),
-                                  sliver: SliverToBoxAdapter(
-                                    child: _CommentsErrorState(
-                                      onRetry: _retryComments,
-                                    ),
-                                  ),
-                                )
-                              else if (comments.isEmpty)
-                                const SliverPadding(
-                                  padding: EdgeInsets.symmetric(horizontal: 20),
-                                  sliver: SliverToBoxAdapter(
-                                    child: _CommentsEmptyState(),
-                                  ),
-                                )
-                              else
+                        child: NotificationListener<UserScrollNotification>(
+                          onNotification: _handleUserCommentScroll,
+                          child:
+                              NotificationListener<ScrollMetricsNotification>(
+                            onNotification: _handleRootScrollMetrics,
+                            child: CustomScrollView(
+                              controller: _scrollController,
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              slivers: [
                                 SliverPadding(
                                   padding:
-                                      const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                                  sliver: SliverList.builder(
-                                    itemCount: comments.length,
-                                    findChildIndexCallback: (key) =>
-                                        rootIndexByKey[key],
-                                    itemBuilder: (context, index) {
-                                      final comment = comments[index];
-                                      final isReplyTargetRoot =
-                                          comment.id == _targetRootCommentId &&
-                                              _targetReplyId != null;
-                                      final isRootTarget =
-                                          comment.id == _targetRootCommentId &&
-                                              _targetReplyId == null;
-                                      return KeyedSubtree(
-                                        key: ValueKey(
-                                            'comment-row-${comment.id}'),
-                                        child: Column(
+                                      const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                                  sliver: SliverToBoxAdapter(
+                                    child: EntryMotion(
+                                      contextKey:
+                                          'comments:${widget.currentUserId ?? 'anonymous'}:${_poll.id}',
+                                      itemId: 'poll:${_poll.id}',
+                                      visible: true,
+                                      indexInBatch: 0,
+                                      child: PollCard(
+                                        key: ValueKey('poll-${_poll.id}'),
+                                        poll: _poll,
+                                        accessToken: widget.accessToken,
+                                        onToggleLike: _isLikingPoll
+                                            ? null
+                                            : _togglePollLike,
+                                        isLiking: _isLikingPoll,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SliverPadding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(20, 26, 20, 0),
+                                  sliver: SliverToBoxAdapter(
+                                    child: Column(
+                                      children: [
+                                        Row(
                                           children: [
-                                            ListScrollAnchorItem(
-                                              id: 'comment-${comment.id}',
-                                              child: EntryMotion(
-                                                key: ValueKey(
-                                                    'entry-comment-${comment.id}'),
-                                                contextKey:
-                                                    'comments:${widget.currentUserId ?? 'anonymous'}:${_poll.id}',
-                                                itemId: comment.id,
-                                                visible: true,
-                                                indexInBatch: index + 1,
-                                                child: KeyedSubtree(
-                                                  key: isRootTarget
+                                            Text(
+                                              '${_poll.commentsCount} comments',
+                                              style: const TextStyle(
+                                                color: _commentsSecondaryText,
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            const Spacer(),
+                                            const Text(
+                                              'Newest',
+                                              style: TextStyle(
+                                                color: _commentsSecondaryText,
+                                                fontSize: 15,
+                                              ),
+                                            ),
+                                            const Icon(
+                                              Icons.keyboard_arrow_down,
+                                              color: _commentsSecondaryText,
+                                              size: 18,
+                                            ),
+                                          ],
+                                        ),
+                                        const Divider(
+                                          height: 32,
+                                          color: _commentsDivider,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                if (hasTargetError)
+                                  SliverPadding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      20,
+                                      0,
+                                      20,
+                                      20,
+                                    ),
+                                    sliver: SliverToBoxAdapter(
+                                      child: _TargetCommentError(
+                                        message: _targetCommentLoadMessage!,
+                                        onRetry: _retryTargetComment,
+                                      ),
+                                    ),
+                                  )
+                                else if (targetContextRoot != null)
+                                  SliverPadding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      20,
+                                      0,
+                                      20,
+                                      20,
+                                    ),
+                                    sliver: SliverToBoxAdapter(
+                                      child: ListScrollAnchorItem(
+                                        id: 'comment-context-${targetContextRoot.id}',
+                                        child: _TargetCommentContext(
+                                          key: _targetContextKey,
+                                          child: showReplyOnlyContext
+                                              ? _LinkedReplyContext(
+                                                  root: targetContextRoot,
+                                                  reply: _targetComment!,
+                                                  targetReplyKey:
+                                                      _userScrolledComments
+                                                          ? null
+                                                          : _targetReplyKey,
+                                                )
+                                              : KeyedSubtree(
+                                                  key: _targetReplyId == null
                                                       ? ValueKey(
-                                                          'notification-target-comment-${comment.id}')
+                                                          'notification-target-comment-${targetContextRoot.id}',
+                                                        )
                                                       : null,
                                                   child: _CommentTile(
-                                                    key: isRootTarget
+                                                    key: _targetReplyId == null
                                                         ? _targetCommentKey
                                                         : ValueKey(
-                                                            'comment-tile-${comment.id}'),
-                                                    comment: comment,
+                                                            'target-context-root-${targetContextRoot.id}',
+                                                          ),
+                                                    comment: targetContextRoot,
                                                     isNotificationTarget:
-                                                        isRootTarget,
+                                                        _targetReplyId == null,
                                                     pollId: _poll.id,
                                                     currentUserId:
                                                         widget.currentUserId,
@@ -809,77 +980,208 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                                                         widget.currentUserId !=
                                                             null,
                                                     focusedReplyId:
-                                                        isReplyTargetRoot
-                                                            ? _targetReplyId
-                                                            : null,
+                                                        _targetReplyId,
+                                                    contextReply:
+                                                        _targetReplyId == null
+                                                            ? null
+                                                            : _targetComment,
+                                                    allowTargetFocus:
+                                                        !_userScrolledComments,
                                                     targetReplyKey:
-                                                        isReplyTargetRoot
-                                                            ? _targetReplyKey
-                                                            : null,
+                                                        _targetReplyId == null
+                                                            ? null
+                                                            : _targetReplyKey,
                                                     onReplyCreated:
                                                         (updatedPoll) =>
                                                             _onReplyCreated(
-                                                                comment.id,
-                                                                updatedPoll),
-                                                    onDelete:
-                                                        widget.currentUserId ==
-                                                                comment
+                                                      targetContextRoot.id,
+                                                      updatedPoll,
+                                                    ),
+                                                    onDelete: widget
+                                                                .currentUserId ==
+                                                            targetContextRoot
+                                                                .author.id
+                                                        ? () => _deleteComment(
+                                                              targetContextRoot,
+                                                            )
+                                                        : null,
+                                                    onReport: widget.currentUserId !=
+                                                                null &&
+                                                            widget.currentUserId !=
+                                                                targetContextRoot
                                                                     .author.id
-                                                            ? () =>
-                                                                _deleteComment(
-                                                                    comment)
-                                                            : null,
-                                                    onReport:
-                                                        widget.currentUserId !=
-                                                                    null &&
-                                                                widget.currentUserId !=
-                                                                    comment
-                                                                        .author
-                                                                        .id
-                                                            ? () =>
-                                                                _reportComment(
-                                                                    comment)
-                                                            : null,
+                                                        ? () => _reportComment(
+                                                              targetContextRoot,
+                                                            )
+                                                        : null,
                                                     onToggleLike:
                                                         _toggleCommentLike,
                                                   ),
                                                 ),
-                                              ),
-                                            ),
-                                            const Divider(
-                                              height: 1,
-                                              indent: 76,
-                                              color: _commentsDivider,
-                                            ),
-                                          ],
                                         ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              if (paginationState.pages.isNotEmpty &&
-                                  paginationState.paginationSupported &&
-                                  (comments.isNotEmpty ||
-                                      paginationState.canLoadMore))
-                                SliverPadding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                  ),
-                                  sliver: SliverToBoxAdapter(
-                                    child: PaginationFooter(
-                                      hasMore: paginationState.canLoadMore,
-                                      loading: paginationState.append.pending,
-                                      error: paginationState.append.error,
-                                      onLoadMore: () => unawaited(
-                                        _commentsController.loadMore(),
-                                      ),
-                                      onRetry: () => unawaited(
-                                        _commentsController.loadMore(),
                                       ),
                                     ),
                                   ),
-                                ),
-                            ],
+                                if (isFirstPagePending)
+                                  const SliverPadding(
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 20),
+                                    sliver: SliverToBoxAdapter(
+                                      child: _CommentsLoadingState(),
+                                    ),
+                                  )
+                                else if (hasFirstPageError)
+                                  SliverPadding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 20),
+                                    sliver: SliverToBoxAdapter(
+                                      child: _CommentsErrorState(
+                                        onRetry: _retryComments,
+                                      ),
+                                    ),
+                                  )
+                                else if (comments.isEmpty)
+                                  const SliverPadding(
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 20),
+                                    sliver: SliverToBoxAdapter(
+                                      child: _CommentsEmptyState(),
+                                    ),
+                                  )
+                                else
+                                  SliverPadding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        20, 0, 20, 24),
+                                    sliver: SliverList.builder(
+                                      itemCount: comments.length,
+                                      findChildIndexCallback: (key) =>
+                                          rootIndexByKey[key],
+                                      itemBuilder: (context, index) {
+                                        final comment = comments[index];
+                                        final isReplyTargetRoot = comment.id ==
+                                                _targetRootCommentId &&
+                                            _targetReplyId != null &&
+                                            _targetReplyMergedIntoMainThread;
+                                        final isRootTarget = comment.id ==
+                                                _targetRootCommentId &&
+                                            _targetReplyId == null;
+                                        return KeyedSubtree(
+                                          key: ValueKey(
+                                              'comment-row-${comment.id}'),
+                                          child: Column(
+                                            children: [
+                                              ListScrollAnchorItem(
+                                                id: 'comment-${comment.id}',
+                                                child: EntryMotion(
+                                                  key: ValueKey(
+                                                      'entry-comment-${comment.id}'),
+                                                  contextKey:
+                                                      'comments:${widget.currentUserId ?? 'anonymous'}:${_poll.id}',
+                                                  itemId: comment.id,
+                                                  visible: true,
+                                                  indexInBatch: index + 1,
+                                                  child: KeyedSubtree(
+                                                    key: isRootTarget
+                                                        ? ValueKey(
+                                                            'notification-target-comment-${comment.id}')
+                                                        : null,
+                                                    child: _CommentTile(
+                                                      key: isRootTarget
+                                                          ? _targetCommentKey
+                                                          : ValueKey(
+                                                              'comment-tile-${comment.id}'),
+                                                      comment: comment,
+                                                      isNotificationTarget:
+                                                          isRootTarget,
+                                                      pollId: _poll.id,
+                                                      currentUserId:
+                                                          widget.currentUserId,
+                                                      accessToken:
+                                                          widget.accessToken,
+                                                      pollsApiClient:
+                                                          widget.pollsApiClient,
+                                                      onRepliesChanged:
+                                                          _handleMainRootRepliesChanged,
+                                                      canReply: widget
+                                                              .currentUserId !=
+                                                          null,
+                                                      focusedReplyId:
+                                                          isReplyTargetRoot
+                                                              ? _targetReplyId
+                                                              : null,
+                                                      contextReply:
+                                                          isReplyTargetRoot
+                                                              ? _targetComment
+                                                              : null,
+                                                      allowTargetFocus:
+                                                          !_userScrolledComments,
+                                                      targetReplyKey:
+                                                          isReplyTargetRoot
+                                                              ? _targetReplyKey
+                                                              : null,
+                                                      onReplyCreated:
+                                                          (updatedPoll) =>
+                                                              _onReplyCreated(
+                                                                  comment.id,
+                                                                  updatedPoll),
+                                                      onDelete:
+                                                          widget.currentUserId ==
+                                                                  comment
+                                                                      .author.id
+                                                              ? () =>
+                                                                  _deleteComment(
+                                                                      comment)
+                                                              : null,
+                                                      onReport: widget.currentUserId !=
+                                                                  null &&
+                                                              widget.currentUserId !=
+                                                                  comment
+                                                                      .author.id
+                                                          ? () =>
+                                                              _reportComment(
+                                                                  comment)
+                                                          : null,
+                                                      onToggleLike:
+                                                          _toggleCommentLike,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              const Divider(
+                                                height: 1,
+                                                indent: 76,
+                                                color: _commentsDivider,
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                if (paginationState.pages.isNotEmpty &&
+                                    paginationState.paginationSupported &&
+                                    (comments.isNotEmpty ||
+                                        paginationState.canLoadMore))
+                                  SliverPadding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                    ),
+                                    sliver: SliverToBoxAdapter(
+                                      child: PaginationFooter(
+                                        hasMore: paginationState.canLoadMore,
+                                        loading: paginationState.append.pending,
+                                        error: paginationState.append.error,
+                                        onLoadMore: () => unawaited(
+                                          _commentsController.loadMore(),
+                                        ),
+                                        onRetry: () => unawaited(
+                                          _commentsController.loadMore(),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -1062,6 +1364,136 @@ class _CommentsErrorState extends StatelessWidget {
   }
 }
 
+class _TargetCommentContext extends StatelessWidget {
+  const _TargetCommentContext({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F7FC),
+        border: Border.all(color: const Color(0xFFDCE3F3)),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Comment context',
+            style: TextStyle(
+              color: _commentsPrimaryText,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'This linked comment is shown separately from the loaded sequence.',
+            style: TextStyle(color: _commentsSecondaryText),
+          ),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _LinkedReplyContext extends StatelessWidget {
+  const _LinkedReplyContext({
+    required this.root,
+    required this.reply,
+    required this.targetReplyKey,
+  });
+
+  final PollCommentSummary root;
+  final PollCommentSummary reply;
+  final GlobalKey? targetReplyKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final rootAuthor = root.author.displayName.isNotEmpty
+        ? root.author.displayName
+        : root.author.username;
+    final replyAuthor = reply.author.displayName.isNotEmpty
+        ? reply.author.displayName
+        : reply.author.username;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Reply to $rootAuthor',
+            style: const TextStyle(
+              color: _commentsNavy,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (root.body.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 8),
+              child: Text(
+                root.body,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: _commentsSecondaryText),
+              ),
+            ),
+          Text(
+            replyAuthor,
+            style: const TextStyle(
+              color: _commentsPrimaryText,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          targetReplyKey == null
+              ? Text(reply.body, style: const TextStyle(height: 1.3))
+              : KeyedSubtree(
+                  key: targetReplyKey,
+                  child: Text(reply.body, style: const TextStyle(height: 1.3)),
+                ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TargetCommentError extends StatelessWidget {
+  const _TargetCommentError({
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return _TargetCommentContext(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(message),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              key: const ValueKey('retry-comment-target'),
+              onPressed: onRetry,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CommentThread extends StatefulWidget {
   const _CommentThread({
     super.key,
@@ -1072,8 +1504,11 @@ class _CommentThread extends StatefulWidget {
     required this.pollsApiClient,
     required this.canReply,
     required this.onReplyCreated,
+    this.onRepliesChanged,
     this.focusedReplyId,
     this.targetReplyKey,
+    this.contextReply,
+    this.allowTargetFocus = true,
   });
 
   final PollCommentSummary rootComment;
@@ -1083,8 +1518,12 @@ class _CommentThread extends StatefulWidget {
   final PollsApiClient pollsApiClient;
   final bool canReply;
   final ValueChanged<PollSummary> onReplyCreated;
+  final void Function(String rootCommentId, Set<String> replyIds)?
+      onRepliesChanged;
   final String? focusedReplyId;
   final GlobalKey? targetReplyKey;
+  final PollCommentSummary? contextReply;
+  final bool allowTargetFocus;
 
   @override
   State<_CommentThread> createState() => _CommentThreadState();
@@ -1120,7 +1559,7 @@ class _CommentThreadState extends State<_CommentThread>
       _isExpanded = true;
       updateKeepAlive();
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) unawaited(_loadReplies());
+        if (mounted) _scheduleTargetReplyFocus();
       });
     }
   }
@@ -1134,7 +1573,7 @@ class _CommentThreadState extends State<_CommentThread>
         _isExpanded = true;
         updateKeepAlive();
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && !_hasLoaded) unawaited(_loadReplies());
+          if (mounted) _scheduleTargetReplyFocus();
         });
       }
     }
@@ -1203,13 +1642,11 @@ class _CommentThreadState extends State<_CommentThread>
         _failedCursor = null;
       });
       updateKeepAlive();
+      widget.onRepliesChanged?.call(
+        widget.rootComment.id,
+        _replies.map((reply) => reply.id).toSet(),
+      );
       _scheduleTargetReplyFocus();
-
-      final targetFound = widget.focusedReplyId == null ||
-          mergedReplies.any((reply) => reply.id == widget.focusedReplyId);
-      if (!targetFound && page.paginationSupported && page.nextCursor != null) {
-        unawaited(_loadReplies(cursor: page.nextCursor));
-      }
     } on PollsApiException catch (error) {
       if (!mounted) return;
       setState(() {
@@ -1246,22 +1683,16 @@ class _CommentThreadState extends State<_CommentThread>
     final targetId = widget.focusedReplyId;
     if (targetId == null ||
         _targetFocusScheduled ||
-        !_replies.any((reply) => reply.id == targetId)) {
+        !widget.allowTargetFocus ||
+        (!_replies.any((reply) => reply.id == targetId) &&
+            widget.contextReply?.id != targetId)) {
       return;
     }
     _targetFocusScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final targetContext = widget.targetReplyKey?.currentContext;
-      if (!mounted || targetContext == null) return;
+      if (!mounted || targetContext == null || !widget.allowTargetFocus) return;
       _targetReplyFocusNode.requestFocus();
-      unawaited(Scrollable.ensureVisible(
-        targetContext,
-        alignment: 0.25,
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 280),
-        curve: Curves.easeOut,
-      ));
     });
   }
 
@@ -1347,6 +1778,15 @@ class _CommentThreadState extends State<_CommentThread>
             onSubmit: _submitReply,
           ),
         if (_isExpanded) ...[
+          if (widget.focusedReplyId != null &&
+              !_hasLoaded &&
+              _loadError == null &&
+              !_isLoading)
+            TextButton(
+              key: ValueKey('load-target-replies-${widget.rootComment.id}'),
+              onPressed: () => unawaited(_loadReplies()),
+              child: const Text('Load replies'),
+            ),
           if (_isLoading && _replies.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
@@ -1379,6 +1819,21 @@ class _CommentThreadState extends State<_CommentThread>
               child: Text('No replies yet.'),
             ),
           for (final reply in _replies) _buildReply(reply),
+          if (widget.contextReply != null &&
+              !_replies
+                  .any((reply) => reply.id == widget.contextReply!.id)) ...[
+            const Padding(
+              padding: EdgeInsets.fromLTRB(8, 12, 8, 4),
+              child: Text(
+                'Linked reply outside the loaded pages',
+                style: TextStyle(
+                  color: _commentsNavy,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            _buildReply(widget.contextReply!),
+          ],
           if (_ownReplyOverlay != null) ...[
             const Padding(
               padding: EdgeInsets.fromLTRB(8, 12, 8, 4),
@@ -1414,6 +1869,7 @@ class _CommentThreadState extends State<_CommentThread>
 
   Widget _buildReply(PollCommentSummary reply) {
     final isTarget = reply.id == widget.focusedReplyId;
+    final replyIndex = _replies.indexOf(reply);
     final card = Focus(
       key: isTarget ? widget.targetReplyKey : null,
       focusNode: isTarget ? _targetReplyFocusNode : null,
@@ -1448,7 +1904,7 @@ class _CommentThreadState extends State<_CommentThread>
           'comments:${widget.currentUserId ?? 'anonymous'}:${widget.pollId}',
       itemId: reply.id,
       visible: true,
-      indexInBatch: _replies.indexOf(reply),
+      indexInBatch: replyIndex < 0 ? 0 : replyIndex,
       child: isTarget
           ? KeyedSubtree(
               key: ValueKey('notification-target-comment-${reply.id}'),
@@ -1544,8 +2000,11 @@ class _CommentTile extends StatefulWidget {
     required this.pollsApiClient,
     required this.canReply,
     required this.onReplyCreated,
+    this.onRepliesChanged,
     this.focusedReplyId,
     this.targetReplyKey,
+    this.contextReply,
+    this.allowTargetFocus = true,
     this.isNotificationTarget = false,
     this.onDelete,
     this.onReport,
@@ -1559,8 +2018,12 @@ class _CommentTile extends StatefulWidget {
   final PollsApiClient pollsApiClient;
   final bool canReply;
   final ValueChanged<PollSummary> onReplyCreated;
+  final void Function(String rootCommentId, Set<String> replyIds)?
+      onRepliesChanged;
   final String? focusedReplyId;
   final GlobalKey? targetReplyKey;
+  final PollCommentSummary? contextReply;
+  final bool allowTargetFocus;
   final bool isNotificationTarget;
   final VoidCallback? onDelete;
   final VoidCallback? onReport;
@@ -1797,8 +2260,11 @@ class _CommentTileState extends State<_CommentTile> {
               accessToken: widget.accessToken,
               pollsApiClient: widget.pollsApiClient,
               canReply: widget.canReply,
+              onRepliesChanged: widget.onRepliesChanged,
               focusedReplyId: widget.focusedReplyId,
               targetReplyKey: widget.targetReplyKey,
+              contextReply: widget.contextReply,
+              allowTargetFocus: widget.allowTargetFocus,
               onReplyCreated: widget.onReplyCreated,
             ),
           ),

@@ -109,6 +109,11 @@ void main() {
 
     await tester.drag(scrollable, const Offset(0, -300));
     await tester.pumpAndSettle();
+    await tester.drag(
+      find.byType(CustomScrollView).first,
+      const Offset(0, -500),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(OutlinedButton, 'Load more'));
     await tester.pumpAndSettle();
 
@@ -1107,6 +1112,700 @@ void main() {
     expect(find.text('Replying to Author'), findsNothing);
   });
 
+  testWidgets('resolves a reply target without paging through replies', (
+    tester,
+  ) async {
+    final target = _replyFor(
+      'reply-target',
+      'root-context',
+      'Reply linked from a notification.',
+    );
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([]),
+      commentLoader: ({required commentId, required pollId}) async =>
+          commentId == target.id ? target : _rootComment(id: 'root-context'),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          pollsApiClient: pollsApiClient,
+          initialCommentId: target.id,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Comment context'), findsOneWidget);
+    expect(find.text('Root comment.'), findsOneWidget);
+    expect(find.text('Reply linked from a notification.'), findsOneWidget);
+    expect(pollsApiClient.getCommentCalls, 2);
+    expect(pollsApiClient.replyPageCalls, 0);
+    expect(pollsApiClient.commentsPageRequests, hasLength(1));
+  });
+
+  testWidgets('retries a timed out target without reloading root comments', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    var targetAttempts = 0;
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([]),
+      commentLoader: ({required commentId, required pollId}) async {
+        targetAttempts++;
+        if (targetAttempts == 1) throw TimeoutException('target timed out');
+        return _rootComment(id: commentId, body: 'Target arrived after retry.');
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          pollsApiClient: pollsApiClient,
+          initialCommentId: 'target-after-timeout',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Could not open this comment. Please try again.'),
+      findsOneWidget,
+    );
+    final retryTarget = find.byKey(const ValueKey('retry-comment-target'));
+    await tester.scrollUntilVisible(
+      retryTarget,
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(retryTarget);
+    await tester.pumpAndSettle();
+
+    final targetComment = find.text('Target arrived after retry.');
+    await tester.scrollUntilVisible(
+      targetComment,
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(targetComment, findsOneWidget);
+    expect(targetAttempts, 2);
+    expect(pollsApiClient.commentsPageRequests, hasLength(1));
+  });
+
+  testWidgets('merges a linked reply when manual pagination reaches its id', (
+    tester,
+  ) async {
+    final root = _rootComment(id: 'root-context', repliesCount: 2);
+    final target = _replyFor(
+      'reply-target',
+      root.id,
+      'The linked reply appears once.',
+    );
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([]),
+      commentLoader: ({required commentId, required pollId}) async =>
+          commentId == target.id ? target : root,
+      replyPageLoader: (
+          {required rootCommentId, required limit, cursor}) async {
+        if (cursor == null) {
+          return PollCommentRepliesPage(
+            items: [_replyFor('earlier-reply', root.id, 'An earlier reply.')],
+            nextCursor: 'reply-page-2',
+          );
+        }
+        return PollCommentRepliesPage(items: [target], nextCursor: null);
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          pollsApiClient: pollsApiClient,
+          initialCommentId: target.id,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(pollsApiClient.replyPageCalls, 0);
+    expect(find.text('Comment context'), findsOneWidget);
+    expect(find.text('Root comment.'), findsOneWidget);
+    expect(find.text('The linked reply appears once.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('load-target-replies-root-context')),
+        findsOneWidget);
+
+    await tester
+        .tap(find.byKey(const ValueKey('load-target-replies-root-context')));
+    await tester.pumpAndSettle();
+    expect(pollsApiClient.replyPageCalls, 1);
+    expect(find.text('The linked reply appears once.'), findsOneWidget);
+
+    await tester.tap(find.text('Load more replies'));
+    await tester.pumpAndSettle();
+
+    expect(pollsApiClient.replyPageCalls, 2);
+    expect(find.text('The linked reply appears once.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('notification-target-comment-reply-target')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+      'replaces a linked reply preview when main thread pagination reaches it',
+      (tester) async {
+    tester.view.physicalSize = const Size(400, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final root = _rootComment(id: 'main-thread-root', repliesCount: 2);
+    final target = _replyFor(
+      'main-thread-target',
+      root.id,
+      'The target moves into the main thread once.',
+    );
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([root]),
+      commentLoader: ({required commentId, required pollId}) async => target,
+      replyPageLoader: (
+          {required rootCommentId, required limit, cursor}) async {
+        if (cursor == null) {
+          return PollCommentRepliesPage(
+            items: [
+              _replyFor('main-thread-earlier', root.id, 'Earlier reply.'),
+            ],
+            nextCursor: 'main-thread-page-2',
+          );
+        }
+        return PollCommentRepliesPage(items: [target], nextCursor: null);
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          pollsApiClient: pollsApiClient,
+          initialCommentId: target.id,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Comment context'), findsOneWidget);
+    expect(find.text('The target moves into the main thread once.'),
+        findsOneWidget);
+
+    final scrollable = find.byType(CustomScrollView).first;
+    await tester.drag(scrollable, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    final toggleReplies = find.byKey(
+      const ValueKey('toggle-replies-main-thread-root'),
+    );
+    await tester.scrollUntilVisible(
+      toggleReplies,
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(toggleReplies);
+    await tester.pumpAndSettle();
+    expect(pollsApiClient.replyPageCalls, 1);
+    expect(find.text('Comment context'), findsOneWidget);
+    expect(find.text('The target moves into the main thread once.'),
+        findsOneWidget);
+
+    final loadMoreReplies = find.text('Load more replies');
+    await tester.scrollUntilVisible(
+      loadMoreReplies,
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.drag(scrollable, const Offset(0, -300));
+    await tester.pumpAndSettle();
+    await tester.tap(loadMoreReplies);
+    await tester.pumpAndSettle();
+
+    expect(pollsApiClient.replyPageCalls, 2);
+    expect(find.text('Comment context'), findsNothing);
+    await tester.scrollUntilVisible(
+      toggleReplies,
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('The target moves into the main thread once.'),
+        findsOneWidget);
+    expect(find.text('Hide replies (2)'), findsOneWidget);
+  });
+
+  testWidgets('merges a linked root when the unchanged main cursor reaches it',
+      (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final requests = <String?>[];
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([]),
+      commentsPageLoader: (
+          {required limit, required order, required pollId, cursor}) async {
+        requests.add(cursor);
+        if (cursor == null) {
+          return CursorPage(
+            items: [
+              for (var index = 0; index < 20; index++)
+                _rootComment(
+                  id: 'first-page-root-$index',
+                  body: 'First page comment $index. ${'Long text. ' * 8}',
+                ),
+            ],
+            nextCursor: 'server-cursor',
+          );
+        }
+        return CursorPage(
+          items: [
+            _rootComment(id: 'target-root', body: 'Target from the next page.'),
+          ],
+          nextCursor: null,
+        );
+      },
+      commentLoader: ({required commentId, required pollId}) async =>
+          _rootComment(id: commentId, body: 'Target from the next page.'),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          pollsApiClient: pollsApiClient,
+          initialCommentId: 'target-root',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(pollsApiClient.getCommentCalls, 1);
+    expect(requests, [null]);
+    expect(find.text('Comment context'), findsOneWidget);
+    expect(find.text('Target from the next page.'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.textContaining('First page comment 19.'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(requests, [null, 'server-cursor']);
+    expect(find.text('Comment context'), findsNothing);
+    expect(find.text('Target from the next page.'), findsOneWidget);
+    expect(
+      find.byKey(
+        const ValueKey('notification-target-comment-target-root'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('focuses a target root already loaded outside the viewport', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final comments = [
+      for (var index = 0; index < 19; index++)
+        _rootComment(
+          id: 'loaded-root-$index',
+          body: 'Loaded root $index.',
+        ),
+      _rootComment(
+        id: 'loaded-target',
+        body: 'Target already in the loaded page.',
+      ),
+    ];
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value(comments),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          pollsApiClient: pollsApiClient,
+          initialCommentId: 'loaded-target',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final target = find.byKey(
+      const ValueKey('notification-target-comment-loaded-target'),
+    );
+    expect(target, findsOneWidget);
+    expect(tester.getTopLeft(target).dy, greaterThanOrEqualTo(0));
+    expect(
+      tester.getBottomRight(target).dy,
+      lessThan(tester.view.physicalSize.height),
+    );
+    expect(pollsApiClient.getCommentCalls, 0);
+  });
+
+  testWidgets('user scroll wins while target lookup is pending',
+      (tester) async {
+    tester.view.physicalSize = const Size(400, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final target = Completer<PollCommentSummary>();
+    final comments = [
+      for (var index = 1; index <= 40; index++)
+        _rootComment(
+          id: index == 1 ? 'deep-root' : 'scroll-root-$index',
+          body: index == 1
+              ? 'Deep root. ${'Long linked root text. ' * 300}'
+              : 'Scroll root $index. ${'Long comment text. ' * 8}',
+        ),
+    ];
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value(comments),
+      commentLoader: ({required commentId, required pollId}) =>
+          commentId == 'deep-target'
+              ? target.future
+              : Future.value(
+                  _rootComment(
+                    id: 'deep-root',
+                    body: 'Deep root. ${'Long linked root text. ' * 300}',
+                  ),
+                ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          pollsApiClient: pollsApiClient,
+          initialCommentId: 'deep-target',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final scrollable = tester.widget<CustomScrollView>(
+      find.byType(CustomScrollView).first,
+    );
+    await tester.drag(
+        find.byType(CustomScrollView).first, const Offset(0, -700));
+    await tester.pumpAndSettle();
+    final anchor = find.textContaining('Scroll root 20.');
+    await tester.scrollUntilVisible(
+      anchor,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.drag(anchor, const Offset(0, -30));
+    await tester.pumpAndSettle();
+    final anchorTopBefore = tester.getTopLeft(anchor).dy;
+
+    target.complete(
+      _replyFor(
+        'deep-target',
+        'deep-root',
+        'Deep target. ${'Long linked reply text. ' * 300}',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(scrollable.controller!.position.pixels, greaterThan(0));
+    expect(pollsApiClient.getCommentCalls, 1);
+    expect(anchorTopBefore, greaterThanOrEqualTo(0));
+    expect(
+      tester.getTopLeft(anchor).dy,
+      closeTo(anchorTopBefore, 0.1),
+    );
+    scrollable.controller!.jumpTo(0);
+    await tester.pumpAndSettle();
+    expect(find.text('Reply to Author'), findsOneWidget);
+    final targetBody = find.textContaining('Deep target.');
+    expect(tester.getSize(targetBody).height, greaterThan(1000));
+    expect(targetBody, findsOneWidget);
+  });
+
+  testWidgets('does not move a viewport before the target context insertion',
+      (tester) async {
+    tester.view.physicalSize = const Size(400, 360);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final target = Completer<PollCommentSummary>();
+    final pollWithTallCard = PollSummary(
+      id: _poll.id,
+      author: _poll.author,
+      question: _poll.question,
+      options: _poll.options,
+      votesCount: _poll.votesCount,
+      commentsCount: _poll.commentsCount,
+      likesCount: _poll.likesCount,
+      viewerHasLiked: _poll.viewerHasLiked,
+      createdAt: _poll.createdAt,
+    );
+    final comments = [
+      for (var index = 0; index < 20; index++)
+        _rootComment(
+          id: 'below-viewport-root-$index',
+          body: 'Below viewport root $index.',
+        ),
+    ];
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value(comments),
+      commentLoader: ({required commentId, required pollId}) => target.future,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: pollWithTallCard,
+          accessToken: 'access-token',
+          pollsApiClient: pollsApiClient,
+          initialCommentId: 'below-viewport-target',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final scrollable = find.byType(Scrollable).first;
+    await tester.drag(scrollable, const Offset(0, -30));
+    await tester.pumpAndSettle();
+    final position = tester.state<ScrollableState>(scrollable).position;
+    final offsetBefore = position.pixels;
+    final question = find.text(_poll.question);
+    final questionTopBefore = tester.getTopLeft(question).dy;
+
+    target.complete(
+      _rootComment(
+        id: 'below-viewport-target',
+        body: 'Long target. ${'Context below the visible poll card. ' * 300}',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(position.pixels, closeTo(offsetBefore, 0.1));
+    expect(tester.getTopLeft(question).dy, closeTo(questionTopBefore, 0.1));
+  });
+
+  testWidgets(
+      'does not use a stale root anchor after returning to the poll card',
+      (tester) async {
+    tester.view.physicalSize = const Size(400, 360);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final target = Completer<PollCommentSummary>();
+    final root = _rootComment(
+      id: 'stale-anchor-root',
+      body: 'Stale anchor root.',
+      repliesCount: 1,
+    );
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([
+        root,
+        for (var index = 1; index < 20; index++)
+          _rootComment(id: 'stale-anchor-$index', body: 'Comment $index.'),
+      ]),
+      commentLoader: ({required commentId, required pollId}) => target.future,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          pollsApiClient: pollsApiClient,
+          currentUserId: 'stale-anchor-user',
+          initialCommentId: 'stale-anchor-reply',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final scrollable = find.byType(CustomScrollView).first;
+    final rootBody = find.textContaining('Stale anchor root.');
+    await tester.scrollUntilVisible(
+      rootBody,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(rootBody).dy, lessThan(360));
+
+    final position = tester
+        .state<ScrollableState>(
+          find.byType(Scrollable).first,
+        )
+        .position;
+    await tester.drag(scrollable, const Offset(0, 5000));
+    await tester.pumpAndSettle();
+    expect(position.pixels, 0);
+
+    final question = find.text(_poll.question);
+    final questionTopBefore = tester.getTopLeft(question).dy;
+    target.complete(
+      _replyFor(
+        'stale-anchor-reply',
+        root.id,
+        'Linked reply. ${'Long reply text. ' * 4}',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(position.pixels, 0);
+    expect(tester.getTopLeft(question).dy, closeTo(questionTopBefore, 0.1));
+  });
+
+  testWidgets('keeps linked context after a failed root refresh',
+      (tester) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final cursors = <String?>[];
+    final targetGets = <String>[];
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([]),
+      commentsPageLoader: ({
+        required pollId,
+        required limit,
+        required order,
+        cursor,
+      }) async {
+        cursors.add(cursor);
+        if (cursors.length == 1) {
+          return CursorPage(
+            items: [
+              for (var index = 0; index < 20; index++)
+                _rootComment(
+                  id: 'refresh-root-$index',
+                  body: 'Refresh root $index. ${'Long comment text. ' * 8}',
+                ),
+            ],
+            nextCursor: 'root-cursor',
+          );
+        }
+        throw const PollsApiException('Could not refresh comments.');
+      },
+      commentLoader: ({required commentId, required pollId}) async {
+        targetGets.add(commentId);
+        return _rootComment(
+          id: commentId,
+          body: 'Linked context survives refresh failure.',
+        );
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          pollsApiClient: pollsApiClient,
+          initialCommentId: 'external-target',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+        find.text('Linked context survives refresh failure.'), findsOneWidget);
+    expect(find.text('Comment context'), findsOneWidget);
+
+    final scrollable = find.byType(Scrollable).first;
+    tester.state<ScrollableState>(scrollable).position.jumpTo(0);
+    await tester.pumpAndSettle();
+    await tester.drag(scrollable, const Offset(0, 350));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not refresh comments.'), findsOneWidget);
+    expect(
+        find.text('Linked context survives refresh failure.'), findsOneWidget);
+    expect(find.text('Comment context'), findsOneWidget);
+    expect(cursors, [null, null]);
+    expect(targetGets, ['external-target']);
+  });
+
+  testWidgets('does not jump when refresh resolves the same linked context',
+      (tester) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final targetGets = <String>[];
+    final pollsApiClient = _FakePollsApiClient(
+      commentsFuture: Future.value([]),
+      commentsPageLoader: ({
+        required pollId,
+        required limit,
+        required order,
+        cursor,
+      }) async =>
+          CursorPage(
+        items: [
+          for (var index = 0; index < 20; index++)
+            _rootComment(
+              id: 'refresh-stable-root-$index',
+              body: 'Refresh root $index. ${'Long comment text. ' * 8}',
+            ),
+        ],
+        nextCursor: 'root-cursor',
+      ),
+      commentLoader: ({required commentId, required pollId}) async {
+        targetGets.add(commentId);
+        return _rootComment(
+          id: commentId,
+          body: 'Stable linked context. ${'Long target text. ' * 200}',
+        );
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PollCommentsScreen(
+          poll: _poll,
+          accessToken: 'access-token',
+          pollsApiClient: pollsApiClient,
+          initialCommentId: 'external-target',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Comment context'), findsOneWidget);
+    expect(targetGets, ['external-target']);
+
+    final scrollable = find.byType(Scrollable).first;
+    await tester.drag(scrollable, const Offset(0, -200));
+    await tester.pumpAndSettle();
+    final position = tester.state<ScrollableState>(scrollable).position;
+    position.jumpTo(0);
+    await tester.pumpAndSettle();
+    final offsetBeforeRefresh = position.pixels;
+    await tester.drag(scrollable, const Offset(0, 350));
+    await tester.pumpAndSettle();
+
+    expect(position.pixels, closeTo(offsetBeforeRefresh, 1));
+    expect(find.text('Comment context'), findsOneWidget);
+    expect(targetGets, ['external-target', 'external-target']);
+  });
+
   testWidgets('shows comments error state', (tester) async {
     final commentsCompleter = Completer<List<PollCommentSummary>>();
 
@@ -1628,6 +2327,7 @@ class _FakePollsApiClient extends PollsApiClient {
     Future<PollSummary>? likePollFuture,
     Future<void>? deleteCommentFuture,
     this.replyPageLoader,
+    this.commentLoader,
   })  : createCommentFuture =
             createCommentFuture ?? Future.value(_createCommentResult),
         likeCommentFuture = likeCommentFuture ?? Future.value(_likedComment),
@@ -1650,10 +2350,15 @@ class _FakePollsApiClient extends PollsApiClient {
     required int limit,
     String? cursor,
   })? replyPageLoader;
+  final Future<PollCommentSummary> Function({
+    required String pollId,
+    required String commentId,
+  })? commentLoader;
   int createCommentCalls = 0;
   final List<String> createdCommentBodies = [];
   final List<String?> createdParentCommentIds = [];
   int replyPageCalls = 0;
+  int getCommentCalls = 0;
   int likeCommentCalls = 0;
   int likePollCalls = 0;
   int deleteCommentCalls = 0;
@@ -1721,6 +2426,11 @@ class _FakePollsApiClient extends PollsApiClient {
     required String commentId,
     required String accessToken,
   }) {
+    getCommentCalls++;
+    final loader = commentLoader;
+    if (loader != null) {
+      return loader(pollId: pollId, commentId: commentId);
+    }
     return Future.error(
       const PollsApiException('Comment was not found.', statusCode: 404),
     );
