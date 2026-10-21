@@ -23,6 +23,7 @@ class PublicProfileScreen extends StatefulWidget {
     this.pollsApiClient,
     this.reportsApiClient,
     this.initialProfile,
+    this.onFollowingChanged,
     super.key,
   });
 
@@ -33,6 +34,7 @@ class PublicProfileScreen extends StatefulWidget {
   final PollsApiClient? pollsApiClient;
   final ReportsApiClient? reportsApiClient;
   final PublicProfile? initialProfile;
+  final VoidCallback? onFollowingChanged;
 
   @override
   State<PublicProfileScreen> createState() => _PublicProfileScreenState();
@@ -131,6 +133,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
               userId: widget.userId,
               accessToken: widget.accessToken,
             );
+
+      if (relationship.following != previousFollowing) {
+        widget.onFollowingChanged?.call();
+      }
 
       if (!mounted) {
         return;

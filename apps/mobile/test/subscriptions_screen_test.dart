@@ -62,6 +62,67 @@ void main() {
     expect(find.text('No subscription polls yet'), findsOneWidget);
     expect(find.text('Follow users to see their polls here.'), findsOneWidget);
   });
+
+  testWidgets('appends Following pages and retries without replacing page one',
+      (tester) async {
+    final requests = <Uri>[];
+    var requestNumber = 0;
+    final client = PollsApiClient(
+      config: const ApiConfig(baseUrl: 'http://api.test'),
+      httpClient: MockClient((request) async {
+        requests.add(request.url);
+        requestNumber++;
+        if (requestNumber == 1) {
+          return http.Response(
+            jsonEncode({
+              'items': [_pollJson('poll-1')],
+              'nextCursor': 'opaque-following-cursor',
+            }),
+            200,
+          );
+        }
+        if (requestNumber == 2) {
+          return http.Response(jsonEncode({'message': 'offline'}), 503);
+        }
+        return http.Response(
+          jsonEncode({
+            'items': [_pollJson('poll-2')],
+            'nextCursor': null
+          }),
+          200,
+        );
+      }),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SubscriptionsScreen(
+          session: _session,
+          pollsApiClient: client,
+          realtimeClient: _FakeRealtimeClient(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('poll-poll-1')), findsOneWidget);
+    expect(find.text('Could not load more.'), findsOneWidget);
+    expect(requests.map((uri) => uri.queryParameters['cursor']), [
+      null,
+      'opaque-following-cursor',
+    ]);
+
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('poll-poll-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('poll-poll-2')), findsOneWidget);
+    expect(requests.map((uri) => uri.queryParameters['cursor']), [
+      null,
+      'opaque-following-cursor',
+      'opaque-following-cursor',
+    ]);
+  });
 }
 
 class _FakeRealtimeClient extends RealtimeClient {
@@ -90,9 +151,9 @@ const _session = AuthSession(
   expiresIn: 'test',
 );
 
-Map<String, dynamic> _pollJson() {
+Map<String, dynamic> _pollJson([String id = 'poll-1']) {
   return {
-    'id': 'poll-1',
+    'id': id,
     'authorId': 'author-1',
     'author': {
       'id': 'author-1',

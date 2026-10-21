@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart' show SemanticsRole;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yaskapp_mobile/src/core/pagination/cursor_page.dart';
 import 'package:yaskapp_mobile/src/features/auth/auth_session.dart';
 import 'package:yaskapp_mobile/src/features/feed/feed_screen.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
@@ -959,6 +960,20 @@ class _FakePollsApiClient extends PollsApiClient {
     listPollsCalls++;
     if (listPollsCalls > 1 && refreshResponse != null) return refreshResponse!;
     return initialPolls;
+  }
+
+  @override
+  Future<CursorPage<PollSummary>> listPollsPage({
+    int limit = 20,
+    String sort = 'newest',
+    String? cursor,
+    String? accessToken,
+  }) async {
+    listPollsCalls++;
+    final polls = listPollsCalls > 1 && refreshResponse != null
+        ? await refreshResponse!
+        : initialPolls;
+    return CursorPage(items: polls, nextCursor: null);
   }
 
   @override

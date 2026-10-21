@@ -151,6 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
               session: widget.session,
               pollsApiClient: _pollsApiClient,
               realtimeClient: widget.realtimeSession.realtimeClient,
+              isActive: _selectedIndex == 0,
               onPollCreated: (_) {
                 unawaited(_profileKey.currentState?.refreshMyPolls());
               },
@@ -159,6 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
               session: widget.session,
               pollsApiClient: _pollsApiClient,
               realtimeClient: widget.realtimeSession.realtimeClient,
+              isActive: _selectedIndex == 1,
             ),
             NotificationNavigationScope(
               accessToken: widget.session.accessToken,

@@ -174,6 +174,10 @@ class ListScrollStateStore {
     _states.removeWhere((context, _) => context.userId == userId);
   }
 
+  void clearForContext(ListScrollContext context) {
+    _states.remove(context);
+  }
+
   void clear() => _states.clear();
 }
 

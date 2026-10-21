@@ -108,11 +108,19 @@ class PollStateStore extends ChangeNotifier {
   String? _viewerId;
   int _sessionEpoch = 0;
   int _nextOperationId = 0;
+  int _followingGeneration = 0;
 
   void Function(String pollId, int sessionEpoch)? onReconcileRequested;
 
   int get sessionEpoch => _sessionEpoch;
   String? get viewerId => _viewerId;
+  int get followingGeneration => _followingGeneration;
+
+  /// Invalidates the Following cursor chain after a confirmed membership edit.
+  void markFollowingMembershipChanged() {
+    _followingGeneration++;
+    notifyListeners();
+  }
 
   PollSummary? pollById(String id) => _polls[id]?.poll;
   bool isDeleted(String id) => _deletedPollIds.contains(id);

@@ -239,10 +239,10 @@
 
 **Файлы:** `feed_screen.dart`, `subscriptions_screen.dart`, их tests; создать `core/widgets/pagination_footer.dart` и `test/pagination_footer_test.dart`.
 
-- [ ] Добавить widget tests первой/второй страницы, footer Retry, empty/end, ручной кнопки, scroll storm, трёх автодогрузок и независимости двух лент.
-- [ ] Подключить page methods/controller, viewport trigger, pull-to-refresh и footer. Сохранить страницы при возврате и отдельно хранить identity Feed/Following.
-- [ ] Связать follow/unfollow с invalidation Following и новым refresh без смешивания с Feed. На logout/dispose завершать lifecycle.
-- [ ] Выполнить FLUTTER-FEED и footer tests.
+- [x] Добавить widget tests первой/второй страницы, footer Retry, empty/end, ручной кнопки, scroll storm, трёх автодогрузок и независимости двух лент.
+- [x] Подключить page methods/controller, viewport trigger, pull-to-refresh и footer. Сохранить страницы при возврате и отдельно хранить identity Feed/Following.
+- [x] Связать follow/unfollow с invalidation Following и новым refresh без смешивания с Feed. На logout/dispose завершать lifecycle.
+- [x] Выполнить FLUTTER-FEED и footer tests.
 
 **Готово, когда:** обе ленты читаются дальше 20 элементов; ошибка не заменяет список; empty и exhausted различаются.
 

@@ -17,9 +17,12 @@ import '../reports/report_dialog.dart';
 import '../reports/reports_api_client.dart';
 import '../../core/analytics/search_analytics.dart';
 import '../../core/motion/entry_motion.dart';
+import '../../core/pagination/cursor_list_controller.dart';
+import '../../core/pagination/cursor_page.dart';
 import '../../core/scroll/list_scroll_anchor_host.dart';
 import '../../core/scroll/list_scroll_state.dart';
 import '../../core/widgets/content_skeleton.dart';
+import '../../core/widgets/pagination_footer.dart';
 import '../search/search_api_client.dart';
 import '../search/search_screen.dart';
 
@@ -34,6 +37,7 @@ class FeedScreen extends StatefulWidget {
     SearchApiClient? searchApiClient,
     SearchAnalytics? searchAnalytics,
     this.onPollCreated,
+    this.isActive = true,
   })  : _pollsApiClient = pollsApiClient,
         _profilesApiClient = profilesApiClient,
         _realtimeClient = realtimeClient,
@@ -49,6 +53,7 @@ class FeedScreen extends StatefulWidget {
   final SearchApiClient? _searchApiClient;
   final SearchAnalytics? _searchAnalytics;
   final ValueChanged<PollSummary>? onPollCreated;
+  final bool isActive;
 
   @override
   State<FeedScreen> createState() => FeedScreenState();
@@ -57,7 +62,7 @@ class FeedScreen extends StatefulWidget {
 class FeedScreenState extends State<FeedScreen> {
   late final PollsApiClient _pollsApiClient;
   late final RealtimeClient _realtimeClient;
-  late Future<List<PollSummary>> _pollsFuture;
+  late CursorListController<PollSummary> _pollsController;
   late final bool _ownsPollsApiClient;
   late final ProfilesApiClient _profilesApiClient;
   late final bool _ownsProfilesApiClient;
@@ -67,9 +72,9 @@ class FeedScreenState extends State<FeedScreen> {
   StreamSubscription<PollVoteRealtimeEvent>? _pollVoteSubscription;
   StreamSubscription<PollDeletedRealtimeEvent>? _pollDeletedSubscription;
   List<PollSummary> _polls = [];
+  final Map<String, PollSummary> _localPollOverlays = {};
   final _scrollController = ScrollController();
   int _pollRequestSequence = 0;
-  var _hasLoadedPolls = false;
   final Set<String> _votingPollIds = {};
   final Set<String> _likingPollIds = {};
 
@@ -85,12 +90,128 @@ class FeedScreenState extends State<FeedScreen> {
     _realtimeClient = widget._realtimeClient ??
         RealtimeClient(accessToken: widget.session.accessToken);
     _reportsApiClient = widget._reportsApiClient ?? ReportsApiClient();
-    _pollsFuture = _loadPolls();
+    _scrollController.addListener(_handleScroll);
+    _createPaginationController();
+    if (widget.isActive) {
+      unawaited(_pollsController.loadInitial());
+    } else {
+      _pollsController.markInactive();
+    }
     _pollVoteSubscription =
         _realtimeClient.pollVotes.listen(_handleRealtimeVote);
     _pollDeletedSubscription =
         _realtimeClient.pollDeletions.listen(_handleRealtimeDeletion);
     _realtimeClient.connect();
+  }
+
+  @override
+  void didUpdateWidget(covariant FeedScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final sessionChanged =
+        oldWidget.session.user.id != widget.session.user.id ||
+            oldWidget.session.accessToken != widget.session.accessToken;
+    if (sessionChanged) {
+      _pollsController.removeListener(_handlePaginationChanged);
+      _pollsController.dispose();
+      _polls = [];
+      _localPollOverlays.clear();
+      _createPaginationController();
+    }
+
+    if (oldWidget.isActive != widget.isActive || sessionChanged) {
+      if (widget.isActive) {
+        _pollsController.markActive();
+        if (_pollsController.state.pages.isEmpty &&
+            !_pollsController.state.initial.pending &&
+            _pollsController.state.initial.error == null) {
+          unawaited(_pollsController.loadInitial());
+        }
+      } else {
+        _pollsController.markInactive();
+      }
+    }
+  }
+
+  void _createPaginationController() {
+    _pollsController = CursorListController<PollSummary>(
+      contextKey: 'feed:${widget.session.user.id}:newest',
+      loader: _loadPollPage,
+      extractId: (poll) => poll.id,
+      onInactiveExpired: () {
+        listScrollStateStore.clearForContext(_scrollContext);
+        if (_scrollController.hasClients) _scrollController.jumpTo(0);
+      },
+    );
+    _pollsController.addListener(_handlePaginationChanged);
+  }
+
+  ListScrollContext get _scrollContext => ListScrollContext(
+        userId: widget.session.user.id,
+        route: '/feed',
+        list: 'polls',
+        query: '',
+        filter: '',
+        sort: '',
+      );
+
+  Future<CursorPage<PollSummary>> _loadPollPage({
+    required int limit,
+    String? cursor,
+  }) {
+    return _pollsApiClient
+        .listPollsPage(
+          limit: limit,
+          sort: 'newest',
+          cursor: cursor,
+          accessToken: widget.session.accessToken,
+        )
+        .timeout(const Duration(seconds: 10));
+  }
+
+  List<PollSummary> _visiblePolls() {
+    final store = PollStateScope.readOf(context);
+    final serverIds =
+        _pollsController.state.items.map((poll) => poll.id).toSet();
+    _localPollOverlays.removeWhere((id, _) => serverIds.contains(id));
+    final visibleById = <String, PollSummary>{};
+    PollSummary? currentPoll(PollSummary poll) {
+      if (store?.isDeleted(poll.id) ?? false) return null;
+      return store?.pollById(poll.id) ?? poll;
+    }
+
+    for (final poll in _localPollOverlays.values) {
+      final current = currentPoll(poll);
+      if (current != null) visibleById.putIfAbsent(current.id, () => current);
+    }
+    for (final poll in _pollsController.state.items) {
+      final current = currentPoll(poll);
+      if (current != null) visibleById.putIfAbsent(current.id, () => current);
+    }
+    return visibleById.values.toList();
+  }
+
+  void _handlePaginationChanged() {
+    if (!mounted) return;
+    setState(() => _polls = _visiblePolls());
+    _scheduleViewportAppend();
+  }
+
+  void _scheduleViewportAppend() {
+    if (!widget.isActive) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _handleScroll();
+    });
+  }
+
+  void _handleScroll() {
+    if (!widget.isActive || !_scrollController.hasClients) return;
+    if (_scrollController.position.extentAfter <= 400) {
+      unawaited(_pollsController.loadMore(automatic: true));
+    }
+  }
+
+  void _handleScrollMetrics(ScrollMetrics metrics) {
+    if (widget.isActive && metrics.extentAfter <= 400) _handleScroll();
   }
 
   @override
@@ -112,15 +233,12 @@ class FeedScreenState extends State<FeedScreen> {
     if (_ownsReportsApiClient) {
       _reportsApiClient.close();
     }
+    _pollsController.removeListener(_handlePaginationChanged);
+    _pollsController.dispose();
+    _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
 
     super.dispose();
-  }
-
-  Future<List<PollSummary>> _loadPolls() {
-    return _pollsApiClient
-        .listPolls(accessToken: widget.session.accessToken)
-        .timeout(const Duration(seconds: 10));
   }
 
   Future<void> _reportPoll(PollSummary poll) {
@@ -134,45 +252,8 @@ class FeedScreenState extends State<FeedScreen> {
   }
 
   Future<void> _refreshPolls() async {
-    final store = PollStateScope.readOf(context);
-    final epoch = store?.sessionEpoch ?? 0;
-    final viewerId = store?.viewerId;
-    final generations = store?.generationSnapshot ?? const <String, int>{};
-    final requestId = 'feed-refresh-${++_pollRequestSequence}';
-    try {
-      final nextPolls = await _loadPolls();
-
-      if (!mounted) {
-        return;
-      }
-
-      final mergedPolls = store == null
-          ? nextPolls
-          : nextPolls
-              .map((poll) {
-                final result = store.ingest(
-                  poll,
-                  PollIngress(
-                    origin: PollOrigin.http,
-                    sessionEpoch: epoch,
-                    viewerId: viewerId,
-                    expectedPollId: null,
-                    requestId: requestId,
-                    startedGeneration: generations[poll.id] ?? 0,
-                  ),
-                );
-                return result.accepted ? result.state : null;
-              })
-              .whereType<PollSummary>()
-              .toList();
-      setState(() {
-        _polls = mergedPolls;
-      });
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-
+    await _pollsController.refresh();
+    if (_pollsController.state.refresh.error != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not refresh the feed.')),
       );
@@ -227,6 +308,7 @@ class FeedScreenState extends State<FeedScreen> {
     if (!mounted) return;
     setState(() {
       _polls.removeWhere((poll) => poll.id == event.pollId);
+      _localPollOverlays.remove(event.pollId);
     });
   }
 
@@ -315,7 +397,10 @@ class FeedScreenState extends State<FeedScreen> {
         accessToken: widget.session.accessToken,
       );
       if (!mounted) return;
-      setState(() => _polls.removeWhere((item) => item.id == poll.id));
+      setState(() {
+        _polls.removeWhere((item) => item.id == poll.id);
+        _localPollOverlays.remove(poll.id);
+      });
       _showSnackBar('Poll deleted.');
     } on PollsApiException catch (error) {
       _showSnackBar(error.userMessage);
@@ -410,6 +495,7 @@ class FeedScreenState extends State<FeedScreen> {
           accessToken: widget.session.accessToken,
           profilesApiClient: _profilesApiClient,
           pollsApiClient: _pollsApiClient,
+          onFollowingChanged: _markFollowingChanged,
         ),
       ),
     );
@@ -427,9 +513,15 @@ class FeedScreenState extends State<FeedScreen> {
           profilesApiClient: _profilesApiClient,
           reportsApiClient: widget._reportsApiClient,
           analytics: widget._searchAnalytics,
+          onFollowingChanged: _markFollowingChanged,
         ),
       ),
     );
+  }
+
+  void _markFollowingChanged() {
+    if (!mounted) return;
+    PollStateScope.readOf(context)?.markFollowingMembershipChanged();
   }
 
   Future<void> _openComments(PollSummary poll) async {
@@ -487,6 +579,9 @@ class FeedScreenState extends State<FeedScreen> {
           .map((currentPoll) =>
               currentPoll.id == updatedPoll.id ? updatedPoll : currentPoll)
           .toList();
+      if (_localPollOverlays.containsKey(updatedPoll.id)) {
+        _localPollOverlays[updatedPoll.id] = updatedPoll;
+      }
     }
 
     if (rebuild) {
@@ -497,6 +592,7 @@ class FeedScreenState extends State<FeedScreen> {
   }
 
   void _promotePollToTop(PollSummary createdPoll) {
+    _localPollOverlays[createdPoll.id] = createdPoll;
     setState(() {
       _polls = [
         createdPoll,
@@ -507,113 +603,29 @@ class FeedScreenState extends State<FeedScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FC),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _refreshPolls,
-          child: ListScrollAnchorHost(
-            context: ListScrollContext(
-              userId: widget.session.user.id,
-              route: '/feed',
-              list: 'polls',
-              query: '',
-              filter: '',
-              sort: '',
-            ),
-            store: listScrollStateStore,
-            controller: _scrollController,
-            itemIds: _polls.map((poll) => 'poll-${poll.id}').toList(),
-            child: EntryMotionRegistryScope(
-              contextKey: 'feed:${widget.session.user.id}',
-              child: CustomScrollView(
-                controller: _scrollController,
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  SliverAppBar(
-                    pinned: true,
-                    backgroundColor: Colors.white,
-                    surfaceTintColor: Colors.transparent,
-                    elevation: 0,
-                    toolbarHeight: 72,
-                    titleSpacing: 20,
-                    title: Semantics(
-                      label: 'Yaskapp',
-                      image: true,
-                      child: Image.asset(
-                        'assets/branding/yaskapp_logo.png',
-                        width: 72,
-                        height: 40,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                    centerTitle: false,
-                    actions: [
-                      SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: IconButton(
-                          tooltip: 'Search',
-                          onPressed: _openSearch,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints.tightFor(
-                            width: 40,
-                            height: 40,
-                          ),
-                          icon: Image.asset(
-                            'assets/branding/search_icon.png',
-                            width: 28,
-                            height: 28,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                    ],
-                  ),
-                  SliverToBoxAdapter(
-                    child: _HomeHeader(onCreatePoll: _openCreatePoll),
-                  ),
-                  FutureBuilder<List<PollSummary>>(
-                    future: _pollsFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting &&
-                          !_hasLoadedPolls) {
-                        return const SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: _FeedLoadingState(),
-                        );
-                      }
-
-                      if (snapshot.hasError && !_hasLoadedPolls) {
-                        return SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: _FeedErrorState(
-                            onRetry: () {
-                              setState(() {
-                                _pollsFuture = _loadPolls();
-                              });
-                            },
-                          ),
-                        );
-                      }
-
-                      if (!_hasLoadedPolls && snapshot.hasData) {
-                        _polls = snapshot.data ?? [];
-                        _hasLoadedPolls = true;
-                      }
-
-                      final polls = _polls;
-
-                      if (polls.isEmpty) {
-                        return const SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: _FeedEmptyState(),
-                        );
-                      }
-
-                      return SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+    final state = _pollsController.state;
+    final polls = _polls;
+    final content = state.pages.isEmpty && state.initial.pending
+        ? const SliverFillRemaining(
+            hasScrollBody: false,
+            child: _FeedLoadingState(),
+          )
+        : state.pages.isEmpty && state.initial.error != null
+            ? SliverFillRemaining(
+                hasScrollBody: false,
+                child: _FeedErrorState(
+                  onRetry: () => unawaited(_pollsController.loadInitial()),
+                ),
+              )
+            : polls.isEmpty && !state.canLoadMore
+                ? const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _FeedEmptyState(),
+                  )
+                : polls.isEmpty
+                    ? const SliverToBoxAdapter(child: SizedBox.shrink())
+                    : SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                         sliver: SliverList.separated(
                           itemBuilder: (context, index) {
                             final poll = polls[index];
@@ -663,9 +675,90 @@ class FeedScreenState extends State<FeedScreen> {
                           itemCount: polls.length,
                         ),
                       );
-                    },
-                  ),
-                ],
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F8FC),
+      body: SafeArea(
+        child: NotificationListener<ScrollMetricsNotification>(
+          onNotification: (notification) {
+            if (notification.depth == 0) {
+              _handleScrollMetrics(notification.metrics);
+            }
+            return false;
+          },
+          child: RefreshIndicator(
+            onRefresh: _refreshPolls,
+            child: ListScrollAnchorHost(
+              context: _scrollContext,
+              store: listScrollStateStore,
+              controller: _scrollController,
+              itemIds: _polls.map((poll) => 'poll-${poll.id}').toList(),
+              child: EntryMotionRegistryScope(
+                contextKey: 'feed:${widget.session.user.id}',
+                child: CustomScrollView(
+                  controller: _scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverAppBar(
+                      pinned: true,
+                      backgroundColor: Colors.white,
+                      surfaceTintColor: Colors.transparent,
+                      elevation: 0,
+                      toolbarHeight: 72,
+                      titleSpacing: 20,
+                      title: Semantics(
+                        label: 'Yaskapp',
+                        image: true,
+                        child: Image.asset(
+                          'assets/branding/yaskapp_logo.png',
+                          width: 72,
+                          height: 40,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      centerTitle: false,
+                      actions: [
+                        SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: IconButton(
+                            tooltip: 'Search',
+                            onPressed: _openSearch,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints.tightFor(
+                              width: 40,
+                              height: 40,
+                            ),
+                            icon: Image.asset(
+                              'assets/branding/search_icon.png',
+                              width: 28,
+                              height: 28,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                      ],
+                    ),
+                    SliverToBoxAdapter(
+                      child: _HomeHeader(onCreatePoll: _openCreatePoll),
+                    ),
+                    content,
+                    if (state.pages.isNotEmpty &&
+                        state.paginationSupported &&
+                        (polls.isNotEmpty || state.canLoadMore))
+                      SliverToBoxAdapter(
+                        child: PaginationFooter(
+                          hasMore: state.canLoadMore,
+                          loading: state.append.pending,
+                          error: state.append.error,
+                          onLoadMore: () =>
+                              unawaited(_pollsController.loadMore()),
+                          onRetry: () => unawaited(_pollsController.loadMore()),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

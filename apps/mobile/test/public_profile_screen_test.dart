@@ -12,6 +12,7 @@ import 'package:yaskapp_mobile/src/features/profile/public_profile_screen.dart';
 void main() {
   testWidgets('loads public profile and follows the user', (tester) async {
     final methods = <String>[];
+    var followingChanges = 0;
     final client = ProfilesApiClient(
       config: const ApiConfig(baseUrl: 'http://api.test'),
       httpClient: MockClient((request) async {
@@ -37,6 +38,7 @@ void main() {
           currentUserId: 'user-1',
           accessToken: 'access-token',
           profilesApiClient: client,
+          onFollowingChanged: () => followingChanges++,
         ),
       ),
     );
@@ -51,6 +53,7 @@ void main() {
 
     expect(methods, ['GET', 'POST']);
     expect(find.widgetWithText(OutlinedButton, 'Following'), findsOneWidget);
+    expect(followingChanges, 1);
   });
 
   testWidgets('shows public polls created by the user', (tester) async {

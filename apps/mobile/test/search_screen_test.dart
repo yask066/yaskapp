@@ -19,6 +19,25 @@ import 'package:yaskapp_mobile/src/features/search/search_result.dart';
 import 'package:yaskapp_mobile/src/features/search/search_screen.dart';
 
 void main() {
+  testWidgets('successful search follow invalidates Following', (tester) async {
+    var invalidations = 0;
+    final profiles = _FakeProfilesApiClient(
+      onFollow: () => invalidations++,
+    );
+    await tester.pumpWidget(_app(
+      _FakeSearchApiClient(),
+      profilesApiClient: profiles,
+    ));
+    await tester.pumpAndSettle();
+
+    final follow = find.widgetWithText(OutlinedButton, 'Follow');
+    expect(follow, findsOneWidget);
+    await tester.tap(follow);
+    await tester.pumpAndSettle();
+
+    expect(invalidations, 1);
+  });
+
   testWidgets('shows discovery sections before a query is entered',
       (tester) async {
     await tester.pumpWidget(_app(_FakeSearchApiClient(),
@@ -550,6 +569,7 @@ Widget _app(
   SearchApiClient client, {
   SearchAnalytics? analytics,
   PollsApiClient? pollsApiClient,
+  ProfilesApiClient? profilesApiClient,
   SearchHistoryStore? searchHistory,
   TextScaler? textScaler,
   bool entryMotion = false,
@@ -567,7 +587,7 @@ Widget _app(
         session: _session(),
         searchApiClient: client,
         pollsApiClient: pollsApiClient,
-        profilesApiClient: _FakeProfilesApiClient(),
+        profilesApiClient: profilesApiClient ?? _FakeProfilesApiClient(),
         analytics: analytics,
         searchHistory: searchHistory,
       ),
@@ -581,6 +601,23 @@ Map<String, dynamic> _readT02Fixture() => jsonDecode(
     ) as Map<String, dynamic>;
 
 class _FakeProfilesApiClient extends ProfilesApiClient {
+  _FakeProfilesApiClient({this.onFollow});
+
+  final VoidCallback? onFollow;
+
+  @override
+  Future<FollowRelationship> follow({
+    required String userId,
+    required String accessToken,
+  }) async {
+    onFollow?.call();
+    return const FollowRelationship(
+      following: true,
+      followerFollowingCount: 1,
+      followeeFollowersCount: 1,
+    );
+  }
+
   @override
   Future<List<PublicProfile>> listPopularUsers({
     String? accessToken,

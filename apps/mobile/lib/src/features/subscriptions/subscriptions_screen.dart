@@ -3,15 +3,19 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/motion/entry_motion.dart';
+import '../../core/pagination/cursor_list_controller.dart';
+import '../../core/pagination/cursor_page.dart';
 import '../../core/scroll/list_scroll_anchor_host.dart';
 import '../../core/scroll/list_scroll_state.dart';
 import '../../core/widgets/content_skeleton.dart';
+import '../../core/widgets/pagination_footer.dart';
 import '../auth/auth_session.dart';
 import '../polls/poll_card.dart';
 import '../polls/poll_comments_screen.dart';
 import '../polls/poll_summary.dart';
 import '../polls/polls_api_client.dart';
 import '../polls/poll_state_scope.dart';
+import '../polls/poll_state_store.dart';
 import '../realtime/realtime_client.dart';
 import '../reports/report_dialog.dart';
 import '../reports/reports_api_client.dart';
@@ -23,6 +27,7 @@ class SubscriptionsScreen extends StatefulWidget {
     PollsApiClient? pollsApiClient,
     RealtimeClient? realtimeClient,
     ReportsApiClient? reportsApiClient,
+    this.isActive = true,
   })  : _pollsApiClient = pollsApiClient,
         _realtimeClient = realtimeClient,
         _reportsApiClient = reportsApiClient;
@@ -31,6 +36,7 @@ class SubscriptionsScreen extends StatefulWidget {
   final PollsApiClient? _pollsApiClient;
   final RealtimeClient? _realtimeClient;
   final ReportsApiClient? _reportsApiClient;
+  final bool isActive;
 
   @override
   State<SubscriptionsScreen> createState() => _SubscriptionsScreenState();
@@ -43,12 +49,15 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   late final bool _ownsRealtimeClient;
   late final ReportsApiClient _reportsApiClient;
   late final bool _ownsReportsApiClient;
-  late Future<List<PollSummary>> _pollsFuture;
+  late CursorListController<PollSummary> _pollsController;
+  PollStateStore? _pollStateStore;
   StreamSubscription<PollVoteRealtimeEvent>? _voteSubscription;
   StreamSubscription<PollDeletedRealtimeEvent>? _pollDeletedSubscription;
   List<PollSummary> _polls = [];
   final _scrollController = ScrollController();
-  var _hasLoaded = false;
+  var _observedFollowingGeneration = 0;
+  var _followingRefreshPending = false;
+  var _followingRefreshInFlight = false;
   final Set<String> _votingPollIds = {};
   final Set<String> _likingPollIds = {};
 
@@ -62,7 +71,13 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     _realtimeClient = widget._realtimeClient ??
         RealtimeClient(accessToken: widget.session.accessToken);
     _reportsApiClient = widget._reportsApiClient ?? ReportsApiClient();
-    _pollsFuture = _loadPolls();
+    _scrollController.addListener(_handleScroll);
+    _createPaginationController();
+    if (widget.isActive) {
+      unawaited(_pollsController.loadInitial());
+    } else {
+      _pollsController.markInactive();
+    }
     _voteSubscription = _realtimeClient.pollVotes.listen(_replacePoll);
     _pollDeletedSubscription =
         _realtimeClient.pollDeletions.listen(_removePoll);
@@ -70,9 +85,162 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final nextStore = PollStateScope.readOf(context);
+    if (identical(nextStore, _pollStateStore)) return;
+    _pollStateStore?.removeListener(_handlePollStateChanged);
+    _pollStateStore = nextStore;
+    _observedFollowingGeneration = nextStore?.followingGeneration ?? 0;
+    nextStore?.addListener(_handlePollStateChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant SubscriptionsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final sessionChanged =
+        oldWidget.session.user.id != widget.session.user.id ||
+            oldWidget.session.accessToken != widget.session.accessToken;
+    if (sessionChanged) {
+      _pollsController.removeListener(_handlePaginationChanged);
+      _pollsController.dispose();
+      _polls = [];
+      _followingRefreshPending = false;
+      _createPaginationController();
+    }
+
+    if (oldWidget.isActive != widget.isActive || sessionChanged) {
+      if (widget.isActive) {
+        _pollsController.markActive();
+        if (_followingRefreshPending) {
+          _followingRefreshPending = false;
+          unawaited(_refreshFollowing());
+        } else if (_pollsController.state.pages.isEmpty &&
+            !_pollsController.state.initial.pending &&
+            _pollsController.state.initial.error == null) {
+          unawaited(_pollsController.loadInitial());
+        }
+      } else {
+        _pollsController.markInactive();
+      }
+    }
+  }
+
+  void _createPaginationController() {
+    _pollsController = CursorListController<PollSummary>(
+      contextKey: 'subscriptions:${widget.session.user.id}:following',
+      loader: _loadSubscriptionPage,
+      extractId: (poll) => poll.id,
+      onInactiveExpired: () {
+        listScrollStateStore.clearForContext(_scrollContext);
+        if (_scrollController.hasClients) _scrollController.jumpTo(0);
+      },
+    );
+    _pollsController.addListener(_handlePaginationChanged);
+  }
+
+  ListScrollContext get _scrollContext => ListScrollContext(
+        userId: widget.session.user.id,
+        route: '/subscriptions',
+        list: 'polls',
+        query: '',
+        filter: '',
+        sort: '',
+      );
+
+  Future<CursorPage<PollSummary>> _loadSubscriptionPage({
+    required int limit,
+    String? cursor,
+  }) {
+    return _pollsApiClient
+        .listSubscriptionsPage(
+          accessToken: widget.session.accessToken,
+          limit: limit,
+          cursor: cursor,
+        )
+        .timeout(const Duration(seconds: 10));
+  }
+
+  List<PollSummary> _visiblePolls() {
+    final store = _pollStateStore;
+    final visibleById = <String, PollSummary>{};
+    for (final poll in _pollsController.state.items) {
+      if (store?.isDeleted(poll.id) ?? false) continue;
+      visibleById.putIfAbsent(poll.id, () => store?.pollById(poll.id) ?? poll);
+    }
+    return visibleById.values.toList();
+  }
+
+  void _handlePaginationChanged() {
+    if (!mounted) return;
+    setState(() => _polls = _visiblePolls());
+    _scheduleViewportAppend();
+    if (_followingRefreshPending &&
+        !_followingRefreshInFlight &&
+        widget.isActive &&
+        !_pollsController.state.refresh.pending) {
+      _followingRefreshPending = false;
+      unawaited(_refreshFollowing());
+    }
+  }
+
+  void _scheduleViewportAppend() {
+    if (!widget.isActive) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _handleScroll();
+    });
+  }
+
+  void _handleScroll() {
+    if (!widget.isActive || !_scrollController.hasClients) return;
+    if (_scrollController.position.extentAfter <= 400) {
+      unawaited(_pollsController.loadMore(automatic: true));
+    }
+  }
+
+  void _handleScrollMetrics(ScrollMetrics metrics) {
+    if (widget.isActive && metrics.extentAfter <= 400) _handleScroll();
+  }
+
+  void _handlePollStateChanged() {
+    final nextGeneration = _pollStateStore?.followingGeneration ?? 0;
+    if (nextGeneration == _observedFollowingGeneration) return;
+    _observedFollowingGeneration = nextGeneration;
+    if (widget.isActive) {
+      unawaited(_refreshFollowing());
+    } else {
+      _followingRefreshPending = true;
+    }
+  }
+
+  Future<void> _refreshFollowing() async {
+    if (_followingRefreshInFlight || _pollsController.state.refresh.pending) {
+      _followingRefreshPending = true;
+      return;
+    }
+
+    _followingRefreshInFlight = true;
+    try {
+      await _pollsController.refresh();
+      if (_pollsController.state.refresh.error != null && mounted) {
+        _showError('Could not refresh subscriptions.');
+      }
+    } finally {
+      _followingRefreshInFlight = false;
+      if (_followingRefreshPending && widget.isActive && mounted) {
+        _followingRefreshPending = false;
+        unawaited(_refreshFollowing());
+      }
+    }
+  }
+
+  @override
   void dispose() {
     unawaited(_voteSubscription?.cancel());
     unawaited(_pollDeletedSubscription?.cancel());
+    _pollStateStore?.removeListener(_handlePollStateChanged);
+    _pollsController.removeListener(_handlePaginationChanged);
+    _pollsController.dispose();
     if (_ownsRealtimeClient) {
       unawaited(_realtimeClient.close());
     }
@@ -82,14 +250,9 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     if (_ownsReportsApiClient) {
       _reportsApiClient.close();
     }
+    _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
     super.dispose();
-  }
-
-  Future<List<PollSummary>> _loadPolls() {
-    return _pollsApiClient
-        .listSubscriptions(accessToken: widget.session.accessToken)
-        .timeout(const Duration(seconds: 10));
   }
 
   Future<void> _reportPoll(PollSummary poll) {
@@ -103,18 +266,9 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   }
 
   Future<void> _refresh() async {
-    try {
-      final polls = await _loadPolls();
-      if (!mounted) return;
-      setState(() {
-        _polls = polls;
-        _hasLoaded = true;
-        _pollsFuture = Future.value(polls);
-      });
-    } on PollsApiException catch (error) {
-      if (mounted) {
-        _showError(error.message);
-      }
+    await _pollsController.refresh();
+    if (_pollsController.state.refresh.error != null && mounted) {
+      _showError('Could not refresh subscriptions.');
     }
   }
 
@@ -256,118 +410,124 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final state = _pollsController.state;
+    if (state.pages.isEmpty && state.initial.pending) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Subscriptions')),
+        body: const SingleChildScrollView(
+          padding: EdgeInsets.all(16),
+          child: DelayedContentSkeleton(
+            kind: ContentSkeletonKind.poll,
+            rows: 2,
+          ),
+        ),
+      );
+    }
+    if (state.pages.isEmpty && state.initial.error != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Subscriptions')),
+        body: _SubscriptionsError(onRetry: _retry),
+      );
+    }
+
+    final showEmpty = _polls.isEmpty && !state.canLoadMore;
+    final showFooter = state.pages.isNotEmpty &&
+        state.paginationSupported &&
+        (_polls.isNotEmpty || state.canLoadMore);
+    final footer = PaginationFooter(
+      hasMore: state.canLoadMore,
+      loading: state.append.pending,
+      error: state.append.error,
+      onLoadMore: () => unawaited(_pollsController.loadMore()),
+      onRetry: () => unawaited(_pollsController.loadMore()),
+    );
+
     return Scaffold(
       appBar: AppBar(title: const Text('Subscriptions')),
-      body: FutureBuilder<List<PollSummary>>(
-        future: _pollsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting &&
-              !_hasLoaded) {
-            return const SingleChildScrollView(
-              padding: EdgeInsets.all(16),
-              child: DelayedContentSkeleton(
-                kind: ContentSkeletonKind.poll,
-                rows: 2,
-              ),
-            );
+      body: NotificationListener<ScrollMetricsNotification>(
+        onNotification: (notification) {
+          if (notification.depth == 0) {
+            _handleScrollMetrics(notification.metrics);
           }
-
-          if (snapshot.hasError && !_hasLoaded) {
-            return _SubscriptionsError(onRetry: _retry);
-          }
-
-          if (!_hasLoaded && snapshot.hasData) {
-            _polls = snapshot.data!;
-            _hasLoaded = true;
-          }
-
-          return RefreshIndicator(
-            onRefresh: _refresh,
-            child: EntryMotionRegistryScope(
-              contextKey: 'subscriptions:${widget.session.user.id}',
-              child: ListScrollAnchorHost(
-                context: ListScrollContext(
-                  userId: widget.session.user.id,
-                  route: '/subscriptions',
-                  list: 'polls',
-                  query: '',
-                  filter: '',
-                  sort: '',
-                ),
-                store: listScrollStateStore,
-                controller: _scrollController,
-                itemIds: _polls.map((poll) => 'poll-${poll.id}').toList(),
-                child: _polls.isEmpty
-                    ? ListView(
-                        controller: _scrollController,
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        children: const [
-                          SizedBox(height: 180),
-                          _SubscriptionsEmpty(),
-                        ],
-                      )
-                    : ListView.separated(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        itemCount: _polls.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final poll = _polls[index];
-                          return ListScrollAnchorItem(
-                            id: 'poll-${poll.id}',
-                            child: EntryMotion(
-                              key: ValueKey('entry-poll-${poll.id}'),
-                              contextKey:
-                                  'subscriptions:${widget.session.user.id}',
-                              itemId: poll.id,
-                              visible: true,
-                              indexInBatch: index,
-                              child: PollCard(
-                                key: ValueKey('poll-${poll.id}'),
-                                poll: poll,
-                                accessToken: widget.session.accessToken,
-                                onVote: poll.isClosed ||
-                                        poll.selectedOptionIndex != null ||
-                                        _votingPollIds.contains(poll.id)
-                                    ? null
-                                    : (option) => _vote(poll, option),
-                                onCancelVote: poll.isClosed ||
-                                        _votingPollIds.contains(poll.id)
-                                    ? null
-                                    : () => _cancelVote(poll),
-                                onDeletePoll:
-                                    poll.author.id == widget.session.user.id
-                                        ? () => _deletePoll(poll)
-                                        : null,
-                                onReport:
-                                    poll.author.id == widget.session.user.id
-                                        ? null
-                                        : () => _reportPoll(poll),
-                                isVoting: _votingPollIds.contains(poll.id),
-                                onOpenComments: () => _openComments(poll),
-                                onToggleLike: _likingPollIds.contains(poll.id)
-                                    ? null
-                                    : () => _toggleLike(poll),
-                                isLiking: _likingPollIds.contains(poll.id),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ),
-          );
+          return false;
         },
+        child: RefreshIndicator(
+          onRefresh: _refresh,
+          child: EntryMotionRegistryScope(
+            contextKey: 'subscriptions:${widget.session.user.id}',
+            child: ListScrollAnchorHost(
+              context: _scrollContext,
+              store: listScrollStateStore,
+              controller: _scrollController,
+              itemIds: _polls.map((poll) => 'poll-${poll.id}').toList(),
+              child: showEmpty || _polls.isEmpty
+                  ? ListView(
+                      controller: _scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        const SizedBox(height: 180),
+                        if (showEmpty) const _SubscriptionsEmpty(),
+                        if (!showEmpty && showFooter) footer,
+                      ],
+                    )
+                  : ListView.separated(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: _polls.length + (showFooter ? 1 : 0),
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        if (index == _polls.length) return footer;
+                        final poll = _polls[index];
+                        return ListScrollAnchorItem(
+                          id: 'poll-${poll.id}',
+                          child: EntryMotion(
+                            key: ValueKey('entry-poll-${poll.id}'),
+                            contextKey:
+                                'subscriptions:${widget.session.user.id}',
+                            itemId: poll.id,
+                            visible: true,
+                            indexInBatch: index,
+                            child: PollCard(
+                              key: ValueKey('poll-${poll.id}'),
+                              poll: poll,
+                              accessToken: widget.session.accessToken,
+                              onVote: poll.isClosed ||
+                                      poll.selectedOptionIndex != null ||
+                                      _votingPollIds.contains(poll.id)
+                                  ? null
+                                  : (option) => _vote(poll, option),
+                              onCancelVote: poll.isClosed ||
+                                      _votingPollIds.contains(poll.id)
+                                  ? null
+                                  : () => _cancelVote(poll),
+                              onDeletePoll:
+                                  poll.author.id == widget.session.user.id
+                                      ? () => _deletePoll(poll)
+                                      : null,
+                              onReport: poll.author.id == widget.session.user.id
+                                  ? null
+                                  : () => _reportPoll(poll),
+                              isVoting: _votingPollIds.contains(poll.id),
+                              onOpenComments: () => _openComments(poll),
+                              onToggleLike: _likingPollIds.contains(poll.id)
+                                  ? null
+                                  : () => _toggleLike(poll),
+                              isLiking: _likingPollIds.contains(poll.id),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ),
+        ),
       ),
     );
   }
 
   void _retry() {
-    setState(() {
-      _hasLoaded = false;
-      _pollsFuture = _loadPolls();
-    });
+    unawaited(_pollsController.loadInitial());
   }
 }
 

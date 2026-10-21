@@ -33,6 +33,7 @@ class SearchScreen extends StatefulWidget {
     this.reportsApiClient,
     this.searchHistory,
     this.analytics,
+    this.onFollowingChanged,
     super.key,
   });
 
@@ -43,6 +44,7 @@ class SearchScreen extends StatefulWidget {
   final ReportsApiClient? reportsApiClient;
   final SearchHistoryStore? searchHistory;
   final SearchAnalytics? analytics;
+  final VoidCallback? onFollowingChanged;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -312,6 +314,9 @@ class _SearchScreenState extends State<SearchScreen> {
               userId: user.id, accessToken: widget.session.accessToken)
           : await _profilesApiClient.follow(
               userId: user.id, accessToken: widget.session.accessToken);
+      if (relationship.following != user.viewerIsFollowing) {
+        widget.onFollowingChanged?.call();
+      }
       if (!mounted) return;
       final index = _topUsers.indexWhere((item) => item.id == user.id);
       if (index != -1) {
@@ -391,6 +396,7 @@ class _SearchScreenState extends State<SearchScreen> {
           accessToken: widget.session.accessToken,
           profilesApiClient: _profilesApiClient,
           pollsApiClient: _pollsApiClient,
+          onFollowingChanged: widget.onFollowingChanged,
         ),
       ),
     );
@@ -405,6 +411,7 @@ class _SearchScreenState extends State<SearchScreen> {
           accessToken: widget.session.accessToken,
           profilesApiClient: _profilesApiClient,
           pollsApiClient: _pollsApiClient,
+          onFollowingChanged: widget.onFollowingChanged,
         ),
       ),
     );
