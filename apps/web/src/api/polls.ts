@@ -1,10 +1,40 @@
 import { apiClient } from './client';
-import { decodePoll, decodePollComment, decodePollCommentRepliesPage, responseField, responseItems, type Poll, type PollComment, type PollCommentRepliesPage } from './models';
+import {
+  decodeClientCursorPage,
+  decodePoll,
+  decodePollComment,
+  decodePollCommentRepliesPage,
+  responseField,
+  responseItems,
+  type ClientCursorPage,
+  type Poll,
+  type PollComment,
+  type PollCommentRepliesPage,
+} from './models';
 
 export function listPolls(input: { sort?: 'newest' | 'popular'; limit?: number } = {}, signal?: AbortSignal): Promise<Poll[]> {
   const params = new URLSearchParams({ limit: String(input.limit ?? 20) });
   if (input.sort && input.sort !== 'newest') params.set('sort', input.sort);
   return apiClient.get(`/polls?${params}`, (body) => responseItems(body, decodePoll), signal);
+}
+
+export function listPollsPage(
+  input: { sort?: 'newest' | 'popular'; limit?: number; cursor?: string } = {},
+  signal?: AbortSignal,
+): Promise<ClientCursorPage<Poll>> {
+  const params = new URLSearchParams({ limit: String(input.limit ?? 20) });
+  if (input.sort && input.sort !== 'newest') params.set('sort', input.sort);
+  if (input.cursor !== undefined) params.set('cursor', input.cursor);
+  return apiClient.get(`/polls?${params}`, (body) => decodeClientCursorPage(body, decodePoll), signal);
+}
+
+export function listSubscriptionsPage(
+  input: { limit?: number; cursor?: string } = {},
+  signal?: AbortSignal,
+): Promise<ClientCursorPage<Poll>> {
+  const params = new URLSearchParams({ limit: String(input.limit ?? 20) });
+  if (input.cursor !== undefined) params.set('cursor', input.cursor);
+  return apiClient.get(`/polls/subscriptions?${params}`, (body) => decodeClientCursorPage(body, decodePoll), signal);
 }
 
 export function getPoll(pollId: string, signal?: AbortSignal): Promise<Poll> {
@@ -47,6 +77,16 @@ export function deletePoll(pollId: string): Promise<void> {
 
 export function listComments(pollId: string, signal?: AbortSignal): Promise<PollComment[]> {
   return apiClient.get(`/polls/${pollId}/comments?limit=50`, (body) => responseItems(body, decodePollComment), signal);
+}
+
+export function listCommentsPage(
+  pollId: string,
+  input: { limit?: number; order?: 'newest' | 'oldest'; cursor?: string } = {},
+  signal?: AbortSignal,
+): Promise<ClientCursorPage<PollComment>> {
+  const params = new URLSearchParams({ limit: String(input.limit ?? 20), order: input.order ?? 'newest' });
+  if (input.cursor !== undefined) params.set('cursor', input.cursor);
+  return apiClient.get(`/polls/${pollId}/comments?${params}`, (body) => decodeClientCursorPage(body, decodePollComment), signal);
 }
 
 export function listCommentReplies(

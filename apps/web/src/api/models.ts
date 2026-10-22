@@ -1,7 +1,11 @@
 import { ApiError } from './client';
-import type { NotificationItem, NotificationRealtimeEventV1, NotificationType } from '@yaskapp/shared';
+import type { CursorPage, NotificationItem, NotificationRealtimeEventV1, NotificationType } from '@yaskapp/shared';
 
 export type { NotificationItem, NotificationRealtimeEventV1, NotificationType } from '@yaskapp/shared';
+
+export interface ClientCursorPage<T> extends CursorPage<T> {
+  paginationSupported: boolean;
+}
 
 export type NotificationListResponse = {
   items: NotificationItem[];
@@ -260,6 +264,18 @@ export function decodePollCommentRepliesPage(value: unknown): PollCommentReplies
   return {
     items: array(source.items).map(decodePollComment),
     nextCursor: nullableString(source.nextCursor),
+  };
+}
+
+export function decodeClientCursorPage<T>(value: unknown, decodeItem: (input: unknown) => T): ClientCursorPage<T> {
+  const source = object(value);
+  const paginationSupported = Object.hasOwn(source, 'nextCursor');
+  const nextCursor = source.nextCursor;
+  if (paginationSupported && nextCursor !== null && typeof nextCursor !== 'string') invalidResponse();
+  return {
+    items: array(source.items).map(decodeItem),
+    nextCursor: paginationSupported ? nextCursor as string | null : null,
+    paginationSupported,
   };
 }
 
