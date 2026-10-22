@@ -808,3 +808,66 @@ test('keeps append errors scoped to their tab when switching between feed surfac
   expect(screen.getByRole('alert')).toHaveTextContent('For you append failed.');
   expect(screen.getByRole('button', { name: 'Retry loading more' })).toBeEnabled();
 });
+
+test('returning after an append error keeps the accepted chain without refetching its pages', async () => {
+  const requests: string[] = [];
+  server.use(http.get('/polls', ({ request }) => {
+    const cursor = new URL(request.url).searchParams.get('cursor');
+    requests.push(cursor ?? '<first>');
+    if (cursor === null) return cursorPage([{ ...poll, question: 'Retained first page?' }], 'cursor-1');
+    if (cursor === 'cursor-1') return cursorPage([{ ...poll, id: 'poll-2', question: 'Retained second page?' }], 'cursor-2');
+    return HttpResponse.json({ error: 'unavailable', message: 'Final append failed.' }, { status: 503 });
+  }));
+  const user = userEvent.setup();
+  function BackToFeed() {
+    const navigate = useNavigate();
+    return <button type="button" onClick={() => navigate(-1)}>Back to feed</button>;
+  }
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } })}>
+      <SessionProvider>
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route path="/" element={<FeedPage />} />
+            <Route path="/polls/:pollId" element={<BackToFeed />} />
+          </Routes>
+        </MemoryRouter>
+      </SessionProvider>
+    </QueryClientProvider>,
+  );
+
+  expect(await screen.findByText('Retained first page?')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  expect(await screen.findByText('Retained second page?')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Final append failed.');
+  await user.click(screen.getAllByRole('button', { name: 'Comments (0)' })[0]);
+  await user.click(await screen.findByRole('button', { name: 'Back to feed' }));
+
+  expect(await screen.findByText('Retained first page?')).toBeInTheDocument();
+  expect(screen.getByText('Retained second page?')).toBeInTheDocument();
+  expect(screen.getByRole('alert')).toHaveTextContent('Final append failed.');
+  expect(screen.getByRole('button', { name: 'Retry loading more' })).toBeEnabled();
+  expect(requests).toEqual(['<first>', 'cursor-1', 'cursor-2']);
+});
+
+test('offers Refresh instead of a dead Load more button when the server repeats a cursor', async () => {
+  const requests: Array<string | null> = [];
+  server.use(http.get('/polls', ({ request }) => {
+    const cursor = new URL(request.url).searchParams.get('cursor');
+    requests.push(cursor);
+    if (cursor === null) return cursorPage([{ ...poll, question: 'Repeated cursor first page?' }], 'cursor-1');
+    return cursorPage([{ ...poll, id: 'poll-2', question: 'Repeated cursor second page?' }], 'cursor-1');
+  }));
+  const user = userEvent.setup();
+  renderFeed();
+
+  expect(await screen.findByText('Repeated cursor first page?')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  expect(await screen.findByText('Repeated cursor second page?')).toBeInTheDocument();
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('The server returned a repeated cursor. Refresh the feed to continue.');
+  expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Refresh feed' })).toBeEnabled();
+  expect(requests).toEqual([null, 'cursor-1']);
+});

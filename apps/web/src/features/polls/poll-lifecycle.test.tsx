@@ -70,7 +70,11 @@ test('logout/relogin ignores the previous viewer read even when transport ignore
   await screen.findByRole('button', { name: 'Like (1)' });
   await act(async () => { release(Response.json({ items: [{ ...poll, likesCount: 50, viewerHasLiked: true, stateRevisions: { ...poll.stateRevisions, likes: '50' } }] })); });
   expect(screen.getByRole('button', { name: 'Like (1)' })).toHaveAttribute('aria-pressed', 'false');
-  expect(client.getQueryData<Poll[]>(['polls', 'for-you'])?.[0]).toMatchObject({ likesCount: 1, viewerHasLiked: false });
+  const secondViewerFeed = client.getQueryCache().getAll().find((query) =>
+    query.queryKey[0] === 'pagination' && query.queryKey[1] === 'feed' && query.queryKey[3] === 'second');
+  expect(secondViewerFeed?.state.data).toMatchObject({
+    pages: [{ items: [{ likesCount: 1, viewerHasLiked: false }] }],
+  });
   view.unmount(); client.clear();
 });
 

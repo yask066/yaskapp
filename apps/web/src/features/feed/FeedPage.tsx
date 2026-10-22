@@ -127,6 +127,7 @@ export function FeedPage() {
       : pollsQuery.isFetchingNextPage ? { kind: 'append', cursor: lastPage?.nextCursor ?? null } : null,
     appendError: pollsQuery.isFetchNextPageError || Boolean(refreshState.appendError),
   };
+  const repeatedCursor = paginationState.nextCursor !== null && paginationState.cursorHistory.includes(paginationState.nextCursor);
   const loadMore = (trigger: PaginationLoadTrigger) => {
     const cursor = paginationState.nextCursor;
     if (!canAppend(paginationState, trigger) || cursor === null) return;
@@ -204,6 +205,7 @@ export function FeedPage() {
         isFetchNextPageError={pollsQuery.isFetchNextPageError || Boolean(refreshState.appendError)}
         paginationSupported={lastPage?.paginationSupported ?? false}
         automaticLoadEnabled={canAppend(paginationState, 'automatic')}
+        repeatedCursor={repeatedCursor}
         error={refreshState.appendError instanceof Error ? refreshState.appendError : pollsQuery.error}
         onLoadMore={loadMore}
       /> : null}{pollsQuery.isError && pollsQuery.data && !pollsQuery.isFetchNextPageError ? <AsyncState state="error" error={pollsQuery.error} onRetry={() => void pollsQuery.refetch()} /> : null}{(pollsQuery.isFetching && pollsQuery.data && !pollsQuery.isFetchingNextPage) || refreshState.pending ? <AsyncState state="refreshing" kind="poll" /> : null}</section>

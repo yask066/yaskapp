@@ -170,7 +170,9 @@ describe('pagination state helpers', () => {
       .not.toEqual(paginationQueryKey({ surface: 'subscriptions', sessionEpoch: 5, userId: 'user-a', followingGeneration: 2 }));
   });
 
-  test('does not refetch accumulated pages on window focus', () => {
+  test('does not automatically refetch accumulated pages during lifecycle events', () => {
+    expect(paginationQueryOptions.refetchOnMount).toBe(false);
+    expect(paginationQueryOptions.refetchOnReconnect).toBe(false);
     expect(paginationQueryOptions.refetchOnWindowFocus).toBe(false);
   });
 });

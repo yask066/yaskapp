@@ -29,7 +29,11 @@ export function paginationQueryKey(scope: PaginationQueryScope) {
   ] as const;
 }
 
-export const paginationQueryOptions = { refetchOnWindowFocus: false } as const;
+export const paginationQueryOptions = {
+  refetchOnMount: false,
+  refetchOnReconnect: false,
+  refetchOnWindowFocus: false,
+} as const;
 
 export interface PaginationPendingRequest {
   kind: PaginationLoadKind;
