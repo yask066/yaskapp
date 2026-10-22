@@ -28,6 +28,47 @@ const poll = {
   endsAt: null,
 };
 
+const authenticatedUser = {
+  id: 'user-1', email: 'member@example.com', username: 'member', status: 'active',
+  profile: { displayName: 'Member', pollsCount: 0, followersCount: 0, followingCount: 0, countryCode: 'BY', bio: null, avatarObjectKey: null, avatarUrl: null },
+};
+
+class TestIntersectionObserver implements IntersectionObserver {
+  static instances: TestIntersectionObserver[] = [];
+  readonly root = null;
+  readonly rootMargin: string;
+  readonly thresholds: ReadonlyArray<number>;
+  private readonly callback: IntersectionObserverCallback;
+
+  constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
+    this.callback = callback;
+    this.rootMargin = options?.rootMargin ?? '0px';
+    this.thresholds = Array.isArray(options?.threshold) ? options.threshold : [options?.threshold ?? 0];
+    TestIntersectionObserver.instances.push(this);
+  }
+
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+  takeRecords(): IntersectionObserverEntry[] { return []; }
+
+  intersect(): void {
+    this.callback([{
+      isIntersecting: true,
+      intersectionRatio: 1,
+      target: document.createElement('div'),
+      boundingClientRect: new DOMRect(),
+      intersectionRect: new DOMRect(),
+      rootBounds: null,
+      time: 0,
+    }], this);
+  }
+}
+
+function cursorPage(items: unknown[], nextCursor: string | null) {
+  return HttpResponse.json({ items, nextCursor });
+}
+
 const server = setupServer();
 
 function SessionStatus() {
@@ -61,6 +102,7 @@ afterEach(() => {
   sessionStorage.clear();
   listScrollState.clear();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 afterAll(() => server.close());
@@ -133,7 +175,8 @@ test('read_timeout_then_retry_ignores_old_response in the feed UI without automa
   await act(async () => { release(Response.json({ items: [poll] })); await vi.advanceTimersByTimeAsync(0); });
   expect(screen.queryByText('Which option?')).not.toBeInTheDocument();
   expect(requests).toBe(2);
-  view.unmount(); view.queryClient.clear();
+  view.unmount();
+  view.queryClient.clear();
   await act(async () => { await vi.advanceTimersByTimeAsync(1); });
   expect(vi.getTimerCount()).toBe(0);
 });
@@ -177,7 +220,7 @@ test('keeps cached polls visible and skips the skeleton during a background refe
   expect(await screen.findByText('Which option?')).toBeInTheDocument();
   await waitFor(() => expect(requests).toBe(1));
   holdNext = true;
-  void queryClient.invalidateQueries({ queryKey: ['polls', 'for-you'] });
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Refresh feed' }));
   await waitFor(() => expect(requests).toBe(2));
   expect(document.querySelector('.feed-main [role="status"]')).toHaveTextContent('Refreshing polls');
   expect(screen.getByText('Which option?')).toBeInTheDocument();
@@ -198,10 +241,10 @@ test('preserves cached rows and shows a local retry after a background refresh e
 
   expect(await screen.findByText('Which option?')).toBeInTheDocument();
   await waitFor(() => expect(requests).toBe(1));
-  void queryClient.invalidateQueries({ queryKey: ['polls', 'for-you'] });
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Refresh feed' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Refresh failed.');
   expect(screen.getByText('Which option?')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Refresh feed' })).toBeEnabled();
   view.unmount();
   queryClient.clear();
 });
@@ -530,4 +573,238 @@ test('a sidebar Retry does not steal focus during a later feed sort load', async
   await user.click(following);
 
   expect(following).toHaveFocus();
+});
+
+test('loads Following from subscriptions and appends its next page when the footer enters the viewport', async () => {
+  TestIntersectionObserver.instances = [];
+  vi.stubGlobal('IntersectionObserver', TestIntersectionObserver);
+  const requests: string[] = [];
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: authenticatedUser })),
+    http.get('/polls', ({ request }) => {
+      requests.push(new URL(request.url).pathname + new URL(request.url).search);
+      return cursorPage([{ ...poll, question: 'For you first page?' }], null);
+    }),
+    http.get('/polls/subscriptions', ({ request }) => {
+      const url = new URL(request.url);
+      const cursor = url.searchParams.get('cursor');
+      requests.push(url.pathname + url.search);
+      return cursor === null
+        ? cursorPage([{ ...poll, id: 'following-1', question: 'Following first page?' }], 'following-cursor')
+        : cursorPage([{ ...poll, id: 'following-2', question: 'Following second page?' }], null);
+    }),
+  );
+  const user = userEvent.setup();
+
+  renderFeed();
+  expect(await screen.findByText('For you first page?')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Following' }));
+  expect(await screen.findByText('Following first page?')).toBeInTheDocument();
+  expect(requests).toContain('/polls/subscriptions?limit=20');
+
+  const observer = TestIntersectionObserver.instances.at(-1);
+  expect(observer?.rootMargin).toContain('100%');
+  act(() => observer?.intersect());
+  expect(await screen.findByText('Following second page?')).toBeInTheDocument();
+  expect(requests).toContain('/polls/subscriptions?limit=20&cursor=following-cursor');
+  expect(requests.filter((request) => request.startsWith('/polls?'))).toEqual(['/polls?limit=20']);
+});
+
+test('loads another page from the footer, ignores a duplicate click, and retries a failed append', async () => {
+  let cursorReads = 0;
+  let finishFirstAppend!: (response: Response) => void;
+  server.use(http.get('/polls', ({ request }) => {
+    const cursor = new URL(request.url).searchParams.get('cursor');
+    if (cursor === null) return cursorPage([{ ...poll, question: 'First page?' }], 'cursor-1');
+    cursorReads += 1;
+    if (cursorReads === 1) return new Promise((resolve) => { finishFirstAppend = resolve; });
+    return cursorPage([{ ...poll, id: 'poll-2', question: 'Second page?' }], null);
+  }));
+  const user = userEvent.setup();
+  renderFeed();
+
+  expect(await screen.findByText('First page?')).toBeInTheDocument();
+  const loadMore = screen.getByRole('button', { name: 'Load more' });
+  await user.dblClick(loadMore);
+  await waitFor(() => expect(cursorReads).toBe(1));
+  expect(screen.getByRole('button', { name: 'Load more' })).toBeDisabled();
+  finishFirstAppend(HttpResponse.json({ error: 'unavailable', message: 'Append failed.' }, { status: 503 }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Append failed.');
+  expect(screen.getByRole('button', { name: 'Retry loading more' })).toBeEnabled();
+  expect(screen.getByText('First page?')).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Retry loading more' }));
+  expect(await screen.findByText('Second page?')).toBeInTheDocument();
+  expect(cursorReads).toBe(2);
+});
+
+test('Refresh replaces the accumulated page chain with a cursorless first page', async () => {
+  const requests: string[] = [];
+  let firstPageReads = 0;
+  server.use(http.get('/polls', ({ request }) => {
+    const cursor = new URL(request.url).searchParams.get('cursor');
+    requests.push(cursor ?? '<first>');
+    if (cursor === null) {
+      firstPageReads += 1;
+      return firstPageReads === 1
+        ? cursorPage([{ ...poll, question: 'Original first page?' }], 'cursor-1')
+        : cursorPage([{ ...poll, id: 'poll-refreshed', question: 'Refreshed first page?' }], null);
+    }
+    return cursorPage([{ ...poll, id: 'poll-2', question: 'Original second page?' }], 'cursor-2');
+  }));
+  const user = userEvent.setup();
+  renderFeed();
+
+  expect(await screen.findByText('Original first page?')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  expect(await screen.findByText('Original second page?')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Refresh feed' }));
+
+  expect(await screen.findByText('Refreshed first page?')).toBeInTheDocument();
+  expect(screen.queryByText('Original first page?')).not.toBeInTheDocument();
+  expect(screen.queryByText('Original second page?')).not.toBeInTheDocument();
+  expect(requests).toEqual(['<first>', 'cursor-1', '<first>']);
+  expect(screen.getByText("You've seen everything.")).toHaveAttribute('role', 'status');
+});
+
+test('a failed Refresh keeps the previous pages and continuation cursor usable', async () => {
+  let firstPageReads = 0;
+  const cursors: string[] = [];
+  server.use(http.get('/polls', ({ request }) => {
+    const cursor = new URL(request.url).searchParams.get('cursor');
+    if (cursor === null) {
+      firstPageReads += 1;
+      if (firstPageReads === 1) return cursorPage([{ ...poll, question: 'Retained first page?' }], 'cursor-1');
+      return HttpResponse.json({ error: 'unavailable', message: 'Refresh failed.' }, { status: 503 });
+    }
+    cursors.push(cursor);
+    if (cursor === 'cursor-1') return cursorPage([{ ...poll, id: 'poll-2', question: 'Retained second page?' }], 'cursor-2');
+    return cursorPage([{ ...poll, id: 'poll-3', question: 'Continued third page?' }], null);
+  }));
+  const user = userEvent.setup();
+  renderFeed();
+
+  expect(await screen.findByText('Retained first page?')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  expect(await screen.findByText('Retained second page?')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Refresh feed' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Refresh failed.');
+  expect(screen.getByText('Retained first page?')).toBeInTheDocument();
+  expect(screen.getByText('Retained second page?')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  expect(await screen.findByText('Continued third page?')).toBeInTheDocument();
+  expect(cursors).toEqual(['cursor-1', 'cursor-2']);
+});
+
+test('requires a manual append after three viewport-triggered page loads', async () => {
+  TestIntersectionObserver.instances = [];
+  vi.stubGlobal('IntersectionObserver', TestIntersectionObserver);
+  const cursors: string[] = [];
+  server.use(http.get('/polls', ({ request }) => {
+    const cursor = new URL(request.url).searchParams.get('cursor');
+    cursors.push(cursor ?? '<first>');
+    const index = cursor === null ? 0 : Number(cursor.replace('cursor-', ''));
+    return cursorPage([{ ...poll, id: `poll-${index}`, question: `Page ${index + 1}?` }], index < 4 ? `cursor-${index + 1}` : null);
+  }));
+  const user = userEvent.setup();
+  renderFeed();
+
+  expect(await screen.findByText('Page 1?')).toBeInTheDocument();
+  for (let page = 2; page <= 4; page += 1) {
+    act(() => TestIntersectionObserver.instances.at(-1)?.intersect());
+    expect(await screen.findByText(`Page ${page}?`)).toBeInTheDocument();
+  }
+  expect(cursors).toHaveLength(4);
+  expect(screen.getByRole('button', { name: 'Load more' })).toBeEnabled();
+
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  expect(await screen.findByText('Page 5?')).toBeInTheDocument();
+  expect(cursors).toHaveLength(5);
+});
+
+test('shows a sign-in prompt for guest Following without requesting a shared feed', async () => {
+  const requests: string[] = [];
+  server.use(http.get('/polls', ({ request }) => {
+    requests.push(new URL(request.url).pathname);
+    return HttpResponse.json({ items: [poll] });
+  }));
+  const user = userEvent.setup();
+  renderFeed();
+
+  await user.click(await screen.findByRole('button', { name: 'Following' }));
+
+  expect(screen.getByText(/Sign in to see polls from people you follow/)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login?next=%2F');
+  expect(screen.getByRole('button', { name: 'Refresh feed' })).toBeDisabled();
+  expect(requests).toEqual(['/polls']);
+});
+
+test('restores the selected feed tab and its cached pages after returning from comments', async () => {
+  const requests: string[] = [];
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: authenticatedUser })),
+    http.get('/polls', () => cursorPage([{ ...poll, question: 'For you tab?' }], null)),
+    http.get('/polls/subscriptions', ({ request }) => {
+      const url = new URL(request.url);
+      requests.push(url.searchParams.get('cursor') ?? '<first>');
+      return url.searchParams.has('cursor')
+        ? cursorPage([{ ...poll, id: 'following-2', question: 'Following cached second?' }], null)
+        : cursorPage([{ ...poll, id: 'following-1', question: 'Following cached first?' }], 'following-cursor');
+    }),
+  );
+  const user = userEvent.setup();
+  function BackToFeed() {
+    const navigate = useNavigate();
+    return <button type="button" onClick={() => navigate(-1)}>Back to feed</button>;
+  }
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } })}>
+      <SessionProvider>
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route path="/" element={<FeedPage />} />
+            <Route path="/polls/:pollId" element={<BackToFeed />} />
+          </Routes>
+        </MemoryRouter>
+      </SessionProvider>
+    </QueryClientProvider>,
+  );
+
+  await user.click(await screen.findByRole('button', { name: 'Following' }));
+  expect(await screen.findByText('Following cached first?')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  expect(await screen.findByText('Following cached second?')).toBeInTheDocument();
+  await user.click(screen.getAllByRole('button', { name: 'Comments (0)' })[0]);
+  await user.click(await screen.findByRole('button', { name: 'Back to feed' }));
+
+  expect(await screen.findByText('Following cached first?')).toBeInTheDocument();
+  expect(screen.getByText('Following cached second?')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Following' })).toHaveAttribute('aria-pressed', 'true');
+  expect(requests).toEqual(['<first>', 'following-cursor']);
+});
+
+test('keeps append errors scoped to their tab when switching between feed surfaces', async () => {
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: authenticatedUser })),
+    http.get('/polls', ({ request }) => new URL(request.url).searchParams.has('cursor')
+      ? HttpResponse.json({ error: 'unavailable', message: 'For you append failed.' }, { status: 503 })
+      : cursorPage([{ ...poll, question: 'For you cached page?' }], 'for-you-cursor')),
+    http.get('/polls/subscriptions', () => cursorPage([{ ...poll, id: 'following-1', question: 'Following separate page?' }], null)),
+  );
+  const user = userEvent.setup();
+  renderFeed();
+
+  expect(await screen.findByText('For you cached page?')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('For you append failed.');
+  await user.click(screen.getByRole('button', { name: 'Following' }));
+
+  expect(await screen.findByText('Following separate page?')).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'For you' }));
+
+  expect(screen.getByText('For you cached page?')).toBeInTheDocument();
+  expect(screen.getByRole('alert')).toHaveTextContent('For you append failed.');
+  expect(screen.getByRole('button', { name: 'Retry loading more' })).toBeEnabled();
 });

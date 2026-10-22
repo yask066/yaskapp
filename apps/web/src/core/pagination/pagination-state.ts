@@ -12,6 +12,10 @@ export interface PaginationQueryScope {
   followingGeneration?: number;
 }
 
+export function followingGenerationQueryKey(sessionEpoch: number, userId: string | null) {
+  return ['pagination', 'following-generation', sessionEpoch, userId] as const;
+}
+
 export function paginationQueryKey(scope: PaginationQueryScope) {
   return [
     'pagination',

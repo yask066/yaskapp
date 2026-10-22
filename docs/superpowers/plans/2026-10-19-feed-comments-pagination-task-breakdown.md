@@ -10,7 +10,7 @@
 
 **Spec:** [PRD: Полная пагинация ленты и комментариев](../../prd-feed-comments-pagination.md).
 
-**Статус:** Backlog, 28 задач; T01–T03, T05–T12 и T15–T16 отмечены выполненными. Остальные задачи открыты. Декомпозиция сохраняет scope PRD; решения для реализации зафиксированы в ADR T01. Документ можно переносить в трекер по одной задаче на карточку.
+**Статус:** Backlog, 28 задач; T01–T03, T05–T12 и T15–T17 отмечены выполненными. Остальные задачи открыты. Декомпозиция сохраняет scope PRD; решения для реализации зафиксированы в ADR T01. Документ можно переносить в трекер по одной задаче на карточку.
 
 ## Global Constraints
 
@@ -331,10 +331,10 @@
 
 **Файлы:** `features/feed/FeedPage.tsx`, `FeedPage.test.tsx`; создать `components/PaginationFooter.tsx`; follow invalidation в существующих consumers `api/profiles.ts` по месту вызова.
 
-- [ ] Добавить tests viewport/button append, double click, retry, refresh, вкладок и возврата; Following должен вызывать `/polls/subscriptions`, а не общий `/polls`.
-- [ ] Перевести ленту на `useInfiniteQuery` с helpers T16; добавить явный Refresh, footer и guest state Following. Отдельно сохранить состояния вкладок.
-- [ ] При follow/unfollow инвалидировать только персональную выдачу с новым generation; добавить ограничение трёх автоматических загрузок и ручной recovery.
-- [ ] Выполнить WEB-FEED и web typecheck.
+- [x] Добавить tests viewport/button append, double click, retry, refresh, вкладок и возврата; Following должен вызывать `/polls/subscriptions`, а не общий `/polls`.
+- [x] Перевести ленту на `useInfiniteQuery` с helpers T16; добавить явный Refresh, footer и guest state Following. Отдельно сохранить состояния вкладок.
+- [x] При follow/unfollow инвалидировать только персональную выдачу с новым generation; добавить ограничение трёх автоматических загрузок и ручной recovery.
+- [x] Выполнить WEB-FEED и web typecheck.
 
 **Готово, когда:** вторая/третья страницы доступны, Following содержит только подписки, переключение вкладки не смешивает pages или ошибки.
 

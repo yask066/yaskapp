@@ -10,6 +10,7 @@ import { Avatar } from '../../components/Avatar';
 import { PollCard } from '../../components/PollCard';
 import { useListScrollState } from '../../core/scroll/useListScrollState';
 import { EntryMotion } from '../../core/motion/EntryMotion';
+import { followingGenerationQueryKey } from '../../core/pagination/pagination-state';
 
 function replaceFollowState(profile: PublicProfile, relationship: FollowRelationship): PublicProfile { return { ...profile, viewerIsFollowing: relationship.following, profile: { ...profile.profile, followersCount: relationship.followeeFollowersCount } }; }
 
@@ -23,7 +24,10 @@ export function PublicProfilePage() {
     { itemIds: pollsQuery.data?.map((poll) => poll.id) ?? [], restoreFocusOnPop: navigationType === 'POP' },
   );
   const profileEntryContext = `profile:${sessionEpoch}:${user?.id ?? 'anonymous'}:${userId}`;
-  const followMutation = useMutation({ mutationFn: (following: boolean) => following ? unfollowUser(userId) : followUser(userId), onSuccess: (relationship) => queryClient.setQueryData<PublicProfile>(['profile', userId], (profile) => profile ? replaceFollowState(profile, relationship) : profile) });
+  const followMutation = useMutation({ mutationFn: (following: boolean) => following ? unfollowUser(userId) : followUser(userId), onSuccess: (relationship) => {
+    queryClient.setQueryData<PublicProfile>(['profile', userId], (profile) => profile ? replaceFollowState(profile, relationship) : profile);
+    if (user) queryClient.setQueryData<number>(followingGenerationQueryKey(sessionEpoch, user.id), (generation) => (generation ?? 0) + 1);
+  } });
   if (user?.id === userId) return <Navigate to="/me" replace />;
   if (profileQuery.isPending && !profileQuery.data) return <main id="main-content"><AsyncState state="loading" kind="user" rows={1} /></main>;
   if (!profileQuery.data) return <main id="main-content"><AsyncState state="error" error={profileQuery.error} onRetry={() => void profileQuery.refetch()} /></main>;

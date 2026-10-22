@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   acceptPage,
   canAppend,
+  followingGenerationQueryKey,
   mergePageIds,
   paginationQueryKey,
   paginationQueryOptions,
@@ -40,6 +41,11 @@ const context = (
 const page = (nextCursor: string | null) => ({ items: [], nextCursor, paginationSupported: true });
 
 describe('pagination state helpers', () => {
+  test('scopes the Following generation by session and viewer', () => {
+    expect(followingGenerationQueryKey(4, 'user-1')).toEqual(['pagination', 'following-generation', 4, 'user-1']);
+    expect(followingGenerationQueryKey(5, null)).toEqual(['pagination', 'following-generation', 5, null]);
+  });
+
   test('merges page IDs in order and keeps the first occurrence', () => {
     const pages = [
       { items: [{ id: 'a' }, { id: 'b' }] },

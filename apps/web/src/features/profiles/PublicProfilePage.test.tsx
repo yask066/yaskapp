@@ -6,6 +6,7 @@ import { setupServer } from 'msw/node';
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest';
 import { SessionProvider } from '../../app/session-provider';
+import { followingGenerationQueryKey, paginationQueryKey } from '../../core/pagination/pagination-state';
 import { listScrollState } from '../../core/scroll/list-scroll-state';
 import { PublicProfilePage } from './PublicProfilePage';
 
@@ -22,6 +23,53 @@ const server = setupServer();
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => { server.resetHandlers(); sessionStorage.clear(); listScrollState.clear(); vi.restoreAllMocks(); });
 afterAll(() => server.close());
+
+test('advances only the active viewer Following generation after a successful follow', async () => {
+  const viewer = {
+    id: 'viewer-user', email: 'viewer@example.com', username: 'viewer', status: 'active',
+    profile: { displayName: 'Viewer', pollsCount: 0, followersCount: 0, followingCount: 0, countryCode: 'BY', bio: null, avatarObjectKey: null, avatarUrl: null },
+  };
+  const oldFollowingKey = paginationQueryKey({ surface: 'subscriptions', sessionEpoch: 0, userId: viewer.id, followingGeneration: 0 });
+  const forYouKey = paginationQueryKey({ surface: 'feed', sessionEpoch: 0, userId: viewer.id, sort: 'newest' });
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: viewer })),
+    http.get('/users/profile-user', () => HttpResponse.json({ user: {
+      id: 'profile-user', username: 'profile', status: 'active', viewerIsFollowing: false,
+      profile: { displayName: 'Profile', pollsCount: 1, followersCount: 0, followingCount: 0, countryCode: null, bio: null, avatarObjectKey: null, avatarUrl: null },
+    } })),
+    http.get('/users/profile-user/polls', () => HttpResponse.json({ items: [poll] })),
+    http.post('/users/profile-user/follow', () => HttpResponse.json({ following: true, followerFollowingCount: 1, followeeFollowersCount: 1 })),
+    http.delete('/users/profile-user/follow', () => HttpResponse.json({ following: false, followerFollowingCount: 0, followeeFollowersCount: 0 })),
+  );
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  const forYouData = { marker: 'for-you-cache' };
+  const oldFollowingData = { marker: 'old-following-cache' };
+  queryClient.setQueryData(followingGenerationQueryKey(0, viewer.id), 0);
+  queryClient.setQueryData(forYouKey, forYouData);
+  queryClient.setQueryData(oldFollowingKey, oldFollowingData);
+  const user = userEvent.setup();
+
+  render(
+    <QueryClientProvider client={queryClient}>
+      <SessionProvider>
+        <MemoryRouter initialEntries={['/users/profile-user']}>
+          <Routes><Route path="/users/:userId" element={<PublicProfilePage />} /></Routes>
+        </MemoryRouter>
+      </SessionProvider>
+    </QueryClientProvider>,
+  );
+
+  await user.click(await screen.findByRole('button', { name: 'Follow' }));
+  expect(await screen.findByRole('button', { name: 'Following' })).toBeEnabled();
+  expect(queryClient.getQueryData(followingGenerationQueryKey(0, viewer.id))).toBe(1);
+  expect(queryClient.getQueryData(forYouKey)).toBe(forYouData);
+  expect(queryClient.getQueryData(oldFollowingKey)).toBe(oldFollowingData);
+
+  await user.click(screen.getByRole('button', { name: 'Following' }));
+  expect(await screen.findByRole('button', { name: 'Follow' })).toBeEnabled();
+  expect(queryClient.getQueryData(followingGenerationQueryKey(0, viewer.id))).toBe(2);
+  expect(queryClient.getQueryData(forYouKey)).toBe(forYouData);
+});
 
 test('restores the public-profile poll anchor and focus after opening a poll and returning', async () => {
   server.use(
