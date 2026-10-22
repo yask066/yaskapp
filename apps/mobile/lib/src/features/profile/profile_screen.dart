@@ -479,14 +479,6 @@ class ProfileScreenState extends State<ProfileScreen> {
                                 width: double.infinity,
                                 child: OutlinedButton(
                                   onPressed: () => _openEditProfile(context),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.person_outline, size: 20),
-                                      SizedBox(width: 8),
-                                      Text('Edit profile'),
-                                    ],
-                                  ),
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: navy,
                                     side: const BorderSide(color: navy),
@@ -499,6 +491,14 @@ class ProfileScreenState extends State<ProfileScreen> {
                                       fontSize: 15,
                                       fontWeight: FontWeight.w600,
                                     ),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.person_outline, size: 20),
+                                      SizedBox(width: 8),
+                                      Text('Edit profile'),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -630,73 +630,6 @@ class ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ProfileSection extends StatelessWidget {
-  const _ProfileSection({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colors.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: children,
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfileRow extends StatelessWidget {
-  const _ProfileRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(icon, color: colors.onSurfaceVariant),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(color: colors.onSurfaceVariant),
-            ),
-          ),
-          Flexible(
-            child: Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.end,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
       ),
     );
   }

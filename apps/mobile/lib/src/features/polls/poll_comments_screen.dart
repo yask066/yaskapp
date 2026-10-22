@@ -249,8 +249,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
 
     var target = _findComment(roots, targetId);
     var rootContext = target?.parentCommentId == null ? target : null;
-    var rootCommentId =
-        target?.parentCommentId == null ? target?.id : target?.parentCommentId;
+    var rootCommentId = target?.parentCommentId ?? target?.id;
     String? replyId;
     String? loadMessage;
 
@@ -446,17 +445,18 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
   }
 
   Future<void> _revealTargetComment(List<PollCommentSummary> comments) async {
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
     for (var attempt = 0; attempt < 100; attempt++) {
       if (!mounted || _userScrolledComments) return;
 
       final targetContext = _targetReplyId == null
           ? _targetCommentKey.currentContext
           : _targetReplyKey.currentContext;
-      if (targetContext != null) {
+      if (targetContext != null && targetContext.mounted) {
         await Scrollable.ensureVisible(
           targetContext,
           alignment: 0.25,
-          duration: MediaQuery.disableAnimationsOf(context)
+          duration: disableAnimations
               ? Duration.zero
               : const Duration(milliseconds: 280),
           curve: Curves.easeOut,

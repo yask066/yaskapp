@@ -291,9 +291,10 @@
 
 **Файлы:** Flutter screens; `core/scroll/list_scroll_anchor_host.dart`, `list_scroll_state.dart` и соответствующие tests только по необходимости; существующие motion-компоненты.
 
-- [ ] Добавить widget tests возврата к третьей странице, media resize, footer error, удалённого якоря и клавиатуры; восстановление списка предшествует якорю и не перезапрашивает всю цепочку.
-- [ ] Проверить screen reader labels, увеличенный текст, ручное продолжение, reduced motion и отсутствие повторной entry-анимации прежних ID.
-- [ ] Выполнить FLUTTER-FINAL; на Android проверить якорь с допуском 8 logical px и сохранить evidence. Frame/memory profile входит в T27.
+- [x] Добавить widget tests возврата к третьей странице, media resize, footer error, удалённого якоря и клавиатуры; восстановление списка предшествует якорю и не перезапрашивает всю цепочку.
+- [x] Проверить screen reader labels, увеличенный текст, ручное продолжение, reduced motion и отсутствие повторной entry-анимации прежних ID.
+- [x] Выполнить FLUTTER-FINAL (`flutter analyze`, `flutter test`, `flutter build apk --debug`) с нулевым кодом выхода.
+- [ ] На Android проверить якорь с допуском 8 logical px и сохранить runtime evidence; widget tests подтверждают те же условия на тестовой платформе. Frame/memory profile входит в T27.
 
 **Готово, когда:** целевые flow и доступность подтверждены, in-memory страницы не теряются при возврате; относящиеся к scope failures устранены.
 

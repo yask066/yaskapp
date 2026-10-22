@@ -72,7 +72,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
             ? ListView(
                 children: [
                   const SizedBox(height: 160),
-                  Center(child: Text('Could not load your reports.')),
+                  const Center(child: Text('Could not load your reports.')),
                   Center(
                     child: TextButton(
                       onPressed: _isLoading ? null : () => _loadReports(),
@@ -89,7 +89,9 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                   if (index == _reports.length) {
                     return Center(
                       child: TextButton(
-                        onPressed: _isLoading ? null : () => _loadReports(append: true),
+                        onPressed: _isLoading
+                            ? null
+                            : () => _loadReports(append: true),
                         child: _isLoading
                             ? const CircularProgressIndicator()
                             : const Text('Load more'),

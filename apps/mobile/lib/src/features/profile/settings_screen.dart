@@ -112,7 +112,7 @@ class _SettingsTile extends StatelessWidget {
         label,
         style: TextStyle(color: color, fontSize: 16),
       ),
-      trailing: Icon(Icons.chevron_right, color: color.withOpacity(0.55)),
+      trailing: Icon(Icons.chevron_right, color: color.withValues(alpha: 0.55)),
       onTap: onTap,
     );
   }

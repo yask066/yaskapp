@@ -368,7 +368,7 @@ void main() {
 
     expect(find.byType(PollCommentsScreen), findsOneWidget);
     expect(find.text('This comment is no longer available.'), findsOneWidget);
-    final targetReads = () => requestedPaths
+    int targetReads() => requestedPaths
         .where((path) => path == '/polls/poll-1/comments/comment-missing')
         .length;
     expect(targetReads(), 1);

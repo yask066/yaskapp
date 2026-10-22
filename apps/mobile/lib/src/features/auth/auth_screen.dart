@@ -460,11 +460,11 @@ class _SocialButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final showUnavailable = () {
+    void showUnavailable() {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Social login is not available yet.')),
       );
-    };
+    }
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,

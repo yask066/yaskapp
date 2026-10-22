@@ -5,6 +5,185 @@ import 'package:yaskapp_mobile/src/core/scroll/list_scroll_state.dart';
 import 'package:yaskapp_mobile/src/core/scroll/list_scroll_anchor_host.dart';
 
 void main() {
+  testWidgets('restores the visible anchor when media above it resizes', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    final store = ListScrollStateStore();
+    const context = ListScrollContext(
+      userId: 'viewer',
+      route: '/feed',
+      list: 'polls',
+      query: '',
+      filter: '',
+      sort: '',
+    );
+    var mediaHeight = 120.0;
+    final itemIds = List.generate(24, (index) => 'item-$index');
+
+    Widget buildList() => MaterialApp(
+          home: Scaffold(
+            body: ListScrollAnchorHost(
+              context: context,
+              store: store,
+              controller: controller,
+              itemIds: itemIds,
+              child: ListView.builder(
+                controller: controller,
+                itemCount: itemIds.length,
+                itemBuilder: (context, index) => ListScrollAnchorItem(
+                  id: itemIds[index],
+                  child: SizedBox(
+                    height: index == 0 ? mediaHeight : 80,
+                    child: Text(itemIds[index]),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(buildList());
+    controller.jumpTo(600);
+    await tester.pumpAndSettle();
+    final anchor = find.text('item-7');
+    final before = tester.getTopLeft(anchor).dy;
+    expect(store.read(context)?.id, 'item-7');
+
+    mediaHeight += 96;
+    await tester.pumpWidget(buildList());
+    await tester.pumpAndSettle();
+
+    expect((tester.getTopLeft(anchor).dy - before).abs(), lessThanOrEqualTo(8));
+  });
+
+  testWidgets('keeps the nearest visible neighbor when its anchor is deleted', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    final store = ListScrollStateStore();
+    const context = ListScrollContext(
+      userId: 'viewer',
+      route: '/feed',
+      list: 'polls',
+      query: '',
+      filter: '',
+      sort: '',
+    );
+    var itemIds = List.generate(20, (index) => 'item-$index');
+
+    Widget buildList() => MaterialApp(
+          home: Scaffold(
+            body: ListScrollAnchorHost(
+              context: context,
+              store: store,
+              controller: controller,
+              itemIds: itemIds,
+              child: ListView.builder(
+                controller: controller,
+                itemCount: itemIds.length,
+                itemBuilder: (context, index) => ListScrollAnchorItem(
+                  id: itemIds[index],
+                  child: SizedBox(height: 80, child: Text(itemIds[index])),
+                ),
+              ),
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(buildList());
+    controller.jumpTo(480);
+    await tester.pumpAndSettle();
+    final before = tester.getTopLeft(find.text('item-7')).dy;
+    expect(store.read(context)?.id, 'item-6');
+
+    itemIds = itemIds.where((id) => id != 'item-6').toList();
+    await tester.pumpWidget(buildList());
+    await tester.pumpAndSettle();
+
+    expect((tester.getTopLeft(find.text('item-7')).dy - before).abs(),
+        lessThanOrEqualTo(8));
+  });
+
+  testWidgets(
+      'keeps the list anchor stable when the keyboard resizes its viewport', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewInsets = FakeViewPadding.zero;
+    addTearDown(tester.view.reset);
+
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    final store = ListScrollStateStore();
+    const context = ListScrollContext(
+      userId: 'viewer',
+      route: '/comments',
+      list: 'roots',
+      query: '',
+      filter: '',
+      sort: 'newest',
+    );
+    final itemIds = List.generate(30, (index) => 'comment-$index');
+
+    Widget buildList() => MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Expanded(
+                  child: ListScrollAnchorHost(
+                    context: context,
+                    store: store,
+                    controller: controller,
+                    itemIds: itemIds,
+                    child: ListView.builder(
+                      controller: controller,
+                      itemCount: itemIds.length,
+                      itemBuilder: (context, index) => ListScrollAnchorItem(
+                        id: itemIds[index],
+                        child: SizedBox(
+                          height: 80,
+                          child: Text(itemIds[index]),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const TextField(
+                    decoration: InputDecoration(labelText: 'Reply')),
+              ],
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(buildList());
+    controller.jumpTo(640);
+    await tester.pumpAndSettle();
+    final anchor = find.text('comment-9');
+    final before = tester.getTopLeft(anchor).dy;
+    expect(store.read(context)?.id, 'comment-8');
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+    await tester.pumpAndSettle();
+
+    expect(
+        tester.getRect(find.byType(TextField)).bottom, lessThanOrEqualTo(520));
+    expect((tester.getTopLeft(anchor).dy - before).abs(), lessThanOrEqualTo(8));
+  });
+
   testWidgets('keeps the visible item anchored when earlier items are removed',
       (tester) async {
     final controller = ScrollController();
@@ -68,7 +247,7 @@ void main() {
     final after = tester.getTopLeft(find.text('item-5')).dy;
     expect((after - before).abs(), lessThanOrEqualTo(2));
 
-    itemIds = [...itemIds, ...List.generate(8, (index) => 'next-${index}')];
+    itemIds = [...itemIds, ...List.generate(8, (index) => 'next-$index')];
     await tester.pumpWidget(buildList());
     await tester.pumpAndSettle();
     final beforeDetail = tester.getTopLeft(find.text('item-5')).dy;

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -172,6 +173,155 @@ void main() {
       'opaque-following-cursor',
       'opaque-following-cursor',
     ]);
+  });
+
+  testWidgets('returning from comments keeps page three and its cursor chain', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final requests = <Uri>[];
+    final pages = List.generate(
+      3,
+      (page) => List.generate(20, (index) => 'page-${page + 1}-$index'),
+    );
+    final client = PollsApiClient(
+      config: const ApiConfig(baseUrl: 'http://api.test'),
+      httpClient: MockClient((request) async {
+        requests.add(request.url);
+        if (request.url.path == '/polls/subscriptions') {
+          final cursor = request.url.queryParameters['cursor'];
+          final pageIndex = switch (cursor) {
+            null => 0,
+            'following-page-2' => 1,
+            'following-page-3' => 2,
+            _ => throw StateError('Unexpected subscriptions cursor: $cursor'),
+          };
+          return http.Response(
+            jsonEncode({
+              'items': pages[pageIndex].map(_pollJson).toList(),
+              'nextCursor': switch (pageIndex) {
+                0 => 'following-page-2',
+                1 => 'following-page-3',
+                _ => null,
+              },
+            }),
+            200,
+          );
+        }
+        return http.Response(
+          jsonEncode({'items': [], 'nextCursor': null}),
+          200,
+        );
+      }),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SubscriptionsScreen(
+          session: _session,
+          pollsApiClient: client,
+          realtimeClient: _FakeRealtimeClient(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final thirdPagePoll = find.byKey(const ValueKey('poll-page-3-0'));
+    await tester.scrollUntilVisible(thirdPagePoll, 350);
+    await tester.pumpAndSettle();
+    expect(thirdPagePoll, findsOneWidget);
+    expect(
+      requests
+          .where((uri) => uri.path == '/polls/subscriptions')
+          .map((uri) => uri.queryParameters['cursor']),
+      [null, 'following-page-2', 'following-page-3'],
+    );
+
+    await tester.tap(
+      find.descendant(
+        of: thirdPagePoll,
+        matching: find.byTooltip('Comments'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Back'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+
+    expect(thirdPagePoll, findsOneWidget);
+    expect(
+      requests
+          .where((uri) => uri.path == '/polls/subscriptions')
+          .map((uri) => uri.queryParameters['cursor']),
+      [null, 'following-page-2', 'following-page-3'],
+    );
+  });
+
+  testWidgets('append error keeps a visible poll anchored in Following', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final appendResponse = Completer<http.Response>();
+    var subscriptionsRequests = 0;
+    final client = PollsApiClient(
+      config: const ApiConfig(baseUrl: 'http://api.test'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/polls/subscriptions') {
+          subscriptionsRequests++;
+          if (subscriptionsRequests == 1) {
+            return http.Response(
+              jsonEncode({
+                'items':
+                    List.generate(20, (index) => _pollJson('page-1-$index')),
+                'nextCursor': 'following-page-2',
+              }),
+              200,
+            );
+          }
+          return appendResponse.future;
+        }
+        return http.Response(
+          jsonEncode({'items': [], 'nextCursor': null}),
+          200,
+        );
+      }),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SubscriptionsScreen(
+          session: _session,
+          pollsApiClient: client,
+          realtimeClient: _FakeRealtimeClient(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final lastPoll = find.byKey(const ValueKey('poll-page-1-19'));
+    await tester.scrollUntilVisible(lastPoll, 350);
+    await tester.pump();
+    expect(subscriptionsRequests, 2);
+    final beforeError = tester.getTopLeft(lastPoll).dy;
+
+    appendResponse.complete(
+      http.Response(jsonEncode({'message': 'offline'}), 503),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not load more.'), findsOneWidget);
+    expect((tester.getTopLeft(lastPoll).dy - beforeError).abs(),
+        lessThanOrEqualTo(8));
+    expect(subscriptionsRequests, 2);
   });
 }
 

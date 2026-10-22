@@ -406,37 +406,3 @@ class _CreateNavigationIcon extends StatelessWidget {
     );
   }
 }
-
-class _SimplePlaceholderScreen extends StatelessWidget {
-  const _SimplePlaceholderScreen({
-    required this.title,
-    required this.icon,
-    required this.message,
-  });
-
-  final String title;
-  final IconData icon;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Text(title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 44, color: const Color(0xFF566A9D)),
-            const SizedBox(height: 14),
-            Text(message, style: const TextStyle(color: Color(0xFF667085))),
-          ],
-        ),
-      ),
-    );
-  }
-}

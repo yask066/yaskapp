@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// Footer controls and status for a cursor-paginated list.
-class PaginationFooter extends StatelessWidget {
+class PaginationFooter extends StatefulWidget {
   const PaginationFooter({
     super.key,
     required this.hasMore,
@@ -22,25 +22,72 @@ class PaginationFooter extends StatelessWidget {
   final VoidCallback? onRetry;
 
   @override
-  Widget build(BuildContext context) {
-    if (!paginationSupported) return const SizedBox.shrink();
+  State<PaginationFooter> createState() => _PaginationFooterState();
+}
 
-    if (loading) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Center(
-          child: Semantics(
-            label: 'Loading more',
-            child: const SizedBox.square(
-              dimension: 22,
-              child: CircularProgressIndicator(strokeWidth: 2),
+class _PaginationFooterState extends State<PaginationFooter> {
+  final FocusNode _actionFocusNode =
+      FocusNode(debugLabel: 'pagination footer action');
+  bool _restoreActionFocusAfterBuild = false;
+
+  bool get _hasFocusablePresentation =>
+      widget.paginationSupported &&
+      (widget.loading || widget.error != null || widget.hasMore);
+
+  @override
+  void didUpdateWidget(covariant PaginationFooter oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final presentationChanged = oldWidget.loading != widget.loading ||
+        oldWidget.error != widget.error ||
+        oldWidget.hasMore != widget.hasMore ||
+        oldWidget.paginationSupported != widget.paginationSupported;
+    if (presentationChanged &&
+        _hasFocusablePresentation &&
+        _actionFocusNode.hasFocus) {
+      _restoreActionFocusAfterBuild = true;
+    }
+  }
+
+  @override
+  void dispose() {
+    _actionFocusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.paginationSupported) return const SizedBox.shrink();
+
+    if (_restoreActionFocusAfterBuild) {
+      _restoreActionFocusAfterBuild = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            _hasFocusablePresentation &&
+            _actionFocusNode.canRequestFocus) {
+          _actionFocusNode.requestFocus();
+        }
+      });
+    }
+
+    if (widget.loading) {
+      return Focus(
+        focusNode: _actionFocusNode,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Center(
+            child: Semantics(
+              label: 'Loading more',
+              child: const SizedBox.square(
+                dimension: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
             ),
           ),
         ),
       );
     }
 
-    if (error != null) {
+    if (widget.error != null) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 16),
         child: Column(
@@ -49,7 +96,8 @@ class PaginationFooter extends StatelessWidget {
             const Text('Could not load more.'),
             const SizedBox(height: 8),
             OutlinedButton(
-              onPressed: onRetry,
+              focusNode: _actionFocusNode,
+              onPressed: widget.onRetry,
               child: const Text('Retry'),
             ),
           ],
@@ -57,12 +105,13 @@ class PaginationFooter extends StatelessWidget {
       );
     }
 
-    if (hasMore) {
+    if (widget.hasMore) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Center(
           child: OutlinedButton(
-            onPressed: onLoadMore,
+            focusNode: _actionFocusNode,
+            onPressed: widget.onLoadMore,
             child: const Text('Load more'),
           ),
         ),
@@ -73,7 +122,7 @@ class PaginationFooter extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 20),
       child: Center(
         child: Text(
-          endMessage,
+          widget.endMessage,
           textAlign: TextAlign.center,
           style:
               TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),

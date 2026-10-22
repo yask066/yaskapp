@@ -295,9 +295,9 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
                         }),
               ),
               const SizedBox(height: 24),
-              Text(
+              const Text(
                 'Options',
-                style: const TextStyle(
+                style: TextStyle(
                   color: primaryText,
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
