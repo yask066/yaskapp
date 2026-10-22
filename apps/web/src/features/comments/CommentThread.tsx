@@ -12,6 +12,7 @@ import { EntryMotion } from '../../core/motion/EntryMotion';
 import { ContentEntryTransition } from '../../components/ContentEntryTransition';
 import { AsyncState } from '../../components/AsyncState';
 import { focusRetryLandmark } from '../../components/focusRetryLandmark';
+import { paginationQueryKey, paginationQueryOptions } from '../../core/pagination/pagination-state';
 
 interface CommentThreadProps {
   pollId: string;
@@ -33,13 +34,16 @@ export function CommentThread({
   onReplyCreated,
 }: CommentThreadProps) {
   const queryClient = useQueryClient();
-  const queryKey = ['comment-replies', pollId, rootComment.id] as const;
+  const queryKey = paginationQueryKey({
+    surface: 'replies', sessionEpoch, userId: currentUserId ?? null, pollId, rootId: rootComment.id,
+  });
   const [isExpanded, setIsExpanded] = useState(autoExpand || Boolean(focusedReplyId));
   const [isReplying, setIsReplying] = useState(false);
   const focusedReplyRef = useRef<HTMLLIElement | null>(null);
   const didFocusReply = useRef(false);
   const repliesQuery = useInfiniteQuery({
     queryKey,
+    ...paginationQueryOptions,
     queryFn: ({ pageParam, signal }) => listCommentReplies(pollId, rootComment.id, { cursor: pageParam }, signal),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,

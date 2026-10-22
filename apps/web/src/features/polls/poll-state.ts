@@ -107,7 +107,15 @@ function isPoll(value: unknown): value is Poll {
 
 export function replacePollInQueryData<T>(data: T, poll: Poll): T {
   if (isPoll(data)) return (data.id === poll.id ? poll : data) as T;
-  if (Array.isArray(data)) return data.map((item) => replacePollInQueryData(item, poll)) as T;
+  if (Array.isArray(data)) {
+    let changed = false;
+    const next = data.map((item) => {
+      const replacement = replacePollInQueryData(item, poll);
+      if (replacement !== item) changed = true;
+      return replacement;
+    });
+    return (changed ? next : data) as T;
+  }
   if (data && typeof data === 'object') {
     const source = data as Record<string, unknown>;
     let changed = false;
@@ -190,7 +198,17 @@ export async function reconcileCachedPolls(client: QueryClient, viewerId: string
 export function reconcilePollQueryData<T>(client: QueryClient, data: T, viewerId: string | null, expectedEpoch = pollSessionEpoch(client), startedGeneration = clientState(client).generation, allowLegacyViewerState = true): T {
   const visit = (value: unknown): unknown => {
     if (isPoll(value)) return ingestPoll(client, value, 'http', viewerId, expectedEpoch, startedGeneration, allowLegacyViewerState);
-    if (Array.isArray(value)) return value.map(visit).filter((item) => item !== undefined);
+    if (Array.isArray(value)) {
+      let changed = false;
+      const next: unknown[] = [];
+      for (const item of value) {
+        const reconciled = visit(item);
+        if (reconciled !== item) changed = true;
+        if (reconciled === undefined && item !== undefined) { changed = true; continue; }
+        next.push(reconciled);
+      }
+      return changed ? next : value;
+    }
     if (value && typeof value === 'object') {
       let changed = false;
       const next: Record<string, unknown> = {};
@@ -232,7 +250,17 @@ export function deleteCachedPoll(client: QueryClient, pollId: string): void {
   for (const query of client.getQueryCache().findAll()) {
     const remove = (value: unknown): unknown => {
       if (isPoll(value)) return value.id === pollId ? undefined : value;
-      if (Array.isArray(value)) return value.map(remove).filter((item) => item !== undefined);
+      if (Array.isArray(value)) {
+        let changed = false;
+        const next: unknown[] = [];
+        for (const item of value) {
+          const removed = remove(item);
+          if (removed !== item) changed = true;
+          if (removed === undefined && item !== undefined) { changed = true; continue; }
+          next.push(removed);
+        }
+        return changed ? next : value;
+      }
       if (value && typeof value === 'object') {
         const entries = Object.entries(value).map(([key, item]) => [key, remove(item)] as const);
         return Object.fromEntries(entries.filter(([, item]) => item !== undefined));

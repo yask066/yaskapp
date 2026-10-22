@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
 import { decodePoll, type Poll } from '../../api/models';
-import { beginPollOperation, fetchPollQuery, finishPollOperation, mergePollSnapshot, replacePollInQueryData, resetPollSession } from './poll-state';
+import { beginPollOperation, deleteCachedPoll, fetchPollQuery, finishPollOperation, ingestPoll, mergePollSnapshot, replacePollInQueryData, resetPollSession } from './poll-state';
 
 const poll = {
   id: 'poll-1', author: { id: 'author-1', username: 'author', displayName: 'Author', avatarObjectKey: null, avatarUrl: null },
@@ -89,5 +89,71 @@ describe('mergePollSnapshot', () => {
     expect(decoded.stateRevisions?.votes).toBe('9007199254740993');
     expect(decoded.viewerState).toEqual({ hasLiked: false, voteOptionId: null });
     expect(() => decodePoll({ ...poll, votesCount: 10 })).toThrow();
+  });
+});
+
+describe('InfiniteData cache compatibility', () => {
+  const otherPoll = { ...poll, id: 'poll-2', question: 'Another question?' };
+
+  function infiniteData() {
+    const pageParams: (string | undefined)[] = [undefined, 'cursor-2'];
+    const data = {
+      pages: [
+        { items: [poll], nextCursor: 'cursor-2', paginationSupported: true },
+        { items: [otherPoll], nextCursor: null, paginationSupported: true },
+      ],
+      pageParams,
+    };
+    return { data, pageParams };
+  }
+
+  test('preserves InfiniteData pageParams when replacing a poll in a page', () => {
+    const { data, pageParams } = infiniteData();
+    const replaced = replacePollInQueryData(data, snapshot({ likesCount: 10 }));
+
+    expect(replaced.pages[0]?.items[0]?.likesCount).toBe(10);
+    expect(replaced.pages[0]?.nextCursor).toBe('cursor-2');
+    expect(replaced.pages[1]?.items[0]?.id).toBe(otherPoll.id);
+    expect(replaced.pageParams).toBe(pageParams);
+    expect(replaced.pageParams).toEqual([undefined, 'cursor-2']);
+  });
+
+  test('ingestPoll merges revisions through InfiniteData and keeps pageParams unchanged', () => {
+    const client = new QueryClient();
+    const { data, pageParams } = infiniteData();
+    const key = ['polls', 'infinite'] as const;
+    client.setQueryData(key, data);
+
+    ingestPoll(client, snapshot({ likesCount: 10, viewerHasLiked: true }, { votes: '0', likes: '1', comments: '0' }), 'http', 'viewer');
+
+    const cached = client.getQueryData<typeof data>(key)!;
+    expect(cached.pages[0]?.items[0]).toMatchObject({ likesCount: 10, viewerHasLiked: true });
+    expect(cached.pages[0]?.nextCursor).toBe('cursor-2');
+    expect(cached.pages[1]?.items[0]?.id).toBe(otherPoll.id);
+    expect(cached.pageParams).toBe(pageParams);
+  });
+
+  test('fetchPollQuery reconciles every InfiniteData page without changing pageParams', async () => {
+    const client = new QueryClient();
+    const { data, pageParams } = infiniteData();
+
+    const result = await fetchPollQuery(client, 'viewer', async () => data);
+
+    expect(result.pages.map((item) => item.items.map((entry) => entry.id))).toEqual([[poll.id], [otherPoll.id]]);
+    expect(result.pages.map((item) => item.nextCursor)).toEqual(['cursor-2', null]);
+    expect(result.pageParams).toBe(pageParams);
+  });
+
+  test('deleteCachedPoll removes a tombstoned item without shifting InfiniteData page params', () => {
+    const client = new QueryClient();
+    const { data, pageParams } = infiniteData();
+    const key = ['polls', 'infinite'] as const;
+    client.setQueryData(key, data);
+
+    deleteCachedPoll(client, poll.id);
+
+    const cached = client.getQueryData<typeof data>(key)!;
+    expect(cached.pages.map((item) => item.items.map((entry) => entry.id))).toEqual([[], [otherPoll.id]]);
+    expect(cached.pageParams).toBe(pageParams);
   });
 });

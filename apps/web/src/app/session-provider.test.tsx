@@ -5,6 +5,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SessionProvider, useSession } from './session-provider';
 import { saveAccountDeletionReceipt } from '../features/account-deletion/account-deletion-receipt';
+import { paginationQueryKey } from '../core/pagination/pagination-state';
 
 const user = {
   id: 'user-1',
@@ -102,6 +103,30 @@ describe('SessionProvider', () => {
       release(Response.json({ user: { ...user, id: 'user-2', username: 'second' } }));
     });
     expect(screen.getByText('anonymous')).toBeInTheDocument();
+  });
+
+  it('does not restore infinite poll pages or viewer state from a prior account after logout and login', async () => {
+    const secondUser = { ...user, id: 'user-2', username: 'second' };
+    server.use(
+      http.get('/auth/me', () => HttpResponse.json({ user })),
+      http.post('/auth/logout', () => new HttpResponse(null, { status: 204 })),
+      http.post('/auth/login', () => HttpResponse.json({ user: secondUser })),
+    );
+    const { queryClient } = renderSession();
+    await screen.findByText('member');
+    const firstAccountKey = paginationQueryKey({ surface: 'feed', sessionEpoch: 0, userId: user.id, sort: 'newest' });
+    queryClient.setQueryData(firstAccountKey, {
+      pages: [{ items: [{ id: 'poll-1', viewerState: { hasLiked: true } }], nextCursor: 'cursor-1', paginationSupported: true }],
+      pageParams: [undefined],
+    });
+
+    await act(async () => { screen.getByRole('button', { name: 'Sign out' }).click(); });
+    expect(queryClient.getQueryData(firstAccountKey)).toBeUndefined();
+
+    await act(async () => { screen.getByRole('button', { name: 'Sign in' }).click(); });
+    expect(await screen.findByText('second')).toBeInTheDocument();
+    expect(queryClient.getQueryData(firstAccountKey)).toBeUndefined();
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
   });
 
   it('restores a cookie session and loads the current user', async () => {

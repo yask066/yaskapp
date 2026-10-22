@@ -10,7 +10,7 @@
 
 **Spec:** [PRD: Полная пагинация ленты и комментариев](../../prd-feed-comments-pagination.md).
 
-**Статус:** Backlog, 28 задач; T01–T03 и T05–T12 отмечены выполненными. Остальные задачи открыты. Декомпозиция сохраняет scope PRD; решения для реализации зафиксированы в ADR T01. Документ можно переносить в трекер по одной задаче на карточку.
+**Статус:** Backlog, 28 задач; T01–T03, T05–T12 и T15–T16 отмечены выполненными. Остальные задачи открыты. Декомпозиция сохраняет scope PRD; решения для реализации зафиксированы в ADR T01. Документ можно переносить в трекер по одной задаче на карточку.
 
 ## Global Constraints
 
@@ -306,9 +306,9 @@
 
 **Файлы:** `apps/web/src/api/models.ts`, `polls.ts`, `polls.test.ts`.
 
-- [ ] Проверить page decoding, explicit null, отсутствие legacy поля, неверный тип, cursor encoding, `AbortSignal`, newest/oldest и subscriptions auth.
-- [ ] Добавить page methods из общей секции, включая отсутствующий сейчас web subscriptions helper; существующие array consumers оставить совместимыми.
-- [ ] Выполнить WEB-API и web typecheck; проверить профильные tests как regression общих DTO/helpers.
+- [x] Проверить page decoding, explicit null, отсутствие legacy поля, неверный тип, cursor encoding, `AbortSignal`, newest/oldest и subscriptions auth.
+- [x] Добавить page methods из общей секции, включая отсутствующий сейчас web subscriptions helper; существующие array consumers оставить совместимыми.
+- [x] Выполнить WEB-API и web typecheck; проверить профильные tests как regression общих DTO/helpers.
 
 **Готово, когда:** новые UI получают metadata без потери текущего viewer/revision state; legacy server не запускает повтор первой страницы.
 
@@ -318,10 +318,10 @@
 
 **Файлы:** создать `core/pagination/pagination-state.ts`, `pagination-state.test.ts`; изменить `features/polls/poll-state.ts`/tests при необходимости.
 
-- [ ] Проверить cursor history, лимит автоматики, ID merge, устаревшие generations/session epochs, refresh success/failure при одновременном append и готовность повторного запроса после ошибки.
-- [ ] Реализовать helpers из общей секции; определить query keys со scope session/user/sort/poll/root и отключить refetch всех накопленных pages на focus.
-- [ ] Проверить `fetchPollQuery`/`ingestPoll`/`replacePollInQueryData` на `InfiniteData`: `pages` и `pageParams` сохраняются; revisions и tombstones обрабатываются как раньше. Не считать форму массива единственной допустимой.
-- [ ] Выполнить WEB-STATE и tests session lifecycle; assert logout/login не возвращает viewer state старого аккаунта.
+- [x] Проверить cursor history, лимит автоматики, ID merge, устаревшие generations/session epochs, refresh success/failure при одновременном append и готовность повторного запроса после ошибки.
+- [x] Реализовать helpers из общей секции; определить query keys со scope session/user/sort/poll/root и отключить refetch всех накопленных pages на focus.
+- [x] Проверить `fetchPollQuery`/`ingestPoll`/`replacePollInQueryData` на `InfiniteData`: `pages` и `pageParams` сохраняются; revisions и tombstones обрабатываются как раньше. Не считать форму массива единственной допустимой.
+- [x] Выполнить WEB-STATE и tests session lifecycle; assert logout/login не возвращает viewer state старого аккаунта.
 
 **Готово, когда:** принятая page chain устойчива к гонкам и совместима с действующим Poll store без его дублирования.
 
