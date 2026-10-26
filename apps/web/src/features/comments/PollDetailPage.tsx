@@ -7,7 +7,7 @@ import { PollCard } from '../../components/PollCard';
 import { isAmbiguousMutationError, replaceCachedPoll, usePollMutations } from '../polls/usePollMutations';
 import { fetchPollQuery, pollSessionEpoch, reconcilePoll } from '../polls/poll-state';
 import { CommentForm } from './CommentForm';
-import { CommentList } from './CommentList';
+import { CommentList, type CommentTargetState } from './CommentList';
 import { paginationQueryKey } from '../../core/pagination/pagination-state';
 import { addCreatedCommentOverlay, commentReactionRevision, reconcileCommentSnapshot } from './comment-state';
 
@@ -48,6 +48,16 @@ export function PollDetailPage() {
   });
   const focusedReplyId = targetRootId ? focusedCommentId : null;
   const resolvedRootComment = targetRootId ? rootTargetQuery.data : commentTargetQuery.data;
+  const commentTarget: CommentTargetState | undefined = focusedCommentId ? {
+    comment: commentTargetQuery.data,
+    root: resolvedRootComment,
+    isPending: commentTargetQuery.isPending,
+    error: commentTargetQuery.error,
+    retry: () => { void commentTargetQuery.refetch(); },
+    rootIsPending: Boolean(targetRootId) && rootTargetQuery.isPending,
+    rootError: targetRootId ? rootTargetQuery.error : null,
+    retryRoot: () => { void rootTargetQuery.refetch(); },
+  } : undefined;
   const createMutation = useMutation({
     mutationFn: ({ body }: { body: string; epoch: number }) => createComment(pollId, body),
     onSuccess: ({ comment, poll }, { epoch }) => {
@@ -75,10 +85,11 @@ export function PollDetailPage() {
           currentUserId={user?.id}
           sessionEpoch={sessionEpoch}
           sessionReady={status !== 'loading'}
-          focusedCommentId={focusedReplyId ? null : focusedCommentId}
+          focusedCommentId={focusedCommentId}
           focusedReplyId={focusedReplyId}
           forcedExpandedRootId={targetRootId}
           resolvedRootComment={resolvedRootComment}
+          target={commentTarget}
           onReplyCreated={(poll) => replaceCachedPoll(queryClient, poll, user?.id ?? null)}
         /> : null}
       </section>

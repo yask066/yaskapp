@@ -27,6 +27,7 @@ const currentUser = {
 };
 
 const server = setupServer();
+let originalScrollIntoViewDescriptor: PropertyDescriptor | undefined;
 
 function renderDetail(
   initialEntry = '/polls/poll-1',
@@ -64,10 +65,25 @@ function makeRootComment(index: number, repliesCount = 0) {
   };
 }
 
+function cachedRootCommentPages(queryClient: QueryClient) {
+  const query = queryClient.getQueryCache().getAll().find(({ queryKey, state }) => {
+    const data = state.data;
+    return queryKey[0] === 'pagination' && queryKey[1] === 'comments' &&
+      data !== null && typeof data === 'object' && 'pages' in data && 'pageParams' in data;
+  });
+  return query?.state.data as { pages: unknown[]; pageParams: unknown[] } | undefined;
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   server.resetHandlers();
   vi.restoreAllMocks();
+  if (originalScrollIntoViewDescriptor) {
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalScrollIntoViewDescriptor);
+  } else {
+    Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+  }
+  originalScrollIntoViewDescriptor = undefined;
   sessionStorage.clear();
 });
 afterAll(() => server.close());
@@ -373,7 +389,7 @@ test('replaces cached feed and profile polls with the poll returned after a comm
   expect(queryClient.getQueryData<typeof poll[]>(['user-polls', poll.author.id])?.[0]?.commentsCount).toBe(3);
 });
 
-test('opens a reply notification target with its root thread expanded and the exact reply focused', async () => {
+test('opens a distant reply in link context without traversing replies pages or changing the root chain', async () => {
   const root = {
     ...comments[0], id: 'root-1', body: 'Target root comment.', repliesCount: 1, parentCommentId: null,
   };
@@ -384,26 +400,169 @@ test('opens a reply notification target with its root thread expanded and the ex
   const earlierReply = {
     ...reply, id: 'reply-0', body: 'An earlier reply in the first page.',
   };
+  const commentGets: string[] = [];
+  const replyCursors: Array<string | null> = [];
+  const scrollIntoView = vi.fn();
+  originalScrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView });
   server.use(
     http.get('/auth/me', () => HttpResponse.json({ user: currentUser })),
     http.get('/polls/poll-1', () => HttpResponse.json({ poll })),
-    http.get('/polls/poll-1/comments', () => HttpResponse.json({ items: [root] })),
-    http.get('/polls/poll-1/comments/reply-1', () => HttpResponse.json({ comment: reply })),
-    http.get('/polls/poll-1/comments/root-1', () => HttpResponse.json({ comment: root })),
+    http.get('/polls/poll-1/comments', () => HttpResponse.json({ items: [{ ...root, id: 'root-0', body: 'A root from the first page.' }], nextCursor: 'root-page-2' })),
+    http.get('/polls/poll-1/comments/reply-1', () => {
+      commentGets.push('reply-1');
+      return HttpResponse.json({ comment: reply });
+    }),
+    http.get('/polls/poll-1/comments/root-1', () => {
+      commentGets.push('root-1');
+      return HttpResponse.json({ comment: root });
+    }),
     http.get('/polls/poll-1/comments/root-1/replies', ({ request }) => {
       const cursor = new URL(request.url).searchParams.get('cursor');
+      replyCursors.push(cursor);
       return cursor
         ? HttpResponse.json({ items: [reply], nextCursor: null })
         : HttpResponse.json({ items: [earlierReply], nextCursor: 'next-page' });
     }),
   );
 
-  renderDetail('/polls/poll-1?comment=reply-1');
+  const { queryClient } = renderDetail('/polls/poll-1?comment=reply-1');
 
-  const focusedReply = await screen.findByRole('listitem', { current: 'location' });
+  expect(await screen.findByText('A root from the first page.')).toBeInTheDocument();
+  expect(await screen.findByText('An earlier reply in the first page.')).toBeInTheDocument();
+  await waitFor(() => expect(commentGets).toHaveLength(2));
+  expect(replyCursors).toEqual([null]);
+  expect(commentGets.sort()).toEqual(['reply-1', 'root-1']);
+
+  expect(await screen.findByText('Target root comment.')).toBeInTheDocument();
+  const linkedContext = screen.getByRole('region', { name: 'Comment from link' });
+  expect(within(linkedContext).getByText('Target root comment.')).toBeInTheDocument();
+  const focusedReply = within(linkedContext).getByRole('listitem', { current: 'location' });
   expect(focusedReply).toHaveTextContent('The exact notification reply.');
   expect(document.activeElement).toBe(focusedReply);
   expect(await screen.findByRole('button', { name: 'Hide replies (1)' })).toBeInTheDocument();
+  expect(scrollIntoView).toHaveBeenCalledTimes(1);
+
+  const rootPagesBeforeAppend = cachedRootCommentPages(queryClient);
+  if (!rootPagesBeforeAppend) throw new Error('Expected the root comments query to be cached.');
+  expect(rootPagesBeforeAppend.pages).toHaveLength(1);
+  expect(rootPagesBeforeAppend.pageParams).toEqual([null]);
+
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'Load more replies' }));
+  await screen.findByText('The exact notification reply.');
+  expect(replyCursors).toEqual([null, 'next-page']);
+  expect(screen.getAllByText('The exact notification reply.')).toHaveLength(1);
+  expect(scrollIntoView).toHaveBeenCalledTimes(1);
+
+  const refreshButton = screen.getByRole('button', { name: 'Refresh comments' });
+  await user.click(refreshButton);
+  await screen.findByText('An earlier reply in the first page.');
+  expect(document.activeElement).toBe(refreshButton);
+  expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  expect(commentGets.sort()).toEqual(['reply-1', 'root-1']);
+});
+
+test('keeps a distant root in a separate target context and deduplicates it when root pagination catches up', async () => {
+  const firstRoot = makeRootComment(1);
+  const targetRoot = makeRootComment(10);
+  let targetReads = 0;
+  let rootPageReads = 0;
+  const scrollIntoView = vi.fn();
+  originalScrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView });
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: currentUser })),
+    http.get('/polls/poll-1', () => HttpResponse.json({ poll })),
+    http.get('/polls/poll-1/comments', ({ request }) => {
+      if (new URL(request.url).searchParams.has('cursor')) {
+        rootPageReads += 1;
+        return HttpResponse.json({ items: [targetRoot], nextCursor: null });
+      }
+      rootPageReads += 1;
+      return HttpResponse.json({ items: [firstRoot], nextCursor: 'root-page-2' });
+    }),
+    http.get('/polls/poll-1/comments/root-10', () => {
+      targetReads += 1;
+      return HttpResponse.json({ comment: targetRoot });
+    }),
+  );
+  const user = userEvent.setup();
+  const { queryClient } = renderDetail('/polls/poll-1?comment=root-10');
+
+  await screen.findByText('Root 10.');
+  const linkedContext = screen.getByRole('region', { name: 'Comment from link' });
+  await waitFor(() => expect(targetReads).toBe(1));
+  expect(within(linkedContext).getByText('Root 10.')).toBeInTheDocument();
+  expect(screen.getAllByText('Root 10.')).toHaveLength(1);
+  expect(targetReads).toBe(1);
+  expect(scrollIntoView).toHaveBeenCalledTimes(1);
+
+  const rootPages = () => cachedRootCommentPages(queryClient)!;
+  expect(rootPages().pages).toHaveLength(1);
+  expect(rootPages().pageParams).toEqual([null]);
+
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  await waitFor(() => expect(screen.queryByRole('region', { name: 'Comment from link' })).not.toBeInTheDocument());
+  expect(screen.getAllByText('Root 10.')).toHaveLength(1);
+  expect(rootPages().pageParams).toEqual([null, 'root-page-2']);
+  expect(rootPageReads).toBe(2);
+  expect(scrollIntoView).toHaveBeenCalledTimes(1);
+
+  const refreshButton = screen.getByRole('button', { name: 'Refresh comments' });
+  await user.click(refreshButton);
+  await screen.findByText('Root 10.');
+  expect(document.activeElement).toBe(refreshButton);
+  expect(scrollIntoView).toHaveBeenCalledTimes(1);
+});
+
+test('reports a missing linked comment while leaving the first comment page available', async () => {
+  const firstRoot = makeRootComment(1);
+  let targetReads = 0;
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: currentUser })),
+    http.get('/polls/poll-1', () => HttpResponse.json({ poll })),
+    http.get('/polls/poll-1/comments', () => HttpResponse.json({ items: [firstRoot], nextCursor: null })),
+    http.get('/polls/poll-1/comments/missing-root', () => {
+      targetReads += 1;
+      return HttpResponse.json({ error: 'not_found', message: 'Comment not found.' }, { status: 404 });
+    }),
+  );
+
+  renderDetail('/polls/poll-1?comment=missing-root');
+
+  expect(await screen.findByText('This comment is unavailable or may have been removed.')).toBeInTheDocument();
+  expect(await screen.findByText('Root 1.')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Retry loading linked comment' })).not.toBeInTheDocument();
+  expect(targetReads).toBe(1);
+});
+
+test('offers a separate retry after a network error loading a linked comment', async () => {
+  const firstRoot = makeRootComment(1);
+  const targetRoot = makeRootComment(10);
+  let targetReads = 0;
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: currentUser })),
+    http.get('/polls/poll-1', () => HttpResponse.json({ poll })),
+    http.get('/polls/poll-1/comments', () => HttpResponse.json({ items: [firstRoot], nextCursor: 'root-page-2' })),
+    http.get('/polls/poll-1/comments/root-10', () => {
+      targetReads += 1;
+      return targetReads === 1
+        ? HttpResponse.json({ error: 'temporarily_unavailable' }, { status: 503 })
+        : HttpResponse.json({ comment: targetRoot });
+    }),
+  );
+  const user = userEvent.setup();
+
+  renderDetail('/polls/poll-1?comment=root-10');
+
+  expect(await screen.findByText('Could not load this comment from the link.')).toBeInTheDocument();
+  expect(await screen.findByText('Root 1.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Retry loading linked comment' }));
+  expect(await screen.findByText('Root 10.')).toBeInTheDocument();
+  const linkedContext = screen.getByRole('region', { name: 'Comment from link' });
+  expect(within(linkedContext).getByText('Root 10.')).toBeInTheDocument();
+  expect(targetReads).toBe(2);
 });
 
 test('updates root repliesCount and the authoritative poll count after posting a reply', async () => {

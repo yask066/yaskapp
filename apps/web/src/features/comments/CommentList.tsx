@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useMutationState, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useNavigationType } from 'react-router-dom';
+import { ApiError } from '../../api/client';
 import { deleteComment, likeComment, listCommentsPage, unlikeComment } from '../../api/polls';
 import type { ClientCursorPage, Poll, PollComment } from '../../api/models';
 import { isAmbiguousMutationError, mutationErrorMessage } from '../polls/usePollMutations';
@@ -35,6 +36,17 @@ import {
 
 type CommentPages = InfiniteData<ClientCursorPage<PollComment>, string | null>;
 
+export interface CommentTargetState {
+  comment?: PollComment;
+  root?: PollComment;
+  isPending: boolean;
+  error: unknown;
+  retry: () => void;
+  rootIsPending: boolean;
+  rootError: unknown;
+  retryRoot: () => void;
+}
+
 interface CommentListProps {
   pollId: string;
   sessionEpoch?: number;
@@ -44,7 +56,19 @@ interface CommentListProps {
   focusedReplyId?: string | null;
   forcedExpandedRootId?: string | null;
   resolvedRootComment?: PollComment;
+  target?: CommentTargetState;
   onReplyCreated?: (poll: Poll) => void;
+}
+
+function linkedCommentErrorMessage(error: unknown, isParent = false): string {
+  if (error instanceof ApiError && error.status === 404) {
+    return isParent ? 'The parent comment is unavailable or may have been removed.' : 'This comment is unavailable or may have been removed.';
+  }
+  return isParent ? 'Could not load the parent comment from this link.' : 'Could not load this comment from the link.';
+}
+
+function isPermanentTargetError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 404;
 }
 
 export function CommentList({
@@ -56,6 +80,7 @@ export function CommentList({
   focusedReplyId,
   forcedExpandedRootId,
   resolvedRootComment,
+  target,
   onReplyCreated,
 }: CommentListProps) {
   const queryClient = useQueryClient();
@@ -118,9 +143,12 @@ export function CommentList({
       void invalidateCommentPages(queryClient, commentScope);
     },
   });
-  const focusedCommentRef = useRef<HTMLLIElement | null>(null);
+  const [focusedTargetNode, setFocusedTargetNode] = useState<HTMLLIElement | null>(null);
   const navigationType = useNavigationType();
   const focusRootId = focusedReplyId ? forcedExpandedRootId : focusedCommentId;
+  const targetFocusKey = focusedReplyId ?? focusedCommentId ?? null;
+  const didFocusTarget = useRef({ key: targetFocusKey, focused: false });
+  if (didFocusTarget.current.key !== targetFocusKey) didFocusTarget.current = { key: targetFocusKey, focused: false };
   const pageData = useMemo(() => commentsQuery.data?.pages ?? [], [commentsQuery.data?.pages]);
   const commentById = useMemo(
     () => new Map(pageData.flatMap((page) => page.items).map((comment) => [comment.id, comment] as const)),
@@ -129,14 +157,15 @@ export function CommentList({
   const comments = mergePageIds(pageData, (comment) => comment.id)
     .map((commentId) => commentById.get(commentId)!)
     .filter((comment): comment is PollComment => comment !== undefined && !isCommentHidden(commentOverlays, comment));
+  const targetAlreadyInRootPages = focusedCommentId && !focusedReplyId ? commentById.get(focusedCommentId) : undefined;
   const serverIds = new Set(comments.map((comment) => comment.id));
   const rootOverlays = commentOverlays.roots.filter((comment) => !serverIds.has(comment.id) && !isCommentHidden(commentOverlays, comment));
   const rootOverlayIds = new Set(rootOverlays.map((comment) => comment.id));
   const targetRoot = resolvedRootComment && !serverIds.has(resolvedRootComment.id) && !rootOverlayIds.has(resolvedRootComment.id) && !isCommentHidden(commentOverlays, resolvedRootComment)
     ? resolvedRootComment
     : null;
-  const mainComments = targetRoot ? [targetRoot, ...comments] : comments;
-  const visibleComments = [...rootOverlays, ...mainComments];
+  const mainComments = comments;
+  const visibleComments = [...rootOverlays, ...(targetRoot ? [targetRoot] : []), ...mainComments];
   const commentScroll = useListScrollState(
     { userId: currentUserId ?? null, route: `/polls/${pollId}`, list: 'comments', query: focusedCommentId ?? focusedReplyId ?? '', filter: '', sort: '' },
     { itemIds: visibleComments.map((comment) => comment.id), priority: focusedCommentId || focusedReplyId ? 'explicit-target' : null, restoreFocusOnPop: navigationType === 'POP' },
@@ -160,13 +189,12 @@ export function CommentList({
   }, [queryIdentity]);
 
   useEffect(() => {
-    if (!focusRootId || !commentsQuery.data) return;
-    const target = focusedCommentRef.current;
-    if (!target) return;
-    if (!focusedReplyId) target.focus();
+    if (!targetFocusKey || !focusedTargetNode || didFocusTarget.current.focused) return;
+    didFocusTarget.current.focused = true;
+    focusedTargetNode.focus();
     const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-    target.scrollIntoView?.({ block: 'center', behavior: commentScrollBehavior(prefersReducedMotion) });
-  }, [commentsQuery.data, focusRootId, focusedReplyId]);
+    focusedTargetNode.scrollIntoView?.({ block: 'center', behavior: commentScrollBehavior(prefersReducedMotion) });
+  }, [targetFocusKey, focusedTargetNode]);
 
   const lastPage = pageData.at(-1);
   const nextCursor = lastPage?.paginationSupported ? lastPage.nextCursor : null;
@@ -241,8 +269,9 @@ export function CommentList({
   }
 
   function renderRootComment(comment: PollComment, index: number) {
+    const isTargetReplyRoot = Boolean(focusedReplyId && comment.id === forcedExpandedRootId && target?.comment?.parentCommentId === comment.id);
     return <EntryMotion key={comment.id} contextKey={`comments:${sessionEpoch}:${currentUserId ?? 'anonymous'}:${pollId}`} itemId={comment.id} visible indexInBatch={index}>
-      <li className={`comment-card${comment.id === focusRootId && !focusedReplyId ? ' comment-card--focused' : ''}`} data-list-item-id={comment.id} ref={comment.id === focusRootId ? focusedCommentRef : undefined} tabIndex={-1} aria-current={comment.id === focusRootId && !focusedReplyId ? 'location' : undefined}>
+      <li className={`comment-card${comment.id === focusRootId && !focusedReplyId ? ' comment-card--focused' : ''}`} data-list-item-id={comment.id} ref={comment.id === focusRootId && !focusedReplyId ? setFocusedTargetNode : undefined} tabIndex={-1} aria-current={comment.id === focusRootId && !focusedReplyId ? 'location' : undefined}>
         <p className="comment-card__author"><strong>{comment.author.displayName || comment.author.username}</strong> <span>@{comment.author.username}</span></p>
         <p className="comment-card__body">{comment.body}</p>
         <div className="comment-card__actions">
@@ -256,6 +285,8 @@ export function CommentList({
           rootComment={comment}
           currentUserId={currentUserId}
           focusedReplyId={comment.id === forcedExpandedRootId ? focusedReplyId : null}
+          contextReply={isTargetReplyRoot ? target?.comment : undefined}
+          focusedTargetRef={isTargetReplyRoot ? setFocusedTargetNode : undefined}
           autoExpand={comment.id === forcedExpandedRootId}
           refreshGeneration={replyGeneration}
           onReplyCreated={(reply, poll) => handleReplyCreated(comment, reply, poll)}
@@ -273,6 +304,39 @@ export function CommentList({
       </div>
       {writeError ? <p role="alert">{mutationErrorMessage(writeError)}</p> : null}
       {currentRefreshState.error ? <p role="alert">{mutationErrorMessage(currentRefreshState.error)}</p> : null}
+      {focusedCommentId && !target?.comment && !targetAlreadyInRootPages && target?.isPending ? <section className="comment-list__target" aria-label="Comment from link">
+        <p role="status">Loading the linked comment…</p>
+      </section> : null}
+      {focusedCommentId && !target?.comment && !targetAlreadyInRootPages && target?.error ? <section className="comment-list__target" aria-label="Comment from link">
+        <p role="alert">{linkedCommentErrorMessage(target.error)}</p>
+        {!isPermanentTargetError(target.error) ? <button className="button" type="button" onClick={(event) => { focusRetryLandmark(event.currentTarget); target.retry(); }}>Retry loading linked comment</button> : null}
+      </section> : null}
+      {targetRoot && !focusedReplyId ? <section className="comment-list__target" aria-label="Comment from link">
+        <p role="status">This comment is outside the loaded pages.</p>
+        <ul>{renderRootComment(targetRoot, 0)}</ul>
+      </section> : null}
+      {targetRoot && focusedReplyId ? <section className="comment-list__target" aria-label="Comment from link">
+        <p role="status">This comment is outside the loaded pages.</p>
+        <ul>{renderRootComment(targetRoot, 0)}</ul>
+      </section> : null}
+      {focusedReplyId && target?.comment && !target?.root && (!target.rootIsPending || target.rootError) && !isCommentHidden(commentOverlays, target.comment) ? <section className="comment-list__target" aria-label="Comment from link">
+        <p role="status">This reply is outside the loaded comment pages.</p>
+        {target?.rootIsPending ? <p role="status">Loading the reply’s parent comment…</p> : null}
+        {target?.rootError ? <div className="comment-thread__error">
+          <p role="alert">{linkedCommentErrorMessage(target.rootError, true)}</p>
+          {!isPermanentTargetError(target.rootError) ? <button className="button" type="button" onClick={(event) => { focusRetryLandmark(event.currentTarget); target.retryRoot(); }}>Retry loading linked parent</button> : null}
+        </div> : null}
+        <ul className="comment-thread__list"><li
+          className="comment-card comment-thread__reply comment-card--focused"
+          data-list-item-id={target.comment.id}
+          ref={setFocusedTargetNode}
+          tabIndex={-1}
+          aria-current="location"
+        >
+          <p className="comment-card__author"><strong>{target.comment.author.displayName || target.comment.author.username}</strong> <span>@{target.comment.author.username}</span></p>
+          <p className="comment-card__body">{target.comment.body}</p>
+        </li></ul>
+      </section> : null}
       <ContentEntryTransition loading={commentsQuery.isPending && !commentsQuery.data} kind="comment" rows={2}>
       {rootOverlays.length ? <section className="comment-list__overlay" aria-label="Your new comments">
         <p role="status">Your comment</p>

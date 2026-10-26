@@ -370,10 +370,10 @@
 
 **Файлы:** `features/comments/PollDetailPage.tsx`, `CommentList.tsx`, `CommentThread.tsx`, `comment-scroll.ts`; comments tests.
 
-- [ ] Закрепить число запросов для далёких root/reply, 404, сетевую ошибку и отдельный Retry; последовательно читать replies pages для target нельзя.
-- [ ] Использовать getComment target/parent и отдельный контекстный блок; main pages/`pageParams` не менять ради target.
-- [ ] Проверить достижение ID обычной пагинацией, dedup, одноразовый focus и отсутствие повторного scroll после пользовательского действия.
-- [ ] Выполнить WEB-COMMENTS.
+- [x] Закрепить число запросов для далёких root/reply, 404, сетевую ошибку и отдельный Retry; последовательно читать replies pages для target нельзя.
+- [x] Использовать getComment target/parent и отдельный контекстный блок; main pages/`pageParams` не менять ради target.
+- [x] Проверить достижение ID обычной пагинацией, dedup, одноразовый focus и отсутствие повторного scroll после пользовательского действия.
+- [x] Выполнить WEB-COMMENTS.
 
 **Готово, когда:** ссылка открывает цель независимо от номера страницы, а доступная часть обсуждения остаётся рабочей при ошибке target.
 

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Ref } from 'react';
 import { useInfiniteQuery, useMutation, useMutationState, useQueryClient } from '@tanstack/react-query';
 import { createComment, deleteComment, likeComment, listCommentReplies, unlikeComment } from '../../api/polls';
 import type { Poll, PollComment } from '../../api/models';
 import { mutationErrorMessage } from '../polls/usePollMutations';
-import { commentScrollBehavior } from './comment-scroll';
 import { CommentForm } from './CommentForm';
 import { pollSessionEpoch, reconcilePoll } from '../polls/poll-state';
 import { isAmbiguousMutationError } from '../polls/usePollMutations';
@@ -40,6 +40,8 @@ interface CommentThreadProps {
   rootComment: PollComment;
   currentUserId?: string | null;
   focusedReplyId?: string | null;
+  contextReply?: PollComment;
+  focusedTargetRef?: Ref<HTMLLIElement>;
   autoExpand?: boolean;
   refreshGeneration?: number;
   onReplyCreated?: (comment: PollComment, poll: Poll) => void;
@@ -52,6 +54,8 @@ export function CommentThread({
   rootComment,
   currentUserId,
   focusedReplyId,
+  contextReply,
+  focusedTargetRef,
   autoExpand = false,
   refreshGeneration = 0,
   onReplyCreated,
@@ -67,8 +71,6 @@ export function CommentThread({
   });
   const [isExpanded, setIsExpanded] = useState(autoExpand || Boolean(focusedReplyId));
   const [isReplying, setIsReplying] = useState(false);
-  const focusedReplyRef = useRef<HTMLLIElement | null>(null);
-  const didFocusReply = useRef(false);
   const activeAppendRequests = useRef(new Set<string>());
   const repliesQuery = useInfiniteQuery({
     queryKey,
@@ -145,6 +147,11 @@ export function CommentThread({
   const serverReplyIds = new Set(replies.map((reply) => reply.id));
   const ownReplyOverlays = (commentOverlays.repliesByRoot[rootComment.id] ?? [])
     .filter((reply) => !serverReplyIds.has(reply.id) && !isCommentHidden(commentOverlays, reply));
+  const visibleReplyIds = new Set([...replies, ...ownReplyOverlays].map((reply) => reply.id));
+  const linkedReplyContext = contextReply && contextReply.id === focusedReplyId &&
+    !visibleReplyIds.has(contextReply.id) && !isCommentHidden(commentOverlays, contextReply)
+    ? contextReply
+    : null;
   const replyGapExists = ownReplyOverlays.length > 0 &&
     (!replyPages.length || !(replyPages.at(-1)?.paginationSupported ?? false) || Boolean(replyPages.at(-1)?.nextCursor));
   const visibleReplies = [...replies, ...ownReplyOverlays];
@@ -152,7 +159,7 @@ export function CommentThread({
     { userId: currentUserId ?? null, route: `/polls/${pollId}`, list: `replies:${rootComment.id}`, query: focusedReplyId ?? '', filter: '', sort: '' },
     { itemIds: isExpanded ? visibleReplies.map((reply) => reply.id) : [], priority: focusedReplyId ? 'explicit-target' : null },
   );
-  const { isError, hasNextPage, isFetchingNextPage } = repliesQuery;
+  const { hasNextPage, isFetchingNextPage } = repliesQuery;
   const lastPage = replyPages.at(-1);
   const nextCursor = lastPage?.nextCursor ?? null;
   const cursorHistory = useMemo(
@@ -197,23 +204,6 @@ export function CommentThread({
     if (autoExpand || focusedReplyId) setIsExpanded(true);
   }, [autoExpand, focusedReplyId]);
 
-  useEffect(() => {
-    didFocusReply.current = false;
-  }, [focusedReplyId]);
-
-  useEffect(() => {
-    if (!isExpanded || !focusedReplyId || didFocusReply.current) return;
-    const matchingReply = replies.find((reply) => reply.id === focusedReplyId);
-    if (matchingReply && focusedReplyRef.current) {
-      didFocusReply.current = true;
-      focusedReplyRef.current.focus();
-      const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-      focusedReplyRef.current.scrollIntoView?.({ block: 'center', behavior: commentScrollBehavior(prefersReducedMotion) });
-      return;
-    }
-    if (!isError && hasNextPage && !isFetchingNextPage) loadMoreReplies();
-  }, [focusedReplyId, isExpanded, replies, hasNextPage, isError, isFetchingNextPage, loadMoreReplies]);
-
   const authorLabel = rootComment.author.displayName || rootComment.author.username;
   const replyButtonName = `Reply to ${authorLabel}`;
   const mutationError = likeMutation.error ?? deleteMutation.error;
@@ -223,7 +213,7 @@ export function CommentThread({
       <li
         className={`comment-card comment-thread__reply${reply.id === focusedReplyId ? ' comment-card--focused' : ''}`}
         data-list-item-id={reply.id}
-        ref={reply.id === focusedReplyId ? focusedReplyRef : undefined}
+        ref={reply.id === focusedReplyId ? focusedTargetRef : undefined}
         tabIndex={-1}
         aria-current={reply.id === focusedReplyId ? 'location' : undefined}
       >
@@ -269,6 +259,10 @@ export function CommentThread({
         {replies.length ? <ul className="comment-thread__list">
           {replies.map(renderReply)}
         </ul> : null}
+        {linkedReplyContext ? <section className="comment-thread__target" aria-label="Linked reply">
+          <p role="status">This reply is outside the loaded pages.</p>
+          <ul className="comment-thread__list">{renderReply(linkedReplyContext, replies.length + ownReplyOverlays.length)}</ul>
+        </section> : null}
         {replyGapExists ? <section className="comment-thread__overlay" aria-label="Your replies">
           <p role="status">Your reply</p>
           <p>Replies between these sections are not loaded yet.</p>
