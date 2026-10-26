@@ -426,9 +426,9 @@
 
 **Файлы:** Flutter Feed/API/footer и tests; web Feed/API/footer и tests.
 
-- [ ] Добавить tests stable popular с reactions, пустой страницей с новым cursor, repeated cursor и `410` на append. Во Flutter подключить согласованную в T01 точку входа popular, включая минимальный переключатель сортировки, если его ранее не было.
-- [ ] При expiry сохранить прочитанные pages и anchor, остановить append и предложить «Обновить ленту»; только явное действие создаёт новый snapshot. Reactions не пересортировывают текущую выдачу.
-- [ ] Выполнить FLUTTER-FEED, WEB-FEED и decoder tests; проверить три automatic attempts и последующее ручное управление.
+- [x] Добавить tests stable popular с reactions, пустой страницей с новым cursor, repeated cursor и `410` на append. Во Flutter подключить согласованную в T01 точку входа popular, включая минимальный переключатель сортировки, если его ранее не было.
+- [x] При expiry сохранить прочитанные pages и anchor, остановить append и предложить «Обновить ленту»; только явное действие создаёт новый snapshot. Reactions не пересортировывают текущую выдачу.
+- [x] Выполнить FLUTTER-FEED, WEB-FEED и decoder tests; проверить три automatic attempts и последующее ручное управление.
 
 **Готово, когда:** оба клиента различают конец/ошибку/expiry и не смешивают snapshots разных refresh.
 

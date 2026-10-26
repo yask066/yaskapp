@@ -62,7 +62,12 @@ class FeedScreen extends StatefulWidget {
 class FeedScreenState extends State<FeedScreen> {
   late final PollsApiClient _pollsApiClient;
   late final RealtimeClient _realtimeClient;
-  late CursorListController<PollSummary> _pollsController;
+  final Map<String, CursorListController<PollSummary>> _feedControllers = {};
+  final Map<CursorListController<PollSummary>, VoidCallback>
+      _feedControllerListeners = {};
+  String _feedSort = 'newest';
+  CursorListController<PollSummary> get _pollsController =>
+      _feedControllers[_feedSort]!;
   late final bool _ownsPollsApiClient;
   late final ProfilesApiClient _profilesApiClient;
   late final bool _ownsProfilesApiClient;
@@ -92,7 +97,7 @@ class FeedScreenState extends State<FeedScreen> {
         RealtimeClient(accessToken: widget.session.accessToken);
     _reportsApiClient = widget._reportsApiClient ?? ReportsApiClient();
     _scrollController.addListener(_handleScroll);
-    _createPaginationController();
+    _createPaginationController(sort: _feedSort);
     if (widget.isActive) {
       unawaited(_pollsController.loadInitial());
     } else {
@@ -134,57 +139,101 @@ class FeedScreenState extends State<FeedScreen> {
         oldWidget.session.user.id != widget.session.user.id ||
             oldWidget.session.accessToken != widget.session.accessToken;
     if (sessionChanged) {
-      _pollsController.removeListener(_handlePaginationChanged);
-      _pollsController.dispose();
+      _disposeFeedControllers();
+      _feedSort = 'newest';
       _polls = [];
       _localPollOverlays.clear();
-      _createPaginationController();
+      _createPaginationController(sort: _feedSort);
     }
 
     if (oldWidget.isActive != widget.isActive || sessionChanged) {
       if (widget.isActive) {
-        _pollsController.markActive();
-        if (_pollsController.state.pages.isEmpty &&
-            !_pollsController.state.initial.pending &&
-            _pollsController.state.initial.error == null) {
-          unawaited(_pollsController.loadInitial());
-        }
+        _activateFeedController(_pollsController);
       } else {
-        _pollsController.markInactive();
+        for (final controller in _feedControllers.values) {
+          controller.markInactive();
+        }
       }
     }
   }
 
-  void _createPaginationController() {
-    _pollsController = CursorListController<PollSummary>(
-      contextKey: 'feed:${widget.session.user.id}:newest',
-      loader: _loadPollPage,
+  void _createPaginationController({required String sort}) {
+    final controller = CursorListController<PollSummary>(
+      contextKey: 'feed:${widget.session.user.id}:$sort',
+      loader: ({required limit, cursor}) =>
+          _loadPollPage(limit: limit, sort: sort, cursor: cursor),
       extractId: (poll) => poll.id,
       onInactiveExpired: () {
-        listScrollStateStore.clearForContext(_scrollContext);
-        if (_scrollController.hasClients) _scrollController.jumpTo(0);
+        listScrollStateStore.clearForContext(_scrollContextFor(sort));
+        if (sort == _feedSort && _scrollController.hasClients) {
+          _scrollController.jumpTo(0);
+        }
       },
     );
-    _pollsController.addListener(_handlePaginationChanged);
+    _feedControllers[sort] = controller;
+    final listener = () => _handlePaginationChanged(controller);
+    _feedControllerListeners[controller] = listener;
+    controller.addListener(listener);
   }
 
-  ListScrollContext get _scrollContext => ListScrollContext(
+  void _disposeFeedControllers() {
+    for (final controller in _feedControllers.values) {
+      controller.removeListener(_feedControllerListeners.remove(controller)!);
+      controller.dispose();
+    }
+    _feedControllers.clear();
+    _feedControllerListeners.clear();
+  }
+
+  void _activateFeedController(CursorListController<PollSummary> controller) {
+    controller.markActive();
+    if (controller.state.pages.isEmpty &&
+        !controller.state.initial.pending &&
+        controller.state.initial.error == null) {
+      unawaited(controller.loadInitial());
+    }
+  }
+
+  void _setFeedSort(String sort) {
+    if (sort == _feedSort) return;
+    _pollsController.markInactive();
+    var nextController = _feedControllers[sort];
+    if (nextController == null) {
+      _createPaginationController(sort: sort);
+      nextController = _feedControllers[sort]!;
+    }
+    nextController.markActive();
+    setState(() {
+      _feedSort = sort;
+      _polls = _visiblePolls();
+    });
+    if (nextController.state.pages.isEmpty &&
+        !nextController.state.initial.pending &&
+        nextController.state.initial.error == null) {
+      unawaited(nextController.loadInitial());
+    }
+  }
+
+  ListScrollContext get _scrollContext => _scrollContextFor(_feedSort);
+
+  ListScrollContext _scrollContextFor(String sort) => ListScrollContext(
         userId: widget.session.user.id,
         route: '/feed',
         list: 'polls',
         query: '',
         filter: '',
-        sort: '',
+        sort: sort,
       );
 
   Future<CursorPage<PollSummary>> _loadPollPage({
     required int limit,
+    required String sort,
     String? cursor,
   }) {
     return _pollsApiClient
         .listPollsPage(
           limit: limit,
-          sort: 'newest',
+          sort: sort,
           cursor: cursor,
           accessToken: widget.session.accessToken,
         )
@@ -213,8 +262,8 @@ class FeedScreenState extends State<FeedScreen> {
     return visibleById.values.toList();
   }
 
-  void _handlePaginationChanged() {
-    if (!mounted) return;
+  void _handlePaginationChanged(CursorListController<PollSummary> controller) {
+    if (!mounted || !identical(controller, _pollsController)) return;
     setState(() => _polls = _visiblePolls());
     _scheduleViewportAppend();
   }
@@ -257,8 +306,7 @@ class FeedScreenState extends State<FeedScreen> {
     if (_ownsReportsApiClient) {
       _reportsApiClient.close();
     }
-    _pollsController.removeListener(_handlePaginationChanged);
-    _pollsController.dispose();
+    _disposeFeedControllers();
     _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
 
@@ -666,6 +714,18 @@ class FeedScreenState extends State<FeedScreen> {
   Widget build(BuildContext context) {
     final state = _pollsController.state;
     final polls = _polls;
+    final appendError = state.append.error;
+    final popularExpired = _feedSort == 'popular' &&
+        appendError is PollsApiException &&
+        appendError.statusCode == 410 &&
+        appendError.code == 'pagination_expired';
+    final repeatedCursor =
+        appendError is StateError && appendError.message == 'Cursor repeated.';
+    final appendErrorMessage = popularExpired
+        ? 'This popular feed snapshot expired. Refresh the feed to continue.'
+        : repeatedCursor
+            ? 'The server returned a repeated cursor. Refresh the feed to continue.'
+            : null;
     final content = state.pages.isEmpty && state.initial.pending
         ? const SliverFillRemaining(
             hasScrollBody: false,
@@ -779,6 +839,22 @@ class FeedScreenState extends State<FeedScreen> {
                       ),
                       centerTitle: false,
                       actions: [
+                        PopupMenuButton<String>(
+                          tooltip: 'Feed order',
+                          initialValue: _feedSort,
+                          onSelected: _setFeedSort,
+                          itemBuilder: (context) => const [
+                            PopupMenuItem(
+                              value: 'newest',
+                              child: Text('Newest'),
+                            ),
+                            PopupMenuItem(
+                              value: 'popular',
+                              child: Text('Popular'),
+                            ),
+                          ],
+                          icon: const Icon(Icons.sort),
+                        ),
                         SizedBox(
                           width: 40,
                           height: 40,
@@ -813,9 +889,12 @@ class FeedScreenState extends State<FeedScreen> {
                           hasMore: state.canLoadMore,
                           loading: state.append.pending,
                           error: state.append.error,
+                          errorMessage: appendErrorMessage,
+                          requiresRefresh: popularExpired || repeatedCursor,
                           onLoadMore: () =>
                               unawaited(_pollsController.loadMore()),
                           onRetry: () => unawaited(_pollsController.loadMore()),
+                          onRefresh: () => unawaited(_refreshPolls()),
                         ),
                       ),
                   ],

@@ -667,6 +667,100 @@ test('Refresh replaces the accumulated page chain with a cursorless first page',
   expect(screen.getByText("You've seen everything.")).toHaveAttribute('role', 'status');
 });
 
+test('Popular keeps snapshot order after a reaction and advances through an empty page', async () => {
+  const popularFirst = { ...poll, id: 'popular-1', question: 'Popular first?' };
+  const popularSecond = { ...poll, id: 'popular-2', question: 'Popular second?', likesCount: 1 };
+  const likedPopularSecond = { ...popularSecond, likesCount: 100, viewerHasLiked: true };
+  const popularThird = { ...poll, id: 'popular-3', question: 'Popular third?' };
+  const requests: Array<{ sort: string; cursor: string | null }> = [];
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: authenticatedUser })),
+    http.get('/polls', ({ request }) => {
+      const url = new URL(request.url);
+      const sort = url.searchParams.get('sort') ?? 'newest';
+      const cursor = url.searchParams.get('cursor');
+      requests.push({ sort, cursor });
+      if (sort !== 'popular') return cursorPage([{ ...poll, question: 'Newest feed?' }], null);
+      if (cursor === null) return cursorPage([popularFirst, popularSecond], 'popular-cursor-1');
+      if (cursor === 'popular-cursor-1') return cursorPage([], 'popular-cursor-2');
+      if (cursor === 'popular-cursor-2') return cursorPage([popularThird], null);
+      throw new Error(`Unexpected popular cursor: ${cursor}`);
+    }),
+    http.post('/polls/:pollId/likes', ({ params }) => {
+      expect(params.pollId).toBe(popularSecond.id);
+      return HttpResponse.json({ poll: likedPopularSecond });
+    }),
+  );
+  const user = userEvent.setup();
+  renderFeed();
+
+  expect(await screen.findByText('Newest feed?')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Trending' }));
+  expect(await screen.findByText('Popular first?')).toBeInTheDocument();
+  expect(screen.getByText('Popular second?')).toBeInTheDocument();
+
+  const pollOrder = () => Array.from(document.querySelectorAll('.feed-list .poll-card h2'))
+    .map((heading) => heading.textContent);
+  expect(pollOrder()).toEqual(['Popular first?', 'Popular second?']);
+  await user.click(screen.getByRole('button', { name: 'Like (1)' }));
+  expect(await screen.findByRole('button', { name: 'Like (100)' })).toHaveAttribute('aria-pressed', 'true');
+  expect(pollOrder()).toEqual(['Popular first?', 'Popular second?']);
+
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  expect(await screen.findByRole('button', { name: 'Load more' })).toBeEnabled();
+  expect(screen.getByText('Popular first?')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  expect(await screen.findByText('Popular third?')).toBeInTheDocument();
+  expect(pollOrder()).toEqual(['Popular first?', 'Popular second?', 'Popular third?']);
+  expect(requests.filter((request) => request.sort === 'popular')).toEqual([
+    { sort: 'popular', cursor: null },
+    { sort: 'popular', cursor: 'popular-cursor-1' },
+    { sort: 'popular', cursor: 'popular-cursor-2' },
+  ]);
+});
+
+test('Popular expiry keeps loaded pages and creates a new snapshot only on refresh', async () => {
+  const retained = { ...poll, id: 'popular-retained', question: 'Retained popular page?' };
+  const refreshed = { ...poll, id: 'popular-refreshed', question: 'Refreshed popular page?' };
+  const requests: Array<string | null> = [];
+  let popularFirstReads = 0;
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: authenticatedUser })),
+    http.get('/polls', ({ request }) => {
+      const url = new URL(request.url);
+      const sort = url.searchParams.get('sort') ?? 'newest';
+      const cursor = url.searchParams.get('cursor');
+      if (sort !== 'popular') return cursorPage([{ ...poll, question: 'Newest feed?' }], null);
+      requests.push(cursor);
+      if (cursor === null) {
+        popularFirstReads += 1;
+        return cursorPage([popularFirstReads === 1 ? retained : refreshed], popularFirstReads === 1 ? 'cursor-1' : null);
+      }
+      return HttpResponse.json({
+        error: 'pagination_expired',
+        message: 'This popular feed snapshot expired.',
+      }, { status: 410 });
+    }),
+  );
+  const user = userEvent.setup();
+  renderFeed();
+
+  expect(await screen.findByText('Newest feed?')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Trending' }));
+  expect(await screen.findByText('Retained popular page?')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('This popular feed snapshot expired. Refresh the feed to continue.');
+  expect(screen.getByText('Retained popular page?')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Retry loading more' })).not.toBeInTheDocument();
+  expect(requests).toEqual([null, 'cursor-1']);
+
+  await user.click(screen.getByRole('button', { name: 'Refresh popular feed' }));
+  expect(await screen.findByText('Refreshed popular page?')).toBeInTheDocument();
+  expect(screen.queryByText('Retained popular page?')).not.toBeInTheDocument();
+  expect(requests).toEqual([null, 'cursor-1', null]);
+});
+
 test('a failed Refresh keeps the previous pages and continuation cursor usable', async () => {
   let firstPageReads = 0;
   const cursors: string[] = [];
@@ -852,10 +946,10 @@ test('returning after an append error keeps the accepted chain without refetchin
 });
 
 test('offers Refresh instead of a dead Load more button when the server repeats a cursor', async () => {
-  const requests: Array<string | null> = [];
+  const cursors: Array<string | null> = [];
   server.use(http.get('/polls', ({ request }) => {
     const cursor = new URL(request.url).searchParams.get('cursor');
-    requests.push(cursor);
+    cursors.push(cursor);
     if (cursor === null) return cursorPage([{ ...poll, question: 'Repeated cursor first page?' }], 'cursor-1');
     return cursorPage([{ ...poll, id: 'poll-2', question: 'Repeated cursor second page?' }], 'cursor-1');
   }));
@@ -868,6 +962,6 @@ test('offers Refresh instead of a dead Load more button when the server repeats 
 
   expect(await screen.findByRole('alert')).toHaveTextContent('The server returned a repeated cursor. Refresh the feed to continue.');
   expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Refresh feed' })).toBeEnabled();
-  expect(requests).toEqual([null, 'cursor-1']);
+  expect(screen.getByRole('button', { name: 'Refresh this feed' })).toBeEnabled();
+  expect(cursors).toEqual([null, 'cursor-1']);
 });

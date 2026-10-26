@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yaskapp_mobile/src/core/pagination/cursor_page.dart';
+import 'package:yaskapp_mobile/src/core/scroll/list_scroll_anchor_host.dart';
 import 'package:yaskapp_mobile/src/features/auth/auth_session.dart';
 import 'package:yaskapp_mobile/src/features/feed/feed_screen.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_state_scope.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_state_store.dart';
+import 'package:yaskapp_mobile/src/features/polls/poll_card.dart';
 import 'package:yaskapp_mobile/src/features/polls/polls_api_client.dart';
 import 'package:yaskapp_mobile/src/features/polls/poll_summary.dart';
 import 'package:yaskapp_mobile/src/features/realtime/realtime_client.dart';
@@ -36,6 +38,211 @@ void main() {
     expect(find.byKey(ValueKey('poll-${second.id}')), findsOneWidget);
     expect(api.feedCursors, [null, 'opaque-next']);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'Popular keeps snapshot order after a reaction and advances across an empty page',
+      (tester) async {
+    _useTallTestViewport(tester);
+    final newest = _poll(1);
+    final popularFirst = _poll(2);
+    final popularSecond = _poll(3);
+    final popularFirstPage = [
+      popularFirst,
+      popularSecond,
+      ...List.generate(18, (index) => _poll(index + 4)),
+    ];
+    final updatedPopularSecond = popularSecond.copyWith(
+      likesCount: 100,
+      viewerHasLiked: true,
+    );
+    final popularThird = _poll(4);
+    final api = _PageApi(
+      feedPagesBySort: {
+        'newest': [
+          Future.value(CursorPage(items: [newest], nextCursor: null)),
+        ],
+        'popular': [
+          Future.value(CursorPage(
+            items: popularFirstPage,
+            nextCursor: 'popular-cursor-1',
+          )),
+          Future.value(const CursorPage(
+            items: [],
+            nextCursor: 'popular-cursor-2',
+          )),
+          Future.value(CursorPage(items: [popularThird], nextCursor: null)),
+        ],
+      },
+      likedPoll: updatedPopularSecond,
+    );
+    final realtime = _FakeRealtimeClient();
+    addTearDown(realtime.close);
+
+    await tester.pumpWidget(_feedApp(api, realtime));
+    await tester.pumpAndSettle();
+
+    await _selectPopular(tester);
+
+    List<String> feedPollIds() => tester
+        .widget<ListScrollAnchorHost>(find.byType(ListScrollAnchorHost))
+        .itemIds
+        .map((id) => id.replaceFirst('poll-', ''))
+        .toList();
+
+    expect(feedPollIds().take(2), [popularFirst.id, popularSecond.id]);
+    await tester
+        .ensureVisible(find.byKey(ValueKey('poll-${popularSecond.id}')));
+    tester
+        .widget<PollCard>(find.byKey(ValueKey('poll-${popularSecond.id}')))
+        .onToggleLike!();
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Unlike'), findsOneWidget);
+    expect(feedPollIds().take(2), [popularFirst.id, popularSecond.id]);
+
+    await tester.fling(
+      find.byType(CustomScrollView),
+      const Offset(0, -5000),
+      10000,
+    );
+    await tester.pumpAndSettle();
+    if (find.byKey(ValueKey('poll-${popularThird.id}')).evaluate().isEmpty) {
+      await tester.fling(
+        find.byType(CustomScrollView),
+        const Offset(0, -5000),
+        10000,
+      );
+      await tester.pumpAndSettle();
+    }
+    if ((api.feedCursorsBySort['popular']?.length ?? 0) == 2) {
+      final loadMore = find.text('Load more');
+      await tester.scrollUntilVisible(loadMore, 200);
+      if (loadMore.evaluate().isNotEmpty) await tester.tap(loadMore);
+      await tester.pumpAndSettle();
+    }
+    expect(feedPollIds(), contains(popularThird.id));
+    expect(api.feedSorts, containsAll(['newest', 'popular']));
+    expect(api.feedCursorsBySort['popular'], [
+      null,
+      'popular-cursor-1',
+      'popular-cursor-2',
+    ]);
+    expect(feedPollIds().take(2), [popularFirst.id, popularSecond.id]);
+  });
+
+  testWidgets('expired Popular keeps its pages until Refresh feed is explicit',
+      (tester) async {
+    _useTallTestViewport(tester);
+    final retained = _poll(11);
+    final refreshed = _poll(12);
+    final expiredAppend = Completer<CursorPage<PollSummary>>();
+    final api = _PageApi(
+      feedPagesBySort: {
+        'newest': [
+          Future.value(CursorPage(items: [_poll(10)], nextCursor: null)),
+        ],
+        'popular': [
+          Future.value(CursorPage(
+            items: [retained],
+            nextCursor: 'expired-snapshot-cursor',
+          )),
+          expiredAppend.future,
+          Future.value(CursorPage(items: [refreshed], nextCursor: null)),
+        ],
+      },
+    );
+    final realtime = _FakeRealtimeClient();
+    addTearDown(realtime.close);
+
+    await tester.pumpWidget(_feedApp(api, realtime));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Feed order'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Popular'));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+    final loadMore = find.text('Load more');
+    if ((api.feedCursorsBySort['popular']?.length ?? 0) == 1 &&
+        loadMore.evaluate().isNotEmpty) {
+      await tester.scrollUntilVisible(loadMore, 200);
+      if ((api.feedCursorsBySort['popular']?.length ?? 0) == 1 &&
+          loadMore.evaluate().isNotEmpty) {
+        await tester.tap(loadMore);
+      }
+    }
+    await tester.pump();
+    expect(api.feedCursorsBySort['popular'], [null, 'expired-snapshot-cursor']);
+    expiredAppend.completeError(const PollsApiException(
+      'Snapshot expired.',
+      statusCode: 410,
+      code: 'pagination_expired',
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(ValueKey('poll-${retained.id}')), findsOneWidget);
+
+    expect(
+        find.text(
+            'This popular feed snapshot expired. Refresh the feed to continue.'),
+        findsOneWidget);
+    expect(find.byKey(ValueKey('poll-${retained.id}')), findsOneWidget);
+    expect(find.text('Retry'), findsNothing);
+    expect(api.feedCursorsBySort['popular'], [null, 'expired-snapshot-cursor']);
+
+    // Refresh is the only action that starts a new Popular snapshot.
+    await tester.scrollUntilVisible(find.text('Refresh feed'), 200);
+    await tester.tap(find.text('Refresh feed'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(ValueKey('poll-${retained.id}')), findsNothing);
+    expect(find.byKey(ValueKey('poll-${refreshed.id}')), findsOneWidget);
+    expect(api.feedCursorsBySort['popular'], [
+      null,
+      'expired-snapshot-cursor',
+      null,
+    ]);
+  });
+
+  testWidgets('a repeated Popular cursor stops append and requires refresh',
+      (tester) async {
+    _useTallTestViewport(tester);
+    final retained = _poll(21);
+    final rejected = _poll(22);
+    final refreshed = _poll(23);
+    final api = _PageApi(
+      feedPagesBySort: {
+        'newest': [
+          Future.value(CursorPage(items: [_poll(20)], nextCursor: null)),
+        ],
+        'popular': [
+          Future.value(
+              CursorPage(items: [retained], nextCursor: 'popular-loop')),
+          Future.value(
+              CursorPage(items: [rejected], nextCursor: 'popular-loop')),
+          Future.value(CursorPage(items: [refreshed], nextCursor: null)),
+        ],
+      },
+    );
+    final realtime = _FakeRealtimeClient();
+    addTearDown(realtime.close);
+
+    await tester.pumpWidget(_feedApp(api, realtime));
+    await tester.pumpAndSettle();
+    await _selectPopular(tester);
+
+    expect(
+        find.text(
+            'The server returned a repeated cursor. Refresh the feed to continue.'),
+        findsOneWidget);
+    expect(find.byKey(ValueKey('poll-${retained.id}')), findsOneWidget);
+    expect(find.byKey(ValueKey('poll-${rejected.id}')), findsNothing);
+    expect(api.feedCursorsBySort['popular'], [null, 'popular-loop']);
+
+    await tester.scrollUntilVisible(find.text('Refresh feed'), 200);
+    await tester.tap(find.text('Refresh feed'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(ValueKey('poll-${refreshed.id}')), findsOneWidget);
+    expect(api.feedCursorsBySort['popular'], [null, 'popular-loop', null]);
   });
 
   testWidgets('Following reads beyond its first 20 items', (tester) async {
@@ -95,6 +302,7 @@ void main() {
     expect(find.text('Could not load more.'), findsOneWidget);
     expect(api.feedCursors, [null, 'cursor-2']);
 
+    await tester.scrollUntilVisible(find.text('Retry'), 200);
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
 
@@ -319,13 +527,41 @@ void main() {
   });
 }
 
-Widget _feedApp(_PageApi api, RealtimeClient realtime) => MaterialApp(
-      home: FeedScreen(
-        session: _session,
-        pollsApiClient: api,
-        realtimeClient: realtime,
-      ),
+Widget _feedApp(
+  _PageApi api,
+  RealtimeClient realtime, {
+  PollStateStore? store,
+}) =>
+    MaterialApp(
+      home: store == null
+          ? FeedScreen(
+              session: _session,
+              pollsApiClient: api,
+              realtimeClient: realtime,
+            )
+          : PollStateScope(
+              store: store,
+              child: FeedScreen(
+                session: _session,
+                pollsApiClient: api,
+                realtimeClient: realtime,
+              ),
+            ),
     );
+
+void _useTallTestViewport(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 900);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+Future<void> _selectPopular(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('Feed order'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Popular'));
+  await tester.pumpAndSettle();
+}
 
 PollSummary _poll(int id) => PollSummary(
       id: 'poll-feed-$id',
@@ -359,12 +595,19 @@ PollSummary _poll(int id) => PollSummary(
 class _PageApi extends PollsApiClient {
   _PageApi({
     this.feedPages = const [],
+    this.feedPagesBySort = const {},
     this.subscriptionPages = const [],
+    this.likedPoll,
   });
 
   final List<Future<CursorPage<PollSummary>>> feedPages;
+  final Map<String, List<Future<CursorPage<PollSummary>>>> feedPagesBySort;
   final List<Future<CursorPage<PollSummary>>> subscriptionPages;
+  final PollSummary? likedPoll;
   final List<String?> feedCursors = [];
+  final List<String> feedSorts = [];
+  final Map<String, List<String?>> feedCursorsBySort = {};
+  final Map<String, int> _feedReadsBySort = {};
   final List<String?> subscriptionCursors = [];
 
   @override
@@ -374,9 +617,21 @@ class _PageApi extends PollsApiClient {
     String? cursor,
     String? accessToken,
   }) {
+    feedSorts.add(sort);
     feedCursors.add(cursor);
-    return feedPages[feedCursors.length - 1];
+    feedCursorsBySort.putIfAbsent(sort, () => []).add(cursor);
+    final pages = feedPagesBySort[sort] ?? feedPages;
+    final index = _feedReadsBySort[sort] ?? 0;
+    _feedReadsBySort[sort] = index + 1;
+    return pages[index];
   }
+
+  @override
+  Future<PollSummary> likePoll({
+    required String pollId,
+    required String accessToken,
+  }) async =>
+      likedPoll!;
 
   @override
   Future<CursorPage<PollSummary>> listSubscriptionsPage({

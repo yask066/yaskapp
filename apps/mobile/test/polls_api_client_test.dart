@@ -386,6 +386,35 @@ void main() {
     expect(page.paginationSupported, isTrue);
   });
 
+  test('decodes popular snapshot expiry with its HTTP status and error code',
+      () async {
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((request) async {
+        expect(request.url.queryParameters, {
+          'limit': '20',
+          'sort': 'popular',
+          'cursor': 'snapshot-cursor',
+        });
+        return http.Response(
+          jsonEncode({
+            'error': 'pagination_expired',
+            'message': 'This popular feed snapshot expired.',
+          }),
+          410,
+        );
+      }),
+    );
+
+    await expectLater(
+      client.listPollsPage(sort: 'popular', cursor: 'snapshot-cursor'),
+      throwsA(isA<PollsApiException>()
+          .having((error) => error.statusCode, 'statusCode', 410)
+          .having((error) => error.code, 'code', 'pagination_expired')),
+    );
+    client.close();
+  });
+
   test('loads cursor-paginated subscriptions and preserves supported end',
       () async {
     late http.Request request;

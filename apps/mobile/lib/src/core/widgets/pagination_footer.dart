@@ -7,19 +7,25 @@ class PaginationFooter extends StatefulWidget {
     required this.hasMore,
     this.loading = false,
     this.error,
+    this.errorMessage,
+    this.requiresRefresh = false,
     this.paginationSupported = true,
     this.endMessage = "You're all caught up.",
     this.onLoadMore,
     this.onRetry,
+    this.onRefresh,
   });
 
   final bool hasMore;
   final bool loading;
   final Object? error;
+  final String? errorMessage;
+  final bool requiresRefresh;
   final bool paginationSupported;
   final String endMessage;
   final VoidCallback? onLoadMore;
   final VoidCallback? onRetry;
+  final VoidCallback? onRefresh;
 
   @override
   State<PaginationFooter> createState() => _PaginationFooterState();
@@ -39,6 +45,7 @@ class _PaginationFooterState extends State<PaginationFooter> {
     super.didUpdateWidget(oldWidget);
     final presentationChanged = oldWidget.loading != widget.loading ||
         oldWidget.error != widget.error ||
+        oldWidget.requiresRefresh != widget.requiresRefresh ||
         oldWidget.hasMore != widget.hasMore ||
         oldWidget.paginationSupported != widget.paginationSupported;
     if (presentationChanged &&
@@ -93,12 +100,13 @@ class _PaginationFooterState extends State<PaginationFooter> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Could not load more.'),
+            Text(widget.errorMessage ?? 'Could not load more.'),
             const SizedBox(height: 8),
             OutlinedButton(
               focusNode: _actionFocusNode,
-              onPressed: widget.onRetry,
-              child: const Text('Retry'),
+              onPressed:
+                  widget.requiresRefresh ? widget.onRefresh : widget.onRetry,
+              child: Text(widget.requiresRefresh ? 'Refresh feed' : 'Retry'),
             ),
           ],
         ),

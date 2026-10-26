@@ -9,10 +9,12 @@ interface PaginationFooterProps {
   paginationSupported: boolean;
   automaticLoadEnabled: boolean;
   repeatedCursor?: boolean;
+  expired?: boolean;
   error?: Error | null;
   endMessage?: string;
   itemName?: string;
   refreshLabel?: string;
+  onRefresh?: () => void;
   onLoadMore: (trigger: PaginationLoadTrigger) => void;
 }
 
@@ -24,10 +26,12 @@ export function PaginationFooter({
   paginationSupported,
   automaticLoadEnabled,
   repeatedCursor = false,
+  expired = false,
   error,
   endMessage = "You've seen everything.",
   itemName = 'polls',
   refreshLabel = 'the feed',
+  onRefresh,
   onLoadMore,
 }: PaginationFooterProps) {
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -49,11 +53,15 @@ export function PaginationFooter({
   if (!paginationSupported) return null;
 
   return <div className="pagination-footer" aria-live="polite">
-    {hasNextPage && !repeatedCursor ? <div ref={sentinelRef} className="pagination-footer__sentinel" aria-hidden="true" /> : null}
+    {hasNextPage && !repeatedCursor && !expired ? <div ref={sentinelRef} className="pagination-footer__sentinel" aria-hidden="true" /> : null}
     {isFetchingNextPage ? <p role="status">Loading more {itemName}…</p> : null}
+    {expired ? <p role="alert">This popular feed snapshot expired. Refresh the feed to continue.</p> : null}
     {repeatedCursor ? <p role="alert">The server returned a repeated cursor. Refresh {refreshLabel} to continue.</p> : null}
-    {isFetchNextPageError ? <p role="alert">{error?.message || `Could not load more ${itemName}.`}</p> : null}
-    {hasNextPage && !repeatedCursor ? <button type="button" aria-disabled={actionBusy} onClick={() => { if (!actionBusy) loadMoreRef.current('manual'); }}>
+    {isFetchNextPageError && !expired && !repeatedCursor ? <p role="alert">{error?.message || `Could not load more ${itemName}.`}</p> : null}
+    {(expired || repeatedCursor) && onRefresh ? <button type="button" aria-disabled={actionBusy} onClick={() => { if (!actionBusy) onRefresh(); }}>
+      {expired ? 'Refresh popular feed' : 'Refresh this feed'}
+    </button> : null}
+    {hasNextPage && !repeatedCursor && !expired ? <button type="button" aria-disabled={actionBusy} onClick={() => { if (!actionBusy) loadMoreRef.current('manual'); }}>
       {isFetchNextPageError ? 'Retry loading more' : 'Load more'}
     </button> : hasNextPage ? null : <p role="status">{endMessage}</p>}
   </div>;

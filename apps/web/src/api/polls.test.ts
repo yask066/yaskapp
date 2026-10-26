@@ -122,6 +122,22 @@ test('lists poll pages with an opaque cursor and preserves viewer and revision s
   expect(page.items[0].viewerState).toEqual({ hasLiked: false, voteOptionId: null });
 });
 
+test('preserves the popular snapshot expiry status and decoder code', async () => {
+  server.use(http.get('http://localhost/polls', ({ request }) => {
+    const url = new URL(request.url);
+    expect(url.searchParams.get('sort')).toBe('popular');
+    expect(url.searchParams.get('limit')).toBe('20');
+    expect(url.searchParams.get('cursor')).toBe('snapshot-cursor');
+    return HttpResponse.json({
+      error: 'pagination_expired',
+      message: 'This popular feed snapshot expired.',
+    }, { status: 410 });
+  }));
+
+  await expect(listPollsPage({ sort: 'popular', cursor: 'snapshot-cursor' }))
+    .rejects.toMatchObject({ status: 410, code: 'pagination_expired' });
+});
+
 test('lists authenticated subscription pages and treats explicit null as a supported end', async () => {
   server.use(http.get('http://localhost/polls/subscriptions', ({ request }) => {
     expect(request.credentials).toBe('include');

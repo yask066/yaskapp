@@ -2,6 +2,7 @@ import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useNavigationType } from 'react-router-dom';
 import { listPollsPage, listSubscriptionsPage } from '../../api/polls';
+import { ApiError } from '../../api/client';
 import type { ClientCursorPage, Poll } from '../../api/models';
 import { listPopularUsers } from '../../api/profiles';
 import { useSession } from '../../app/session-provider';
@@ -131,6 +132,9 @@ export function FeedPage() {
     appendError: pollsQuery.isFetchNextPageError || Boolean(refreshState.appendError),
   };
   const repeatedCursor = paginationState.nextCursor !== null && paginationState.cursorHistory.includes(paginationState.nextCursor);
+  const appendError = refreshState.appendError instanceof Error ? refreshState.appendError : pollsQuery.error;
+  const popularSnapshotExpired = sort === 'trending' && appendError instanceof ApiError &&
+    appendError.status === 410 && appendError.code === 'pagination_expired';
   const loadMore = (trigger: PaginationLoadTrigger) => {
     const cursor = paginationState.nextCursor;
     if (!canAppend(paginationState, trigger) || cursor === null) return;
@@ -207,7 +211,9 @@ export function FeedPage() {
         paginationSupported={lastPage?.paginationSupported ?? false}
         automaticLoadEnabled={canAppend(paginationState, 'automatic')}
         repeatedCursor={repeatedCursor}
-        error={refreshState.appendError instanceof Error ? refreshState.appendError : pollsQuery.error}
+        expired={popularSnapshotExpired}
+        error={appendError}
+        onRefresh={() => void refreshFeed()}
         onLoadMore={loadMore}
       /> : null}{pollsQuery.isError && pollsQuery.data && !pollsQuery.isFetchNextPageError ? <AsyncState state="error" error={pollsQuery.error} onRetry={() => void pollsQuery.refetch()} /> : null}{(pollsQuery.isFetching && pollsQuery.data && !pollsQuery.isFetchingNextPage) || refreshState.pending ? <AsyncState state="refreshing" kind="poll" /> : null}</section>
     <aside className="feed-sidebar context-rail" aria-label="Discover content"><section className="context-panel discovery-card trends-card"><header className="discovery-heading"><h2><MaterialIcon name="fire" /> Trending today</h2></header><button className="trends-toggle" type="button" aria-expanded={trendsOpen} aria-controls="trends-list" onClick={() => setTrendsOpen((open) => !open)}>Toggle trending topics</button>{trendsOpen ? <ul id="trends-list">{trends.map((trend, index) => <li key={trend.topic}><a href={`/?topic=${trend.topic}`}><span>{index + 1}</span><div><strong>{trend.topic}</strong><small>{trend.polls}</small></div></a></li>)}</ul> : null}</section><section className="context-panel discovery-card suggested-users"><header className="discovery-heading"><h2>Who to follow</h2><a className="show-more" href="/search">See all</a></header><ul>{suggestedUsersQuery.isFetching && !suggestedUsersQuery.data ? <li><AsyncState state="loading" kind="user" rows={2} /></li> : null}{suggestedUsersQuery.isError ? <li><AsyncState state="error" kind="user" error={suggestedUsersQuery.error} onRetry={() => void suggestedUsersQuery.refetch()} /></li> : null}{suggestedUsers.map((person) => <li key={person.id}><Link to={`/users/${person.id}`}><Avatar name={person.profile.displayName || person.username} src={person.profile.avatarUrl} size={40} /></Link><p><Link to={`/users/${person.id}`}><strong>{person.profile.displayName || person.username}</strong></Link><small>@{person.username}</small></p><button type="button">Follow</button></li>)}</ul></section><footer className="sidebar-links"><div><a href="/">About</a><a href="/">Help</a><a href="/">Privacy</a><a href="/">Terms</a></div><p>© {new Date().getFullYear()} Yask. All rights reserved.</p></footer></aside>
