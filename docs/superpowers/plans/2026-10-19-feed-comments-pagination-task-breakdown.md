@@ -357,10 +357,10 @@
 
 **Файлы:** `features/comments/PollDetailPage.tsx`, `CommentList.tsx`, `CommentThread.tsx`; `features/polls/usePollMutations.ts`, `poll-state.ts` и tests по необходимости.
 
-- [ ] Проверить create/like/delete root/reply на нескольких pages, поздние list ответы, logout/login и взаимодействие vote/like/realtime на третьей странице Feed.
-- [ ] Перевести все comment cache writers с `PollComment[]` на server pages + overlays; сохранять `pageParams`, pending per entity и authoritative counters. Удалённые записи защищать в текущей generation.
-- [ ] Создавать root overlay и отдельный далёкий own reply с обозначенным разрывом; при встрече ID в page объединять без повторного focus. При ошибке POST сохранять текст и не выполнять automatic resubmit.
-- [ ] Выполнить WEB-COMMENTS и `usePollMutations.test.tsx`/`poll-state.test.ts`.
+- [x] Проверить create/like/delete root/reply на нескольких pages, поздние list ответы, logout/login и взаимодействие vote/like/realtime на третьей странице Feed.
+- [x] Перевести все comment cache writers с `PollComment[]` на server pages + overlays; сохранять `pageParams`, pending per entity и authoritative counters. Удалённые записи защищать в текущей generation.
+- [x] Создавать root overlay и отдельный далёкий own reply с обозначенным разрывом; при встрече ID в page объединять без повторного focus. При ошибке POST сохранять текст и не выполнять automatic resubmit.
+- [x] Выполнить WEB-COMMENTS и `usePollMutations.test.tsx`/`poll-state.test.ts`.
 
 **Готово, когда:** реакции и counters актуальны во всех представлениях, новые записи не ломают cursor и не дублируются.
 

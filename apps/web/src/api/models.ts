@@ -93,7 +93,7 @@ export interface PollComment {
   updatedAt: string;
 }
 
-export interface PollCommentRepliesPage extends ClientCursorPage<PollComment> {}
+export type PollCommentRepliesPage = ClientCursorPage<PollComment>;
 
 export interface PublicProfile {
   id: string;

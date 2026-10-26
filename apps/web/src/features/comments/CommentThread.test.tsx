@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -26,7 +26,7 @@ const server = setupServer();
 
 function renderThread(input: { rootComment?: PollComment; currentUserId?: string | null; onReplyCreated?: ReturnType<typeof vi.fn> } = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  return render(
+  return { queryClient, ...render(
     <QueryClientProvider client={queryClient}>
       <main id="main-content"><CommentThread
         pollId="poll-1"
@@ -35,11 +35,11 @@ function renderThread(input: { rootComment?: PollComment; currentUserId?: string
         onReplyCreated={input.onReplyCreated}
       /></main>
     </QueryClientProvider>,
-  );
+  ) };
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => server.resetHandlers());
+afterEach(() => { server.resetHandlers(); vi.restoreAllMocks(); });
 afterAll(() => server.close());
 
 test('shows the reply count, retries a failed page, loads more, and collapses the thread', async () => {
@@ -107,6 +107,132 @@ test('cancels a reply composer and submits a reply to the root comment', async (
 
   expect(await screen.findByText('A reply to the root.')).toBeInTheDocument();
   expect(onReplyCreated).toHaveBeenCalledWith(newReply, updatedPoll);
+});
+
+test('keeps a new reply in a separate gap overlay until the server cursor reaches it', async () => {
+  const member = { ...author, id: 'user-1', username: 'member', displayName: 'Member' };
+  const ownReply: PollComment = { ...replyTwo, id: 'reply-new', author: member, body: 'My newest reply.' };
+  const interveningReply: PollComment = { ...replyOne, id: 'reply-middle', body: 'An intervening reply.' };
+  const user = userEvent.setup();
+  server.use(
+    http.get('/polls/poll-1/comments/root-1/replies', ({ request }) => {
+      const cursor = new URL(request.url).searchParams.get('cursor');
+      return cursor
+        ? HttpResponse.json({ items: [interveningReply, ownReply], nextCursor: null })
+        : HttpResponse.json({ items: [replyOne], nextCursor: 'cursor-2' });
+    }),
+    http.post('/polls/poll-1/comments', async ({ request }) => {
+      expect(await request.json()).toEqual({ body: 'My newest reply.', parentCommentId: 'root-1' });
+      return HttpResponse.json({ comment: ownReply, poll: { ...poll, commentsCount: 6 } }, { status: 201 });
+    }),
+  );
+  const { queryClient } = renderThread();
+
+  await user.click(screen.getByRole('button', { name: 'Show replies (3)' }));
+  expect(await screen.findByText('First reply.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Reply to Author' }));
+  await user.type(screen.getByLabelText('Write a reply'), 'My newest reply.');
+  await user.click(screen.getByRole('button', { name: 'Post reply' }));
+
+  expect(await screen.findByText('My newest reply.')).toBeInTheDocument();
+  expect(screen.getByText('Your reply')).toBeInTheDocument();
+  expect(screen.getByText('Replies between these sections are not loaded yet.')).toBeInTheDocument();
+  const replyQuery = queryClient.getQueryCache().findAll().find((query) =>
+    query.queryKey[0] === 'pagination' && query.queryKey[1] === 'replies' &&
+    Boolean(query.state.data && typeof query.state.data === 'object' && 'pages' in query.state.data),
+  )!;
+  const beforeAppend = queryClient.getQueryData<{ pages: Array<{ items: PollComment[]; nextCursor: string | null }>; pageParams: unknown[] }>(replyQuery.queryKey)!;
+  expect(beforeAppend.pages).toHaveLength(1);
+  expect(beforeAppend.pages[0]?.items.map((item) => item.id)).toEqual(['reply-1']);
+  expect(beforeAppend.pages[0]?.nextCursor).toBe('cursor-2');
+  expect(beforeAppend.pageParams).toEqual([undefined]);
+
+  await user.click(screen.getByRole('button', { name: 'Load more replies' }));
+  expect(await screen.findByText('An intervening reply.')).toBeInTheDocument();
+  expect(screen.getAllByText('My newest reply.')).toHaveLength(1);
+  expect(screen.queryByText('Your reply')).not.toBeInTheDocument();
+  expect(screen.queryByText('Replies between these sections are not loaded yet.')).not.toBeInTheDocument();
+  const afterAppend = queryClient.getQueryData<typeof beforeAppend>(replyQuery.queryKey)!;
+  expect(afterAppend.pages.map((page) => page.items.map((item) => item.id))).toEqual([['reply-1'], ['reply-middle', 'reply-new']]);
+  expect(afterAppend.pageParams).toEqual([undefined, 'cursor-2']);
+});
+
+test('allows reacting to and deleting a reply on a later server page', async () => {
+  const likedReply = { ...replyTwo, likesCount: 1, viewerHasLiked: true };
+  let deleted = false;
+  server.use(
+    http.get('/polls/poll-1/comments/root-1/replies', ({ request }) => {
+      const cursor = new URL(request.url).searchParams.get('cursor');
+      return cursor
+        ? HttpResponse.json({ items: [replyTwo], nextCursor: null })
+        : HttpResponse.json({ items: [replyOne], nextCursor: 'cursor-2' });
+    }),
+    http.post('/polls/poll-1/comments/reply-2/likes', () => HttpResponse.json({ comment: likedReply }, { status: 201 })),
+    http.delete('/polls/poll-1/comments/reply-2', () => { deleted = true; return new HttpResponse(null, { status: 204 }); }),
+    http.get('/polls/poll-1', () => HttpResponse.json({ poll: { ...poll, commentsCount: 4 } })),
+  );
+  const user = userEvent.setup();
+  const { queryClient } = renderThread({ currentUserId: 'author-1' });
+
+  await user.click(screen.getByRole('button', { name: 'Show replies (3)' }));
+  expect(await screen.findByText('First reply.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Load more replies' }));
+  expect(await screen.findByText('Second reply.')).toBeInTheDocument();
+  const secondReply = screen.getByText('Second reply.').closest('li')!;
+  await user.click(within(secondReply).getByRole('button', { name: 'Like (0)' }));
+  expect(await within(secondReply).findByRole('button', { name: 'Like (1)' })).toHaveAttribute('aria-pressed', 'true');
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  await user.click(within(secondReply).getByRole('button', { name: 'Delete reply' }));
+
+  await waitFor(() => expect(deleted).toBe(true));
+  expect(screen.queryByText('Second reply.')).not.toBeInTheDocument();
+  const replyQuery = queryClient.getQueryCache().findAll().find((query) =>
+    query.queryKey[0] === 'pagination' && query.queryKey[1] === 'replies' &&
+    Boolean(query.state.data && typeof query.state.data === 'object' && 'pages' in query.state.data),
+  )!;
+  const pages = queryClient.getQueryData<{ pages: Array<{ items: PollComment[]; nextCursor: string | null }>; pageParams: unknown[] }>(replyQuery.queryKey)!;
+  expect(pages.pages.flatMap((page) => page.items.map((item) => item.id))).not.toContain('reply-2');
+  expect(pages.pages[0]?.nextCursor).toBe('cursor-2');
+  expect(pages.pageParams).toEqual([undefined, 'cursor-2']);
+});
+
+test('keeps a confirmed reply reaction when an older append commits its captured page chain', async () => {
+  const likedReply = { ...replyOne, likesCount: 1, viewerHasLiked: true };
+  let appendStarted = false;
+  let releaseAppend: ((response: Response) => void) | undefined;
+  server.use(
+    http.get('/polls/poll-1/comments/root-1/replies', ({ request }) => {
+      const cursor = new URL(request.url).searchParams.get('cursor');
+      if (!cursor) return HttpResponse.json({ items: [replyOne], nextCursor: 'cursor-2' });
+      appendStarted = true;
+      return new Promise<Response>((resolve) => { releaseAppend = resolve; });
+    }),
+    http.post('/polls/poll-1/comments/reply-1/likes', () => HttpResponse.json({ comment: likedReply }, { status: 201 })),
+  );
+  const user = userEvent.setup();
+  const { queryClient } = renderThread();
+
+  await user.click(screen.getByRole('button', { name: 'Show replies (3)' }));
+  await screen.findByText('First reply.');
+  await user.click(screen.getByRole('button', { name: 'Load more replies' }));
+  await waitFor(() => expect(appendStarted).toBe(true));
+  const firstReply = screen.getByText('First reply.').closest('li')!;
+  await user.click(within(firstReply).getByRole('button', { name: 'Like (0)' }));
+  expect(await within(firstReply).findByRole('button', { name: 'Like (1)' })).toHaveAttribute('aria-pressed', 'true');
+
+  await act(async () => {
+    releaseAppend?.(HttpResponse.json({ items: [replyTwo], nextCursor: null }));
+    await Promise.resolve();
+  });
+  expect(await screen.findByText('Second reply.')).toBeInTheDocument();
+  await waitFor(() => {
+    const query = queryClient.getQueryCache().findAll().find((item) =>
+      item.queryKey[0] === 'pagination' && item.queryKey[1] === 'replies' &&
+      Boolean(item.state.data && typeof item.state.data === 'object' && 'pages' in item.state.data),
+    );
+    expect(queryClient.getQueryData<{ pages: Array<{ items: PollComment[] }> }>(query?.queryKey ?? [])?.pages).toHaveLength(2);
+  });
+  expect(within(firstReply).getByRole('button', { name: 'Like (1)' })).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('lets anonymous visitors read replies without showing reply controls', async () => {

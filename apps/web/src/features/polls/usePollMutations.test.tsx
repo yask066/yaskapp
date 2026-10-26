@@ -30,6 +30,14 @@ function VoteButton() {
   return <button type="button" onClick={() => vote({ pollId: 'poll-1', optionId: 'option-1' })}>Vote</button>;
 }
 
+function ThirdPageButtons() {
+  const mutations = usePollMutations();
+  return <>
+    <button type="button" onClick={() => mutations.vote({ pollId: 'poll-1', optionId: 'option-1' })}>Vote third page poll</button>
+    <button type="button" onClick={() => mutations.toggleLike({ pollId: 'poll-1', viewerHasLiked: false })}>Like third page poll</button>
+  </>;
+}
+
 function RefusalButtons() {
   const mutations = usePollMutations();
   return <>
@@ -61,6 +69,58 @@ test('replaces every cached poll with the authoritative poll returned after a vo
   expect(queryClient.getQueryData<typeof poll[]>(['polls', 'popular'])?.[0]).toMatchObject(votedPoll);
   expect(queryClient.getQueryData<typeof poll[]>(['user-polls', 'author-1'])?.[0]).toMatchObject(votedPoll);
   expect(queryClient.getQueryData(['poll', 'poll-1'])).toMatchObject(votedPoll);
+});
+
+test('keeps vote and like revisions current on the third feed page when an older page response arrives', async () => {
+  const voted = {
+    ...poll,
+    options: [{ ...poll.options[0], votesCount: 4 }, poll.options[1]],
+    votesCount: 4,
+    viewerVoteOptionId: 'option-1',
+    stateRevisions: { votes: '1', likes: '0', comments: '0' },
+  };
+  const liked = { ...voted, likesCount: 3, viewerHasLiked: true, stateRevisions: { ...voted.stateRevisions, likes: '1' } };
+  server.use(
+    http.post('/polls/poll-1/votes', () => HttpResponse.json({ poll: voted }, { status: 201 })),
+    http.post('/polls/poll-1/likes', () => HttpResponse.json({ poll: liked }, { status: 201 })),
+  );
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  const feedKey = ['pagination', 'feed', 1, 'user-1', 'newest', null, null, null] as const;
+  const pageParams = [null, 'feed-cursor-2', 'feed-cursor-3'];
+  const staleFeed = {
+    pages: [
+      { items: [{ ...poll, id: 'poll-a' }], nextCursor: 'feed-cursor-2', paginationSupported: true },
+      { items: [{ ...poll, id: 'poll-b' }], nextCursor: 'feed-cursor-3', paginationSupported: true },
+      { items: [poll], nextCursor: null, paginationSupported: true },
+    ],
+    pageParams,
+  };
+  client.setQueryData(feedKey, staleFeed);
+  const requestStarted = t02ResponseGate<void>();
+  const responseGate = t02ResponseGate<typeof staleFeed>();
+  const oldRead = client.fetchQuery({
+    queryKey: feedKey,
+    queryFn: () => fetchPollQuery(client, 'user-1', async () => {
+      requestStarted.release(undefined);
+      return responseGate.response;
+    }),
+  });
+  await requestStarted.response;
+
+  const user = userEvent.setup();
+  render(<QueryClientProvider client={client}><ThirdPageButtons /></QueryClientProvider>);
+  await user.click(screen.getByRole('button', { name: 'Vote third page poll' }));
+  await waitFor(() => expect(client.getQueryData<typeof staleFeed>(feedKey)?.pages[2]?.items[0]?.votesCount).toBe(4));
+  await user.click(screen.getByRole('button', { name: 'Like third page poll' }));
+  await waitFor(() => expect(client.getQueryData<typeof staleFeed>(feedKey)?.pages[2]?.items[0]?.likesCount).toBe(3));
+  responseGate.release(staleFeed);
+  await oldRead;
+
+  const updatedFeed = client.getQueryData<typeof staleFeed>(feedKey)!;
+  expect(updatedFeed.pages[2]?.items[0]).toMatchObject({ votesCount: 4, likesCount: 3, viewerHasLiked: true, viewerVoteOptionId: 'option-1' });
+  expect(updatedFeed.pages.map((page) => page.nextCursor)).toEqual(['feed-cursor-2', 'feed-cursor-3', null]);
+  expect(updatedFeed.pageParams).toBe(pageParams);
+  client.clear();
 });
 
 test('keeps confirmed poll state and releases pending after closed-poll and invalid-option refusals', async () => {

@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
-import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest';
 import { SessionProvider } from '../../app/session-provider';
 import { PollDetailPage } from './PollDetailPage';
 
@@ -67,6 +67,7 @@ function makeRootComment(index: number, repliesCount = 0) {
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   server.resetHandlers();
+  vi.restoreAllMocks();
   sessionStorage.clear();
 });
 afterAll(() => server.close());
@@ -99,6 +100,181 @@ test('shows a poll and comments, then adds the returned comment and authoritativ
   expect(screen.getByRole('button', { name: 'Comments (3)' })).toBeInTheDocument();
 });
 
+test('keeps a posted root outside server pages and deduplicates it when a later page catches up', async () => {
+  const createdComment = {
+    id: 'comment-new', pollId: 'poll-1', author: { id: 'user-1', username: 'member', displayName: 'Member', avatarObjectKey: null, avatarUrl: null },
+    body: 'New root from an overlay.', likesCount: 0, viewerHasLiked: false,
+    parentCommentId: null, repliesCount: 0, createdAt: '2026-09-06T12:03:00.000Z', updatedAt: '2026-09-06T12:03:00.000Z',
+  };
+  let created = false;
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: currentUser })),
+    http.get('/polls/poll-1', () => HttpResponse.json({ poll: { ...poll, commentsCount: created ? 3 : 2 } })),
+    http.get('/polls/poll-1/comments', ({ request }) => {
+      const cursor = new URL(request.url).searchParams.get('cursor');
+      return cursor
+        ? HttpResponse.json({ items: [createdComment], nextCursor: null })
+        : HttpResponse.json({ items: [comments[0]], nextCursor: 'cursor-2' });
+    }),
+    http.post('/polls/poll-1/comments', () => {
+      created = true;
+      return HttpResponse.json({ comment: createdComment, poll: { ...poll, commentsCount: 3 } }, { status: 201 });
+    }),
+  );
+  const user = userEvent.setup();
+  const { queryClient } = renderDetail();
+
+  expect(await screen.findByText('First existing comment.')).toBeInTheDocument();
+  await user.type(screen.getByLabelText('Add a comment'), 'New root from an overlay.');
+  await user.click(screen.getByRole('button', { name: 'Post comment' }));
+
+  expect(await screen.findByText('New root from an overlay.')).toBeInTheDocument();
+  const rootQuery = queryClient.getQueryCache().findAll().find((query) =>
+    query.queryKey[0] === 'pagination' && query.queryKey[1] === 'comments' &&
+    Boolean(query.state.data && typeof query.state.data === 'object' && 'pages' in query.state.data),
+  )!;
+  const beforeAppend = queryClient.getQueryData<{ pages: Array<{ items: Array<{ id: string }>; nextCursor: string | null }>; pageParams: unknown[] }>(rootQuery.queryKey)!;
+  expect(beforeAppend.pages[0]?.items.map((item) => item.id)).toEqual(['comment-1']);
+  expect(beforeAppend.pages[0]?.nextCursor).toBe('cursor-2');
+  expect(beforeAppend.pageParams).toEqual([null]);
+
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  expect(await screen.findByText('New root from an overlay.')).toBeInTheDocument();
+  expect(screen.getAllByText('New root from an overlay.')).toHaveLength(1);
+  const afterAppend = queryClient.getQueryData<typeof beforeAppend>(rootQuery.queryKey)!;
+  expect(afterAppend.pages.map((page) => page.items.map((item) => item.id))).toEqual([['comment-1'], ['comment-new']]);
+  expect(afterAppend.pageParams).toEqual([null, 'cursor-2']);
+});
+
+test('keeps reactions across an in-flight stale refresh and accepts a newer server snapshot', async () => {
+  const root = { ...makeRootComment(1), viewerHasLiked: false, likesCount: 0 };
+  const likedRoot = { ...root, viewerHasLiked: true, likesCount: 1 };
+  const updatedRoot = { ...root, viewerHasLiked: true, likesCount: 5 };
+  let commentsReads = 0;
+  let releaseStaleRefresh: ((response: Response) => void) | undefined;
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: currentUser })),
+    http.get('/polls/poll-1', () => HttpResponse.json({ poll })),
+    http.get('/polls/poll-1/comments', () => {
+      commentsReads += 1;
+      if (commentsReads === 1) return HttpResponse.json({ items: [root], nextCursor: null });
+      if (commentsReads === 2) return new Promise<Response>((resolve) => { releaseStaleRefresh = resolve; });
+      return HttpResponse.json({ items: [updatedRoot], nextCursor: null });
+    }),
+    http.post('/polls/poll-1/comments/root-1/likes', () => HttpResponse.json({ comment: likedRoot }, { status: 201 })),
+  );
+  const user = userEvent.setup();
+
+  renderDetail();
+  await screen.findByText('Root 1.');
+  await user.click(screen.getByRole('button', { name: 'Refresh comments' }));
+  await waitFor(() => expect(releaseStaleRefresh).toBeTypeOf('function'));
+  await user.click(screen.getByRole('button', { name: 'Like (0)' }));
+  expect(await screen.findByRole('button', { name: 'Like (1)' })).toHaveAttribute('aria-pressed', 'true');
+  await act(async () => {
+    releaseStaleRefresh?.(HttpResponse.json({ items: [root], nextCursor: null }));
+    await Promise.resolve();
+  });
+
+  expect(await screen.findByRole('button', { name: 'Like (1)' })).toHaveAttribute('aria-pressed', 'true');
+  await user.click(screen.getByRole('button', { name: 'Refresh comments' }));
+  expect(await screen.findByRole('button', { name: 'Like (5)' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('keeps a confirmed root reaction when an older append commits its captured page chain', async () => {
+  const root = { ...makeRootComment(1), likesCount: 0, viewerHasLiked: false };
+  const likedRoot = { ...root, likesCount: 1, viewerHasLiked: true };
+  const nextRoot = { ...makeRootComment(2), body: 'Root from appended page.' };
+  let appendStarted = false;
+  let releaseAppend: ((response: Response) => void) | undefined;
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: currentUser })),
+    http.get('/polls/poll-1', () => HttpResponse.json({ poll })),
+    http.get('/polls/poll-1/comments', ({ request }) => {
+      const cursor = new URL(request.url).searchParams.get('cursor');
+      if (!cursor) return HttpResponse.json({ items: [root], nextCursor: 'cursor-2' });
+      appendStarted = true;
+      return new Promise<Response>((resolve) => { releaseAppend = resolve; });
+    }),
+    http.post('/polls/poll-1/comments/root-1/likes', () => HttpResponse.json({ comment: likedRoot }, { status: 201 })),
+  );
+  const user = userEvent.setup();
+  const { queryClient } = renderDetail();
+
+  await screen.findByText('Root 1.');
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  await waitFor(() => expect(appendStarted).toBe(true));
+  await user.click(screen.getByRole('button', { name: 'Like (0)' }));
+  expect(await screen.findByRole('button', { name: 'Like (1)' })).toHaveAttribute('aria-pressed', 'true');
+
+  await act(async () => {
+    releaseAppend?.(HttpResponse.json({ items: [nextRoot], nextCursor: null }));
+    await Promise.resolve();
+  });
+  expect(await screen.findByText('Root from appended page.')).toBeInTheDocument();
+  await waitFor(() => {
+    const query = queryClient.getQueryCache().findAll().find((item) =>
+      item.queryKey[0] === 'pagination' && item.queryKey[1] === 'comments' &&
+      Boolean(item.state.data && typeof item.state.data === 'object' && 'pages' in item.state.data),
+    );
+    expect(queryClient.getQueryData<{ pages: Array<{ items: Array<{ id: string }> }> }>(query?.queryKey ?? [])?.pages).toHaveLength(2);
+  });
+  const rootCard = screen.getByText('Root 1.').closest('li')!;
+  expect(within(rootCard).getByRole('button', { name: 'Like (1)' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('filters a deleted root from a late page and keeps the third feed page counter authoritative', async () => {
+  const memberAuthor = { id: 'user-1', username: 'member', displayName: 'Member', avatarObjectKey: null, avatarUrl: null };
+  const root = { ...makeRootComment(1), author: memberAuthor };
+  const confirmedPoll = { ...poll, commentsCount: 1 };
+  let releaseAppend: ((response: Response) => void) | undefined;
+  let appendStarted = false;
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: currentUser })),
+    http.get('/polls/poll-1', () => HttpResponse.json({ poll: confirmedPoll })),
+    http.get('/polls/poll-1/comments', ({ request }) => {
+      const cursor = new URL(request.url).searchParams.get('cursor');
+      return cursor ? new Promise<Response>((resolve) => { appendStarted = true; releaseAppend = resolve; }) : HttpResponse.json({ items: [root], nextCursor: 'cursor-2' });
+    }),
+    http.delete('/polls/poll-1/comments/root-1', () => new HttpResponse(null, { status: 204 })),
+  );
+  const user = userEvent.setup();
+  const { queryClient } = renderDetail();
+  const feedPageParams = [null, 'feed-2', 'feed-3'];
+  const feedKey = ['pagination', 'feed', 1, 'user-1', 'newest', null, null, null] as const;
+  queryClient.setQueryData(feedKey, {
+    pages: [
+      { items: [{ ...poll, id: 'feed-a' }], nextCursor: 'feed-2', paginationSupported: true },
+      { items: [{ ...poll, id: 'feed-b' }], nextCursor: 'feed-3', paginationSupported: true },
+      { items: [poll], nextCursor: null, paginationSupported: true },
+    ],
+    pageParams: feedPageParams,
+  });
+
+  expect(await screen.findByText('Root 1.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  await waitFor(() => expect(appendStarted).toBe(true));
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  await user.click(screen.getByRole('button', { name: 'Delete' }));
+  await waitFor(() => expect(screen.queryByText('Root 1.')).not.toBeInTheDocument());
+  await act(async () => {
+    releaseAppend?.(HttpResponse.json({ items: [root], nextCursor: null }));
+    await Promise.resolve();
+  });
+
+  expect(screen.queryByText('Root 1.')).not.toBeInTheDocument();
+  const rootQuery = queryClient.getQueryCache().findAll().find((query) =>
+    query.queryKey[0] === 'pagination' && query.queryKey[1] === 'comments' &&
+    Boolean(query.state.data && typeof query.state.data === 'object' && 'pages' in query.state.data),
+  )!;
+  const rootPages = queryClient.getQueryData<{ pages: Array<{ items: Array<{ id: string }> }>; pageParams: unknown[] }>(rootQuery.queryKey)!;
+  expect(rootPages.pages.flatMap((page) => page.items.map((item) => item.id))).not.toContain('root-1');
+  expect(rootPages.pageParams).toEqual([null, 'cursor-2']);
+  const feed = queryClient.getQueryData<typeof poll | { pages: Array<{ items: typeof poll[] }>; pageParams: unknown[] }>(feedKey)!;
+  expect('pages' in feed && feed.pages[2]?.items[0]?.commentsCount).toBe(1);
+  expect('pages' in feed && feed.pageParams).toBe(feedPageParams);
+});
+
 test.each([false, true])('reconciles an ambiguous comment write (reply=%s) without repeating POST', async (reply) => {
   let written = false; let writes = 0; let reads = 0;
   server.use(
@@ -116,6 +292,7 @@ test.each([false, true])('reconciles an ambiguous comment write (reply=%s) witho
   await user.type(screen.getByLabelText(reply ? 'Write a reply' : 'Add a comment'), 'Possibly saved comment');
   await user.click(screen.getByRole('button', { name: reply ? 'Post reply' : 'Post comment' }));
   expect(await screen.findByRole('button', { name: 'Comments (3)' })).toBeInTheDocument();
+  expect(screen.getByLabelText(reply ? 'Write a reply' : 'Add a comment')).toHaveValue('Possibly saved comment');
   expect(writes).toBe(1); expect(reads).toBe(2);
 });
 
