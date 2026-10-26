@@ -176,6 +176,31 @@ services:
         done
     restart: unless-stopped
 
+  poll-feed-snapshot-cleanup:
+    image: yaskapp-api:staging
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    env_file:
+      - ../../services/api/.env.staging
+    environment:
+      ACCOUNT_DELETION_ENABLED: "false"
+      ACCOUNT_DELETION_JOURNAL_ENABLED: "false"
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    command:
+      - sh
+      - -c
+      - >-
+        while true; do
+          node services/api/dist/jobs/cleanup-poll-feed-snapshots.js;
+          sleep 300;
+        done
+    restart: unless-stopped
   moderation-web:
     image: yaskapp-moderation-web:staging
     build:

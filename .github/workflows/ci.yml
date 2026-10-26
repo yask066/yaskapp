@@ -62,6 +62,18 @@ jobs:
           docker run --network host --rm minio/mc:latest mb --ignore-existing ci/yaskapp-media
       - run: npm run api:typecheck
       - run: npm run api:test
+      - name: Create poll feed snapshot test database
+        env:
+          PGPASSWORD: yaskapp
+        run: createdb --host=127.0.0.1 --username=yaskapp yaskapp_pagination
+      - name: Poll feed snapshot lifecycle integration tests
+        working-directory: services/api
+        env:
+          DATABASE_URL: postgres://yaskapp:yaskapp@localhost:5432/yaskapp_pagination
+          PAGINATION_TEST_DATABASE_URL: postgres://yaskapp:yaskapp@localhost:5432/yaskapp_pagination
+        run: |
+          npm run db:migrate
+          node --import tsx --test src/modules/polls/poll-feed-snapshots.test.ts
       - name: Public web checks
         run: |
           npm run typecheck -w @yaskapp/web

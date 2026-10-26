@@ -22,7 +22,8 @@
     "account-deletion:journal-import-legacy": "tsx src/jobs/run-import-account-deletion-cloud-journal.ts",
     "account-deletion:journal-reapply": "tsx src/jobs/reapply-account-deletions.ts",
     "test": "npm run db:migrate && node --import tsx --test --test-reporter spec \"src/**/*.test.ts\"",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "poll-feed-snapshots:cleanup": "tsx src/jobs/cleanup-poll-feed-snapshots.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.609.0",

@@ -398,10 +398,10 @@
 
 **Файлы:** создать `poll-feed-snapshots.repository.ts`, `poll-feed-snapshots.test.ts`, `jobs/cleanup-poll-feed-snapshots.ts`; миграция snapshot tables при выборе PostgreSQL; env/server/job wiring согласно ADR.
 
-- [ ] Проверить сохранённый rank/order, TTL ровно 30 минут без продления, квоту владельца из ADR, конкурентное создание, cleanup и отсутствие доступа другого владельца.
-- [ ] Реализовать интерфейсы snapshot repository из общей секции: immutable ordered IDs, server-side position, безопасную ownership binding и исключение долгоживущей транзакции между HTTP calls.
-- [ ] Подключить cleanup и ограничения storage из ADR; verify, что выборка не обрезается первыми N ID. Номер миграции выбрать после фактически существующих migrations.
-- [ ] Выполнить snapshot tests, API typecheck и migration check; сохранить пример lifecycle evidence.
+- [x] Проверить сохранённый rank/order, TTL ровно 30 минут без продления, квоту владельца из ADR, конкурентное создание, cleanup и отсутствие доступа другого владельца.
+- [x] Реализовать интерфейсы snapshot repository из общей секции: immutable ordered IDs, server-side position, безопасную ownership binding и исключение долгоживущей транзакции между HTTP calls.
+- [x] Подключить cleanup и ограничения storage из ADR; verify, что выборка не обрезается первыми N ID. Номер миграции выбрать после фактически существующих migrations.
+- [x] Выполнить snapshot tests, API typecheck и migration check; сохранить пример lifecycle evidence.
 
 **Готово, когда:** snapshots имеют ограниченный срок/количество, полный зафиксированный порядок и проверяемую очистку. Лимиты не меняют полноту отдельного snapshot.
 
