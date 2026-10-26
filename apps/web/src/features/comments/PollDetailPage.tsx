@@ -1,7 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { createComment, getComment, getPoll } from '../../api/polls';
-import type { PollComment } from '../../api/models';
+import type { ClientCursorPage, PollComment } from '../../api/models';
 import { useSession } from '../../app/session-provider';
 import { AsyncState } from '../../components/AsyncState';
 import { PollCard } from '../../components/PollCard';
@@ -9,6 +9,7 @@ import { isAmbiguousMutationError, replaceCachedPoll, usePollMutations } from '.
 import { fetchPollQuery, pollSessionEpoch, reconcilePoll } from '../polls/poll-state';
 import { CommentForm } from './CommentForm';
 import { CommentList } from './CommentList';
+import { paginationQueryKey } from '../../core/pagination/pagination-state';
 
 export function PollDetailPage() {
   const { pollId = '' } = useParams();
@@ -17,6 +18,9 @@ export function PollDetailPage() {
   const { user, status, sessionEpoch } = useSession();
   const queryClient = useQueryClient();
   const pollMutations = usePollMutations();
+  const commentsQueryKey = paginationQueryKey({
+    surface: 'comments', sessionEpoch, userId: user?.id ?? null, pollId,
+  });
   const pollQuery = useQuery({ queryKey: ['poll', pollId], queryFn: ({ signal }) => fetchPollQuery(queryClient, user?.id ?? null, () => getPoll(pollId, signal), true, signal), enabled: Boolean(pollId) && status !== 'loading' });
   const commentTargetQuery = useQuery({
     queryKey: ['comment-target', pollId, focusedCommentId],
@@ -35,13 +39,27 @@ export function PollDetailPage() {
     mutationFn: ({ body }: { body: string; epoch: number }) => createComment(pollId, body),
     onSuccess: ({ comment, poll }, { epoch }) => {
       if (pollSessionEpoch(queryClient) !== epoch) return;
-      queryClient.setQueryData<PollComment[]>(['comments', pollId], (cached = []) => [comment, ...cached]);
+      const cached = queryClient.getQueryData<InfiniteData<ClientCursorPage<PollComment>, string | null>>(commentsQueryKey);
+      if (cached) {
+        const alreadyPresent = cached.pages.some((page) => page.items.some((item) => item.id === comment.id));
+        queryClient.setQueryData<InfiniteData<ClientCursorPage<PollComment>, string | null>>(commentsQueryKey, {
+          ...cached,
+          pages: cached.pages.map((page, index) => {
+            if (page.items.some((item) => item.id === comment.id)) {
+              return { ...page, items: page.items.map((item) => item.id === comment.id ? comment : item) };
+            }
+            return index === 0 && !alreadyPresent ? { ...page, items: [comment, ...page.items] } : page;
+          }),
+        });
+      } else {
+        void queryClient.invalidateQueries({ queryKey: commentsQueryKey, exact: true });
+      }
       replaceCachedPoll(queryClient, poll, user?.id ?? null);
     },
     onError: (error, { epoch }) => {
       if (pollSessionEpoch(queryClient) !== epoch || !isAmbiguousMutationError(error)) return;
       void reconcilePoll(queryClient, pollId, user?.id ?? null, epoch);
-      void queryClient.invalidateQueries({ queryKey: ['comments', pollId] });
+      void queryClient.invalidateQueries({ queryKey: commentsQueryKey, exact: true });
     },
   });
 
@@ -57,6 +75,7 @@ export function PollDetailPage() {
           pollId={pollId}
           currentUserId={user?.id}
           sessionEpoch={sessionEpoch}
+          sessionReady={status !== 'loading'}
           focusedCommentId={focusedReplyId ? null : focusedCommentId}
           focusedReplyId={focusedReplyId}
           forcedExpandedRootId={targetRootId}

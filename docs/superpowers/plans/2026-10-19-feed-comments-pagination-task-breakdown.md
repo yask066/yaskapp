@@ -10,7 +10,7 @@
 
 **Spec:** [PRD: Полная пагинация ленты и комментариев](../../prd-feed-comments-pagination.md).
 
-**Статус:** Backlog, 28 задач; T01–T03, T05–T12 и T15–T17 отмечены выполненными. Остальные задачи открыты. Декомпозиция сохраняет scope PRD; решения для реализации зафиксированы в ADR T01. Документ можно переносить в трекер по одной задаче на карточку.
+**Статус:** Backlog, 28 задач; T01–T03, T05–T12 и T15–T18 отмечены выполненными. Остальные задачи открыты. Декомпозиция сохраняет scope PRD; решения для реализации зафиксированы в ADR T01. Документ можно переносить в трекер по одной задаче на карточку.
 
 ## Global Constraints
 
@@ -342,12 +342,12 @@
 
 **Тип / размер:** Web, M. **Зависимости:** T06, T16, T17. **PRD:** FR-01/02/03, AC-01/02/05/06/10/18.
 
-**Файлы:** `features/comments/CommentList.tsx`, `CommentThread.tsx`, `PollDetailPage.test.tsx`, `CommentThread.test.tsx`; footer T17.
+**Файлы:** `features/comments/CommentList.tsx`, `CommentThread.tsx`, `PollDetailPage.tsx`/`PollDetailPage.test.tsx`, `CommentThread.test.tsx`; адаптировать `components/PaginationFooter.tsx` T17.
 
-- [ ] Проверить 125 newest roots, pagination footer, legacy state и две раскрытые ветки; append error одной ветки не блокирует другую.
-- [ ] Перевести roots на infinite pages; replies сохранить на `useInfiniteQuery`, добавив общие guards и ручную кнопку без автоматического чтения ветки.
-- [ ] Добавить refresh обсуждения с новой generation, сохранением старых pages при ошибке и перезапуском раскрытых веток по необходимости.
-- [ ] Выполнить WEB-COMMENTS и typecheck.
+- [x] Проверить 125 newest roots, pagination footer, legacy state и две раскрытые ветки; append error одной ветки не блокирует другую.
+- [x] Перевести roots на infinite pages; replies сохранить на `useInfiniteQuery`, добавив общие guards и ручную кнопку без автоматического чтения ветки.
+- [x] Добавить refresh обсуждения с новой generation, сохранением старых pages при ошибке и перезапуском раскрытых веток по необходимости.
+- [x] Выполнить WEB-COMMENTS и typecheck.
 
 **Готово, когда:** roots/replies используют согласованные rules и не зависят от длины массива/счётчика при определении конца.
 

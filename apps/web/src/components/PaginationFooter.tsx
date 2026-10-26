@@ -11,6 +11,8 @@ interface PaginationFooterProps {
   repeatedCursor?: boolean;
   error?: Error | null;
   endMessage?: string;
+  itemName?: string;
+  refreshLabel?: string;
   onLoadMore: (trigger: PaginationLoadTrigger) => void;
 }
 
@@ -24,6 +26,8 @@ export function PaginationFooter({
   repeatedCursor = false,
   error,
   endMessage = "You've seen everything.",
+  itemName = 'polls',
+  refreshLabel = 'the feed',
   onLoadMore,
 }: PaginationFooterProps) {
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -45,9 +49,9 @@ export function PaginationFooter({
 
   return <div className="pagination-footer" aria-live="polite">
     {hasNextPage && !repeatedCursor ? <div ref={sentinelRef} className="pagination-footer__sentinel" aria-hidden="true" /> : null}
-    {isFetchingNextPage ? <p role="status">Loading more polls…</p> : null}
-    {repeatedCursor ? <p role="alert">The server returned a repeated cursor. Refresh the feed to continue.</p> : null}
-    {isFetchNextPageError ? <p role="alert">{error?.message || 'Could not load more polls.'}</p> : null}
+    {isFetchingNextPage ? <p role="status">Loading more {itemName}…</p> : null}
+    {repeatedCursor ? <p role="alert">The server returned a repeated cursor. Refresh {refreshLabel} to continue.</p> : null}
+    {isFetchNextPageError ? <p role="alert">{error?.message || `Could not load more ${itemName}.`}</p> : null}
     {hasNextPage && !repeatedCursor ? <button type="button" disabled={isFetchingNextPage || isRefreshing} onClick={() => loadMoreRef.current('manual')}>
       {isFetchNextPageError ? 'Retry loading more' : 'Load more'}
     </button> : hasNextPage ? null : <p role="status">{endMessage}</p>}

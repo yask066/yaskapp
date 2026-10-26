@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -39,6 +39,15 @@ function renderDetail(initialEntry = '/polls/poll-1') {
       </SessionProvider>
     </QueryClientProvider>,
   ) };
+}
+
+function makeRootComment(index: number, repliesCount = 0) {
+  const createdAt = new Date(Date.UTC(2026, 9, 19, 12, 0, index)).toISOString();
+  return {
+    id: `root-${index}`, pollId: 'poll-1', author: poll.author, body: `Root ${index}.`,
+    likesCount: 0, viewerHasLiked: false, parentCommentId: null, repliesCount,
+    createdAt, updatedAt: createdAt,
+  };
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -139,13 +148,15 @@ test('keeps focus on the page when Retry replaces a failed poll with a new loadi
 
 test('shows a Login link instead of a comment text area for anonymous visitors', async () => {
   server.use(
+    http.get('/auth/me', () => HttpResponse.json({ error: 'unauthorized' }, { status: 401 })),
     http.get('/polls/poll-1', () => HttpResponse.json({ poll })),
-    http.get('/polls/poll-1/comments', () => HttpResponse.json({ items: comments })),
+    http.get('/polls/poll-1/comments', () => HttpResponse.json({ items: comments, nextCursor: null })),
   );
 
   renderDetail();
 
   expect(await screen.findByRole('link', { name: 'Login' })).toHaveAttribute('href', '/login?next=%2Fpolls%2Fpoll-1');
+  expect(await screen.findByText('First existing comment.')).toBeInTheDocument();
   expect(screen.queryByLabelText('Add a comment')).not.toBeInTheDocument();
 });
 
@@ -236,4 +247,180 @@ test('updates root repliesCount and the authoritative poll count after posting a
   await user.click(screen.getByRole('button', { name: 'Hide replies (1)' }));
   expect(screen.getByRole('button', { name: 'Show replies (1)' })).toBeInTheDocument();
   expect(queryClient.getQueryData<typeof poll>(['poll', 'poll-1'])?.commentsCount).toBe(3);
+});
+
+test('loads 125 newest roots through cursor pages and exposes the end only after the final cursor', async () => {
+  const roots = Array.from({ length: 125 }, (_, index) => makeRootComment(125 - index));
+  const requests: Array<{ order: string | null; limit: string | null; cursor: string | null }> = [];
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ error: 'unauthorized' }, { status: 401 })),
+    http.get('/polls/poll-1', () => HttpResponse.json({ poll })),
+    http.get('/polls/poll-1/comments', ({ request }) => {
+      const url = new URL(request.url);
+      const offset = Number(url.searchParams.get('cursor') ?? 0);
+      requests.push({
+        order: url.searchParams.get('order'),
+        limit: url.searchParams.get('limit'),
+        cursor: url.searchParams.get('cursor'),
+      });
+      return HttpResponse.json({
+        items: roots.slice(offset, offset + 20),
+        nextCursor: offset + 20 < roots.length ? String(offset + 20) : null,
+      });
+    }),
+  );
+  const user = userEvent.setup();
+
+  renderDetail();
+
+  expect(await screen.findByText('Root 125.')).toBeInTheDocument();
+  expect(screen.getByText('Root 106.')).toBeInTheDocument();
+  expect(screen.queryByText('Root 105.')).not.toBeInTheDocument();
+  for (let page = 0; page < 6; page += 1) {
+    await user.click(screen.getByRole('button', { name: 'Load more' }));
+    expect(await screen.findByText(`Root ${105 - page * 20}.`)).toBeInTheDocument();
+  }
+
+  expect(screen.getByText('Root 1.')).toBeInTheDocument();
+  expect(screen.getAllByText(/^Root \d+\.$/)).toHaveLength(125);
+  expect(screen.getByText("You've seen everything.")).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
+  expect(requests).toEqual([
+    { order: 'newest', limit: '20', cursor: null },
+    { order: 'newest', limit: '20', cursor: '20' },
+    { order: 'newest', limit: '20', cursor: '40' },
+    { order: 'newest', limit: '20', cursor: '60' },
+    { order: 'newest', limit: '20', cursor: '80' },
+    { order: 'newest', limit: '20', cursor: '100' },
+    { order: 'newest', limit: '20', cursor: '120' },
+  ]);
+});
+
+test('keeps a legacy roots response readable without offering append or claiming the list is complete', async () => {
+  let reads = 0;
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ error: 'unauthorized' }, { status: 401 })),
+    http.get('/polls/poll-1', () => HttpResponse.json({ poll })),
+    http.get('/polls/poll-1/comments', () => { reads += 1; return HttpResponse.json({ items: [makeRootComment(1)] }); }),
+  );
+
+  renderDetail();
+
+  expect(await screen.findByText('Root 1.')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
+  expect(screen.queryByText("You've seen everything.")).not.toBeInTheDocument();
+  expect(reads).toBe(1);
+});
+
+test('preserves root pages and their next cursor when discussion refresh fails', async () => {
+  const roots = [makeRootComment(1), makeRootComment(2), makeRootComment(3)];
+  const cursors: Array<string | null> = [];
+  let firstPageReads = 0;
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ error: 'unauthorized' }, { status: 401 })),
+    http.get('/polls/poll-1', () => HttpResponse.json({ poll })),
+    http.get('/polls/poll-1/comments', ({ request }) => {
+      const cursor = new URL(request.url).searchParams.get('cursor');
+      cursors.push(cursor);
+      if (!cursor) {
+        firstPageReads += 1;
+        return firstPageReads === 1
+          ? HttpResponse.json({ items: [roots[0]], nextCursor: 'cursor-2' })
+          : HttpResponse.json({ error: 'unavailable', message: 'Refresh failed.' }, { status: 503 });
+      }
+      if (cursor === 'cursor-2') return HttpResponse.json({ items: [roots[1]], nextCursor: 'cursor-3' });
+      return HttpResponse.json({ items: [roots[2]], nextCursor: null });
+    }),
+  );
+  const user = userEvent.setup();
+
+  renderDetail();
+
+  expect(await screen.findByText('Root 1.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  expect(await screen.findByText('Root 2.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Refresh comments' }));
+  expect(await screen.findByText('Refresh failed.')).toBeInTheDocument();
+  expect(screen.getByText('Root 1.')).toBeInTheDocument();
+  expect(screen.getByText('Root 2.')).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  expect(await screen.findByText('Root 3.')).toBeInTheDocument();
+  expect(cursors).toEqual([null, 'cursor-2', null, 'cursor-3']);
+});
+
+test('does not let an in-flight append overwrite a successful discussion refresh', async () => {
+  const initialRoot = makeRootComment(1);
+  const refreshedRoot = { ...makeRootComment(2), body: 'Fresh root after refresh.' };
+  const staleRoot = { ...makeRootComment(3), body: 'Stale append response.' };
+  let firstPageReads = 0;
+  let releaseStaleAppend: ((response: Response) => void) | undefined;
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ error: 'unauthorized' }, { status: 401 })),
+    http.get('/polls/poll-1', () => HttpResponse.json({ poll })),
+    http.get('/polls/poll-1/comments', ({ request }) => {
+      const cursor = new URL(request.url).searchParams.get('cursor');
+      if (cursor) return new Promise((resolve) => { releaseStaleAppend = resolve; });
+      firstPageReads += 1;
+      return HttpResponse.json({
+        items: [firstPageReads === 1 ? initialRoot : refreshedRoot],
+        nextCursor: firstPageReads === 1 ? 'cursor-2' : null,
+      });
+    }),
+  );
+  const user = userEvent.setup();
+
+  renderDetail();
+
+  expect(await screen.findByText('Root 1.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  await waitFor(() => expect(releaseStaleAppend).toBeTypeOf('function'));
+  await user.click(screen.getByRole('button', { name: 'Refresh comments' }));
+  expect(await screen.findByText('Fresh root after refresh.')).toBeInTheDocument();
+
+  await act(async () => {
+    releaseStaleAppend?.(HttpResponse.json({ items: [staleRoot], nextCursor: null }));
+    await Promise.resolve();
+  });
+  expect(screen.queryByText('Stale append response.')).not.toBeInTheDocument();
+  expect(screen.queryByText('Root 1.')).not.toBeInTheDocument();
+});
+
+test('refreshes expanded reply threads from their first page after a successful discussion refresh', async () => {
+  const root = makeRootComment(1, 2);
+  let rootReads = 0;
+  let replyFirstPageReads = 0;
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ error: 'unauthorized' }, { status: 401 })),
+    http.get('/polls/poll-1', () => HttpResponse.json({ poll })),
+    http.get('/polls/poll-1/comments', () => {
+      rootReads += 1;
+      return HttpResponse.json({ items: [rootReads === 1 ? root : { ...root, body: 'Root after refresh.' }], nextCursor: null });
+    }),
+    http.get('/polls/poll-1/comments/root-1/replies', ({ request }) => {
+      const cursor = new URL(request.url).searchParams.get('cursor');
+      if (cursor) return HttpResponse.json({ items: [{ ...comments[1], id: 'reply-2', parentCommentId: 'root-1', body: 'Old second reply.' }], nextCursor: null });
+      replyFirstPageReads += 1;
+      const body = replyFirstPageReads === 1 ? 'Old first reply.' : 'Fresh first reply.';
+      return HttpResponse.json({
+        items: [{ ...comments[1], id: 'reply-1', parentCommentId: 'root-1', body }],
+        nextCursor: replyFirstPageReads === 1 ? 'reply-cursor-2' : null,
+      });
+    }),
+  );
+  const user = userEvent.setup();
+
+  renderDetail();
+
+  expect(await screen.findByText('Root 1.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Show replies (2)' }));
+  expect(await screen.findByText('Old first reply.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Load more replies' }));
+  expect(await screen.findByText('Old second reply.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Refresh comments' }));
+
+  expect(await screen.findByText('Root after refresh.')).toBeInTheDocument();
+  expect(await screen.findByText('Fresh first reply.')).toBeInTheDocument();
+  expect(screen.queryByText('Old second reply.')).not.toBeInTheDocument();
+  expect(replyFirstPageReads).toBe(2);
 });

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -108,4 +108,58 @@ test('lets anonymous visitors read replies without showing reply controls', asyn
   expect(await screen.findByText('First reply.')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Reply to Author' })).not.toBeInTheDocument();
   expect(screen.queryByLabelText('Write a reply')).not.toBeInTheDocument();
+});
+
+test('keeps append errors and manual retries isolated to their own expanded reply branch', async () => {
+  const rootA = { ...root, id: 'root-a', author: { ...author, displayName: 'Author A' }, repliesCount: 2 };
+  const rootB = { ...root, id: 'root-b', author: { ...author, displayName: 'Author B' }, repliesCount: 2 };
+  const replyA1 = { ...replyOne, id: 'reply-a1', parentCommentId: 'root-a', body: 'First reply in A.' };
+  const replyA2 = { ...replyOne, id: 'reply-a2', parentCommentId: 'root-a', body: 'Second reply in A.' };
+  const replyB1 = { ...replyOne, id: 'reply-b1', parentCommentId: 'root-b', body: 'First reply in B.' };
+  const replyB2 = { ...replyOne, id: 'reply-b2', parentCommentId: 'root-b', body: 'Second reply in B.' };
+  let branchAAppendAttempts = 0;
+  server.use(
+    http.get('/polls/poll-1/comments/root-a/replies', ({ request }) => {
+      const cursor = new URL(request.url).searchParams.get('cursor');
+      if (!cursor) return HttpResponse.json({ items: [replyA1], nextCursor: 'a-next' });
+      branchAAppendAttempts += 1;
+      return branchAAppendAttempts === 1
+        ? HttpResponse.json({ error: 'unavailable', message: 'Branch A append failed.' }, { status: 503 })
+        : HttpResponse.json({ items: [replyA2], nextCursor: null });
+    }),
+    http.get('/polls/poll-1/comments/root-b/replies', ({ request }) => {
+      const cursor = new URL(request.url).searchParams.get('cursor');
+      return cursor
+        ? HttpResponse.json({ items: [replyB2], nextCursor: null })
+        : HttpResponse.json({ items: [replyB1], nextCursor: 'b-next' });
+    }),
+  );
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  const user = userEvent.setup();
+  render(
+    <QueryClientProvider client={queryClient}>
+      <main id="main-content">
+        <CommentThread pollId="poll-1" rootComment={rootA} currentUserId={null} />
+        <CommentThread pollId="poll-1" rootComment={rootB} currentUserId={null} />
+      </main>
+    </QueryClientProvider>,
+  );
+  const branchA = within(screen.getByRole('region', { name: 'Replies to Author A' }));
+  const branchB = within(screen.getByRole('region', { name: 'Replies to Author B' }));
+
+  await user.click(branchA.getByRole('button', { name: 'Show replies (2)' }));
+  await user.click(branchB.getByRole('button', { name: 'Show replies (2)' }));
+  expect(await branchA.findByText('First reply in A.')).toBeInTheDocument();
+  expect(await branchB.findByText('First reply in B.')).toBeInTheDocument();
+
+  await user.click(branchA.getByRole('button', { name: 'Load more replies' }));
+  expect(await branchA.findByRole('alert')).toHaveTextContent('Branch A append failed.');
+  expect(branchA.getByRole('button', { name: 'Retry loading more replies' })).toBeInTheDocument();
+  await user.click(branchB.getByRole('button', { name: 'Load more replies' }));
+  expect(await branchB.findByText('Second reply in B.')).toBeInTheDocument();
+
+  await user.click(branchA.getByRole('button', { name: 'Retry loading more replies' }));
+  expect(await branchA.findByText('Second reply in A.')).toBeInTheDocument();
+  expect(branchB.getByText('Second reply in B.')).toBeInTheDocument();
+  expect(branchAAppendAttempts).toBe(2);
 });
