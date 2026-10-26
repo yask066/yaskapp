@@ -3,7 +3,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
 import { SessionProvider } from '../../app/session-provider';
 import { PollDetailPage } from './PollDetailPage';
@@ -28,8 +28,10 @@ const currentUser = {
 
 const server = setupServer();
 
-function renderDetail(initialEntry = '/polls/poll-1') {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+function renderDetail(
+  initialEntry = '/polls/poll-1',
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } }),
+) {
   return { queryClient, ...render(
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
@@ -39,6 +41,18 @@ function renderDetail(initialEntry = '/polls/poll-1') {
       </SessionProvider>
     </QueryClientProvider>,
   ) };
+}
+
+function DetailRouteHarness() {
+  const navigate = useNavigate();
+  return <>
+    <button type="button" onClick={() => navigate('/away')}>Navigate away</button>
+    <button type="button" onClick={() => navigate('/polls/poll-1?comment=reply-1')}>Return to notification</button>
+    <Routes>
+      <Route path="/polls/:pollId" element={<PollDetailPage />} />
+      <Route path="/away" element={<p>Away from poll.</p>} />
+    </Routes>
+  </>;
 }
 
 function makeRootComment(index: number, repliesCount = 0) {
@@ -422,5 +436,44 @@ test('refreshes expanded reply threads from their first page after a successful 
   expect(await screen.findByText('Root after refresh.')).toBeInTheDocument();
   expect(await screen.findByText('Fresh first reply.')).toBeInTheDocument();
   expect(screen.queryByText('Old second reply.')).not.toBeInTheDocument();
+  expect(replyFirstPageReads).toBe(2);
+});
+
+test('keeps the refreshed reply generation when the detail page remounts from a notification target', async () => {
+  const root = makeRootComment(1, 1);
+  const notificationReply = { ...comments[1], id: 'reply-1', parentCommentId: 'root-1', repliesCount: 0 };
+  let replyFirstPageReads = 0;
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ error: 'unauthorized' }, { status: 401 })),
+    http.get('/polls/poll-1', () => HttpResponse.json({ poll })),
+    http.get('/polls/poll-1/comments', () => HttpResponse.json({ items: [root], nextCursor: null })),
+    http.get('/polls/poll-1/comments/reply-1', () => HttpResponse.json({ comment: notificationReply })),
+    http.get('/polls/poll-1/comments/root-1', () => HttpResponse.json({ comment: root })),
+    http.get('/polls/poll-1/comments/root-1/replies', () => {
+      replyFirstPageReads += 1;
+      const body = replyFirstPageReads === 1 ? 'Old cached notification reply.' : 'Fresh notification reply.';
+      return HttpResponse.json({ items: [{ ...notificationReply, body }], nextCursor: null });
+    }),
+  );
+  const user = userEvent.setup();
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <SessionProvider>
+        <MemoryRouter initialEntries={['/polls/poll-1?comment=reply-1']}>
+          <DetailRouteHarness />
+        </MemoryRouter>
+      </SessionProvider>
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByText('Old cached notification reply.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Refresh comments' }));
+  expect(await screen.findByText('Fresh notification reply.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Navigate away' }));
+  expect(await screen.findByText('Away from poll.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Return to notification' }));
+
+  expect(await screen.findByText('Fresh notification reply.')).toBeInTheDocument();
+  expect(screen.queryByText('Old cached notification reply.')).not.toBeInTheDocument();
   expect(replyFirstPageReads).toBe(2);
 });

@@ -62,8 +62,20 @@ test('shows the reply count, retries a failed page, loads more, and collapses th
   expect(await screen.findByText('First reply.')).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Load more replies' }));
   expect(await screen.findByText('Second reply.')).toBeInTheDocument();
+  expect(screen.getByText("You've seen all replies.")).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Hide replies (3)' }));
   expect(screen.queryByText('First reply.')).not.toBeInTheDocument();
+});
+
+test('does not claim the end of a legacy replies response without cursor metadata', async () => {
+  server.use(http.get('/polls/poll-1/comments/root-1/replies', () => HttpResponse.json({ items: [replyOne] })));
+  const user = userEvent.setup();
+
+  renderThread();
+
+  await user.click(screen.getByRole('button', { name: 'Show replies (3)' }));
+  expect(await screen.findByText('First reply.')).toBeInTheDocument();
+  expect(screen.queryByText("You've seen all replies.")).not.toBeInTheDocument();
 });
 
 test('cancels a reply composer and submits a reply to the root comment', async () => {

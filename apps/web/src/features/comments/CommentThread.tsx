@@ -98,7 +98,7 @@ export function CommentThread({
     () => repliesQuery.data?.pageParams.filter((cursor): cursor is string => typeof cursor === 'string') ?? [],
     [repliesQuery.data?.pageParams],
   );
-  const paginationSupported = Boolean(repliesQuery.data);
+  const paginationSupported = lastPage?.paginationSupported ?? false;
   const appendError = repliesQuery.isFetchNextPageError;
   const paginationState = useMemo<PaginationState>(() => ({
     generation: refreshGeneration,
@@ -198,6 +198,7 @@ export function CommentThread({
           disabled={repliesQuery.isFetchingNextPage || !canAppend(paginationState, 'manual')}
           onClick={loadMoreReplies}
         >{repliesQuery.isFetchingNextPage ? 'Loading more replies…' : repliesQuery.isFetchNextPageError ? 'Retry loading more replies' : 'Load more replies'}</button> : null}
+        {paginationSupported && nextCursor === null && replies.length > 0 ? <p role="status">You've seen all replies.</p> : null}
         {repeatedCursor ? <p role="alert">The server returned a repeated cursor. Refresh comments to continue.</p> : null}
         {repliesQuery.isFetchNextPageError && repliesQuery.data ? <div className="comment-thread__error"><p role="alert">{mutationErrorMessage(repliesQuery.error)}</p></div> : null}
         {repliesQuery.isFetching && !repliesQuery.isFetchingNextPage && repliesQuery.data ? <AsyncState state="refreshing" kind="comment" /> : null}

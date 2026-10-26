@@ -71,7 +71,7 @@ test('lists cursor-paginated replies using cookie-backed API requests', async ()
   }));
 
   await expect(listCommentReplies('poll-1', 'root-1', { limit: 3, cursor: 'next-page' }))
-    .resolves.toMatchObject({ items: [{ id: 'comment-1', parentCommentId: 'root-1' }], nextCursor: null });
+    .resolves.toMatchObject({ items: [{ id: 'comment-1', parentCommentId: 'root-1' }], nextCursor: null, paginationSupported: true });
 });
 
 test('loads an individual comment target through the existing cookie-backed route', async () => {

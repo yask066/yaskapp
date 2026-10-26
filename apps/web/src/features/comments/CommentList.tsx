@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useNavigationType } from 'react-router-dom';
 import { deleteComment, likeComment, listCommentsPage, unlikeComment } from '../../api/polls';
 import type { ClientCursorPage, Poll, PollComment } from '../../api/models';
@@ -68,6 +68,13 @@ export function CommentList({
     surface: 'comments', sessionEpoch, userId: currentUserId ?? null, pollId,
   });
   const queryIdentity = JSON.stringify(queryKey);
+  const replyGenerationKey = [...queryKey, 'reply-generation'] as const;
+  const replyGenerationQuery = useQuery({
+    queryKey: replyGenerationKey,
+    queryFn: () => 0,
+    initialData: 0,
+    staleTime: Infinity,
+  });
   const commentsQuery = useInfiniteQuery({
     queryKey,
     ...paginationQueryOptions,
@@ -109,8 +116,7 @@ export function CommentList({
     identity: '', pending: false, error: null,
   });
   const currentRefreshState = refreshState.identity === queryIdentity ? refreshState : { identity: queryIdentity, pending: false, error: null };
-  const [replyGenerationState, setReplyGenerationState] = useState({ identity: queryIdentity, value: 0 });
-  const replyGeneration = replyGenerationState.identity === queryIdentity ? replyGenerationState.value : 0;
+  const replyGeneration = replyGenerationQuery.data;
   const currentIdentity = useRef(queryIdentity);
   currentIdentity.current = queryIdentity;
   const refreshGeneration = useRef(0);
@@ -177,10 +183,7 @@ export function CommentList({
       if (controller.signal.aborted || currentIdentity.current !== requestIdentity || refreshGeneration.current !== requestGeneration) return;
       queryClient.setQueryData<CommentPages>(queryKey, { pages: [page], pageParams: [null] });
       automaticLoadCounts.current.set(requestIdentity, 0);
-      setReplyGenerationState((current) => ({
-        identity: requestIdentity,
-        value: current.identity === requestIdentity ? current.value + 1 : 1,
-      }));
+      queryClient.setQueryData<number>(replyGenerationKey, (current) => (current ?? 0) + 1);
       setRefreshState({ identity: requestIdentity, pending: false, error: null });
     } catch (error) {
       if (!controller.signal.aborted && currentIdentity.current === requestIdentity && refreshGeneration.current === requestGeneration) {

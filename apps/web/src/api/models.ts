@@ -93,10 +93,7 @@ export interface PollComment {
   updatedAt: string;
 }
 
-export interface PollCommentRepliesPage {
-  items: PollComment[];
-  nextCursor: string | null;
-}
+export interface PollCommentRepliesPage extends ClientCursorPage<PollComment> {}
 
 export interface PublicProfile {
   id: string;
@@ -260,11 +257,7 @@ export function decodePollComment(value: unknown): PollComment {
 }
 
 export function decodePollCommentRepliesPage(value: unknown): PollCommentRepliesPage {
-  const source = object(value);
-  return {
-    items: array(source.items).map(decodePollComment),
-    nextCursor: nullableString(source.nextCursor),
-  };
+  return decodeClientCursorPage(value, decodePollComment);
 }
 
 export function decodeClientCursorPage<T>(value: unknown, decodeItem: (input: unknown) => T): ClientCursorPage<T> {
