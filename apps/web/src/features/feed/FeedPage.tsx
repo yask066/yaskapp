@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useNavigationType } from 'react-router-dom';
 import { listPollsPage, listSubscriptionsPage } from '../../api/polls';
 import type { ClientCursorPage, Poll } from '../../api/models';
@@ -8,14 +8,13 @@ import { useSession } from '../../app/session-provider';
 import { AsyncState } from '../../components/AsyncState';
 import { ContentEntryTransition } from '../../components/ContentEntryTransition';
 import { Avatar } from '../../components/Avatar';
-import { PollCard } from '../../components/PollCard';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { usePollMutations } from '../polls/usePollMutations';
 import { fetchPollQuery } from '../polls/poll-state';
 import { useListScrollState } from '../../core/scroll/useListScrollState';
-import { EntryMotion } from '../../core/motion/EntryMotion';
 import { canAppend, followingGenerationQueryKey, mergePageIds, paginationQueryKey, paginationQueryOptions, type PaginationLoadTrigger, type PaginationState } from '../../core/pagination/pagination-state';
 import { PaginationFooter } from '../../components/PaginationFooter';
+import { FeedPollItem } from './FeedPollItem';
 
 type FeedSort = 'for-you' | 'following' | 'trending';
 type FeedUiState = { pending: boolean; error: unknown | null; appendError: unknown | null };
@@ -56,6 +55,10 @@ export function FeedPage() {
   const navigate = useNavigate();
   const navigationType = useNavigationType();
   const mutations = usePollMutations();
+  const { vote, toggleLike } = mutations;
+  const onVote = useCallback((pollId: string, optionId: string) => vote({ pollId, optionId }), [vote]);
+  const onLike = useCallback((pollId: string, viewerHasLiked: boolean) => toggleLike({ pollId, viewerHasLiked }), [toggleLike]);
+  const onOpenComments = useCallback((openedPoll: Poll) => navigate(`/polls/${openedPoll.id}`), [navigate]);
   const followingGenerationKey = followingGenerationQueryKey(sessionEpoch, viewerId);
   const followingGenerationQuery = useQuery({
     queryKey: followingGenerationKey,
@@ -195,9 +198,7 @@ export function FeedPage() {
       {sort === 'following' && status !== 'authenticated' ? <p className="feed-following-guest">Sign in to see polls from people you follow. <Link to={`/login?next=${encodeURIComponent('/')}`}>Sign in</Link></p> : null}
       {pollsQuery.isError && !pollsQuery.data ? <AsyncState state="error" error={pollsQuery.error} onRetry={() => void pollsQuery.refetch()} /> : null}{refreshState.error ? <p role="alert">{refreshState.error instanceof Error ? refreshState.error.message : 'Could not refresh polls.'}</p> : null}{pollsQuery.data && polls.length === 0 ? <AsyncState state="empty" emptyMessage="No polls to show yet." /> : null}{mutations.error ? <p aria-live="polite">{mutations.error}</p> : null}
       <ContentEntryTransition loading={pollsQuery.isPending && !pollsQuery.data} kind="poll" rows={2}>
-      <div className="feed-list" ref={feedScroll.listRef} aria-busy={pollsQuery.isFetching || refreshState.pending}>{polls.map((poll, index) => <EntryMotion key={poll.id} contextKey={feedEntryContext} itemId={poll.id} visible indexInBatch={index}>
-        <PollCard poll={poll} viewerId={user?.id} isVoting={mutations.isVoting(poll.id)} isLiking={mutations.isLiking(poll.id)} onVote={user ? (pollId, optionId) => mutations.vote({ pollId, optionId }) : undefined} onCancelVote={user ? mutations.cancelVote : undefined} onLike={user ? (pollId, viewerHasLiked) => mutations.toggleLike({ pollId, viewerHasLiked }) : undefined} onDelete={user ? mutations.deletePoll : undefined} onOpenComments={(openedPoll) => navigate(`/polls/${openedPoll.id}`)} />
-      </EntryMotion>)}</div>
+      <div className="feed-list" ref={feedScroll.listRef} aria-busy={pollsQuery.isFetching || refreshState.pending}>{polls.map((poll, index) => <FeedPollItem key={poll.id} poll={poll} contextKey={feedEntryContext} indexInBatch={index} viewerId={user?.id} isVoting={mutations.isVoting(poll.id)} isLiking={mutations.isLiking(poll.id)} onVote={user ? onVote : undefined} onCancelVote={user ? mutations.cancelVote : undefined} onLike={user ? onLike : undefined} onDelete={user ? mutations.deletePoll : undefined} onOpenComments={onOpenComments} />)}</div>
       </ContentEntryTransition>{pollsQuery.data ? <PaginationFooter
         hasNextPage={Boolean(pollsQuery.hasNextPage)}
         isFetchingNextPage={pollsQuery.isFetchingNextPage}

@@ -338,7 +338,7 @@ test('restores the feed poll anchor after opening comments and returning', async
   anchorTop = 270;
   await user.click(screen.getByRole('button', { name: 'Back to feed' }));
   await screen.findByText('Second poll?');
-  expect(scrollTo).toHaveBeenCalledWith({ top: 150, behavior: 'auto' });
+  expect(scrollTo).toHaveBeenCalledWith({ top: 150, behavior: 'instant' });
   expect(document.activeElement).toBe(screen.getByText('Second poll?').closest('[data-list-item-id]'));
 });
 
@@ -627,7 +627,7 @@ test('loads another page from the footer, ignores a duplicate click, and retries
   const loadMore = screen.getByRole('button', { name: 'Load more' });
   await user.dblClick(loadMore);
   await waitFor(() => expect(cursorReads).toBe(1));
-  expect(screen.getByRole('button', { name: 'Load more' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Load more' })).toHaveAttribute('aria-disabled', 'true');
   finishFirstAppend(HttpResponse.json({ error: 'unavailable', message: 'Append failed.' }, { status: 503 }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Append failed.');
   expect(screen.getByRole('button', { name: 'Retry loading more' })).toBeEnabled();

@@ -30,7 +30,7 @@ export function useListScrollState(context: ListContext, options: UseListScrollS
   itemIdsRef.current = itemIds;
   const contextKey = keyFor(stableContext);
   const itemIdsKey = useMemo(() => JSON.stringify(itemIds), [itemIds]);
-  const restoredFocus = useRef(false);
+  const focusRestorationAttempted = useRef(false);
 
   const capture = useCallback(() => {
     const root = listElement.current;
@@ -56,21 +56,27 @@ export function useListScrollState(context: ListContext, options: UseListScrollS
 
     const currentScrollTop = window.scrollY || document.documentElement.scrollTop;
     const requestedTop = currentScrollTop + element.getBoundingClientRect().top - anchor.top;
-    window.scrollTo({ top: clampToDocument(requestedTop), behavior: 'auto' });
-    if (restoreFocusOnPop && !restoredFocus.current) {
+    const clampedTop = clampToDocument(requestedTop);
+    window.scrollTo({ top: clampedTop, behavior: 'instant' });
+    if (restoreFocusOnPop && !focusRestorationAttempted.current) {
       element.focus({ preventScroll: true });
-      restoredFocus.current = true;
+      focusRestorationAttempted.current = true;
     }
     return true;
   }, [stableContext, priority, store, restoreFocusOnPop]);
 
   useLayoutEffect(() => {
     const ids = itemIdsRef.current;
-    if (ids.length === 0 || priority) return;
-    if (!restore(ids, priority) && (window.scrollY || document.documentElement.scrollTop) > 0) {
-      window.scrollTo({ top: 0, behavior: 'auto' });
+    if (ids.length === 0) return;
+    if (priority) {
+      if (restoreFocusOnPop) focusRestorationAttempted.current = true;
+      return;
     }
-  }, [contextKey, itemIdsKey, priority, restore]);
+    if (!restore(ids, priority) && (window.scrollY || document.documentElement.scrollTop) > 0) {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+    if (restoreFocusOnPop) focusRestorationAttempted.current = true;
+  }, [contextKey, itemIdsKey, priority, restore, restoreFocusOnPop]);
 
   useLayoutEffect(() => {
     const saveOnScroll = () => capture();

@@ -12,7 +12,7 @@ const context: ListContext = {
   sort: 'newest',
 };
 
-test('restores the saved item immediately with auto scrolling and clamps at document boundaries', () => {
+test('restores the saved item immediately without inheriting smooth page scrolling', () => {
   const store = new ListScrollStateStore();
   store.capture(context, { id: 'poll-2', top: 100 });
   Object.defineProperty(window, 'scrollY', { configurable: true, value: 100 });
@@ -30,7 +30,7 @@ test('restores the saved item immediately with auto scrolling and clamps at docu
   });
   const view = render(<Harness />);
 
-  expect(scrollTo).toHaveBeenCalledWith({ top: 200, behavior: 'auto' });
+  expect(scrollTo).toHaveBeenCalledWith({ top: 200, behavior: 'instant' });
 
   view.unmount();
   itemRect.mockRestore();
@@ -54,6 +54,28 @@ test('does not restore over an explicit target or the new-items action', () => {
   scrollTo.mockRestore();
 });
 
+test('keeps keyboard focus on the manual append action when another page is added', () => {
+  const store = new ListScrollStateStore();
+  const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+  const initialIds = ['poll-1', 'poll-2'];
+
+  function Harness({ itemIds }: { itemIds: string[] }) {
+    const { listRef } = useListScrollState(context, { store, itemIds, restoreFocusOnPop: true });
+    return <><button type="button">Load more</button><section ref={listRef}>{itemIds.map((id) => <article key={id} data-list-item-id={id} tabIndex={-1}>{id}</article>)}</section></>;
+  }
+
+  const view = render(<Harness itemIds={initialIds} />);
+  const loadMore = view.getByRole('button', { name: 'Load more' });
+  store.capture(context, { id: 'poll-2', top: 100 }, [{ id: 'poll-2', top: 100 }], initialIds);
+  loadMore.focus();
+
+  view.rerender(<Harness itemIds={[...initialIds, 'poll-3']} />);
+
+  expect(loadMore).toHaveFocus();
+  view.unmount();
+  scrollTo.mockRestore();
+});
+
 test('rechecks the saved anchor after a viewport resize', () => {
   const store = new ListScrollStateStore();
   store.capture(context, { id: 'poll-2', top: 80 });
@@ -70,10 +92,10 @@ test('rechecks the saved anchor after a viewport resize', () => {
   }
 
   const view = render(<Harness />);
-  expect(scrollTo).toHaveBeenLastCalledWith({ top: 140, behavior: 'auto' });
+  expect(scrollTo).toHaveBeenLastCalledWith({ top: 140, behavior: 'instant' });
   top = 140;
   fireEvent.resize(window);
-  expect(scrollTo).toHaveBeenLastCalledWith({ top: 160, behavior: 'auto' });
+  expect(scrollTo).toHaveBeenLastCalledWith({ top: 160, behavior: 'instant' });
 
   view.unmount();
   itemRect.mockRestore();

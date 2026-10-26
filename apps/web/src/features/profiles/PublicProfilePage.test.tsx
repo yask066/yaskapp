@@ -119,6 +119,6 @@ test('restores the public-profile poll anchor and focus after opening a poll and
   await user.click(screen.getByRole('button', { name: 'Back to profile' }));
 
   const restoredPoll = await screen.findByText('A poll from this profile?');
-  expect(scrollTo).toHaveBeenCalledWith({ top: 80, behavior: 'auto' });
+  expect(scrollTo).toHaveBeenCalledWith({ top: 80, behavior: 'instant' });
   expect(document.activeElement).toBe(restoredPoll.closest('[data-list-item-id]'));
 });

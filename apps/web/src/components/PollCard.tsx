@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
+import { forwardRef, memo, useEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import type { Poll } from '../api/models';
 import { useMotionSettings } from '../core/motion/use-motion-settings';
@@ -22,7 +22,7 @@ interface PollCardProps {
   'data-entry-motion'?: 'active' | 'idle';
 }
 
-export const PollCard = forwardRef<HTMLElement, PollCardProps>(function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelete, onOpenComments, isVoting = false, isLiking = false, className, style, 'data-entry-motion': entryMotionState }, ref) {
+export const PollCard = memo(forwardRef<HTMLElement, PollCardProps>(function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelete, onOpenComments, isVoting = false, isLiking = false, className, style, 'data-entry-motion': entryMotionState }, ref) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { reactionsMotion, reduceMotion } = useMotionSettings();
   const reactionsEnabled = reactionsMotion && !reduceMotion;
@@ -107,7 +107,7 @@ export const PollCard = forwardRef<HTMLElement, PollCardProps>(function PollCard
       </footer>
     </article>
   );
-});
+}));
 
 function PollMedia({ src }: { src: string }) {
   const [failed, setFailed] = useState(false);

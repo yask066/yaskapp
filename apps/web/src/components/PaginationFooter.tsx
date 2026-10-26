@@ -33,6 +33,7 @@ export function PaginationFooter({
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef(onLoadMore);
   loadMoreRef.current = onLoadMore;
+  const actionBusy = isFetchingNextPage || isRefreshing;
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -52,7 +53,7 @@ export function PaginationFooter({
     {isFetchingNextPage ? <p role="status">Loading more {itemName}…</p> : null}
     {repeatedCursor ? <p role="alert">The server returned a repeated cursor. Refresh {refreshLabel} to continue.</p> : null}
     {isFetchNextPageError ? <p role="alert">{error?.message || `Could not load more ${itemName}.`}</p> : null}
-    {hasNextPage && !repeatedCursor ? <button type="button" disabled={isFetchingNextPage || isRefreshing} onClick={() => loadMoreRef.current('manual')}>
+    {hasNextPage && !repeatedCursor ? <button type="button" aria-disabled={actionBusy} onClick={() => { if (!actionBusy) loadMoreRef.current('manual'); }}>
       {isFetchNextPageError ? 'Retry loading more' : 'Load more'}
     </button> : hasNextPage ? null : <p role="status">{endMessage}</p>}
   </div>;

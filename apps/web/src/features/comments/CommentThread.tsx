@@ -159,7 +159,7 @@ export function CommentThread({
     { userId: currentUserId ?? null, route: `/polls/${pollId}`, list: `replies:${rootComment.id}`, query: focusedReplyId ?? '', filter: '', sort: '' },
     { itemIds: isExpanded ? visibleReplies.map((reply) => reply.id) : [], priority: focusedReplyId ? 'explicit-target' : null },
   );
-  const { hasNextPage, isFetchingNextPage } = repliesQuery;
+  const { isFetchingNextPage } = repliesQuery;
   const lastPage = replyPages.at(-1);
   const nextCursor = lastPage?.nextCursor ?? null;
   const cursorHistory = useMemo(

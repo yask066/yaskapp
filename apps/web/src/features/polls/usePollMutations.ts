@@ -53,22 +53,31 @@ export function usePollMutations() {
   });
   const error = [voteMutation, likeMutation, deleteMutation].find((mutation) => mutation.variables?.epoch === epoch && mutation.error)?.error;
 
+  const voteMutationFn = voteMutation.mutate;
+  const likeMutationFn = likeMutation.mutate;
+  const deleteMutationFn = deleteMutation.mutate;
   const runAction = useCallback((action: 'vote' | 'like', pollId: string, run: () => Promise<Poll>) => {
     const token = beginPollOperation(queryClient, pollId, action);
     if (!token) return;
     const operationEpoch = pollSessionEpoch(queryClient);
     rerender();
-    const mutation = action === 'vote' ? voteMutation : likeMutation;
-    mutation.mutate({ pollId, token, epoch: operationEpoch, run });
-  }, [likeMutation, queryClient, voteMutation]);
+    (action === 'vote' ? voteMutationFn : likeMutationFn)({ pollId, token, epoch: operationEpoch, run });
+  }, [likeMutationFn, queryClient, voteMutationFn]);
+
+  const vote = useCallback(({ pollId, optionId }: { pollId: string; optionId: string }) => runAction('vote', pollId, () => votePoll(pollId, optionId)), [runAction]);
+  const cancelVote = useCallback((pollId: string) => runAction('vote', pollId, () => cancelPollVote(pollId)), [runAction]);
+  const toggleLike = useCallback(({ pollId, viewerHasLiked }: { pollId: string; viewerHasLiked: boolean }) => runAction('like', pollId, () => viewerHasLiked ? unlikePoll(pollId) : likePoll(pollId)), [runAction]);
+  const deletePoll = useCallback((pollId: string) => deleteMutationFn({ pollId, epoch }), [deleteMutationFn, epoch]);
+  const isVoting = useCallback((pollId: string) => isPollOperationPending(queryClient, pollId, 'vote'), [queryClient]);
+  const isLiking = useCallback((pollId: string) => isPollOperationPending(queryClient, pollId, 'like'), [queryClient]);
 
   return {
-    vote: ({ pollId, optionId }: { pollId: string; optionId: string }) => runAction('vote', pollId, () => votePoll(pollId, optionId)),
-    cancelVote: (pollId: string) => runAction('vote', pollId, () => cancelPollVote(pollId)),
-    toggleLike: ({ pollId, viewerHasLiked }: { pollId: string; viewerHasLiked: boolean }) => runAction('like', pollId, () => viewerHasLiked ? unlikePoll(pollId) : likePoll(pollId)),
-    deletePoll: (pollId: string) => deleteMutation.mutate({ pollId, epoch }),
-    isVoting: (pollId: string) => isPollOperationPending(queryClient, pollId, 'vote'),
-    isLiking: (pollId: string) => isPollOperationPending(queryClient, pollId, 'like'),
+    vote,
+    cancelVote,
+    toggleLike,
+    deletePoll,
+    isVoting,
+    isLiking,
     isPending: [voteMutation, likeMutation, deleteMutation].some((mutation) => mutation.variables?.epoch === epoch && mutation.isPending),
     error: error ? mutationErrorMessage(error) : null,
   };

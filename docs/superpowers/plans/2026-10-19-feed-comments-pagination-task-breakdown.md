@@ -383,10 +383,10 @@
 
 **Файлы:** Feed/comments UI, `core/scroll/useListScrollState.ts`, `ScrollRestorationCoordinator.tsx` и tests; существующие motion-компоненты.
 
-- [ ] Проверить восстановление третьей страницы до anchor, удалённого соседа, поздние media, footer error и explicit target; допуск 8 CSS px измеряется в браузере.
-- [ ] Снять trace на 100 и 1 000 элементах; выбрать и применить минимальный необходимый способ ограничения render cost. Windowing, если нужен, сохраняет данные, keyboard focus и путь назад; не добавлять его без evidence проблемы.
-- [ ] Проверить manual append/Retry с клавиатуры и screen reader, увеличенный текст, reduced motion и registry старых entry animations.
-- [ ] Выполнить WEB-FINAL и сохранить browser evidence. Финальные frame/memory бюджеты проверяются в T27.
+- [x] Проверить восстановление третьей страницы до anchor, удалённого соседа, поздние media, footer error и explicit target; допуск 8 CSS px измеряется в браузере.
+- [x] Снять trace на 100 и 1 000 элементах; выбрать и применить минимальный необходимый способ ограничения render cost. Windowing, если нужен, сохраняет данные, keyboard focus и путь назад; не добавлять его без evidence проблемы.
+- [ ] Проверить manual append/Retry с клавиатуры и screen reader, увеличенный текст, reduced motion и registry старых entry animations. Клавиатура, accessibility tree, увеличенный текст и motion/registry покрыты; ручное чтение реальным screen reader осталось pending (в системе нет запущенного NVDA и доступного воспроизводимого screen-reader вывода).
+- [x] Выполнить WEB-FINAL и сохранить browser evidence. Финальные frame/memory бюджеты проверяются в T27.
 
 **Готово, когда:** длинный список не теряет позицию/focus; стратегия рендера обоснована измерением и удовлетворяет FR-06.
 
