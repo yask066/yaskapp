@@ -223,7 +223,7 @@ function mapComment(row: PollCommentRow): PollComment {
   };
 }
 
-async function findPollRowsByIds(client: PoolClient, pollIds: string[]) {
+async function findPollRowsByIds(client: PoolClient, pollIds: string[], visibility?: PollVisibility) {
   if (pollIds.length === 0) {
     return [];
   }
@@ -255,12 +255,13 @@ async function findPollRowsByIds(client: PoolClient, pollIds: string[]) {
       JOIN users u ON u.id = p.author_id
       JOIN profiles pr ON pr.user_id = p.author_id
       WHERE p.id = ANY($1::uuid[])
+        AND ($2::text IS NULL OR p.visibility::text = $2::text)
         AND p.deleted_at IS NULL
         AND u.status = 'active'
         AND u.deleted_at IS NULL
       ORDER BY p.created_at DESC, p.id DESC
     `,
-    [pollIds]
+    [pollIds, visibility ?? null]
   );
 
   return result.rows;
@@ -328,11 +329,17 @@ async function findViewerVoteOptionIds(
   return new Map(result.rows.map((row) => [row.poll_id, row.option_id]));
 }
 
-export async function hydratePolls(client: PoolClient, pollIds: string[], viewerId?: string) {
-  const pollRows = await findPollRowsByIds(client, pollIds);
-  const optionRows = await findOptionRowsByPollIds(client, pollIds);
-  const viewerLikedPollIds = await findViewerLikedPollIds(client, pollIds, viewerId);
-  const viewerVoteOptionIds = await findViewerVoteOptionIds(client, pollIds, viewerId);
+export async function hydratePolls(
+  client: PoolClient,
+  pollIds: string[],
+  viewerId?: string,
+  visibility?: PollVisibility
+) {
+  const pollRows = await findPollRowsByIds(client, pollIds, visibility);
+  const availablePollIds = pollRows.map(({ id }) => id);
+  const optionRows = await findOptionRowsByPollIds(client, availablePollIds);
+  const viewerLikedPollIds = await findViewerLikedPollIds(client, availablePollIds, viewerId);
+  const viewerVoteOptionIds = await findViewerVoteOptionIds(client, availablePollIds, viewerId);
   const optionsByPollId = new Map<string, PollOption[]>();
 
   for (const optionRow of optionRows) {
@@ -606,6 +613,25 @@ export async function listPublicPollRecords(
       result.rows.map((row) => row.id),
       viewerId
     );
+    });
+  } finally {
+    client.release();
+  }
+}
+
+export async function listVisiblePublicPollRecordsByIds(pollIds: string[], viewerId?: string) {
+  if (pollIds.length === 0) return [];
+
+  const client = await db.connect();
+
+  try {
+    return await withPollReadSnapshot(client, async () => {
+      const polls = await hydratePolls(client, pollIds, viewerId, 'public');
+      const pollsById = new Map(polls.map((poll) => [poll.id, poll]));
+      return pollIds.flatMap((pollId) => {
+        const poll = pollsById.get(pollId);
+        return poll ? [poll] : [];
+      });
     });
   } finally {
     client.release();

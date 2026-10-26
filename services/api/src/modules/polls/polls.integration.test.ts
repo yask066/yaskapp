@@ -19,12 +19,14 @@ const [
   { buildApp },
   { closeDatabaseConnection, db },
   { closeRedisConnection },
-  { closeStorageConnection }
+  { closeStorageConnection },
+  { createPollCursorOwnerKey }
 ] = await Promise.all([
   import('../../app.js'),
   import('../../config/database.js'),
   import('../../config/redis.js'),
-  import('../../config/storage.js')
+  import('../../config/storage.js'),
+  import('./poll-pagination.js')
 ]);
 
 const app = buildApp();
@@ -165,6 +167,30 @@ async function registerTestUser() {
     ...auth,
     password
   };
+}
+
+async function createPopularFixturePoll(author: AuthResponse, question: string, votesCount: number) {
+  const response = await app.inject({
+    method: 'POST',
+    url: '/polls',
+    headers: bearer(author.accessToken),
+    payload: { question, options: ['Yes', 'No'] }
+  });
+  assert.equal(response.statusCode, 201, response.body);
+  const poll = response.json<PollResponse>().poll;
+  await db.query(
+    'UPDATE polls SET votes_count = $2, likes_count = 0, comments_count = 0 WHERE id = $1',
+    [poll.id, votesCount]
+  );
+  return poll;
+}
+
+async function cleanupPopularFixturePolls(ownerId: string, pollIds: string[]) {
+  const ownerKey = createPollCursorOwnerKey({ type: 'user', userId: ownerId });
+  await db.query('DELETE FROM poll_feed_snapshots WHERE owner_key = $1', [ownerKey]);
+  if (pollIds.length > 0) {
+    await db.query('DELETE FROM polls WHERE id = ANY($1::uuid[])', [pollIds]);
+  }
 }
 
 test('newly registered users receive the default user role', async () => {
@@ -2296,9 +2322,216 @@ test('newest feed traverses 125 polls without gaps across tied timestamps and a 
 
     const popularResponse = await app.inject({ method: 'GET', url: '/polls?sort=popular' });
     assert.equal(popularResponse.statusCode, 200, popularResponse.body);
-    assert.equal('nextCursor' in popularResponse.json<Record<string, unknown>>(), false);
+    const popularPage = popularResponse.json<ListPollsResponse>();
+    assert.equal(popularPage.items.length, 20);
+    assert.ok(popularPage.nextCursor, 'popular first page exposes a continuation for the saved snapshot');
   } finally {
     await cleanupPollPaginationFixtures(db, seeded);
+  }
+});
+
+test('popular continuation keeps the original rank after scores change and refresh captures the new rank', async () => {
+  const viewer = await registerTestUser();
+  const polls: PollResponse['poll'][] = [];
+
+  try {
+    polls.push(await createPopularFixturePoll(viewer, 'T23 popular rank one', 4_000_000));
+    polls.push(await createPopularFixturePoll(viewer, 'T23 popular rank two', 3_000_000));
+    polls.push(await createPopularFixturePoll(viewer, 'T23 popular rank three', 2_000_000));
+    polls.push(await createPopularFixturePoll(viewer, 'T23 popular rank four', 1_000_000));
+
+    const firstResponse = await app.inject({
+      method: 'GET',
+      url: '/polls?sort=popular&limit=2',
+      headers: bearer(viewer.accessToken)
+    });
+    assert.equal(firstResponse.statusCode, 200, firstResponse.body);
+    const firstPage = firstResponse.json<ListPollsResponse>();
+    assert.deepEqual(firstPage.items.map(({ id }) => id), polls.slice(0, 2).map(({ id }) => id));
+    assert.ok(firstPage.nextCursor);
+
+    await db.query('UPDATE polls SET votes_count = $2 WHERE id = $1', [polls[2]!.id, 9_000_000]);
+    await db.query('UPDATE polls SET votes_count = $2 WHERE id = $1', [polls[0]!.id, 8_000_000]);
+
+    const continuationResponse = await app.inject({
+      method: 'GET',
+      url: `/polls?sort=popular&limit=2&cursor=${encodeURIComponent(firstPage.nextCursor)}`,
+      headers: bearer(viewer.accessToken)
+    });
+    assert.equal(continuationResponse.statusCode, 200, continuationResponse.body);
+    const continuationPage = continuationResponse.json<ListPollsResponse>();
+    assert.deepEqual(continuationPage.items.map(({ id }) => id), polls.slice(2).map(({ id }) => id));
+    assert.equal(continuationPage.items[0]?.votesCount, 9_000_000, 'continuation hydrates current poll counters');
+
+    const fixturePollIds = new Set(polls.map(({ id }) => id));
+    const fixturePollIdsSeen = [
+      ...firstPage.items.map(({ id }) => id).filter((id) => fixturePollIds.has(id)),
+      ...continuationPage.items.map(({ id }) => id).filter((id) => fixturePollIds.has(id))
+    ];
+    let cursor = continuationPage.nextCursor ?? undefined;
+    let pageRequests = 0;
+    while (cursor) {
+      assert.ok(pageRequests < 100, 'the stable popular walk reaches the snapshot end');
+      pageRequests += 1;
+      const pageResponse = await app.inject({
+        method: 'GET',
+        url: `/polls?sort=popular&limit=2&cursor=${encodeURIComponent(cursor)}`,
+        headers: bearer(viewer.accessToken)
+      });
+      assert.equal(pageResponse.statusCode, 200, pageResponse.body);
+      const page = pageResponse.json<ListPollsResponse>();
+      fixturePollIdsSeen.push(...page.items.map(({ id }) => id).filter((id) => fixturePollIds.has(id)));
+      cursor = page.nextCursor ?? undefined;
+    }
+    assert.deepEqual(fixturePollIdsSeen, polls.map(({ id }) => id));
+    assert.equal(new Set(fixturePollIdsSeen).size, polls.length, 'each fixture poll appears once in the saved snapshot');
+
+    const refreshResponse = await app.inject({
+      method: 'GET',
+      url: '/polls?sort=popular&limit=2',
+      headers: bearer(viewer.accessToken)
+    });
+    assert.equal(refreshResponse.statusCode, 200, refreshResponse.body);
+    const refreshedPage = refreshResponse.json<ListPollsResponse>();
+    assert.deepEqual(refreshedPage.items.map(({ id }) => id), [polls[2]!.id, polls[0]!.id]);
+    assert.ok(refreshedPage.nextCursor);
+    assert.notEqual(refreshedPage.nextCursor, firstPage.nextCursor, 'refresh starts a new popular snapshot');
+  } finally {
+    await cleanupPopularFixturePolls(viewer.user.id, polls.map(({ id }) => id));
+  }
+});
+
+test('popular continuation advances across an empty range after polls and an author become unavailable', async () => {
+  const viewer = await registerTestUser();
+  const moderatedAuthor = await registerTestUser();
+  const polls: Array<PollResponse['poll']> = [];
+  const ownerKey = createPollCursorOwnerKey({ type: 'user', userId: viewer.user.id });
+
+  try {
+    polls.push(await createPopularFixturePoll(viewer, 'T23 available rank one', 7_000_000));
+    polls.push(await createPopularFixturePoll(viewer, 'T23 available rank two', 6_000_000));
+    polls.push(await createPopularFixturePoll(viewer, 'T23 available rank three', 5_000_000));
+    polls.push(await createPopularFixturePoll(viewer, 'T23 deleted rank four', 4_000_000));
+    polls.push(await createPopularFixturePoll(viewer, 'T23 hidden rank five', 3_000_000));
+    polls.push(await createPopularFixturePoll(moderatedAuthor, 'T23 moderated author rank six', 2_000_000));
+    polls.push(await createPopularFixturePoll(viewer, 'T23 available rank seven', 1_000_000));
+
+    const firstResponse = await app.inject({
+      method: 'GET',
+      url: '/polls?sort=popular&limit=3',
+      headers: bearer(viewer.accessToken)
+    });
+    assert.equal(firstResponse.statusCode, 200, firstResponse.body);
+    const firstPage = firstResponse.json<ListPollsResponse>();
+    assert.deepEqual(firstPage.items.map(({ id }) => id), polls.slice(0, 3).map(({ id }) => id));
+    assert.ok(firstPage.nextCursor);
+
+    await db.query('DELETE FROM polls WHERE id = $1', [polls[3]!.id]);
+    await db.query('UPDATE polls SET visibility = $2 WHERE id = $1', [polls[4]!.id, 'private']);
+    await db.query('UPDATE users SET deleted_at = now() WHERE id = $1', [moderatedAuthor.user.id]);
+
+    const emptyRangeResponse = await app.inject({
+      method: 'GET',
+      url: `/polls?sort=popular&limit=3&cursor=${encodeURIComponent(firstPage.nextCursor)}`,
+      headers: bearer(viewer.accessToken)
+    });
+    assert.equal(emptyRangeResponse.statusCode, 200, emptyRangeResponse.body);
+    const emptyRangePage = emptyRangeResponse.json<ListPollsResponse>();
+    assert.deepEqual(emptyRangePage.items, []);
+    assert.ok(emptyRangePage.nextCursor, 'scanned snapshot positions advance even when no poll remains visible');
+    assert.notEqual(emptyRangePage.nextCursor, firstPage.nextCursor);
+
+    const tailResponse = await app.inject({
+      method: 'GET',
+      url: `/polls?sort=popular&limit=3&cursor=${encodeURIComponent(emptyRangePage.nextCursor)}`,
+      headers: bearer(viewer.accessToken)
+    });
+    assert.equal(tailResponse.statusCode, 200, tailResponse.body);
+    const tailPage = tailResponse.json<ListPollsResponse>();
+    const fixturePollIds = new Set(polls.map(({ id }) => id));
+    const fixturePollIdsSeen = tailPage.items.map(({ id }) => id).filter((id) => fixturePollIds.has(id));
+    let cursor = tailPage.nextCursor ?? undefined;
+    let pageRequests = 0;
+    while (cursor) {
+      assert.ok(pageRequests < 100, 'the continuation after an empty range reaches the snapshot end');
+      pageRequests += 1;
+      const pageResponse = await app.inject({
+        method: 'GET',
+        url: `/polls?sort=popular&limit=3&cursor=${encodeURIComponent(cursor)}`,
+        headers: bearer(viewer.accessToken)
+      });
+      assert.equal(pageResponse.statusCode, 200, pageResponse.body);
+      const page = pageResponse.json<ListPollsResponse>();
+      fixturePollIdsSeen.push(...page.items.map(({ id }) => id).filter((id) => fixturePollIds.has(id)));
+      cursor = page.nextCursor ?? undefined;
+    }
+    assert.deepEqual(fixturePollIdsSeen, [polls[6]!.id]);
+    assert.equal(new Set(fixturePollIdsSeen).size, 1, 'the final fixture poll appears once after the empty range');
+  } finally {
+    await db.query('UPDATE users SET deleted_at = NULL WHERE id = $1', [moderatedAuthor.user.id]);
+    await db.query('DELETE FROM poll_feed_snapshots WHERE owner_key = $1', [ownerKey]);
+    if (polls.length > 0) {
+      await db.query('DELETE FROM polls WHERE id = ANY($1::uuid[])', [polls.map(({ id }) => id)]);
+    }
+  }
+});
+
+test('popular cursors reject another viewer and return pagination_expired for an expired snapshot', async () => {
+  const viewer = await registerTestUser();
+  const otherViewer = await registerTestUser();
+  const polls: PollResponse['poll'][] = [];
+  const ownerKey = createPollCursorOwnerKey({ type: 'user', userId: viewer.user.id });
+
+  try {
+    polls.push(await createPopularFixturePoll(viewer, 'T23 cursor owner rank one', 2_000_000));
+    polls.push(await createPopularFixturePoll(viewer, 'T23 cursor owner rank two', 1_000_000));
+
+    const firstResponse = await app.inject({
+      method: 'GET',
+      url: '/polls?sort=popular&limit=1',
+      headers: bearer(viewer.accessToken)
+    });
+    assert.equal(firstResponse.statusCode, 200, firstResponse.body);
+    const firstPage = firstResponse.json<ListPollsResponse>();
+    assert.ok(firstPage.nextCursor);
+
+    const foreignCursorResponse = await app.inject({
+      method: 'GET',
+      url: `/polls?sort=popular&limit=1&cursor=${encodeURIComponent(firstPage.nextCursor)}`,
+      headers: bearer(otherViewer.accessToken)
+    });
+    assert.equal(foreignCursorResponse.statusCode, 400, foreignCursorResponse.body);
+    assert.equal(foreignCursorResponse.json<{ error: string }>().error, 'pagination_cursor_invalid');
+
+    const snapshotResult = await db.query<{ id: string }>(
+      `SELECT id::text AS id
+       FROM poll_feed_snapshots
+       WHERE owner_key = $1
+       ORDER BY created_at DESC, id DESC
+       LIMIT 1`,
+      [ownerKey]
+    );
+    const snapshotId = snapshotResult.rows[0]?.id;
+    assert.ok(snapshotId, 'first popular page persists an owner-bound snapshot');
+    await db.query(
+      `WITH elapsed AS (SELECT clock_timestamp() - INTERVAL '31 minutes' AS created_at)
+       UPDATE poll_feed_snapshots AS snapshot
+       SET created_at = elapsed.created_at,
+           expires_at = elapsed.created_at + INTERVAL '30 minutes'
+       FROM elapsed
+       WHERE snapshot.id = $1`,
+      [snapshotId]
+    );
+
+    const expiredResponse = await app.inject({
+      method: 'GET',
+      url: `/polls?sort=popular&limit=1&cursor=${encodeURIComponent(firstPage.nextCursor)}`,
+      headers: bearer(viewer.accessToken)
+    });
+    assert.equal(expiredResponse.statusCode, 410, expiredResponse.body);
+    assert.equal(expiredResponse.json<{ error: string }>().error, 'pagination_expired');
+  } finally {
+    await cleanupPopularFixturePolls(viewer.user.id, polls.map(({ id }) => id));
   }
 });
 

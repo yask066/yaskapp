@@ -7,6 +7,7 @@ import { AdminCursorError } from '../admin/pagination.js';
 import {
   createPollCursorOwnerKey,
   PollPaginationCursorError,
+  PollPaginationExpiredError,
   POLL_CURSOR_MAX_LENGTH
 } from './poll-pagination.js';
 import {
@@ -39,7 +40,7 @@ import {
   likeComment,
   listPollComments,
   listPollCommentReplies,
-  listPublicPolls,
+  listPopularPublicPollPage,
   listSubscriptionPolls,
   unlikePoll,
   unlikeComment,
@@ -122,6 +123,12 @@ function validationError(reply: FastifyReply, error: z.ZodError) {
 }
 
 function pollError(reply: FastifyReply, error: unknown) {
+  if (error instanceof PollPaginationExpiredError) {
+    return reply.status(error.statusCode).send({
+      error: error.code,
+      message: error.message
+    });
+  }
   if (error instanceof PollPaginationCursorError || error instanceof AdminCursorError) {
     const cursorError = error instanceof PollPaginationCursorError
       ? error
@@ -282,12 +289,19 @@ export function registerPollRoutes(app: FastifyInstance) {
     }
 
     if (parsedQuery.data.sort === 'popular') {
-      if (parsedQuery.data.cursor !== undefined) {
-        return pollError(reply, new PollPaginationCursorError());
+      try {
+        const ownerIdentity = request.user?.sub
+          ? { type: 'user' as const, userId: request.user.sub }
+          : { type: 'guest' as const, ip: request.ip };
+        return await listPopularPublicPollPage({
+          limit: parsedQuery.data.limit,
+          viewerId: request.user?.sub,
+          cursor: parsedQuery.data.cursor,
+          ownerIdentity
+        });
+      } catch (error) {
+        return pollError(reply, error);
       }
-
-      const items = await listPublicPolls(parsedQuery.data.limit, request.user?.sub, 'popular');
-      return { items };
     }
 
     try {

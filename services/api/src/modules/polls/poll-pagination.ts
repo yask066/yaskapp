@@ -54,6 +54,16 @@ export class PollPaginationCursorError extends Error {
   }
 }
 
+export class PollPaginationExpiredError extends Error {
+  readonly code = 'pagination_expired';
+  readonly statusCode = 410;
+
+  constructor() {
+    super('The popular feed snapshot has expired.');
+    this.name = 'PollPaginationExpiredError';
+  }
+}
+
 type CursorWirePayload = {
   v: 1;
   kind: PollCursorKind;

@@ -12,6 +12,7 @@ import {
   findViewablePollCommentRecordById,
   listNewestPublicPollPageRecords,
   listPublicPollRecords,
+  listVisiblePublicPollRecordsByIds,
   listSubscriptionPollRecords,
   findViewablePollRecordById,
   unlikePollRecord,
@@ -20,6 +21,18 @@ import {
 import { deletePollImageObject, PollImageStorageError } from './poll-images.service.js';
 import type { PollVisibility } from './polls.repository.js';
 import { assertUserCanComment, assertUserCanCreatePoll } from '../moderation/sanctions.repository.js';
+import {
+  createPollCursorOwnerKey,
+  decodePollCursor,
+  encodePollCursor,
+  PollPaginationCursorError,
+  PollPaginationExpiredError,
+  type PollCursorOwnerIdentity
+} from './poll-pagination.js';
+import {
+  createFeedSnapshot,
+  readFeedSnapshotPage
+} from './poll-feed-snapshots.repository.js';
 
 export class PollNotFoundError extends Error {}
 
@@ -134,6 +147,48 @@ export async function listNewestPublicPolls(input: {
   owner: string;
 }) {
   return listNewestPublicPollPageRecords(input);
+}
+
+export async function listPopularPublicPollPage(input: {
+  limit: number;
+  viewerId?: string;
+  cursor?: string;
+  ownerIdentity: PollCursorOwnerIdentity;
+}) {
+  const owner = createPollCursorOwnerKey(input.ownerIdentity);
+  let snapshotId: string;
+  let afterPosition = -1;
+
+  if (input.cursor !== undefined) {
+    const cursor = decodePollCursor(input.cursor, { kind: 'polls', sort: 'popular', owner });
+    if (!('snapshotId' in cursor)) throw new PollPaginationCursorError();
+    snapshotId = cursor.snapshotId;
+    afterPosition = cursor.position;
+  } else {
+    const snapshot = await createFeedSnapshot(input.ownerIdentity);
+    snapshotId = snapshot.snapshotId;
+  }
+
+  const page = await readFeedSnapshotPage({
+    snapshotId,
+    ownerKey: owner,
+    afterPosition,
+    limit: input.limit
+  });
+  if (!page) throw new PollPaginationExpiredError();
+
+  return {
+    items: await listVisiblePublicPollRecordsByIds(page.items.map(({ pollId }) => pollId), input.viewerId),
+    nextCursor: page.nextPosition === null
+      ? null
+      : encodePollCursor({
+        kind: 'polls',
+        sort: 'popular',
+        owner,
+        snapshotId,
+        position: page.nextPosition
+      })
+  };
 }
 
 export async function getViewablePoll(pollId: string, viewerId?: string) {
