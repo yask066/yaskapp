@@ -10,7 +10,7 @@
 
 **Spec:** [PRD: Полная пагинация ленты и комментариев](../../prd-feed-comments-pagination.md).
 
-**Статус:** Backlog, 28 задач; полностью выполнены T01–T03, T05–T12, T15–T20 и T22–T23. T14 и T21 выполнены частично; T04, T13 и T24–T28 открыты. Декомпозиция сохраняет scope PRD; решения для реализации зафиксированы в ADR T01. Документ можно переносить в трекер по одной задаче на карточку.
+**Статус:** Backlog, 28 задач; полностью выполнены T01–T03, T05–T12, T15–T20, T22–T23 и T25. T14 и T21 выполнены частично; T04, T13, T24 и T26–T28 открыты. Декомпозиция сохраняет scope PRD; решения для реализации зафиксированы в ADR T01. Документ можно переносить в трекер по одной задаче на карточку.
 
 ## Global Constraints
 
@@ -440,9 +440,9 @@
 
 **Файлы:** точка API logging в polls routes; pagination controllers/helpers; создать Flutter `core/analytics/pagination_analytics.dart` и web `core/pagination/pagination-analytics.ts` с целевыми tests, если подходящего adapter ещё нет.
 
-- [ ] Закрепить schema событий start/success/failure/retry/refresh/cursor anomaly: surface, sort, page number, duration, item count, error code, request ID. Добавить проверку, что raw cursor, auth headers и comment body не передаются adapter/log sink.
-- [ ] Подключить существующий logging/analytics sink; не создавать новый сервис. Добавить измерения latency/failures, cursor loops, dedup и snapshot storage/expiry.
-- [ ] Проверить контрольные успешные и неуспешные запросы с synthetic markers, сверить redaction и отсутствие двойных событий из late completions.
+- [x] Закрепить schema событий start/success/failure/retry/refresh/cursor anomaly: surface, sort, page number, duration, item count, error code, request ID. Добавить проверку, что raw cursor, auth headers и comment body не передаются adapter/log sink.
+- [x] Подключить существующий logging/analytics sink; не создавать новый сервис. Добавить измерения latency/failures, cursor loops, dedup и snapshot storage/expiry.
+- [x] Проверить контрольные успешные и неуспешные запросы с synthetic markers, сверить redaction и отсутствие двойных событий из late completions.
 
 **Готово, когда:** исход запроса диагностируется без чувствительного payload; список метрик и способ чтения описаны в evidence README.
 

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/analytics/pagination_analytics.dart';
 import '../../core/motion/entry_motion.dart';
 import '../../core/pagination/cursor_list_controller.dart';
 import '../../core/pagination/cursor_page.dart';
@@ -129,8 +130,24 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   void _createPaginationController() {
     _pollsController = CursorListController<PollSummary>(
       contextKey: 'subscriptions:${widget.session.user.id}:following',
-      loader: _loadSubscriptionPage,
+      trackedLoader: ({
+        required limit,
+        cursor,
+        required requestId,
+        required pageNumber,
+        required action,
+      }) =>
+          _loadSubscriptionPage(
+        limit: limit,
+        cursor: cursor,
+        requestId: requestId,
+        pageNumber: pageNumber,
+        paginationAction: action,
+      ),
       extractId: (poll) => poll.id,
+      analytics: PaginationAnalytics(),
+      surface: PaginationSurface.subscriptions,
+      sort: 'newest',
       onInactiveExpired: () {
         listScrollStateStore.clearForContext(_scrollContext);
         if (_scrollController.hasClients) _scrollController.jumpTo(0);
@@ -151,12 +168,18 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   Future<CursorPage<PollSummary>> _loadSubscriptionPage({
     required int limit,
     String? cursor,
+    String? requestId,
+    int? pageNumber,
+    String? paginationAction,
   }) {
     return _pollsApiClient
         .listSubscriptionsPage(
           accessToken: widget.session.accessToken,
           limit: limit,
           cursor: cursor,
+          requestId: requestId,
+          pageNumber: pageNumber,
+          paginationAction: paginationAction,
         )
         .timeout(const Duration(seconds: 10));
   }

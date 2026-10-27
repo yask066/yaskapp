@@ -17,8 +17,8 @@ export class ApiClient {
     for (const controller of this.requests) controller.abort();
   }
 
-  get<T>(path: string, decoder: ResponseDecoder<T>, signal?: AbortSignal): Promise<T> {
-    return this.send(path, { method: 'GET', signal }, decoder);
+  get<T>(path: string, decoder: ResponseDecoder<T>, signal?: AbortSignal, headers?: HeadersInit): Promise<T> {
+    return this.send(path, { method: 'GET', signal, headers }, decoder);
   }
 
   send<T>(path: string, init: RequestInit, decoder: ResponseDecoder<T>): Promise<T> {

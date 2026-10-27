@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderBox, ScrollDirection;
 
+import '../../core/analytics/pagination_analytics.dart';
 import '../../core/pagination/cursor_list_controller.dart';
 import '../../core/pagination/cursor_page.dart';
 import '../../core/motion/entry_motion.dart';
@@ -110,8 +111,24 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
     _reportsApiClient = widget.reportsApiClient ?? ReportsApiClient();
     _commentsController = CursorListController<PollCommentSummary>(
       contextKey: 'comments:${widget.currentUserId ?? 'anonymous'}:${_poll.id}',
-      loader: _loadCommentPage,
+      trackedLoader: ({
+        required limit,
+        cursor,
+        required requestId,
+        required pageNumber,
+        required action,
+      }) =>
+          _loadCommentPage(
+        limit: limit,
+        cursor: cursor,
+        requestId: requestId,
+        pageNumber: pageNumber,
+        paginationAction: action,
+      ),
       extractId: (comment) => comment.id,
+      analytics: PaginationAnalytics(),
+      surface: PaginationSurface.comments,
+      sort: 'newest',
     );
     _commentsController.addListener(_handleCommentsChanged);
     _scrollController.addListener(_handleRootScroll);
@@ -142,6 +159,9 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
   Future<CursorPage<PollCommentSummary>> _loadCommentPage({
     required int limit,
     String? cursor,
+    String? requestId,
+    int? pageNumber,
+    String? paginationAction,
   }) {
     return widget.pollsApiClient.listCommentsPage(
       pollId: _poll.id,
@@ -149,6 +169,9 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
       order: 'newest',
       cursor: cursor,
       accessToken: widget.accessToken,
+      requestId: requestId,
+      pageNumber: pageNumber,
+      paginationAction: paginationAction,
     );
   }
 
@@ -1533,6 +1556,9 @@ class _CommentThreadState extends State<_CommentThread>
     with AutomaticKeepAliveClientMixin<_CommentThread> {
   final _replyController = TextEditingController();
   final _targetReplyFocusNode = FocusNode(debugLabel: 'notification reply');
+  final _paginationAnalytics = PaginationAnalytics();
+  final Set<String> _usedReplyCursors = {};
+  int _replyPagesLoaded = 0;
   List<PollCommentSummary> _replies = [];
   PollCommentSummary? _ownReplyOverlay;
   String? _nextCursor;
@@ -1605,6 +1631,24 @@ class _CommentThreadState extends State<_CommentThread>
   Future<void> _loadReplies({String? cursor}) async {
     if (_isLoading || _isLoadingMore) return;
     final isFirstPage = cursor == null;
+    final isRetry = _loadError != null && _failedCursor == cursor;
+    final pageNumber = isFirstPage ? 1 : _replyPagesLoaded + 1;
+    final requestId = createPaginationRequestId();
+    if (isRetry) {
+      _recordReplyPagination(
+        event: 'pagination.retry',
+        requestId: requestId,
+        pageNumber: pageNumber,
+        durationMs: 0,
+        itemCount: 0,
+      );
+    }
+    _recordReplyPagination(
+      event: 'pagination.start',
+      requestId: requestId,
+      pageNumber: pageNumber,
+    );
+    final stopwatch = Stopwatch()..start();
     setState(() {
       _loadError = null;
       _failedCursor = cursor;
@@ -1623,8 +1667,23 @@ class _CommentThreadState extends State<_CommentThread>
         limit: 20,
         cursor: cursor,
         accessToken: widget.accessToken,
+        requestId: requestId,
+        pageNumber: pageNumber,
+        paginationAction: isRetry
+            ? 'retry'
+            : isFirstPage
+                ? 'initial'
+                : 'append',
       );
       if (!mounted) return;
+      final currentIds = _replies.map((reply) => reply.id).toSet();
+      final deduplicatedCount =
+          page.items.where((reply) => !currentIds.add(reply.id)).length;
+      if (isFirstPage) _usedReplyCursors.clear();
+      if (cursor != null) _usedReplyCursors.add(cursor);
+      final nextCursor = page.nextCursor;
+      final repeatedCursor = nextCursor != null &&
+          (nextCursor == cursor || _usedReplyCursors.contains(nextCursor));
       final mergedReplies = _mergeReplies(_replies, page.items);
       final ownReplyId = _ownReplyOverlay?.id;
       setState(() {
@@ -1633,7 +1692,7 @@ class _CommentThreadState extends State<_CommentThread>
             page.items.any((reply) => reply.id == ownReplyId)) {
           _ownReplyOverlay = null;
         }
-        _nextCursor = page.nextCursor;
+        _nextCursor = nextCursor;
         _paginationSupported = page.paginationSupported;
         _hasLoaded = true;
         _isLoading = false;
@@ -1641,6 +1700,33 @@ class _CommentThreadState extends State<_CommentThread>
         _loadError = null;
         _failedCursor = null;
       });
+      _replyPagesLoaded = isFirstPage ? 1 : _replyPagesLoaded + 1;
+      _recordReplyPagination(
+        event: 'pagination.success',
+        requestId: requestId,
+        pageNumber: pageNumber,
+        durationMs: stopwatch.elapsedMilliseconds,
+        itemCount: page.items.length,
+      );
+      if (deduplicatedCount > 0) {
+        _recordReplyPagination(
+          event: 'pagination.deduplication',
+          requestId: requestId,
+          pageNumber: pageNumber,
+          itemCount: page.items.length,
+          deduplicatedCount: deduplicatedCount,
+        );
+      }
+      if (repeatedCursor) {
+        _recordReplyPagination(
+          event: 'pagination.cursor_anomaly',
+          requestId: requestId,
+          pageNumber: pageNumber,
+          durationMs: stopwatch.elapsedMilliseconds,
+          itemCount: page.items.length,
+          errorCode: 'repeated_cursor',
+        );
+      }
       updateKeepAlive();
       widget.onRepliesChanged?.call(
         widget.rootComment.id,
@@ -1649,6 +1735,13 @@ class _CommentThreadState extends State<_CommentThread>
       _scheduleTargetReplyFocus();
     } on PollsApiException catch (error) {
       if (!mounted) return;
+      _recordReplyPagination(
+        event: 'pagination.failure',
+        requestId: requestId,
+        pageNumber: pageNumber,
+        durationMs: stopwatch.elapsedMilliseconds,
+        errorCode: error.code ?? 'request_failed',
+      );
       setState(() {
         _isLoading = false;
         _isLoadingMore = false;
@@ -1658,6 +1751,13 @@ class _CommentThreadState extends State<_CommentThread>
       updateKeepAlive();
     } on Object {
       if (!mounted) return;
+      _recordReplyPagination(
+        event: 'pagination.failure',
+        requestId: requestId,
+        pageNumber: pageNumber,
+        durationMs: stopwatch.elapsedMilliseconds,
+        errorCode: 'request_failed',
+      );
       setState(() {
         _isLoading = false;
         _isLoadingMore = false;
@@ -1666,6 +1766,33 @@ class _CommentThreadState extends State<_CommentThread>
       });
       updateKeepAlive();
     }
+  }
+
+  void _recordReplyPagination({
+    required String event,
+    required String requestId,
+    required int pageNumber,
+    int? durationMs,
+    int? itemCount,
+    int? deduplicatedCount,
+    String? errorCode,
+  }) {
+    final safeErrorCode = errorCode == null
+        ? null
+        : RegExp(r'^[a-z][a-z0-9_-]{0,63}$').hasMatch(errorCode)
+            ? errorCode
+            : 'request_failed';
+    _paginationAnalytics.emit(PaginationAnalyticsEvent(
+      event: event,
+      surface: PaginationSurface.replies,
+      sort: 'oldest',
+      pageNumber: pageNumber,
+      durationMs: durationMs,
+      itemCount: itemCount,
+      errorCode: safeErrorCode,
+      requestId: requestId,
+      deduplicatedCount: deduplicatedCount,
+    ));
   }
 
   List<PollCommentSummary> _mergeReplies(

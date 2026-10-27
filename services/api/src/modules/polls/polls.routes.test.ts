@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import Fastify from 'fastify';
 
+import { generateApiRequestId, safeRequestSerializer } from '../../observability/pagination-logging.js';
 import { cleanupUploadedPollImage, registerPollRoutes } from './polls.routes.js';
 
 test('poll image cleanup does not replace the original create error', async () => {
@@ -95,6 +96,40 @@ test('invalid newest-feed cursors use the pagination cursor error envelope', asy
     error: 'pagination_cursor_invalid',
     message: 'The pagination cursor is invalid.'
   });
+});
+
+test('invalid pagination cursors log a safe failure and cursor anomaly', async (context) => {
+  const logLines: string[] = [];
+  const app = Fastify({
+    requestIdHeader: false,
+    genReqId: generateApiRequestId,
+    logger: {
+      stream: { write: (line: string) => logLines.push(line) },
+      serializers: { req: safeRequestSerializer },
+    },
+  });
+  context.after(() => app.close());
+  registerPollRoutes(app);
+
+  const response = await app.inject({
+    method: 'GET',
+    url: '/polls?cursor=RAW_CURSOR_CANARY',
+    headers: {
+      'x-request-id': 'e5b2e8b1-f4c8-44ba-a25f-a63d60058128',
+    },
+  });
+
+  assert.equal(response.statusCode, 400);
+  const records = logLines.map((line) => JSON.parse(line) as Record<string, unknown>);
+  const events = records.filter((record) => typeof record.event === 'string' &&
+    (record.event as string).startsWith('pagination.'));
+  assert.deepEqual(events.map((record) => record.event), [
+    'pagination.start', 'pagination.failure', 'pagination.cursor_anomaly',
+  ]);
+  assert.equal(events[1].errorCode, 'pagination_cursor_invalid');
+  assert.ok(events.every((record) => record.requestId === 'e5b2e8b1-f4c8-44ba-a25f-a63d60058128'));
+  const serialized = logLines.join('\n');
+  assert.equal(serialized.includes('RAW_CURSOR_CANARY'), false);
 });
 
 test('overlong replies cursors use the pagination cursor error envelope', async (context) => {

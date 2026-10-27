@@ -154,6 +154,7 @@ export async function listPopularPublicPollPage(input: {
   viewerId?: string;
   cursor?: string;
   ownerIdentity: PollCursorOwnerIdentity;
+  requestId?: string;
 }) {
   const owner = createPollCursorOwnerKey(input.ownerIdentity);
   let snapshotId: string;
@@ -165,7 +166,7 @@ export async function listPopularPublicPollPage(input: {
     snapshotId = cursor.snapshotId;
     afterPosition = cursor.position;
   } else {
-    const snapshot = await createFeedSnapshot(input.ownerIdentity);
+    const snapshot = await createFeedSnapshot(input.ownerIdentity, input.requestId);
     snapshotId = snapshot.snapshotId;
   }
 

@@ -13,6 +13,66 @@ import 'package:yaskapp_mobile/src/features/polls/poll_state_store.dart';
 void main() {
   const config = ApiConfig(baseUrl: 'http://api.test');
 
+  test('sends safe pagination correlation headers on each cursor endpoint',
+      () async {
+    final requests = <http.Request>[];
+    final client = PollsApiClient(
+      config: config,
+      httpClient: MockClient((request) async {
+        requests.add(request);
+        return http.Response(
+            jsonEncode({'items': [], 'nextCursor': null}), 200);
+      }),
+    );
+    const requestId = 'e5b2e8b1-f4c8-44ba-a25f-a63d60058128';
+
+    await client.listPollsPage(
+      cursor: 'RAW_CURSOR_CANARY',
+      accessToken: 'AUTH_HEADER_CANARY',
+      requestId: requestId,
+      pageNumber: 4,
+      paginationAction: 'retry',
+    );
+    await client.listSubscriptionsPage(
+      accessToken: 'AUTH_HEADER_CANARY',
+      cursor: 'RAW_CURSOR_CANARY',
+      requestId: requestId,
+      pageNumber: 4,
+      paginationAction: 'retry',
+    );
+    await client.listCommentsPage(
+      pollId: 'poll-1',
+      cursor: 'RAW_CURSOR_CANARY',
+      accessToken: 'AUTH_HEADER_CANARY',
+      requestId: requestId,
+      pageNumber: 4,
+      paginationAction: 'retry',
+    );
+    await client.listCommentReplies(
+      pollId: 'poll-1',
+      rootCommentId: 'root-1',
+      cursor: 'RAW_CURSOR_CANARY',
+      accessToken: 'AUTH_HEADER_CANARY',
+      requestId: requestId,
+      pageNumber: 4,
+      paginationAction: 'retry',
+    );
+
+    expect(requests.map((request) => request.url.path), [
+      '/polls',
+      '/polls/subscriptions',
+      '/polls/poll-1/comments',
+      '/polls/poll-1/comments/root-1/replies',
+    ]);
+    for (final request in requests) {
+      expect(request.headers['x-request-id'], requestId);
+      expect(request.headers['x-pagination-page'], '4');
+      expect(request.headers['x-pagination-action'], 'retry');
+      expect(request.headers['authorization'], 'Bearer AUTH_HEADER_CANARY');
+    }
+    client.close();
+  });
+
   test('loads a poll by ID for an authenticated viewer', () async {
     late http.Request sentRequest;
     final client = PollsApiClient(

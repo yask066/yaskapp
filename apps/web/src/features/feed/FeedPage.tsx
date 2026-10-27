@@ -16,6 +16,7 @@ import { useListScrollState } from '../../core/scroll/useListScrollState';
 import { canAppend, followingGenerationQueryKey, mergePageIds, paginationQueryKey, paginationQueryOptions, type PaginationLoadTrigger, type PaginationState } from '../../core/pagination/pagination-state';
 import { PaginationFooter } from '../../components/PaginationFooter';
 import { FeedPollItem } from './FeedPollItem';
+import { paginationAnalytics, resolvePaginationPageRequest } from '../../core/pagination/pagination-analytics';
 
 type FeedSort = 'for-you' | 'following' | 'trending';
 type FeedUiState = { pending: boolean; error: unknown | null; appendError: unknown | null };
@@ -72,24 +73,60 @@ export function FeedPage() {
   const feedQueryKey = sort === 'following'
     ? paginationQueryKey({ surface: 'subscriptions', sessionEpoch, userId: viewerId, followingGeneration: followingGenerationQuery.data })
     : paginationQueryKey({ surface: 'feed', sessionEpoch, userId: viewerId, sort: sort === 'trending' ? 'popular' : 'newest' });
+  const feedRequestIdentity = JSON.stringify(feedQueryKey);
+  const activeFeedRequestIdentity = useRef(feedRequestIdentity);
+  activeFeedRequestIdentity.current = feedRequestIdentity;
+  const refetchPageNumber = useRef(1);
   const pollsQuery = useInfiniteQuery({
     queryKey: feedQueryKey,
-    queryFn: ({ pageParam, signal }) => fetchPollQuery(
-      queryClient,
-      viewerId,
-      () => sort === 'following'
-        ? listSubscriptionsPage({ cursor: pageParam ?? undefined }, signal)
-        : listPollsPage({ sort: sort === 'trending' ? 'popular' : 'newest', cursor: pageParam ?? undefined }, signal),
-      true,
-      signal,
-    ),
+    queryFn: ({ pageParam, signal }) => {
+      const cached = queryClient.getQueryData<InfiniteData<ClientCursorPage<Poll>, string | null>>(feedQueryKey);
+      const queryState = queryClient.getQueryState(feedQueryKey);
+      const isFetchingMore = queryState?.fetchMeta?.fetchMore !== undefined;
+      const isRefetching = cached !== undefined && !isFetchingMore;
+      const { pageNumber, kind } = resolvePaginationPageRequest(
+        cached?.pageParams,
+        pageParam,
+        isFetchingMore,
+        isRefetching,
+        refetchPageNumber.current,
+      );
+      const surface = sort === 'following' ? 'subscriptions' : 'feed';
+      const pageSort = sort === 'trending' ? 'popular' : 'newest';
+      return paginationAnalytics.trackPageRequest<Poll, ClientCursorPage<Poll>>({
+        surface,
+        sort: pageSort,
+        pageNumber,
+        chainId: feedRequestIdentity,
+        kind,
+        cursor: pageParam,
+        signal,
+        isCurrent: () => !signal.aborted && activeFeedRequestIdentity.current === feedRequestIdentity,
+        existingIds: kind === 'append' ? cached?.pages.flatMap((page) => page.items.map((poll) => poll.id)) ?? [] : [],
+        getId: (poll) => poll.id,
+      }, ({ requestId, action }) => fetchPollQuery(
+        queryClient,
+        viewerId,
+        () => sort === 'following'
+          ? listSubscriptionsPage({ cursor: pageParam ?? undefined, requestId, pageNumber, paginationAction: action }, signal)
+          : listPollsPage({ sort: pageSort, cursor: pageParam ?? undefined, requestId, pageNumber, paginationAction: action }, signal),
+        true,
+        signal,
+      )).then((page) => {
+        if (kind === 'refetch' && !signal.aborted && activeFeedRequestIdentity.current === feedRequestIdentity) {
+          refetchPageNumber.current = pageNumber + 1;
+        }
+        return page;
+      });
+    },
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.paginationSupported ? lastPage.nextCursor ?? undefined : undefined,
     enabled: status !== 'loading' && (sort !== 'following' || status === 'authenticated'),
     staleTime: Infinity,
     ...paginationQueryOptions,
   });
-  const queryIdentity = JSON.stringify(feedQueryKey);
+  const queryIdentity = feedRequestIdentity;
+  useEffect(() => () => paginationAnalytics.disposeChain(feedRequestIdentity), [feedRequestIdentity]);
   const feedUiStateKey = ['pagination', 'feed-ui-state', ...feedQueryKey] as const;
   const feedUiStateQuery = useQuery({
     queryKey: feedUiStateKey,
@@ -160,15 +197,26 @@ export function FeedPage() {
     updateFeedUiState({ pending: true, error: null });
     try {
       await queryClient.cancelQueries({ queryKey: feedQueryKey, exact: true });
-      const page = await fetchPollQuery(
+      const page = await paginationAnalytics.trackPageRequest<Poll, ClientCursorPage<Poll>>({
+        surface: sort === 'following' ? 'subscriptions' : 'feed',
+        sort: sort === 'trending' ? 'popular' : 'newest',
+        pageNumber: 1,
+        chainId: queryIdentity,
+        kind: 'refresh',
+        cursor: null,
+        signal: controller.signal,
+        isCurrent: () => !controller.signal.aborted && activeFeedRequestIdentity.current === queryIdentity && currentSessionIdentity.current.sessionEpoch === requestEpoch && currentSessionIdentity.current.viewerId === requestViewerId,
+        existingIds: pollsQuery.data?.pages.flatMap((cachedPage) => cachedPage.items.map((poll) => poll.id)) ?? [],
+        getId: (poll) => poll.id,
+      }, ({ requestId, action }) => fetchPollQuery(
         queryClient,
         viewerId,
         () => sort === 'following'
-          ? listSubscriptionsPage({}, controller.signal)
-          : listPollsPage({ sort: sort === 'trending' ? 'popular' : 'newest' }, controller.signal),
+          ? listSubscriptionsPage({ requestId, pageNumber: 1, paginationAction: action }, controller.signal)
+          : listPollsPage({ sort: sort === 'trending' ? 'popular' : 'newest', requestId, pageNumber: 1, paginationAction: action }, controller.signal),
         true,
         controller.signal,
-      );
+      ));
       if (controller.signal.aborted || currentSessionIdentity.current.sessionEpoch !== requestEpoch || currentSessionIdentity.current.viewerId !== requestViewerId) return;
       queryClient.setQueryData<InfiniteData<ClientCursorPage<Poll>, string | null>>(feedQueryKey, {
         pages: [page],

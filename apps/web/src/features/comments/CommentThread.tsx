@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Ref } from 'react';
-import { useInfiniteQuery, useMutation, useMutationState, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useMutationState, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { createComment, deleteComment, likeComment, listCommentReplies, unlikeComment } from '../../api/polls';
-import type { Poll, PollComment } from '../../api/models';
+import type { ClientCursorPage, Poll, PollComment } from '../../api/models';
 import { mutationErrorMessage } from '../polls/usePollMutations';
 import { CommentForm } from './CommentForm';
 import { pollSessionEpoch, reconcilePoll } from '../polls/poll-state';
@@ -32,6 +32,7 @@ import {
   paginationQueryOptions,
   type PaginationState,
 } from '../../core/pagination/pagination-state';
+import { paginationAnalytics, resolvePaginationPageRequest } from '../../core/pagination/pagination-analytics';
 
 interface CommentThreadProps {
   pollId: string;
@@ -66,18 +67,53 @@ export function CommentThread({
   const queryKey = [...paginationQueryKey({
     surface: 'replies', sessionEpoch, userId: currentUserId ?? null, pollId, rootId: rootComment.id,
   }), refreshGeneration] as const;
+  const replyQueryIdentity = JSON.stringify(queryKey);
+  const currentReplyQueryIdentity = useRef(replyQueryIdentity);
+  currentReplyQueryIdentity.current = replyQueryIdentity;
+  useEffect(() => () => paginationAnalytics.disposeChain(replyQueryIdentity), [replyQueryIdentity]);
   const commentsQueryKey = paginationQueryKey({
     surface: 'comments', sessionEpoch, userId: currentUserId ?? null, pollId,
   });
   const [isExpanded, setIsExpanded] = useState(autoExpand || Boolean(focusedReplyId));
   const [isReplying, setIsReplying] = useState(false);
   const activeAppendRequests = useRef(new Set<string>());
+  const refetchPageNumber = useRef(1);
   const repliesQuery = useInfiniteQuery({
     queryKey,
     ...paginationQueryOptions,
     queryFn: async ({ pageParam, signal }) => {
       const reactionRevision = commentReactionRevision(queryClient, commentScope);
-      const page = await listCommentReplies(pollId, rootComment.id, { cursor: pageParam }, signal);
+      const cached = queryClient.getQueryData<InfiniteData<ClientCursorPage<PollComment>, string | undefined>>(queryKey);
+      const queryState = queryClient.getQueryState(queryKey);
+      const isFetchingMore = queryState?.fetchMeta?.fetchMore !== undefined;
+      const isRefetching = cached !== undefined && !isFetchingMore;
+      const { pageNumber, kind } = resolvePaginationPageRequest(
+        cached?.pageParams,
+        pageParam,
+        isFetchingMore,
+        isRefetching,
+        refetchPageNumber.current,
+      );
+      const page = await paginationAnalytics.trackPageRequest<PollComment, ClientCursorPage<PollComment>>({
+        surface: 'replies',
+        sort: 'oldest',
+        pageNumber,
+        chainId: replyQueryIdentity,
+        kind,
+        cursor: pageParam ?? null,
+        signal,
+        isCurrent: () => !signal.aborted && currentReplyQueryIdentity.current === replyQueryIdentity,
+        existingIds: kind === 'append' ? cached?.pages.flatMap((entry) => entry.items.map((comment) => comment.id)) ?? [] : [],
+        getId: (comment) => comment.id,
+      }, ({ requestId, action }) => listCommentReplies(
+        pollId,
+        rootComment.id,
+        { cursor: pageParam, requestId, pageNumber, paginationAction: action },
+        signal,
+      ));
+      if (kind === 'refetch' && !signal.aborted && currentReplyQueryIdentity.current === replyQueryIdentity) {
+        refetchPageNumber.current = pageNumber + 1;
+      }
       return reconcileCommentPage(queryClient, commentScope, page, reactionRevision);
     },
     initialPageParam: undefined as string | undefined,

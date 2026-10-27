@@ -2,11 +2,20 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../analytics/pagination_analytics.dart';
 import 'cursor_page.dart';
 
 typedef CursorPageLoader<T> = Future<CursorPage<T>> Function({
   required int limit,
   String? cursor,
+});
+
+typedef TrackedCursorPageLoader<T> = Future<CursorPage<T>> Function({
+  required int limit,
+  String? cursor,
+  required String requestId,
+  required int pageNumber,
+  required String action,
 });
 
 /// One independent cursor chain. Include session/surface/sort/poll/root in
@@ -18,8 +27,12 @@ typedef CursorPageLoader<T> = Future<CursorPage<T>> Function({
 class CursorListController<T> extends ChangeNotifier {
   CursorListController({
     required this.contextKey,
-    required this.loader,
+    this.loader,
+    this.trackedLoader,
     required this.extractId,
+    this.analytics,
+    this.surface = PaginationSurface.feed,
+    this.sort,
     this.limit = 20,
     this.inactiveRetention = const Duration(minutes: 5),
     this.onInactiveExpired,
@@ -33,6 +46,9 @@ class CursorListController<T> extends ChangeNotifier {
           automaticLoadsUsed: 0,
           automaticLoadPaused: false,
         ) {
+    if (loader == null && trackedLoader == null) {
+      throw ArgumentError('Provide either loader or trackedLoader.');
+    }
     if (limit < 1 || limit > 50) {
       throw ArgumentError.value(limit, 'limit', 'Must be between 1 and 50.');
     }
@@ -47,8 +63,12 @@ class CursorListController<T> extends ChangeNotifier {
 
   /// Composite identity owned by the feature, including the session epoch.
   final Object contextKey;
-  final CursorPageLoader<T> loader;
+  final CursorPageLoader<T>? loader;
+  final TrackedCursorPageLoader<T>? trackedLoader;
   final String Function(T item) extractId;
+  final PaginationAnalytics? analytics;
+  final PaginationSurface surface;
+  final String? sort;
   final int limit;
   final Duration inactiveRetention;
 
@@ -75,6 +95,11 @@ class CursorListController<T> extends ChangeNotifier {
     markActive();
 
     final generation = _state.generation;
+    final requestId = createPaginationRequestId();
+    final isRetry = _state.initial.error != null;
+    if (isRetry) _record('pagination.retry', requestId, pageNumber: 1);
+    _record('pagination.start', requestId, pageNumber: 1);
+    final stopwatch = Stopwatch()..start();
     _publish(_state.copyWith(
       initial: const CursorReadState(pending: true),
       automaticLoadsUsed: 0,
@@ -82,7 +107,11 @@ class CursorListController<T> extends ChangeNotifier {
     ));
 
     try {
-      final page = await loader(limit: limit);
+      final page = await _loadPage(
+        requestId: requestId,
+        pageNumber: 1,
+        action: isRetry ? 'retry' : 'initial',
+      );
       if (!_isCurrent(generation)) return;
       _usedCursors.clear();
       _publish(_state.copyWith(
@@ -90,9 +119,25 @@ class CursorListController<T> extends ChangeNotifier {
         initial: const CursorReadState(),
         append: const CursorReadState(),
       ));
+      final deduplicatedCount = _countDuplicates(page.items, const <String>[]);
+      _record(
+        'pagination.success',
+        requestId,
+        pageNumber: 1,
+        durationMs: stopwatch.elapsedMilliseconds,
+        itemCount: page.items.length,
+      );
+      _recordDeduplication(requestId, 1, page.items.length, deduplicatedCount);
     } catch (error) {
       if (!_isCurrent(generation)) return;
       _publish(_state.copyWith(initial: CursorReadState(error: error)));
+      _record(
+        'pagination.failure',
+        requestId,
+        pageNumber: 1,
+        durationMs: stopwatch.elapsedMilliseconds,
+        errorCode: _errorCode(error),
+      );
     }
   }
 
@@ -112,6 +157,13 @@ class CursorListController<T> extends ChangeNotifier {
     }
     markActive();
 
+    final pageNumber = _state.pages.length + 1;
+    final requestId = createPaginationRequestId();
+    final isRetry = _state.append.error != null;
+    if (isRetry) _record('pagination.retry', requestId, pageNumber: pageNumber);
+    _record('pagination.start', requestId, pageNumber: pageNumber);
+    final stopwatch = Stopwatch()..start();
+
     if (!automatic) {
       _state = _state.copyWith(
         automaticLoadsUsed: 0,
@@ -122,7 +174,12 @@ class CursorListController<T> extends ChangeNotifier {
     _publish(_state.copyWith(append: const CursorReadState(pending: true)));
 
     try {
-      final page = await loader(limit: limit, cursor: cursor);
+      final page = await _loadPage(
+        cursor: cursor,
+        requestId: requestId,
+        pageNumber: pageNumber,
+        action: isRetry ? 'retry' : 'append',
+      );
       if (!_isCurrent(generation)) return;
       final nextCursor = page.nextCursor;
       if (page.paginationSupported &&
@@ -132,21 +189,54 @@ class CursorListController<T> extends ChangeNotifier {
           append: CursorReadState(error: StateError('Cursor repeated.')),
           automaticLoadPaused: true,
         ));
+        _record(
+          'pagination.cursor_anomaly',
+          requestId,
+          pageNumber: pageNumber,
+          durationMs: stopwatch.elapsedMilliseconds,
+          itemCount: page.items.length,
+          errorCode: 'repeated_cursor',
+        );
+        _record(
+          'pagination.failure',
+          requestId,
+          pageNumber: pageNumber,
+          durationMs: stopwatch.elapsedMilliseconds,
+          itemCount: 0,
+          errorCode: 'repeated_cursor',
+        );
         return;
       }
 
+      final deduplicatedCount = _countDuplicates(page.items, _state.ids);
       _usedCursors.add(cursor);
       _publish(_state.copyWith(
         pages: <CursorPage<T>>[..._state.pages, page],
         append: const CursorReadState(),
         automaticLoadsUsed: automatic ? _state.automaticLoadsUsed + 1 : 0,
       ));
+      _record(
+        'pagination.success',
+        requestId,
+        pageNumber: pageNumber,
+        durationMs: stopwatch.elapsedMilliseconds,
+        itemCount: page.items.length,
+      );
+      _recordDeduplication(
+          requestId, pageNumber, page.items.length, deduplicatedCount);
     } catch (error) {
       if (!_isCurrent(generation)) return;
       _publish(_state.copyWith(
         append: CursorReadState(error: error),
         automaticLoadPaused: true,
       ));
+      _record(
+        'pagination.failure',
+        requestId,
+        pageNumber: pageNumber,
+        durationMs: stopwatch.elapsedMilliseconds,
+        errorCode: _errorCode(error),
+      );
     }
   }
 
@@ -157,6 +247,12 @@ class CursorListController<T> extends ChangeNotifier {
     markActive();
 
     final generation = _state.generation + 1;
+    final requestId = createPaginationRequestId();
+    final isRetry = _state.refresh.error != null;
+    if (isRetry) _record('pagination.retry', requestId, pageNumber: 1);
+    _record('pagination.refresh', requestId, pageNumber: 1);
+    _record('pagination.start', requestId, pageNumber: 1);
+    final stopwatch = Stopwatch()..start();
     _publish(_state.copyWith(
       generation: generation,
       initial: const CursorReadState(),
@@ -166,7 +262,11 @@ class CursorListController<T> extends ChangeNotifier {
     ));
 
     try {
-      final page = await loader(limit: limit);
+      final page = await _loadPage(
+        requestId: requestId,
+        pageNumber: 1,
+        action: 'refresh',
+      );
       if (!_isCurrent(generation)) return;
       _usedCursors.clear();
       _publish(_state.copyWith(
@@ -175,9 +275,25 @@ class CursorListController<T> extends ChangeNotifier {
         append: const CursorReadState(),
         automaticLoadPaused: false,
       ));
+      final deduplicatedCount = _countDuplicates(page.items, const <String>[]);
+      _record(
+        'pagination.success',
+        requestId,
+        pageNumber: 1,
+        durationMs: stopwatch.elapsedMilliseconds,
+        itemCount: page.items.length,
+      );
+      _recordDeduplication(requestId, 1, page.items.length, deduplicatedCount);
     } catch (error) {
       if (!_isCurrent(generation)) return;
       _publish(_state.copyWith(refresh: CursorReadState(error: error)));
+      _record(
+        'pagination.failure',
+        requestId,
+        pageNumber: 1,
+        durationMs: stopwatch.elapsedMilliseconds,
+        errorCode: _errorCode(error),
+      );
     }
   }
 
@@ -217,6 +333,88 @@ class CursorListController<T> extends ChangeNotifier {
 
   bool _isCurrent(int generation) =>
       !_disposed && _state.generation == generation;
+
+  Future<CursorPage<T>> _loadPage({
+    String? cursor,
+    required String requestId,
+    required int pageNumber,
+    required String action,
+  }) {
+    final tracked = trackedLoader;
+    if (tracked != null) {
+      return tracked(
+        limit: limit,
+        cursor: cursor,
+        requestId: requestId,
+        pageNumber: pageNumber,
+        action: action,
+      );
+    }
+    return loader!(limit: limit, cursor: cursor);
+  }
+
+  int _countDuplicates(Iterable<T> items, Iterable<String> existingIds) {
+    final seen = existingIds.toSet();
+    var duplicates = 0;
+    for (final item in items) {
+      if (!seen.add(extractId(item))) duplicates++;
+    }
+    return duplicates;
+  }
+
+  void _recordDeduplication(
+    String requestId,
+    int pageNumber,
+    int itemCount,
+    int deduplicatedCount,
+  ) {
+    if (deduplicatedCount == 0) return;
+    _record(
+      'pagination.deduplication',
+      requestId,
+      pageNumber: pageNumber,
+      itemCount: itemCount,
+      deduplicatedCount: deduplicatedCount,
+    );
+  }
+
+  void _record(
+    String event,
+    String requestId, {
+    required int pageNumber,
+    int? durationMs,
+    int? itemCount,
+    String? errorCode,
+    int? deduplicatedCount,
+  }) {
+    analytics?.emit(PaginationAnalyticsEvent(
+      event: event,
+      surface: surface,
+      sort: sort,
+      pageNumber: pageNumber,
+      durationMs: durationMs,
+      itemCount: itemCount,
+      errorCode: errorCode,
+      requestId: requestId,
+      deduplicatedCount: deduplicatedCount,
+    ));
+  }
+
+  String _errorCode(Object error) {
+    if (error is StateError && error.message == 'Cursor repeated.') {
+      return 'repeated_cursor';
+    }
+    if (error is TimeoutException) return 'read_timeout';
+    try {
+      final code = (error as dynamic).code;
+      if (code is String && RegExp(r'^[a-z0-9_-]{1,64}$').hasMatch(code)) {
+        return code;
+      }
+    } on Object {
+      // Error messages may contain request data and are never used as codes.
+    }
+    return 'request_failed';
+  }
 
   void _publish(CursorListState<T> next) {
     if (_disposed) return;

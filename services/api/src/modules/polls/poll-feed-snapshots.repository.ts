@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
 import type { PollCursorOwnerIdentity } from './poll-pagination.js';
 
 import { db } from '../../config/database.js';
+import { recordPaginationMetric } from '../../observability/pagination-logging.js';
 import { createPollCursorOwnerKey } from './poll-pagination.js';
 
 const maximumActiveSnapshotsPerOwner = 3;
@@ -61,7 +63,8 @@ function readPosition(value: string): number {
   return position;
 }
 
-export async function createFeedSnapshot(identity: PollCursorOwnerIdentity): Promise<FeedSnapshot> {
+export async function createFeedSnapshot(identity: PollCursorOwnerIdentity, requestId: string = randomUUID()): Promise<FeedSnapshot> {
+  const startedAt = performance.now();
   const ownerKey = createPollCursorOwnerKey(identity);
   const snapshotId = randomUUID();
   const client = await db.connect();
@@ -95,7 +98,7 @@ export async function createFeedSnapshot(identity: PollCursorOwnerIdentity): Pro
       throw new Error('Poll feed snapshot was not created.');
     }
 
-    await client.query(
+    const storedItems = await client.query(
       `INSERT INTO poll_feed_snapshot_items (snapshot_id, position, poll_id)
        SELECT $1::uuid,
               ROW_NUMBER() OVER (
@@ -126,7 +129,32 @@ export async function createFeedSnapshot(identity: PollCursorOwnerIdentity): Pro
       [ownerKey, maximumActiveSnapshotsPerOwner]
     );
 
+    const activeSnapshots = await client.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count
+       FROM poll_feed_snapshots
+       WHERE owner_key = $1 AND expires_at > clock_timestamp()`,
+      [ownerKey]
+    );
+
     await client.query('COMMIT');
+
+    try {
+      recordPaginationMetric({
+        event: 'pagination.snapshot_storage',
+        surface: 'feed',
+        sort: 'popular',
+        pageNumber: 1,
+        durationMs: performance.now() - startedAt,
+        itemCount: storedItems.rowCount ?? 0,
+        errorCode: null,
+        requestId,
+        storedItemCount: storedItems.rowCount ?? 0,
+        activeSnapshotCount: Number(activeSnapshots.rows[0]?.count ?? 0),
+        snapshotLifetimeSeconds: 30 * 60,
+      });
+    } catch {
+      // Metrics do not change the result of a committed snapshot transaction.
+    }
 
     return {
       snapshotId,

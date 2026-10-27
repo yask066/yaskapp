@@ -3,6 +3,11 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
+import {
+  observePaginationRequest,
+  type PaginationRequestAction,
+  type PaginationSurface,
+} from '../../observability/pagination-logging.js';
 import { AdminCursorError } from '../admin/pagination.js';
 import {
   createPollCursorOwnerKey,
@@ -188,6 +193,57 @@ function pollCursorOwnerForRequest(request: FastifyRequest): string {
     : createPollCursorOwnerKey({ type: 'guest', ip: request.ip });
 }
 
+function paginationRequestContext(
+  request: FastifyRequest,
+  surface: PaginationSurface,
+  sort: string | null,
+  hasCursor: boolean,
+) {
+  const pageHeader = request.headers['x-pagination-page'];
+  const pageNumber = typeof pageHeader === 'string' && /^\d{1,5}$/.test(pageHeader)
+    ? Number(pageHeader)
+    : null;
+  const actionHeader = request.headers['x-pagination-action'];
+  const action: PaginationRequestAction = actionHeader === 'retry' || actionHeader === 'refresh' || actionHeader === 'append' || actionHeader === 'refetch'
+    ? actionHeader
+    : hasCursor ? 'append' : 'initial';
+
+  return {
+    surface,
+    sort,
+    pageNumber: pageNumber !== null && pageNumber > 0 ? pageNumber : hasCursor ? null : 1,
+    requestId: request.id,
+    action,
+  } as const;
+}
+
+function requestHasPaginationCursor(request: FastifyRequest): boolean {
+  return typeof request.query === 'object' && request.query !== null &&
+    Object.hasOwn(request.query, 'cursor');
+}
+
+function paginationValidationFailure(code: 'validation_error' | 'pagination_cursor_invalid') {
+  return Object.assign(new Error('Pagination request validation failed.'), { code });
+}
+
+async function logRejectedPaginationRequest(
+  request: FastifyRequest,
+  surface: PaginationSurface,
+  sort: string | null,
+  hasCursor: boolean,
+  error: unknown,
+) {
+  try {
+    await observePaginationRequest(
+      request.log,
+      paginationRequestContext(request, surface, sort, hasCursor),
+      async () => { throw error; },
+    );
+  } catch {
+    // The route below still owns the public error response.
+  }
+}
+
 export async function cleanupUploadedPollImage(
   objectKey: string,
   deleteImage: (key: string) => Promise<void> = deletePollImageObject,
@@ -279,44 +335,60 @@ export function registerPollRoutes(app: FastifyInstance) {
       preHandler: optionalAuthenticate
     },
     async (request, reply) => {
-    const parsedQuery = listPollsQuerySchema.safeParse(request.query);
-
-    if (!parsedQuery.success) {
-      if (parsedQuery.error.issues.some((issue) => issue.path[0] === 'cursor')) {
-        return pollError(reply, new PollPaginationCursorError());
+      const hasCursor = requestHasPaginationCursor(request);
+      const parsedQuery = listPollsQuerySchema.safeParse(request.query);
+      if (!parsedQuery.success) {
+        const cursorError = parsedQuery.error.issues.some((issue) => issue.path[0] === 'cursor');
+        await logRejectedPaginationRequest(
+          request,
+          'feed',
+          null,
+          hasCursor,
+          cursorError ? new PollPaginationCursorError() : paginationValidationFailure('validation_error'),
+        );
+        return cursorError
+          ? pollError(reply, new PollPaginationCursorError())
+          : validationError(reply, parsedQuery.error);
       }
-      return validationError(reply, parsedQuery.error);
-    }
 
-    if (parsedQuery.data.sort === 'popular') {
+      if (parsedQuery.data.sort === 'popular') {
+        try {
+          const ownerIdentity = request.user?.sub
+            ? { type: 'user' as const, userId: request.user.sub }
+            : { type: 'guest' as const, ip: request.ip };
+          return await observePaginationRequest(
+            request.log,
+            paginationRequestContext(request, 'feed', 'popular', hasCursor),
+            () => listPopularPublicPollPage({
+              limit: parsedQuery.data.limit,
+              viewerId: request.user?.sub,
+              cursor: parsedQuery.data.cursor,
+              ownerIdentity,
+              requestId: request.id,
+            }),
+          );
+        } catch (error) {
+          return pollError(reply, error);
+        }
+      }
+
       try {
-        const ownerIdentity = request.user?.sub
-          ? { type: 'user' as const, userId: request.user.sub }
-          : { type: 'guest' as const, ip: request.ip };
-        return await listPopularPublicPollPage({
-          limit: parsedQuery.data.limit,
-          viewerId: request.user?.sub,
-          cursor: parsedQuery.data.cursor,
-          ownerIdentity
-        });
+        const owner = request.user?.sub
+          ? createPollCursorOwnerKey({ type: 'user', userId: request.user.sub })
+          : createPollCursorOwnerKey({ type: 'guest', ip: request.ip });
+        return await observePaginationRequest(
+          request.log,
+          paginationRequestContext(request, 'feed', 'newest', hasCursor),
+          () => listNewestPublicPolls({
+            limit: parsedQuery.data.limit,
+            viewerId: request.user?.sub,
+            cursor: parsedQuery.data.cursor,
+            owner,
+          }),
+        );
       } catch (error) {
         return pollError(reply, error);
       }
-    }
-
-    try {
-      const owner = request.user?.sub
-        ? createPollCursorOwnerKey({ type: 'user', userId: request.user.sub })
-        : createPollCursorOwnerKey({ type: 'guest', ip: request.ip });
-      return await listNewestPublicPolls({
-        limit: parsedQuery.data.limit,
-        viewerId: request.user?.sub,
-        cursor: parsedQuery.data.cursor,
-        owner
-      });
-    } catch (error) {
-      return pollError(reply, error);
-    }
     }
   );
 
@@ -423,22 +495,34 @@ export function registerPollRoutes(app: FastifyInstance) {
       preHandler: authenticate
     },
     async (request, reply) => {
+      const hasCursor = requestHasPaginationCursor(request);
       const parsedQuery = listPollsQuerySchema.safeParse(request.query);
 
       if (!parsedQuery.success) {
-        if (parsedQuery.error.issues.some((issue) => issue.path[0] === 'cursor')) {
-          return pollError(reply, new PollPaginationCursorError());
-        }
-        return validationError(reply, parsedQuery.error);
+        const cursorError = parsedQuery.error.issues.some((issue) => issue.path[0] === 'cursor');
+        await logRejectedPaginationRequest(
+          request,
+          'subscriptions',
+          null,
+          hasCursor,
+          cursorError ? new PollPaginationCursorError() : paginationValidationFailure('validation_error'),
+        );
+        return cursorError
+          ? pollError(reply, new PollPaginationCursorError())
+          : validationError(reply, parsedQuery.error);
       }
 
       try {
         const owner = createPollCursorOwnerKey({ type: 'user', userId: request.user.sub });
-        return await listSubscriptionPolls(
-          request.user.sub,
-          parsedQuery.data.limit,
-          parsedQuery.data.cursor,
-          owner
+        return await observePaginationRequest(
+          request.log,
+          paginationRequestContext(request, 'subscriptions', 'newest', hasCursor),
+          () => listSubscriptionPolls(
+            request.user.sub,
+            parsedQuery.data.limit,
+            parsedQuery.data.cursor,
+            owner,
+          ),
         );
       } catch (error) {
         return pollError(reply, error);
@@ -447,30 +531,49 @@ export function registerPollRoutes(app: FastifyInstance) {
   );
 
   app.get('/polls/:pollId/comments', { preHandler: optionalAuthenticate }, async (request, reply) => {
+    const hasCursor = requestHasPaginationCursor(request);
     const parsedParams = commentsParamsSchema.safeParse(request.params);
 
     if (!parsedParams.success) {
+      await logRejectedPaginationRequest(
+        request,
+        'comments',
+        null,
+        hasCursor,
+        paginationValidationFailure('validation_error'),
+      );
       return validationError(reply, parsedParams.error);
     }
 
     const parsedQuery = commentsQuerySchema.safeParse(request.query);
 
     if (!parsedQuery.success) {
-      if (parsedQuery.error.issues.some((issue) => issue.path[0] === 'cursor')) {
-        return pollError(reply, new PollPaginationCursorError());
-      }
-      return validationError(reply, parsedQuery.error);
+      const cursorError = parsedQuery.error.issues.some((issue) => issue.path[0] === 'cursor');
+      await logRejectedPaginationRequest(
+        request,
+        'comments',
+        null,
+        hasCursor,
+        cursorError ? new PollPaginationCursorError() : paginationValidationFailure('validation_error'),
+      );
+      return cursorError
+        ? pollError(reply, new PollPaginationCursorError())
+        : validationError(reply, parsedQuery.error);
     }
 
     try {
-      return await listPollComments({
-        pollId: parsedParams.data.pollId,
-        limit: parsedQuery.data.limit,
-        order: parsedQuery.data.order,
-        cursor: parsedQuery.data.cursor,
-        owner: pollCursorOwnerForRequest(request),
-        viewerId: request.user?.sub
-      });
+      return await observePaginationRequest(
+        request.log,
+        paginationRequestContext(request, 'comments', parsedQuery.data.order, hasCursor),
+        () => listPollComments({
+          pollId: parsedParams.data.pollId,
+          limit: parsedQuery.data.limit,
+          order: parsedQuery.data.order,
+          cursor: parsedQuery.data.cursor,
+          owner: pollCursorOwnerForRequest(request),
+          viewerId: request.user?.sub,
+        }),
+      );
     } catch (error) {
       return pollError(reply, error);
     }
@@ -480,26 +583,47 @@ export function registerPollRoutes(app: FastifyInstance) {
     '/polls/:pollId/comments/:commentId/replies',
     { preHandler: optionalAuthenticate },
     async (request, reply) => {
+      const hasCursor = requestHasPaginationCursor(request);
       const parsedParams = commentLikeParamsSchema.safeParse(request.params);
-      if (!parsedParams.success) return validationError(reply, parsedParams.error);
+      if (!parsedParams.success) {
+        await logRejectedPaginationRequest(
+          request,
+          'replies',
+          'oldest',
+          hasCursor,
+          paginationValidationFailure('validation_error'),
+        );
+        return validationError(reply, parsedParams.error);
+      }
 
       const parsedQuery = commentRepliesQuerySchema.safeParse(request.query);
       if (!parsedQuery.success) {
-        if (parsedQuery.error.issues.some((issue) => issue.path[0] === 'cursor')) {
-          return pollError(reply, new PollPaginationCursorError());
-        }
-        return validationError(reply, parsedQuery.error);
+        const cursorError = parsedQuery.error.issues.some((issue) => issue.path[0] === 'cursor');
+        await logRejectedPaginationRequest(
+          request,
+          'replies',
+          'oldest',
+          hasCursor,
+          cursorError ? new PollPaginationCursorError() : paginationValidationFailure('validation_error'),
+        );
+        return cursorError
+          ? pollError(reply, new PollPaginationCursorError())
+          : validationError(reply, parsedQuery.error);
       }
 
       try {
-        return await listPollCommentReplies({
-          pollId: parsedParams.data.pollId,
-          commentId: parsedParams.data.commentId,
-          limit: parsedQuery.data.limit,
-          cursor: parsedQuery.data.cursor,
-          owner: pollCursorOwnerForRequest(request),
-          viewerId: request.user?.sub
-        });
+        return await observePaginationRequest(
+          request.log,
+          paginationRequestContext(request, 'replies', 'oldest', hasCursor),
+          () => listPollCommentReplies({
+            pollId: parsedParams.data.pollId,
+            commentId: parsedParams.data.commentId,
+            limit: parsedQuery.data.limit,
+            cursor: parsedQuery.data.cursor,
+            owner: pollCursorOwnerForRequest(request),
+            viewerId: request.user?.sub,
+          }),
+        );
       } catch (error) {
         return pollError(reply, error);
       }

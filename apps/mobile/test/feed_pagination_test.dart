@@ -616,6 +616,9 @@ class _PageApi extends PollsApiClient {
     String sort = 'newest',
     String? cursor,
     String? accessToken,
+    String? requestId,
+    int? pageNumber,
+    String? paginationAction,
   }) {
     feedSorts.add(sort);
     feedCursors.add(cursor);
@@ -638,6 +641,9 @@ class _PageApi extends PollsApiClient {
     required String accessToken,
     int limit = 20,
     String? cursor,
+    String? requestId,
+    int? pageNumber,
+    String? paginationAction,
   }) {
     subscriptionCursors.add(cursor);
     return subscriptionPages[subscriptionCursors.length - 1];

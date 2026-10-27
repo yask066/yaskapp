@@ -74,6 +74,45 @@ test('lists cursor-paginated replies using cookie-backed API requests', async ()
     .resolves.toMatchObject({ items: [{ id: 'comment-1', parentCommentId: 'root-1' }], nextCursor: null, paginationSupported: true });
 });
 
+test('sends safe pagination correlation headers on cursor page endpoints', async () => {
+  const seen: Request[] = [];
+  server.use(http.get('http://localhost/polls', ({ request }) => {
+    seen.push(request);
+    return HttpResponse.json({ items: [], nextCursor: null });
+  }));
+  server.use(http.get('http://localhost/polls/subscriptions', ({ request }) => {
+    seen.push(request);
+    return HttpResponse.json({ items: [], nextCursor: null });
+  }));
+  server.use(http.get('http://localhost/polls/poll-1/comments', ({ request }) => {
+    seen.push(request);
+    return HttpResponse.json({ items: [], nextCursor: null });
+  }));
+  server.use(http.get('http://localhost/polls/poll-1/comments/root-1/replies', ({ request }) => {
+    seen.push(request);
+    return HttpResponse.json({ items: [], nextCursor: null });
+  }));
+  const metadata = {
+    requestId: 'e5b2e8b1-f4c8-44ba-a25f-a63d60058128',
+    pageNumber: 4,
+    paginationAction: 'retry' as const,
+  };
+
+  await listPollsPage({ cursor: 'RAW_CURSOR_CANARY', ...metadata });
+  await listSubscriptionsPage({ cursor: 'RAW_CURSOR_CANARY', ...metadata });
+  await listCommentsPage('poll-1', { cursor: 'RAW_CURSOR_CANARY', ...metadata });
+  await listCommentReplies('poll-1', 'root-1', { cursor: 'RAW_CURSOR_CANARY', ...metadata });
+
+  expect(seen).toHaveLength(4);
+  for (const request of seen) {
+    expect(request.headers.get('x-request-id')).toBe(metadata.requestId);
+    expect(request.headers.get('x-pagination-page')).toBe('4');
+    expect(request.headers.get('x-pagination-action')).toBe('retry');
+    expect(request.headers.get('authorization')).toBeNull();
+  }
+  expect(seen.every((request) => new URL(request.url).searchParams.get('cursor') === 'RAW_CURSOR_CANARY')).toBe(true);
+});
+
 test('loads an individual comment target through the existing cookie-backed route', async () => {
   const reply = { ...comment, parentCommentId: 'root-1' };
   server.use(http.get('http://localhost/polls/poll-1/comments/comment-1', ({ request }) => {

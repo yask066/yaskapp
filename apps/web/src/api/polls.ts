@@ -12,6 +12,20 @@ import {
   type PollCommentRepliesPage,
 } from './models';
 
+type PaginationRequestMetadata = {
+  requestId?: string;
+  pageNumber?: number;
+  paginationAction?: 'initial' | 'append' | 'refetch' | 'retry' | 'refresh';
+};
+
+function paginationHeaders(metadata: PaginationRequestMetadata): HeadersInit {
+  return {
+    ...(metadata.requestId ? { 'x-request-id': metadata.requestId } : {}),
+    ...(metadata.pageNumber && metadata.pageNumber > 0 ? { 'x-pagination-page': String(metadata.pageNumber) } : {}),
+    ...(metadata.paginationAction ? { 'x-pagination-action': metadata.paginationAction } : {}),
+  };
+}
+
 export function listPolls(input: { sort?: 'newest' | 'popular'; limit?: number } = {}, signal?: AbortSignal): Promise<Poll[]> {
   const params = new URLSearchParams({ limit: String(input.limit ?? 20) });
   if (input.sort && input.sort !== 'newest') params.set('sort', input.sort);
@@ -19,22 +33,22 @@ export function listPolls(input: { sort?: 'newest' | 'popular'; limit?: number }
 }
 
 export function listPollsPage(
-  input: { sort?: 'newest' | 'popular'; limit?: number; cursor?: string } = {},
+  input: { sort?: 'newest' | 'popular'; limit?: number; cursor?: string } & PaginationRequestMetadata = {},
   signal?: AbortSignal,
 ): Promise<ClientCursorPage<Poll>> {
   const params = new URLSearchParams({ limit: String(input.limit ?? 20) });
   if (input.sort && input.sort !== 'newest') params.set('sort', input.sort);
   if (input.cursor !== undefined) params.set('cursor', input.cursor);
-  return apiClient.get(`/polls?${params}`, (body) => decodeClientCursorPage(body, decodePoll), signal);
+  return apiClient.get(`/polls?${params}`, (body) => decodeClientCursorPage(body, decodePoll), signal, paginationHeaders(input));
 }
 
 export function listSubscriptionsPage(
-  input: { limit?: number; cursor?: string } = {},
+  input: { limit?: number; cursor?: string } & PaginationRequestMetadata = {},
   signal?: AbortSignal,
 ): Promise<ClientCursorPage<Poll>> {
   const params = new URLSearchParams({ limit: String(input.limit ?? 20) });
   if (input.cursor !== undefined) params.set('cursor', input.cursor);
-  return apiClient.get(`/polls/subscriptions?${params}`, (body) => decodeClientCursorPage(body, decodePoll), signal);
+  return apiClient.get(`/polls/subscriptions?${params}`, (body) => decodeClientCursorPage(body, decodePoll), signal, paginationHeaders(input));
 }
 
 export function getPoll(pollId: string, signal?: AbortSignal): Promise<Poll> {
@@ -81,18 +95,18 @@ export function listComments(pollId: string, signal?: AbortSignal): Promise<Poll
 
 export function listCommentsPage(
   pollId: string,
-  input: { limit?: number; order?: 'newest' | 'oldest'; cursor?: string } = {},
+  input: { limit?: number; order?: 'newest' | 'oldest'; cursor?: string } & PaginationRequestMetadata = {},
   signal?: AbortSignal,
 ): Promise<ClientCursorPage<PollComment>> {
   const params = new URLSearchParams({ limit: String(input.limit ?? 20), order: input.order ?? 'newest' });
   if (input.cursor !== undefined) params.set('cursor', input.cursor);
-  return apiClient.get(`/polls/${pollId}/comments?${params}`, (body) => decodeClientCursorPage(body, decodePollComment), signal);
+  return apiClient.get(`/polls/${pollId}/comments?${params}`, (body) => decodeClientCursorPage(body, decodePollComment), signal, paginationHeaders(input));
 }
 
 export function listCommentReplies(
   pollId: string,
   rootCommentId: string,
-  input: { limit?: number; cursor?: string } = {},
+  input: { limit?: number; cursor?: string } & PaginationRequestMetadata = {},
   signal?: AbortSignal,
 ): Promise<PollCommentRepliesPage> {
   const params = new URLSearchParams({ limit: String(input.limit ?? 20) });
@@ -101,6 +115,7 @@ export function listCommentReplies(
     `/polls/${pollId}/comments/${rootCommentId}/replies?${params}`,
     decodePollCommentRepliesPage,
     signal,
+    paginationHeaders(input),
   );
 }
 

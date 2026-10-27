@@ -25,6 +25,7 @@ import '../../core/widgets/content_skeleton.dart';
 import '../../core/widgets/pagination_footer.dart';
 import '../search/search_api_client.dart';
 import '../search/search_screen.dart';
+import '../../core/analytics/pagination_analytics.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({
@@ -160,9 +161,25 @@ class FeedScreenState extends State<FeedScreen> {
   void _createPaginationController({required String sort}) {
     final controller = CursorListController<PollSummary>(
       contextKey: 'feed:${widget.session.user.id}:$sort',
-      loader: ({required limit, cursor}) =>
-          _loadPollPage(limit: limit, sort: sort, cursor: cursor),
+      trackedLoader: ({
+        required limit,
+        cursor,
+        required requestId,
+        required pageNumber,
+        required action,
+      }) =>
+          _loadPollPage(
+        limit: limit,
+        sort: sort,
+        cursor: cursor,
+        requestId: requestId,
+        pageNumber: pageNumber,
+        paginationAction: action,
+      ),
       extractId: (poll) => poll.id,
+      analytics: PaginationAnalytics(),
+      surface: PaginationSurface.feed,
+      sort: sort,
       onInactiveExpired: () {
         listScrollStateStore.clearForContext(_scrollContextFor(sort));
         if (sort == _feedSort && _scrollController.hasClients) {
@@ -171,7 +188,7 @@ class FeedScreenState extends State<FeedScreen> {
       },
     );
     _feedControllers[sort] = controller;
-    final listener = () => _handlePaginationChanged(controller);
+    void listener() => _handlePaginationChanged(controller);
     _feedControllerListeners[controller] = listener;
     controller.addListener(listener);
   }
@@ -229,6 +246,9 @@ class FeedScreenState extends State<FeedScreen> {
     required int limit,
     required String sort,
     String? cursor,
+    String? requestId,
+    int? pageNumber,
+    String? paginationAction,
   }) {
     return _pollsApiClient
         .listPollsPage(
@@ -236,6 +256,9 @@ class FeedScreenState extends State<FeedScreen> {
           sort: sort,
           cursor: cursor,
           accessToken: widget.session.accessToken,
+          requestId: requestId,
+          pageNumber: pageNumber,
+          paginationAction: paginationAction,
         )
         .timeout(const Duration(seconds: 10));
   }

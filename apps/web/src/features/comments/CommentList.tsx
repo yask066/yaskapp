@@ -22,6 +22,7 @@ import {
   type PaginationState,
 } from '../../core/pagination/pagination-state';
 import { PaginationFooter } from '../../components/PaginationFooter';
+import { paginationAnalytics, resolvePaginationPageRequest } from '../../core/pagination/pagination-analytics';
 import {
   applyCommentReaction,
   commentReactionRevision,
@@ -90,6 +91,10 @@ export function CommentList({
   });
   const commentOverlays = useCommentOverlayState(commentScope);
   const queryIdentity = JSON.stringify(queryKey);
+  const currentIdentity = useRef(queryIdentity);
+  currentIdentity.current = queryIdentity;
+  useEffect(() => () => paginationAnalytics.disposeChain(queryIdentity), [queryIdentity]);
+  const refetchPageNumber = useRef(1);
   const replyGenerationKey = [...queryKey, 'reply-generation'] as const;
   const replyGenerationQuery = useQuery({
     queryKey: replyGenerationKey,
@@ -102,7 +107,36 @@ export function CommentList({
     ...paginationQueryOptions,
     queryFn: async ({ pageParam, signal }) => {
       const reactionRevision = commentReactionRevision(queryClient, commentScope);
-      const page = await listCommentsPage(pollId, { cursor: pageParam ?? undefined, order: 'newest' }, signal);
+      const cached = queryClient.getQueryData<CommentPages>(queryKey);
+      const queryState = queryClient.getQueryState(queryKey);
+      const isFetchingMore = queryState?.fetchMeta?.fetchMore !== undefined;
+      const isRefetching = cached !== undefined && !isFetchingMore;
+      const { pageNumber, kind } = resolvePaginationPageRequest(
+        cached?.pageParams,
+        pageParam,
+        isFetchingMore,
+        isRefetching,
+        refetchPageNumber.current,
+      );
+      const page = await paginationAnalytics.trackPageRequest<PollComment, ClientCursorPage<PollComment>>({
+        surface: 'comments',
+        sort: 'newest',
+        pageNumber,
+        chainId: queryIdentity,
+        kind,
+        cursor: pageParam,
+        signal,
+        isCurrent: () => !signal.aborted && currentIdentity.current === queryIdentity,
+        existingIds: kind === 'append' ? cached?.pages.flatMap((entry) => entry.items.map((comment) => comment.id)) ?? [] : [],
+        getId: (comment) => comment.id,
+      }, ({ requestId, action }) => listCommentsPage(
+        pollId,
+        { cursor: pageParam ?? undefined, order: 'newest', requestId, pageNumber, paginationAction: action },
+        signal,
+      ));
+      if (kind === 'refetch' && !signal.aborted && currentIdentity.current === queryIdentity) {
+        refetchPageNumber.current = pageNumber + 1;
+      }
       return reconcileCommentPage(queryClient, commentScope, page, reactionRevision);
     },
     initialPageParam: null as string | null,
@@ -175,8 +209,6 @@ export function CommentList({
   });
   const currentRefreshState = refreshState.identity === queryIdentity ? refreshState : { identity: queryIdentity, pending: false, error: null };
   const replyGeneration = replyGenerationQuery.data;
-  const currentIdentity = useRef(queryIdentity);
-  currentIdentity.current = queryIdentity;
   const refreshGeneration = useRef(0);
   const refreshController = useRef<AbortController | null>(null);
   const activeAppendRequests = useRef(new Set<string>());
@@ -244,7 +276,22 @@ export function CommentList({
       const page = reconcileCommentPage(
         queryClient,
         commentScope,
-        await listCommentsPage(pollId, { order: 'newest' }, controller.signal),
+        await paginationAnalytics.trackPageRequest<PollComment, ClientCursorPage<PollComment>>({
+          surface: 'comments',
+          sort: 'newest',
+          pageNumber: 1,
+          chainId: requestIdentity,
+          kind: 'refresh',
+          cursor: null,
+          signal: controller.signal,
+          isCurrent: () => !controller.signal.aborted && currentIdentity.current === requestIdentity && refreshGeneration.current === requestGeneration,
+          existingIds: commentsQuery.data?.pages.flatMap((entry) => entry.items.map((comment) => comment.id)) ?? [],
+          getId: (comment) => comment.id,
+        }, ({ requestId, action }) => listCommentsPage(
+          pollId,
+          { order: 'newest', requestId, pageNumber: 1, paginationAction: action },
+          controller.signal,
+        )),
         reactionRevision,
       );
       if (controller.signal.aborted || currentIdentity.current !== requestIdentity || refreshGeneration.current !== requestGeneration) return;

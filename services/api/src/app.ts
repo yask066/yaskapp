@@ -4,6 +4,7 @@ import multipart from '@fastify/multipart';
 import websocket from '@fastify/websocket';
 import Fastify from 'fastify';
 
+import { generateApiRequestId, safeRequestSerializer } from './observability/pagination-logging.js';
 import { env } from './config/env.js';
 import { rateLimit } from './config/rate-limit.js';
 import { registerAuthRoutes } from './modules/auth/auth.routes.js';
@@ -37,9 +38,12 @@ export function buildApp(options: { accountDeletionJournal?: AccountDeletionJour
   let deletionEventsTimer: ReturnType<typeof setInterval> | undefined;
   const app = Fastify({
     trustProxy: ['loopback', 'linklocal', 'uniquelocal'],
+    requestIdHeader: false,
+    genReqId: generateApiRequestId,
     logger:
       env.NODE_ENV !== 'test'
         ? {
+            serializers: { req: safeRequestSerializer },
             redact: {
               paths: [
                 'req.headers.authorization',
@@ -123,7 +127,15 @@ export function buildApp(options: { accountDeletionJournal?: AccountDeletionJour
       ? true
       : env.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean),
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Auth-Mode']
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Auth-Mode',
+      'X-Request-ID',
+      'X-Pagination-Page',
+      'X-Pagination-Action',
+    ],
+    exposedHeaders: ['X-Request-ID'],
   });
 
   app.register(multipart, {
@@ -141,8 +153,9 @@ export function buildApp(options: { accountDeletionJournal?: AccountDeletionJour
     }
   });
 
-  app.addHook('onRequest', async (request) => {
+  app.addHook('onRequest', async (request, reply) => {
     request.cookies = parseCookieHeader(request.headers.cookie);
+    reply.header('x-request-id', request.id);
   });
 
   app.decorateRequest('getCurrentUser', function () {

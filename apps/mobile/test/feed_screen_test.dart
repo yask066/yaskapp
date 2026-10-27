@@ -1193,6 +1193,9 @@ class _FakePollsApiClient extends PollsApiClient {
     String order = 'newest',
     String? cursor,
     String? accessToken,
+    String? requestId,
+    int? pageNumber,
+    String? paginationAction,
   }) async =>
       CursorPage(
         items: comments,
@@ -1206,6 +1209,9 @@ class _FakePollsApiClient extends PollsApiClient {
     String sort = 'newest',
     String? cursor,
     String? accessToken,
+    String? requestId,
+    int? pageNumber,
+    String? paginationAction,
   }) async {
     listPollsCalls++;
     final loader = pageLoader;

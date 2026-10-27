@@ -6,6 +6,23 @@ T22 snapshot storage and lifecycle verification is recorded in [t22-snapshot-lif
 
 This directory records the pre-pagination baseline for T02. It includes source-level behavior and runtime measurements from an isolated test environment. Values in the source baseline below describe request/rendering behavior; they are not latency or scroll measurements.
 
+## Pagination telemetry (T25)
+
+Request-level API events use Fastify's existing logger. Snapshot storage and expiry metrics are JSON lines on the API process's existing stdout stream. Web and Flutter clients write the same event shape to the browser console and Flutter debug log. Each request uses one UUID `requestId`; clients send it as `X-Request-ID`, and the API echoes it in the response and uses it in its pagination logs, including the popular-feed snapshot storage event. API request serialization keeps the route template and method, and omits query strings, headers, and request bodies. Web marks cached pages reloaded after query invalidation as `refetch`; these keep their original page numbers and do not count their replacement items as deduplication.
+
+Every event has `event`, `surface`, `sort`, `pageNumber`, `durationMs`, `itemCount`, `errorCode`, and `requestId`. `surface` is `feed`, `subscriptions`, `comments`, or `replies`; `sort` is `newest`, `oldest`, or `popular` where applicable. Page numbers start at 1. A null value means the field is not available for that event. `pagination.start` begins a read, `pagination.success` records the returned page size and elapsed time, `pagination.failure` records a safe error code, and `pagination.retry` / `pagination.refresh` identify those user actions. `pagination.cursor_anomaly` reports a rejected or repeated cursor. `pagination.deduplication` is emitted by clients only when they discard duplicate item IDs and includes `deduplicatedCount`.
+
+| Question | Read these fields |
+|---|---|
+| Page latency, including p95 | API `pagination.success`; group `durationMs` by `surface` and `sort`. Use client success events when investigating client-observed latency. |
+| Failure rate | API `pagination.failure` divided by `pagination.success` + `pagination.failure`, grouped by `surface`, `sort`, and `errorCode`. Exclude in-flight requests from the denominator. |
+| Cursor loops or invalid cursors | Count API and client `pagination.cursor_anomaly` by `surface`, `sort`, and `errorCode`. Client events identify repeated next cursors; API events identify rejected cursor values. |
+| Client-side duplicate pages | Sum client `pagination.deduplication.deduplicatedCount` by `surface` and `sort`. |
+| Popular snapshot storage | API `pagination.snapshot_storage`: `storedItemCount` is the number of stored poll ID rows, `activeSnapshotCount` is the number of unexpired snapshots for that owner, `durationMs` is storage operation time, and `snapshotLifetimeSeconds` is the configured lifetime (1,800 seconds). |
+| Snapshot cleanup | API `pagination.snapshot_expiry`: `deletedSnapshotCount` is the number of expired snapshots removed and `durationMs` is cleanup time. |
+
+Filter the existing API JSON log stream on its `event` field, then group by `surface`, `sort`, and `errorCode` as needed. Correlate an API event with its client request using `requestId`. Client logs are useful for comparing client-observed requests with server outcomes. Snapshot storage counts measure ID rows, not database bytes. Cursor values, authorization headers, comment text, poll/comment IDs, snapshot IDs, owner keys, and raw IP addresses are not telemetry fields.
+
 ## Reproduction environment
 
 | Item | Value |

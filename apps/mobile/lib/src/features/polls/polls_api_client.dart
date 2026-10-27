@@ -246,6 +246,9 @@ class PollsApiClient {
     String sort = 'newest',
     String? cursor,
     String? accessToken,
+    String? requestId,
+    int? pageNumber,
+    String? paginationAction,
   }) async {
     final readContext = _captureRead();
     final uri = Uri.parse(_config.baseUrl).replace(
@@ -261,6 +264,11 @@ class PollsApiClient {
       uri,
       headers: {
         if (accessToken != null) 'authorization': 'Bearer $accessToken',
+        ..._paginationHeaders(
+          requestId: requestId,
+          pageNumber: pageNumber,
+          action: paginationAction,
+        ),
       },
     );
     final body = _decodeObject(response);
@@ -381,6 +389,9 @@ class PollsApiClient {
     required String accessToken,
     int limit = 20,
     String? cursor,
+    String? requestId,
+    int? pageNumber,
+    String? paginationAction,
   }) async {
     final readContext = _captureRead();
     final uri = Uri.parse(_config.baseUrl).replace(
@@ -395,6 +406,11 @@ class PollsApiClient {
       uri,
       headers: {
         'authorization': 'Bearer $accessToken',
+        ..._paginationHeaders(
+          requestId: requestId,
+          pageNumber: pageNumber,
+          action: paginationAction,
+        ),
       },
     );
     final body = _decodeObject(response);
@@ -710,6 +726,9 @@ class PollsApiClient {
     String order = 'newest',
     String? cursor,
     String? accessToken,
+    String? requestId,
+    int? pageNumber,
+    String? paginationAction,
   }) {
     return _listCommentsPage(
       pollId: pollId,
@@ -717,6 +736,9 @@ class PollsApiClient {
       order: order,
       cursor: cursor,
       accessToken: accessToken,
+      requestId: requestId,
+      pageNumber: pageNumber,
+      paginationAction: paginationAction,
     );
   }
 
@@ -726,6 +748,9 @@ class PollsApiClient {
     String? order,
     String? cursor,
     String? accessToken,
+    String? requestId,
+    int? pageNumber,
+    String? paginationAction,
   }) async {
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls/$pollId/comments',
@@ -740,6 +765,11 @@ class PollsApiClient {
       uri,
       headers: {
         if (accessToken != null) 'authorization': 'Bearer $accessToken',
+        ..._paginationHeaders(
+          requestId: requestId,
+          pageNumber: pageNumber,
+          action: paginationAction,
+        ),
       },
     );
     final body = _decodeObject(response);
@@ -756,6 +786,9 @@ class PollsApiClient {
     int limit = 20,
     String? cursor,
     String? accessToken,
+    String? requestId,
+    int? pageNumber,
+    String? paginationAction,
   }) async {
     final uri = Uri.parse(_config.baseUrl).replace(
       path: '/polls/$pollId/comments/$rootCommentId/replies',
@@ -769,6 +802,11 @@ class PollsApiClient {
       uri,
       headers: {
         if (accessToken != null) 'authorization': 'Bearer $accessToken',
+        ..._paginationHeaders(
+          requestId: requestId,
+          pageNumber: pageNumber,
+          action: paginationAction,
+        ),
       },
     );
     final body = _decodeObject(response);
@@ -997,6 +1035,22 @@ class PollsApiClient {
     );
   }
 }
+
+Map<String, String> _paginationHeaders({
+  String? requestId,
+  int? pageNumber,
+  String? action,
+}) =>
+    {
+      if (requestId != null && requestId.isNotEmpty) 'x-request-id': requestId,
+      if (pageNumber != null && pageNumber > 0)
+        'x-pagination-page': pageNumber.toString(),
+      if (action == 'initial' ||
+          action == 'append' ||
+          action == 'retry' ||
+          action == 'refresh')
+        'x-pagination-action': action!,
+    };
 
 class _PollReadContext {
   const _PollReadContext({

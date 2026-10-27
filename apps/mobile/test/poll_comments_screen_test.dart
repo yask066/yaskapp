@@ -2371,6 +2371,9 @@ class _FakePollsApiClient extends PollsApiClient {
     String order = 'newest',
     String? cursor,
     String? accessToken,
+    String? requestId,
+    int? pageNumber,
+    String? paginationAction,
   }) async {
     commentsPageRequests.add({
       'pollId': pollId,
@@ -2410,6 +2413,9 @@ class _FakePollsApiClient extends PollsApiClient {
     int limit = 20,
     String? cursor,
     String? accessToken,
+    String? requestId,
+    int? pageNumber,
+    String? paginationAction,
   }) {
     replyPageCalls++;
     return replyPageLoader?.call(
