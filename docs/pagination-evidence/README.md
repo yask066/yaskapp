@@ -2,6 +2,8 @@
 
 The latest cross-platform acceptance status and T27 runtime evidence are in the [acceptance matrix](acceptance-matrix.md), including physical Android frame samples.
 
+The current T28 readiness state and unrun staging/rollback checks are in the [pagination release record](release-record.md); follow the [release checklist](../pagination-release-checklist.md) when a staging target and release owners are available.
+
 T07's chronological query-plan evidence is documented in [t07-query-plans.md](t07-query-plans.md), with full plans captured before and after the new indexes and a supplemental sparse-subscriptions plan.
 
 T22 snapshot storage and lifecycle verification is recorded in [t22-snapshot-lifecycle.md](t22-snapshot-lifecycle.md).

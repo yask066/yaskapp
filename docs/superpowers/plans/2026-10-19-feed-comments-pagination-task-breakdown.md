@@ -487,9 +487,11 @@
 
 **Файлы:** создать `docs/pagination-release-checklist.md`, `docs/pagination-evidence/release-record.md`; существующие release controls/CI менять только по необходимости.
 
-- [ ] Подготовить конкретный checklist: миграции и cleanup, совместимый API, окно legacy replies из T01, затем ограниченное включение web/Flutter и наблюдение метрик; указать владельцев решения о расширении охвата.
-- [ ] На staging проверить старый клиент с новым API и новые clients с legacy response; протестировать выключение новой автодогрузки и возврат к первой странице без удаления additive API/старых decoders.
+- [x] Подготовить конкретный checklist: миграции и cleanup, совместимый API, окно legacy replies из T01, затем ограниченное включение web/Flutter и наблюдение метрик; указать владельцев решения о расширении охвата. См. [`pagination-release-checklist.md`](../../pagination-release-checklist.md) и [`release-record.md`](../../pagination-evidence/release-record.md). Владельцы заданы ролями; перед запуском нужно вписать имена.
+- [ ] На staging проверить старый клиент с новым API и новые clients с legacy response; протестировать выключение новой автодогрузки и возврат к первой странице без удаления additive API/старых decoders. Не выполнялось: staging target/`.env.staging` отсутствуют; T24 build-time flags не найдены.
 - [ ] После требуемого в проекте допуска к выкладке выполнить последовательность, smoke и наблюдение; записать commit/build, migration status, timestamp, устройства, результаты AC/performance, rollback result и ограничения.
+
+**Текущий статус:** подготовительные документы созданы; staging, rollout и rollback smoke не выполнялись. T28 остаётся открытой. В `release-record.md` записаны известные T27 ограничения, открытые зависимости и отсутствующая staging/build-flag конфигурация. Этот task breakdown сам по себе не запускает deploy.
 
 **Готово, когда:** release record подтверждает фактически выполненный rollout/rollback smoke; подготовка checklist без выкладки не закрывает весь эпик. Этот task breakdown сам по себе не запускает deploy.
 
