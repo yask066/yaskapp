@@ -771,6 +771,29 @@ test('Popular expiry keeps loaded pages and creates a new snapshot only on refre
   expect(requests).toEqual([null, 'cursor-1', null]);
 });
 
+test('pagination flag off keeps the first page and hides continuation', async () => {
+  vi.stubEnv('VITE_FEED_PAGINATION', 'false');
+  const cursors: Array<string | null> = [];
+  server.use(http.get('/polls', ({ request }) => {
+    const cursor = new URL(request.url).searchParams.get('cursor');
+    cursors.push(cursor);
+    return cursor === null
+      ? cursorPage([{ ...poll, question: 'First page with pagination disabled?' }], 'cursor-1')
+      : cursorPage([{ ...poll, id: 'poll-2', question: 'Unexpected second page?' }], null);
+  }));
+  const user = userEvent.setup();
+  try {
+    renderFeed();
+
+    expect(await screen.findByText('First page with pagination disabled?')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Unexpected second page?')).not.toBeInTheDocument();
+    expect(cursors).toEqual([null]);
+  } finally {
+    vi.stubEnv('VITE_FEED_PAGINATION', 'true');
+  }
+});
+
 test('a failed Refresh keeps the previous pages and continuation cursor usable', async () => {
   let firstPageReads = 0;
   const cursors: string[] = [];

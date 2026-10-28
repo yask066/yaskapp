@@ -13,6 +13,7 @@ import { AsyncState } from '../../components/AsyncState';
 import { EntryMotion } from '../../core/motion/EntryMotion';
 import { ContentEntryTransition } from '../../components/ContentEntryTransition';
 import { focusRetryLandmark } from '../../components/focusRetryLandmark';
+import { isFeedPaginationEnabled } from '../../core/pagination/feed-pagination-flag';
 import {
   canAppend,
   mergePageIds,
@@ -151,6 +152,7 @@ export function CommentList({
   target,
   onReplyCreated,
 }: CommentListProps) {
+  const paginationEnabled = isFeedPaginationEnabled();
   const queryClient = useQueryClient();
   const commentScope = useMemo(() => ({ sessionEpoch, userId: currentUserId ?? null, pollId }), [sessionEpoch, currentUserId, pollId]);
   const queryKey = useMemo(() => paginationQueryKey({
@@ -207,7 +209,7 @@ export function CommentList({
       return reconcileCommentPage(queryClient, commentScope, page, reactionRevision);
     },
     initialPageParam: null as string | null,
-    getNextPageParam: (lastPage) => lastPage.paginationSupported ? lastPage.nextCursor ?? undefined : undefined,
+    getNextPageParam: (lastPage) => paginationEnabled && lastPage.paginationSupported ? lastPage.nextCursor ?? undefined : undefined,
     enabled: sessionReady,
   });
   const likeMutationKey = commentMutationQueryKey(commentScope, 'like');
@@ -304,7 +306,7 @@ export function CommentList({
   }, [targetFocusKey, focusedTargetNode]);
 
   const lastPage = pageData.at(-1);
-  const nextCursor = lastPage?.paginationSupported ? lastPage.nextCursor : null;
+  const nextCursor = paginationEnabled && lastPage?.paginationSupported ? lastPage.nextCursor : null;
   const paginationState: PaginationState = {
     generation: replyGeneration,
     sessionEpoch,
@@ -312,7 +314,7 @@ export function CommentList({
     followingGeneration: 0,
     nextCursor: nextCursor ?? null,
     cursorHistory: commentsQuery.data?.pageParams.filter((cursor): cursor is string => typeof cursor === 'string') ?? [],
-    paginationSupported: lastPage?.paginationSupported ?? false,
+    paginationSupported: paginationEnabled && (lastPage?.paginationSupported ?? false),
     automaticLoadCount: automaticLoadCounts.current.get(queryIdentity) ?? 0,
     pending: currentRefreshState.pending
       ? { kind: 'refresh', cursor: null }
@@ -471,7 +473,7 @@ export function CommentList({
         isFetchingNextPage={commentsQuery.isFetchingNextPage}
         isRefreshing={currentRefreshState.pending}
         isFetchNextPageError={commentsQuery.isFetchNextPageError}
-        paginationSupported={lastPage?.paginationSupported ?? false}
+        paginationSupported={paginationEnabled && (lastPage?.paginationSupported ?? false)}
         automaticLoadEnabled={canAppend(paginationState, 'automatic')}
         repeatedCursor={repeatedCursor}
         error={commentsQuery.error}

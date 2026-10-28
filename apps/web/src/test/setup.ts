@@ -1,9 +1,12 @@
 import '@testing-library/jest-dom/vitest';
+import { vi } from 'vitest';
 import { transferableAbortController } from 'node:util';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, type RenderOptions } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { createElement, type ReactElement, type ReactNode } from 'react';
+
+vi.stubEnv('VITE_FEED_PAGINATION', 'true');
 
 // Node fetch/Request (and MSW) require signals from their own realm.
 const nodeController = transferableAbortController();

@@ -33,6 +33,7 @@ class PollCommentsScreen extends StatefulWidget {
     this.currentUserId,
     this.reportsApiClient,
     this.initialCommentId,
+    this.paginationEnabled = true,
     super.key,
   });
 
@@ -42,6 +43,7 @@ class PollCommentsScreen extends StatefulWidget {
   final String? currentUserId;
   final ReportsApiClient? reportsApiClient;
   final String? initialCommentId;
+  final bool paginationEnabled;
 
   @override
   State<PollCommentsScreen> createState() => _PollCommentsScreenState();
@@ -129,6 +131,7 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
       analytics: PaginationAnalytics(),
       surface: PaginationSurface.comments,
       sort: 'newest',
+      paginationEnabled: widget.paginationEnabled,
     );
     _commentsController.addListener(_handleCommentsChanged);
     _scrollController.addListener(_handleRootScroll);
@@ -990,6 +993,8 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                                                             'target-context-root-${targetContextRoot.id}',
                                                           ),
                                                     comment: targetContextRoot,
+                                                    paginationEnabled: widget
+                                                        .paginationEnabled,
                                                     isNotificationTarget:
                                                         _targetReplyId == null,
                                                     pollId: _poll.id,
@@ -1114,6 +1119,8 @@ class _PollCommentsScreenState extends State<PollCommentsScreen> {
                                                           : ValueKey(
                                                               'comment-tile-${comment.id}'),
                                                       comment: comment,
+                                                      paginationEnabled: widget
+                                                          .paginationEnabled,
                                                       isNotificationTarget:
                                                           isRootTarget,
                                                       pollId: _poll.id,
@@ -1532,6 +1539,7 @@ class _CommentThread extends StatefulWidget {
     this.targetReplyKey,
     this.contextReply,
     this.allowTargetFocus = true,
+    this.paginationEnabled = true,
   });
 
   final PollCommentSummary rootComment;
@@ -1547,6 +1555,7 @@ class _CommentThread extends StatefulWidget {
   final GlobalKey? targetReplyKey;
   final PollCommentSummary? contextReply;
   final bool allowTargetFocus;
+  final bool paginationEnabled;
 
   @override
   State<_CommentThread> createState() => _CommentThreadState();
@@ -1693,7 +1702,8 @@ class _CommentThreadState extends State<_CommentThread>
           _ownReplyOverlay = null;
         }
         _nextCursor = nextCursor;
-        _paginationSupported = page.paginationSupported;
+        _paginationSupported =
+            page.paginationSupported && widget.paginationEnabled;
         _hasLoaded = true;
         _isLoading = false;
         _isLoadingMore = false;
@@ -2132,6 +2142,7 @@ class _CommentTile extends StatefulWidget {
     this.targetReplyKey,
     this.contextReply,
     this.allowTargetFocus = true,
+    this.paginationEnabled = true,
     this.isNotificationTarget = false,
     this.onDelete,
     this.onReport,
@@ -2151,6 +2162,7 @@ class _CommentTile extends StatefulWidget {
   final GlobalKey? targetReplyKey;
   final PollCommentSummary? contextReply;
   final bool allowTargetFocus;
+  final bool paginationEnabled;
   final bool isNotificationTarget;
   final VoidCallback? onDelete;
   final VoidCallback? onReport;
@@ -2392,6 +2404,7 @@ class _CommentTileState extends State<_CommentTile> {
               targetReplyKey: widget.targetReplyKey,
               contextReply: widget.contextReply,
               allowTargetFocus: widget.allowTargetFocus,
+              paginationEnabled: widget.paginationEnabled,
               onReplyCreated: widget.onReplyCreated,
             ),
           ),

@@ -28,6 +28,7 @@ class ProfileScreen extends StatefulWidget {
     required this.onUserUpdated,
     this.onAccountDeletionAccepted,
     this.onAccountDeletionCompleted,
+    this.feedPaginationEnabled = true,
     super.key,
     PollsApiClient? pollsApiClient,
     RealtimeClient? realtimeClient,
@@ -41,6 +42,7 @@ class ProfileScreen extends StatefulWidget {
   final ValueChanged<AuthUser> onUserUpdated;
   final AccountDeletionAccepted? onAccountDeletionAccepted;
   final VoidCallback? onAccountDeletionCompleted;
+  final bool feedPaginationEnabled;
   final PollsApiClient? _pollsApiClient;
   final RealtimeClient? _realtimeClient;
 
@@ -299,6 +301,7 @@ class ProfileScreenState extends State<ProfileScreen> {
           accessToken: widget.accessToken,
           pollsApiClient: _pollsApiClient,
           currentUserId: widget.user.id,
+          paginationEnabled: widget.feedPaginationEnabled,
         ),
       ),
     );

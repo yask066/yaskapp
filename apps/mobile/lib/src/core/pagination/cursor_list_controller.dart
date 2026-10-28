@@ -36,9 +36,11 @@ class CursorListController<T> extends ChangeNotifier {
     this.limit = 20,
     this.inactiveRetention = const Duration(minutes: 5),
     this.onInactiveExpired,
+    this.paginationEnabled = true,
   }) : _state = CursorListState<T>._(
           pages: const [],
           extractId: extractId,
+          paginationEnabled: paginationEnabled,
           generation: 0,
           initial: const CursorReadState(),
           refresh: const CursorReadState(),
@@ -71,6 +73,7 @@ class CursorListController<T> extends ChangeNotifier {
   final String? sort;
   final int limit;
   final Duration inactiveRetention;
+  final bool paginationEnabled;
 
   /// Lets the owning feature clear its scroll anchor when retained pages expire.
   final VoidCallback? onInactiveExpired;
@@ -456,6 +459,7 @@ class CursorListState<T> {
   factory CursorListState._({
     required List<CursorPage<T>> pages,
     required String Function(T item) extractId,
+    required bool paginationEnabled,
     required int generation,
     required CursorReadState initial,
     required CursorReadState refresh,
@@ -487,6 +491,7 @@ class CursorListState<T> {
       append: append,
       automaticLoadsUsed: automaticLoadsUsed,
       automaticLoadPaused: automaticLoadPaused,
+      paginationEnabled: paginationEnabled,
       nextCursor: stablePages.isEmpty ? null : stablePages.last.nextCursor,
       paginationSupported:
           stablePages.isNotEmpty && stablePages.last.paginationSupported,
@@ -504,16 +509,21 @@ class CursorListState<T> {
     required this.append,
     required this.automaticLoadsUsed,
     required this.automaticLoadPaused,
+    required this.paginationEnabled,
     required this.nextCursor,
-    required this.paginationSupported,
+    required bool paginationSupported,
     required String Function(T item) extractId,
-  }) : _extractId = extractId;
+  })  : _serverPaginationSupported = paginationSupported,
+        _extractId = extractId;
 
   final List<CursorPage<T>> pages;
   final List<String> ids;
   final List<T> items;
   final String? nextCursor;
-  final bool paginationSupported;
+  final bool paginationEnabled;
+  final bool _serverPaginationSupported;
+  bool get paginationSupported =>
+      paginationEnabled && _serverPaginationSupported;
   final int generation;
   final CursorReadState initial;
   final CursorReadState refresh;
@@ -542,5 +552,6 @@ class CursorListState<T> {
         append: append ?? this.append,
         automaticLoadsUsed: automaticLoadsUsed ?? this.automaticLoadsUsed,
         automaticLoadPaused: automaticLoadPaused ?? this.automaticLoadPaused,
+        paginationEnabled: paginationEnabled,
       );
 }

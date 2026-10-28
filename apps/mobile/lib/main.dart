@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'src/app.dart';
 import 'src/core/motion/motion_flags.dart';
+import 'src/core/pagination/feed_pagination_flags.dart';
 import 'src/features/notifications/firebase_push_service.dart';
 import 'src/performance/ac12_frame_timing_probe.dart';
 
@@ -19,5 +20,6 @@ Future<void> main() async {
   runApp(YaskappApp(
     reactionsMotion: _motionFlags.reactionsMotion,
     entryMotion: _motionFlags.entryMotion,
+    feedPaginationEnabled: FeedPaginationFlags.enabled,
   ));
 }

@@ -29,6 +29,7 @@ class SubscriptionsScreen extends StatefulWidget {
     RealtimeClient? realtimeClient,
     ReportsApiClient? reportsApiClient,
     this.isActive = true,
+    this.paginationEnabled = true,
   })  : _pollsApiClient = pollsApiClient,
         _realtimeClient = realtimeClient,
         _reportsApiClient = reportsApiClient;
@@ -38,6 +39,7 @@ class SubscriptionsScreen extends StatefulWidget {
   final RealtimeClient? _realtimeClient;
   final ReportsApiClient? _reportsApiClient;
   final bool isActive;
+  final bool paginationEnabled;
 
   @override
   State<SubscriptionsScreen> createState() => _SubscriptionsScreenState();
@@ -148,6 +150,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
       analytics: PaginationAnalytics(),
       surface: PaginationSurface.subscriptions,
       sort: 'newest',
+      paginationEnabled: widget.paginationEnabled,
       onInactiveExpired: () {
         listScrollStateStore.clearForContext(_scrollContext);
         if (_scrollController.hasClients) _scrollController.jumpTo(0);
@@ -479,6 +482,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
           accessToken: widget.session.accessToken,
           pollsApiClient: _pollsApiClient,
           currentUserId: widget.session.user.id,
+          paginationEnabled: widget.paginationEnabled,
         ),
       ),
     );

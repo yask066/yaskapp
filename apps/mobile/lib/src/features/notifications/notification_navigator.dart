@@ -11,6 +11,7 @@ class NotificationNavigationScope extends InheritedWidget {
     required this.accessToken,
     required this.currentUserId,
     required this.pollsApiClient,
+    this.paginationEnabled = true,
     required super.child,
     this.profilesApiClient,
     super.key,
@@ -19,6 +20,7 @@ class NotificationNavigationScope extends InheritedWidget {
   final String accessToken;
   final String currentUserId;
   final PollsApiClient pollsApiClient;
+  final bool paginationEnabled;
   final ProfilesApiClient? profilesApiClient;
 
   static NotificationNavigationScope? maybeOf(BuildContext context) =>
@@ -79,6 +81,7 @@ Future<void> openNotificationTarget(
           pollsApiClient: scope.pollsApiClient,
           currentUserId: scope.currentUserId,
           initialCommentId: isCommentTarget ? commentId : null,
+          paginationEnabled: scope.paginationEnabled,
         ),
       ),
     );

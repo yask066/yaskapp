@@ -29,6 +29,7 @@ class HomeScreen extends StatefulWidget {
     required this.pollStateStore,
     this.onAccountDeletionAccepted,
     this.onAccountDeletionCompleted,
+    this.feedPaginationEnabled = true,
     super.key,
     PollsApiClient? pollsApiClient,
   }) : _pollsApiClient = pollsApiClient;
@@ -41,6 +42,7 @@ class HomeScreen extends StatefulWidget {
   final PollStateStore pollStateStore;
   final AccountDeletionAccepted? onAccountDeletionAccepted;
   final VoidCallback? onAccountDeletionCompleted;
+  final bool feedPaginationEnabled;
   final PollsApiClient? _pollsApiClient;
 
   @override
@@ -152,6 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
               pollsApiClient: _pollsApiClient,
               realtimeClient: widget.realtimeSession.realtimeClient,
               isActive: _selectedIndex == 0,
+              paginationEnabled: widget.feedPaginationEnabled,
               onPollCreated: (_) {
                 unawaited(_profileKey.currentState?.refreshMyPolls());
               },
@@ -161,11 +164,13 @@ class _HomeScreenState extends State<HomeScreen> {
               pollsApiClient: _pollsApiClient,
               realtimeClient: widget.realtimeSession.realtimeClient,
               isActive: _selectedIndex == 1,
+              paginationEnabled: widget.feedPaginationEnabled,
             ),
             NotificationNavigationScope(
               accessToken: widget.session.accessToken,
               currentUserId: widget.session.user.id,
               pollsApiClient: _pollsApiClient,
+              paginationEnabled: widget.feedPaginationEnabled,
               child: NotificationsScreen(
                 isActive: _selectedIndex == 2,
                 notificationStore: _notificationStore,
@@ -186,6 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onUserUpdated: widget.onUserUpdated,
               onAccountDeletionAccepted: widget.onAccountDeletionAccepted,
               onAccountDeletionCompleted: widget.onAccountDeletionCompleted,
+              feedPaginationEnabled: widget.feedPaginationEnabled,
             ),
           ],
         ),

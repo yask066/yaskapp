@@ -39,6 +39,7 @@ class FeedScreen extends StatefulWidget {
     SearchAnalytics? searchAnalytics,
     this.onPollCreated,
     this.isActive = true,
+    this.paginationEnabled = true,
   })  : _pollsApiClient = pollsApiClient,
         _profilesApiClient = profilesApiClient,
         _realtimeClient = realtimeClient,
@@ -55,6 +56,7 @@ class FeedScreen extends StatefulWidget {
   final SearchAnalytics? _searchAnalytics;
   final ValueChanged<PollSummary>? onPollCreated;
   final bool isActive;
+  final bool paginationEnabled;
 
   @override
   State<FeedScreen> createState() => FeedScreenState();
@@ -180,6 +182,7 @@ class FeedScreenState extends State<FeedScreen> {
       analytics: PaginationAnalytics(),
       surface: PaginationSurface.feed,
       sort: sort,
+      paginationEnabled: widget.paginationEnabled,
       onInactiveExpired: () {
         listScrollStateStore.clearForContext(_scrollContextFor(sort));
         if (sort == _feedSort && _scrollController.hasClients) {
@@ -640,6 +643,7 @@ class FeedScreenState extends State<FeedScreen> {
       MaterialPageRoute<void>(
         builder: (_) => SearchScreen(
           session: widget.session,
+          feedPaginationEnabled: widget.paginationEnabled,
           searchApiClient: widget._searchApiClient,
           pollsApiClient: _pollsApiClient,
           profilesApiClient: _profilesApiClient,
@@ -664,6 +668,7 @@ class FeedScreenState extends State<FeedScreen> {
           accessToken: widget.session.accessToken,
           pollsApiClient: _pollsApiClient,
           currentUserId: widget.session.user.id,
+          paginationEnabled: widget.paginationEnabled,
         ),
       ),
     );

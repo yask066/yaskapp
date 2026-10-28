@@ -13,6 +13,7 @@ import { MaterialIcon } from '../../components/MaterialIcon';
 import { usePollMutations } from '../polls/usePollMutations';
 import { fetchPollQuery } from '../polls/poll-state';
 import { useListScrollState } from '../../core/scroll/useListScrollState';
+import { isFeedPaginationEnabled } from '../../core/pagination/feed-pagination-flag';
 import { canAppend, followingGenerationQueryKey, mergePageIds, paginationQueryKey, paginationQueryOptions, type PaginationLoadTrigger, type PaginationState } from '../../core/pagination/pagination-state';
 import { PaginationFooter } from '../../components/PaginationFooter';
 import { FeedPollItem } from './FeedPollItem';
@@ -39,6 +40,7 @@ const trends = [
   { topic: 'Education', polls: '590 polls' },
 ];
 export function FeedPage() {
+  const paginationEnabled = isFeedPaginationEnabled();
   const { status, user, sessionEpoch } = useSession();
   const viewerId = user?.id ?? null;
   const sortStorageKey = `feed-sort:${sessionEpoch}:${viewerId ?? 'anonymous'}`;
@@ -120,7 +122,7 @@ export function FeedPage() {
       });
     },
     initialPageParam: null as string | null,
-    getNextPageParam: (lastPage) => lastPage.paginationSupported ? lastPage.nextCursor ?? undefined : undefined,
+    getNextPageParam: (lastPage) => paginationEnabled && lastPage.paginationSupported ? lastPage.nextCursor ?? undefined : undefined,
     enabled: status !== 'loading' && (sort !== 'following' || status === 'authenticated'),
     staleTime: Infinity,
     ...paginationQueryOptions,
@@ -159,9 +161,9 @@ export function FeedPage() {
     sessionEpoch,
     userId: viewerId,
     followingGeneration: sort === 'following' ? followingGenerationQuery.data : 0,
-    nextCursor: lastPage?.paginationSupported ? lastPage.nextCursor : null,
+    nextCursor: paginationEnabled && lastPage?.paginationSupported ? lastPage.nextCursor : null,
     cursorHistory: pollsQuery.data?.pageParams.filter((cursor): cursor is string => typeof cursor === 'string') ?? [],
-    paginationSupported: lastPage?.paginationSupported ?? false,
+    paginationSupported: paginationEnabled && (lastPage?.paginationSupported ?? false),
     automaticLoadCount: automaticLoadCounts.current.get(queryIdentity) ?? 0,
     pending: refreshState.pending
       ? { kind: 'refresh', cursor: null }
@@ -256,7 +258,7 @@ export function FeedPage() {
         isFetchingNextPage={pollsQuery.isFetchingNextPage}
         isRefreshing={refreshState.pending}
         isFetchNextPageError={pollsQuery.isFetchNextPageError || Boolean(refreshState.appendError)}
-        paginationSupported={lastPage?.paginationSupported ?? false}
+        paginationSupported={paginationEnabled && (lastPage?.paginationSupported ?? false)}
         automaticLoadEnabled={canAppend(paginationState, 'automatic')}
         repeatedCursor={repeatedCursor}
         expired={popularSnapshotExpired}

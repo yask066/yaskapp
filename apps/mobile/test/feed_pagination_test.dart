@@ -43,7 +43,10 @@ void main() {
   testWidgets(
       'Popular keeps snapshot order after a reaction and advances across an empty page',
       (tester) async {
-    _useTallTestViewport(tester);
+    tester.view.physicalSize = const Size(800, 10000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     final newest = _poll(1);
     final popularFirst = _poll(2);
     final popularSecond = _poll(3);
@@ -56,7 +59,9 @@ void main() {
       likesCount: 100,
       viewerHasLiked: true,
     );
-    final popularThird = _poll(4);
+    // Keep this ID outside the first page fixture so the assertion below can
+    // only pass after the empty cursor page is followed by a real append.
+    final popularThird = _poll(40);
     final api = _PageApi(
       feedPagesBySort: {
         'newest': [
@@ -100,26 +105,7 @@ void main() {
     expect(find.byTooltip('Unlike'), findsOneWidget);
     expect(feedPollIds().take(2), [popularFirst.id, popularSecond.id]);
 
-    await tester.fling(
-      find.byType(CustomScrollView),
-      const Offset(0, -5000),
-      10000,
-    );
     await tester.pumpAndSettle();
-    if (find.byKey(ValueKey('poll-${popularThird.id}')).evaluate().isEmpty) {
-      await tester.fling(
-        find.byType(CustomScrollView),
-        const Offset(0, -5000),
-        10000,
-      );
-      await tester.pumpAndSettle();
-    }
-    if ((api.feedCursorsBySort['popular']?.length ?? 0) == 2) {
-      final loadMore = find.text('Load more');
-      await tester.scrollUntilVisible(loadMore, 200);
-      if (loadMore.evaluate().isNotEmpty) await tester.tap(loadMore);
-      await tester.pumpAndSettle();
-    }
     expect(feedPollIds(), contains(popularThird.id));
     expect(api.feedSorts, containsAll(['newest', 'popular']));
     expect(api.feedCursorsBySort['popular'], [

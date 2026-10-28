@@ -12,6 +12,7 @@ import { EntryMotion } from '../../core/motion/EntryMotion';
 import { ContentEntryTransition } from '../../components/ContentEntryTransition';
 import { AsyncState } from '../../components/AsyncState';
 import { focusRetryLandmark } from '../../components/focusRetryLandmark';
+import { isFeedPaginationEnabled } from '../../core/pagination/feed-pagination-flag';
 import {
   addCreatedCommentOverlay,
   applyCommentReaction,
@@ -61,6 +62,7 @@ export function CommentThread({
   refreshGeneration = 0,
   onReplyCreated,
 }: CommentThreadProps) {
+  const paginationEnabled = isFeedPaginationEnabled();
   const queryClient = useQueryClient();
   const commentScope = useMemo(() => ({ sessionEpoch, userId: currentUserId ?? null, pollId }), [sessionEpoch, currentUserId, pollId]);
   const commentOverlays = useCommentOverlayState(commentScope);
@@ -117,7 +119,7 @@ export function CommentThread({
       return reconcileCommentPage(queryClient, commentScope, page, reactionRevision);
     },
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    getNextPageParam: (lastPage) => paginationEnabled && lastPage.paginationSupported ? lastPage.nextCursor ?? undefined : undefined,
     enabled: isExpanded && sessionReady,
   });
   const likeMutationKey = commentMutationQueryKey(commentScope, 'like');
@@ -197,12 +199,12 @@ export function CommentThread({
   );
   const { isFetchingNextPage } = repliesQuery;
   const lastPage = replyPages.at(-1);
-  const nextCursor = lastPage?.nextCursor ?? null;
+  const nextCursor = paginationEnabled ? lastPage?.nextCursor ?? null : null;
   const cursorHistory = useMemo(
     () => repliesQuery.data?.pageParams.filter((cursor): cursor is string => typeof cursor === 'string') ?? [],
     [repliesQuery.data?.pageParams],
   );
-  const paginationSupported = lastPage?.paginationSupported ?? false;
+  const paginationSupported = paginationEnabled && (lastPage?.paginationSupported ?? false);
   const appendError = repliesQuery.isFetchNextPageError;
   const paginationState = useMemo<PaginationState>(() => ({
     generation: refreshGeneration,

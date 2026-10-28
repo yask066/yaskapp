@@ -1,3 +1,5 @@
+import { isFeedPaginationEnabled } from './feed-pagination-flag';
+
 export type PaginationSurface = 'feed' | 'subscriptions' | 'comments' | 'replies';
 export type PaginationLoadKind = 'initial' | 'append' | 'refresh';
 export type PaginationLoadTrigger = 'automatic' | 'manual';
@@ -83,7 +85,12 @@ export function mergePageIds<T, Id>(pages: readonly { items: readonly T[] }[], g
   return ids;
 }
 
-export function canAppend(state: PaginationState, trigger: PaginationLoadTrigger = 'manual'): boolean {
+export function canAppend(
+  state: PaginationState,
+  trigger: PaginationLoadTrigger = 'manual',
+  enabled = isFeedPaginationEnabled(),
+): boolean {
+  if (!enabled) return false;
   if (!state.paginationSupported || state.nextCursor === null || state.pending !== null) return false;
   if (state.cursorHistory.includes(state.nextCursor)) return false;
   if (trigger === 'automatic' && (state.appendError || state.automaticLoadCount >= 3)) return false;

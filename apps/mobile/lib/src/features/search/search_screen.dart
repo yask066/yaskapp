@@ -34,6 +34,7 @@ class SearchScreen extends StatefulWidget {
     this.searchHistory,
     this.analytics,
     this.onFollowingChanged,
+    this.feedPaginationEnabled = true,
     super.key,
   });
 
@@ -45,6 +46,7 @@ class SearchScreen extends StatefulWidget {
   final SearchHistoryStore? searchHistory;
   final SearchAnalytics? analytics;
   final VoidCallback? onFollowingChanged;
+  final bool feedPaginationEnabled;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -358,6 +360,7 @@ class _SearchScreenState extends State<SearchScreen> {
           accessToken: widget.session.accessToken,
           pollsApiClient: _pollsApiClient,
           currentUserId: widget.session.user.id,
+          paginationEnabled: widget.feedPaginationEnabled,
         ),
       ),
     );

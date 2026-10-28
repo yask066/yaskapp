@@ -30,6 +30,7 @@ class YaskappApp extends StatefulWidget {
     this.pollsApiClient,
     this.reactionsMotion = false,
     this.entryMotion = false,
+    this.feedPaginationEnabled = true,
   });
 
   final AuthApiClient? authApiClient;
@@ -38,6 +39,7 @@ class YaskappApp extends StatefulWidget {
   final PollsApiClient? pollsApiClient;
   final bool reactionsMotion;
   final bool entryMotion;
+  final bool feedPaginationEnabled;
 
   @override
   State<YaskappApp> createState() => _YaskappAppState();
@@ -515,6 +517,7 @@ class _YaskappAppState extends State<YaskappApp> with WidgetsBindingObserver {
                           onAccountDeletionAccepted: _handleDeletionAccepted,
                           onAccountDeletionCompleted: () =>
                               unawaited(_handleDeletionCompleted()),
+                          feedPaginationEnabled: widget.feedPaginationEnabled,
                         ),
     );
   }
