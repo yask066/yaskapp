@@ -199,12 +199,40 @@ abstract final class ListScrollRestoration {
   }) async {
     if (hasExplicitTarget) return false;
 
+    await WidgetsBinding.instance.endOfFrame;
+    return restoreAtCurrentLayout(
+      store: store,
+      context: context,
+      currentItemIds: currentItemIds,
+      controller: controller,
+      anchorTop: anchorTop,
+      hasExplicitTarget: hasExplicitTarget,
+      isExplicitTargetActive: isExplicitTargetActive,
+    );
+  }
+
+  /// Applies a saved anchor when the caller is already running after layout.
+  ///
+  /// Scroll hosts that schedule a post-frame callback can use this synchronous
+  /// form to avoid waiting through another frame with stale item IDs.
+  static bool restoreAtCurrentLayout({
+    required ListScrollStateStore store,
+    required ListScrollContext context,
+    required List<String> currentItemIds,
+    required ScrollController controller,
+    required double? Function(String id) anchorTop,
+    bool hasExplicitTarget = false,
+    bool Function()? isExplicitTargetActive,
+  }) {
+    if (hasExplicitTarget || (isExplicitTargetActive?.call() ?? false)) {
+      return false;
+    }
+
     final revision = store.revisionFor(context);
     if (revision == null) return false;
     final anchor = store.read(context, currentItemIds: currentItemIds);
     if (anchor == null || !anchor.hasMeasuredTop) return false;
 
-    await WidgetsBinding.instance.endOfFrame;
     if (!controller.hasClients || store.revisionFor(context) != revision) {
       return false;
     }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useMutationState, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useNavigationType } from 'react-router-dom';
 import { ApiError } from '../../api/client';
@@ -61,6 +61,73 @@ interface CommentListProps {
   onReplyCreated?: (poll: Poll) => void;
 }
 
+interface CommentRootItemProps {
+  comment: PollComment;
+  pollId: string;
+  sessionEpoch: number;
+  sessionReady: boolean;
+  currentUserId?: string | null;
+  isLiking: boolean;
+  isDeleting: boolean;
+  indexInBatch: number;
+  contextKey: string;
+  isFocusedRoot: boolean;
+  focusedReplyId?: string | null;
+  forcedExpandedRootId?: string | null;
+  replyGeneration: number;
+  contextReply?: PollComment;
+  focusedTargetRef?: (node: HTMLLIElement | null) => void;
+  onLike: (comment: PollComment) => void;
+  onDelete: (comment: PollComment) => void;
+  onReplyCreated?: (reply: PollComment, poll: Poll) => void;
+}
+
+const CommentRootItem = memo(function CommentRootItem({
+  comment,
+  pollId,
+  sessionEpoch,
+  sessionReady,
+  currentUserId,
+  isLiking,
+  isDeleting,
+  indexInBatch,
+  contextKey,
+  isFocusedRoot,
+  focusedReplyId,
+  forcedExpandedRootId,
+  replyGeneration,
+  contextReply,
+  focusedTargetRef,
+  onLike,
+  onDelete,
+  onReplyCreated,
+}: CommentRootItemProps) {
+  const isTargetReplyRoot = Boolean(focusedReplyId && comment.id === forcedExpandedRootId && contextReply?.parentCommentId === comment.id);
+  return <EntryMotion key={comment.id} contextKey={contextKey} itemId={comment.id} visible indexInBatch={indexInBatch}>
+    <li className={`comment-card${isFocusedRoot ? ' comment-card--focused' : ''}`} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 150px' }} data-list-item-id={comment.id} ref={isFocusedRoot ? focusedTargetRef : undefined} tabIndex={-1} aria-current={isFocusedRoot ? 'location' : undefined}>
+      <p className="comment-card__author"><strong>{comment.author.displayName || comment.author.username}</strong> <span>@{comment.author.username}</span></p>
+      <p className="comment-card__body">{comment.body}</p>
+      <div className="comment-card__actions">
+        {currentUserId ? <button className="button" type="button" disabled={isLiking} aria-pressed={comment.viewerHasLiked} onClick={() => onLike(comment)}>Like ({comment.likesCount})</button> : null}
+        {comment.author.id === currentUserId ? <button className="button" type="button" disabled={isDeleting} onClick={() => onDelete(comment)}>Delete</button> : null}
+      </div>
+      <CommentThread
+        pollId={pollId}
+        sessionEpoch={sessionEpoch}
+        sessionReady={sessionReady}
+        rootComment={comment}
+        currentUserId={currentUserId}
+        focusedReplyId={isTargetReplyRoot ? focusedReplyId : null}
+        contextReply={isTargetReplyRoot ? contextReply : undefined}
+        focusedTargetRef={isTargetReplyRoot ? focusedTargetRef : undefined}
+        autoExpand={comment.id === forcedExpandedRootId}
+        refreshGeneration={replyGeneration}
+        onReplyCreated={onReplyCreated}
+      />
+    </li>
+  </EntryMotion>;
+});
+
 function linkedCommentErrorMessage(error: unknown, isParent = false): string {
   if (error instanceof ApiError && error.status === 404) {
     return isParent ? 'The parent comment is unavailable or may have been removed.' : 'This comment is unavailable or may have been removed.';
@@ -86,9 +153,9 @@ export function CommentList({
 }: CommentListProps) {
   const queryClient = useQueryClient();
   const commentScope = useMemo(() => ({ sessionEpoch, userId: currentUserId ?? null, pollId }), [sessionEpoch, currentUserId, pollId]);
-  const queryKey = paginationQueryKey({
+  const queryKey = useMemo(() => paginationQueryKey({
     surface: 'comments', sessionEpoch, userId: currentUserId ?? null, pollId,
-  });
+  }), [sessionEpoch, currentUserId, pollId]);
   const commentOverlays = useCommentOverlayState(commentScope);
   const queryIdentity = JSON.stringify(queryKey);
   const currentIdentity = useRef(queryIdentity);
@@ -177,6 +244,14 @@ export function CommentList({
       void invalidateCommentPages(queryClient, commentScope);
     },
   });
+  const mutateRootLike = likeMutation.mutate;
+  const handleRootLike = useCallback((comment: PollComment) => {
+    mutateRootLike({ comment, epoch: pollSessionEpoch(queryClient) });
+  }, [mutateRootLike, queryClient]);
+  const mutateRootDelete = deleteMutation.mutate;
+  const handleRootDelete = useCallback((comment: PollComment) => {
+    if (window.confirm('Delete this comment?')) mutateRootDelete({ comment, epoch: pollSessionEpoch(queryClient) });
+  }, [mutateRootDelete, queryClient]);
   const [focusedTargetNode, setFocusedTargetNode] = useState<HTMLLIElement | null>(null);
   const navigationType = useNavigationType();
   const focusRootId = focusedReplyId ? forcedExpandedRootId : focusedCommentId;
@@ -310,36 +385,33 @@ export function CommentList({
 
   const writeError = likeMutation.error ?? deleteMutation.error;
 
-  function handleReplyCreated(_rootComment: PollComment, _reply: PollComment, poll: Poll) {
+  const handleReplyCreated = useCallback((_reply: PollComment, poll: Poll) => {
     onReplyCreated?.(poll);
     void queryClient.invalidateQueries({ queryKey, exact: true });
-  }
+  }, [onReplyCreated, queryClient, queryKey]);
 
   function renderRootComment(comment: PollComment, index: number) {
-    const isTargetReplyRoot = Boolean(focusedReplyId && comment.id === forcedExpandedRootId && target?.comment?.parentCommentId === comment.id);
-    return <EntryMotion key={comment.id} contextKey={`comments:${sessionEpoch}:${currentUserId ?? 'anonymous'}:${pollId}`} itemId={comment.id} visible indexInBatch={index}>
-      <li className={`comment-card${comment.id === focusRootId && !focusedReplyId ? ' comment-card--focused' : ''}`} data-list-item-id={comment.id} ref={comment.id === focusRootId && !focusedReplyId ? setFocusedTargetNode : undefined} tabIndex={-1} aria-current={comment.id === focusRootId && !focusedReplyId ? 'location' : undefined}>
-        <p className="comment-card__author"><strong>{comment.author.displayName || comment.author.username}</strong> <span>@{comment.author.username}</span></p>
-        <p className="comment-card__body">{comment.body}</p>
-        <div className="comment-card__actions">
-          {currentUserId ? <button className="button" type="button" disabled={pendingLikeIds.includes(comment.id)} aria-pressed={comment.viewerHasLiked} onClick={() => likeMutation.mutate({ comment, epoch: pollSessionEpoch(queryClient) })}>Like ({comment.likesCount})</button> : null}
-          {comment.author.id === currentUserId ? <button className="button" type="button" disabled={pendingDeleteIds.includes(comment.id)} onClick={() => { if (window.confirm('Delete this comment?')) deleteMutation.mutate({ comment, epoch: pollSessionEpoch(queryClient) }); }}>Delete</button> : null}
-        </div>
-        <CommentThread
-          pollId={pollId}
-          sessionEpoch={sessionEpoch}
-          sessionReady={sessionReady}
-          rootComment={comment}
-          currentUserId={currentUserId}
-          focusedReplyId={comment.id === forcedExpandedRootId ? focusedReplyId : null}
-          contextReply={isTargetReplyRoot ? target?.comment : undefined}
-          focusedTargetRef={isTargetReplyRoot ? setFocusedTargetNode : undefined}
-          autoExpand={comment.id === forcedExpandedRootId}
-          refreshGeneration={replyGeneration}
-          onReplyCreated={(reply, poll) => handleReplyCreated(comment, reply, poll)}
-        />
-      </li>
-    </EntryMotion>;
+    return <CommentRootItem
+      key={comment.id}
+      comment={comment}
+      pollId={pollId}
+      sessionEpoch={sessionEpoch}
+      sessionReady={sessionReady}
+      currentUserId={currentUserId}
+      isLiking={pendingLikeIds.includes(comment.id)}
+      isDeleting={pendingDeleteIds.includes(comment.id)}
+      indexInBatch={index}
+      contextKey={`comments:${sessionEpoch}:${currentUserId ?? 'anonymous'}:${pollId}`}
+      isFocusedRoot={comment.id === focusRootId && !focusedReplyId}
+      focusedReplyId={focusedReplyId}
+      forcedExpandedRootId={forcedExpandedRootId}
+      replyGeneration={replyGeneration}
+      contextReply={target?.comment}
+      focusedTargetRef={setFocusedTargetNode}
+      onLike={handleRootLike}
+      onDelete={handleRootDelete}
+      onReplyCreated={handleReplyCreated}
+    />;
   }
 
   return (

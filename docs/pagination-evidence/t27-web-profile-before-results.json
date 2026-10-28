@@ -1,0 +1,112 @@
+{
+  "capturedAt": "2026-10-28T10:49:29.464Z",
+  "browser": "Chrome/156.0.8078.48",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+  "datasetDescription": "Local deterministic synthetic public feed; 20 items per page; 12 ms response delay; production Vite build.",
+  "perfBudget": "Web: fewer than 5% RAF intervals above 16.7 ms; measurements are from headless Chrome on this host.",
+  "traces": [
+    {
+      "dataset": 100,
+      "cardsRendered": 100,
+      "scrollHeightCssPx": 55374,
+      "frameMetrics": {
+        "frameSamples": 223,
+        "framesOver16_7ms": 70,
+        "framesOverBudgetPercent": 31.39,
+        "p95FrameMs": 16.7,
+        "p99FrameMs": 16.8,
+        "maxFrameMs": 16.8,
+        "longTasks": 0,
+        "usedJsHeapBytes": 7059082
+      },
+      "pollRequests": 5,
+      "traceEventCount": 11056,
+      "tracePath": "docs/pagination-evidence/t27-web-100-before-trace.json.gz",
+      "traceBytesGzip": 145871,
+      "traceSha256": "431f9da2f39c109261f1400c40a83435b4779c1e8af83eb11ac1e846f9b2d636",
+      "droppedFrameEvents": 2,
+      "beginFrameEvents": 221,
+      "droppedFramePercent": 0.9
+    },
+    {
+      "dataset": 1000,
+      "cardsRendered": 1000,
+      "scrollHeightCssPx": 549178,
+      "frameMetrics": {
+        "frameSamples": 389,
+        "framesOver16_7ms": 113,
+        "framesOverBudgetPercent": 29.05,
+        "p95FrameMs": 16.8,
+        "p99FrameMs": 33.3,
+        "maxFrameMs": 33.4,
+        "longTasks": 0,
+        "usedJsHeapBytes": 39396113
+      },
+      "pollRequests": 55,
+      "traceEventCount": 25029,
+      "tracePath": "docs/pagination-evidence/t27-web-1000-before-trace.json.gz",
+      "traceBytesGzip": 344577,
+      "traceSha256": "0fb0108166ab1450430337a241504f1ecc12caa52d27d8d1b22be06d0fc888d6",
+      "droppedFrameEvents": 63,
+      "beginFrameEvents": 404,
+      "droppedFramePercent": 15.59
+    }
+  ],
+  "lifecycle": {
+    "baseline": {
+      "heapUsedBytes": 579512,
+      "dom": {
+        "documents": 1,
+        "nodes": 4,
+        "jsEventListeners": 0
+      }
+    },
+    "cycles": [
+      {
+        "cycle": 1,
+        "cardsLoaded": 200,
+        "heapAtExitBytes": 7699740,
+        "afterExit": {
+          "heapUsedBytes": 580676,
+          "dom": {
+            "documents": 1,
+            "nodes": 4,
+            "jsEventListeners": 0
+          }
+        },
+        "activeRequests": 0
+      },
+      {
+        "cycle": 2,
+        "cardsLoaded": 200,
+        "heapAtExitBytes": 7699212,
+        "afterExit": {
+          "heapUsedBytes": 580964,
+          "dom": {
+            "documents": 1,
+            "nodes": 4,
+            "jsEventListeners": 0
+          }
+        },
+        "activeRequests": 0
+      },
+      {
+        "cycle": 3,
+        "cardsLoaded": 200,
+        "heapAtExitBytes": 7699692,
+        "afterExit": {
+          "heapUsedBytes": 581396,
+          "dom": {
+            "documents": 1,
+            "nodes": 4,
+            "jsEventListeners": 0
+          }
+        },
+        "activeRequests": 0
+      }
+    ],
+    "afterExitHeapNonMonotonic": false,
+    "allRequestsSettledAtEnd": true
+  },
+  "metricNote": "The baseline criterion is RAF intervals above 16.7 ms. The compositor ratio is supplementary. In the 1,000-card raw trace, layerTreeId 2 contributes one DroppedFrame with no matching BeginFrame in the measured layer; the corrected count is 63 drops for layerTreeId 4 / 404 BeginFrame events."
+}

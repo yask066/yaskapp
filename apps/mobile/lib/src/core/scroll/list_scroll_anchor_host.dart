@@ -34,6 +34,9 @@ class ListScrollAnchorHost extends StatefulWidget {
 class _ListScrollAnchorHostState extends State<ListScrollAnchorHost> {
   final Map<String, GlobalKey> _itemKeys = {};
   bool _captureScheduled = false;
+  bool _restoreScheduled = false;
+  bool _capturePending = false;
+  bool _captureAfterRestore = false;
 
   @override
   void initState() {
@@ -88,10 +91,21 @@ class _ListScrollAnchorHostState extends State<ListScrollAnchorHost> {
 
   void _scheduleCapture() {
     if (_captureScheduled || !mounted) return;
+    if (_restoreScheduled) {
+      _capturePending = true;
+      return;
+    }
     _captureScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _captureScheduled = false;
-      if (mounted) _capture();
+      if (!mounted) return;
+      // A capture queued before a layout change must not replace the saved
+      // anchor while its restoration is waiting for the new layout to settle.
+      if (_restoreScheduled) {
+        _capturePending = true;
+        return;
+      }
+      _capture();
     });
   }
 
@@ -124,36 +138,64 @@ class _ListScrollAnchorHostState extends State<ListScrollAnchorHost> {
   }
 
   void _scheduleRestore({bool captureAfterRestore = false}) {
+    if (_restoreScheduled) {
+      _captureAfterRestore |= captureAfterRestore;
+      return;
+    }
+    _restoreScheduled = true;
+    final revisionAtSchedule = widget.store.revisionFor(widget.context);
+    _captureAfterRestore = captureAfterRestore;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted || widget.hasExplicitTarget) return;
-      await ListScrollRestoration.restoreAfterLayout(
-        store: widget.store,
-        context: widget.context,
-        currentItemIds: widget.itemIds,
-        controller: widget.controller,
-        anchorTop: _itemTop,
-        hasExplicitTarget: widget.hasExplicitTarget,
-      );
-      if (captureAfterRestore && mounted) _scheduleCapture();
+      WidgetsBinding.instance.scheduleFrame();
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      if (mounted && !widget.hasExplicitTarget) {
+        ListScrollRestoration.restoreAtCurrentLayout(
+          store: widget.store,
+          context: widget.context,
+          currentItemIds: widget.itemIds,
+          controller: widget.controller,
+          anchorTop: _itemTop,
+          hasExplicitTarget: widget.hasExplicitTarget,
+        );
+      }
+      _restoreScheduled = false;
+      final shouldCapture = _capturePending || _captureAfterRestore;
+      _capturePending = false;
+      _captureAfterRestore = false;
+      if (shouldCapture &&
+          mounted &&
+          widget.store.revisionFor(widget.context) == revisionAtSchedule) {
+        _scheduleCapture();
+      }
     });
   }
 
   bool _handleScroll(ScrollNotification notification) {
     if (notification.depth != 0) return false;
-    if (notification is ScrollMetricsNotification) {
-      _scheduleRestore(captureAfterRestore: true);
-    } else if (notification is ScrollUpdateNotification ||
+    if (notification is ScrollUpdateNotification ||
         notification is ScrollEndNotification) {
       _scheduleCapture();
     }
     return false;
   }
 
+  bool _handleScrollMetrics(ScrollMetricsNotification notification) {
+    if (notification.depth == 0 &&
+        widget.store.revisionFor(widget.context) != null) {
+      _scheduleRestore(captureAfterRestore: true);
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) =>
-      NotificationListener<ScrollNotification>(
-        onNotification: _handleScroll,
-        child: widget.child,
+      NotificationListener<ScrollMetricsNotification>(
+        onNotification: _handleScrollMetrics,
+        child: NotificationListener<ScrollNotification>(
+          onNotification: _handleScroll,
+          child: widget.child,
+        ),
       );
 }
 

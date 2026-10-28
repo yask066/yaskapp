@@ -63,6 +63,77 @@ void main() {
     expect((tester.getTopLeft(anchor).dy - before).abs(), lessThanOrEqualTo(8));
   });
 
+  testWidgets('restores an anchor when an unanchored sliver above it grows', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    final store = ListScrollStateStore();
+    const context = ListScrollContext(
+      userId: 'viewer',
+      route: '/feed',
+      list: 'polls',
+      query: '',
+      filter: '',
+      sort: 'newest',
+    );
+    final itemIds = List<String>.generate(
+      32,
+      (index) => 'anchor-$index',
+      growable: false,
+    );
+    var mediaHeight = 1200.0;
+
+    Widget buildList() => MaterialApp(
+          home: Scaffold(
+            body: ListScrollAnchorHost(
+              context: context,
+              store: store,
+              controller: controller,
+              itemIds: itemIds,
+              child: CustomScrollView(
+                controller: controller,
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: SizedBox(height: mediaHeight),
+                  ),
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) => ListScrollAnchorItem(
+                        id: itemIds[index],
+                        child: SizedBox(
+                          height: 160,
+                          child: Text(itemIds[index]),
+                        ),
+                      ),
+                      childCount: itemIds.length,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(buildList());
+    controller.jumpTo(1100);
+    await tester.pumpAndSettle();
+    final anchor = find.text('anchor-0');
+    final before = tester.getTopLeft(anchor).dy;
+    expect(store.read(context)?.id, 'anchor-0');
+
+    mediaHeight += 96;
+    await tester.pumpWidget(buildList());
+    await tester.pumpAndSettle();
+
+    expect((tester.getTopLeft(anchor).dy - before).abs(), lessThanOrEqualTo(8));
+  });
+
   testWidgets('keeps the nearest visible neighbor when its anchor is deleted', (
     tester,
   ) async {

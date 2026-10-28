@@ -198,6 +198,16 @@ test('renders polls with immediately clickable answer options', async () => {
   expect(screen.getByRole('button', { name: 'Comments (0)' })).not.toHaveAccessibleDescription('Comments are not available yet.');
 });
 
+test('marks feed poll cards for offscreen render containment', async () => {
+  server.use(http.get('/polls', () => cursorPage([poll], null)));
+
+  renderFeed();
+
+  const card = await screen.findByText('Which option?').then((heading) => heading.closest('.poll-card'));
+  expect(card).toHaveClass('feed-poll-card');
+  expect(card).toHaveStyle({ contentVisibility: 'auto', containIntrinsicSize: 'auto 560px' });
+});
+
 test('does not show a suggested-users skeleton for an anonymous viewer', async () => {
   renderFeed();
 

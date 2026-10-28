@@ -19,6 +19,18 @@ export interface FeedPollItemProps {
 
 export const FeedPollItem = memo(function FeedPollItem({ poll, contextKey, indexInBatch, viewerId, isVoting, isLiking, onVote, onCancelVote, onLike, onDelete, onOpenComments }: FeedPollItemProps) {
   return <EntryMotion key={poll.id} contextKey={contextKey} itemId={poll.id} visible indexInBatch={indexInBatch}>
-    <PollCard poll={poll} viewerId={viewerId} isVoting={isVoting} isLiking={isLiking} onVote={onVote} onCancelVote={onCancelVote} onLike={onLike} onDelete={onDelete} onOpenComments={onOpenComments} />
+    <PollCard
+      poll={poll}
+      className="feed-poll-card"
+      style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 560px' }}
+      viewerId={viewerId}
+      isVoting={isVoting}
+      isLiking={isLiking}
+      onVote={onVote}
+      onCancelVote={onCancelVote}
+      onLike={onLike}
+      onDelete={onDelete}
+      onOpenComments={onOpenComments}
+    />
   </EntryMotion>;
 });

@@ -248,6 +248,7 @@ export function CommentThread({
     return <EntryMotion key={reply.id} contextKey={`replies:${sessionEpoch}:${currentUserId ?? 'anonymous'}:${pollId}:${rootComment.id}`} itemId={reply.id} visible indexInBatch={index}>
       <li
         className={`comment-card comment-thread__reply${reply.id === focusedReplyId ? ' comment-card--focused' : ''}`}
+        style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 80px' }}
         data-list-item-id={reply.id}
         ref={reply.id === focusedReplyId ? focusedTargetRef : undefined}
         tabIndex={-1}

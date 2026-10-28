@@ -67,6 +67,18 @@ test('shows the reply count, retries a failed page, loads more, and collapses th
   expect(screen.queryByText('First reply.')).not.toBeInTheDocument();
 });
 
+test('marks reply rows for offscreen render containment', async () => {
+  server.use(http.get('/polls/poll-1/comments/root-1/replies', () =>
+    HttpResponse.json({ items: [replyOne], nextCursor: null })));
+  const user = userEvent.setup();
+
+  renderThread({ currentUserId: null });
+
+  await user.click(screen.getByRole('button', { name: 'Show replies (3)' }));
+  const reply = await screen.findByText('First reply.');
+  expect(reply.closest('li')).toHaveStyle({ contentVisibility: 'auto', containIntrinsicSize: 'auto 80px' });
+});
+
 test('does not claim the end of a legacy replies response without cursor metadata', async () => {
   server.use(http.get('/polls/poll-1/comments/root-1/replies', () => HttpResponse.json({ items: [replyOne] })));
   const user = userEvent.setup();

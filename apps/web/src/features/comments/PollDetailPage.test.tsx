@@ -116,6 +116,19 @@ test('shows a poll and comments, then adds the returned comment and authoritativ
   expect(screen.getByRole('button', { name: 'Comments (3)' })).toBeInTheDocument();
 });
 
+test('marks root comment rows for offscreen render containment', async () => {
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ error: 'unauthorized' }, { status: 401 })),
+    http.get('/polls/poll-1', () => HttpResponse.json({ poll })),
+    http.get('/polls/poll-1/comments', () => HttpResponse.json({ items: comments, nextCursor: null })),
+  );
+
+  renderDetail();
+
+  const root = await screen.findByText('First existing comment.');
+  expect(root.closest('li')).toHaveStyle({ contentVisibility: 'auto', containIntrinsicSize: 'auto 150px' });
+});
+
 test('keeps a posted root outside server pages and deduplicates it when a later page catches up', async () => {
   const createdComment = {
     id: 'comment-new', pollId: 'poll-1', author: { id: 'user-1', username: 'member', displayName: 'Member', avatarObjectKey: null, avatarUrl: null },
