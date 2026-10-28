@@ -311,6 +311,10 @@ void main() {
     await tester.scrollUntilVisible(lastPoll, 350);
     await tester.pump();
     expect(subscriptionsRequests, 2);
+    final scrollPosition =
+        tester.state<ScrollableState>(find.byType(Scrollable).first).position;
+    scrollPosition.jumpTo(scrollPosition.maxScrollExtent);
+    await tester.pump();
     final beforeError = tester.getTopLeft(lastPoll).dy;
 
     appendResponse.complete(

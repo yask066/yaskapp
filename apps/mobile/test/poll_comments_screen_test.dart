@@ -1408,6 +1408,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(requests, [null, 'server-cursor']);
+    await tester.scrollUntilVisible(
+      find.text('Target from the next page.'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Comment context'), findsNothing);
     expect(find.text('Target from the next page.'), findsOneWidget);
     expect(

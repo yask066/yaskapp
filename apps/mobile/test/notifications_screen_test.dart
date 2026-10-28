@@ -443,6 +443,11 @@ void main() {
 
     expect(requests.map((request) => request.url.queryParameters['cursor']),
         [null, 'cursor-1']);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('notification-card-page-2')),
+      400,
+      scrollable: find.byType(Scrollable),
+    );
     expect(
         find.byKey(const ValueKey('notification-card-page-0')), findsOneWidget);
     expect(

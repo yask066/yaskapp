@@ -363,6 +363,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(client.calls, hasLength(2));
+    await tester.drag(
+      find.byKey(const ValueKey('search-results-list')),
+      const Offset(0, -600),
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Could not load more results.'), findsOneWidget);
     expect(find.text('Retry'), findsOneWidget);
     expect(find.text('Climate?'), findsAtLeastNWidgets(1));

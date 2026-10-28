@@ -1,6 +1,6 @@
 # Чек-лист выпуска пагинации
 
-**Статус на 2026-10-28:** подготовка; staging и rollout не запускались. T28 остаётся открытой до фактической проверки staging и rollback smoke.
+**Статус на 2026-10-28:** пользователь закрыл T28 без staging. Staging, rollout и rollback smoke не запускались; выпуск остаётся NOT RELEASED.
 
 Документ следует PRD и ADR T01. Выпускать в порядке **совместимый API → ограниченная web/Android группа → решение о расширении**. У API нет remote kill switch: клиентский rollback требует новых web и Android builds с выключенной пагинацией. Не удалять additive API, legacy decoders, миграции или snapshot cleanup при откате клиентов.
 
@@ -20,7 +20,7 @@
 
 ## Gate перед staging
 
-- [ ] Закрыть T04 и T13 либо внести отдельные письменные исключения Release Owner. T24 закрыта в commit `aaabd6e`: `VITE_FEED_PAGINATION` и `YASKAPP_FEED_PAGINATION` реализованы с default `false`; оба режима web build и default-off Flutter проверены локально (свидетельства — в task breakdown). Staging rollout и rollback smoke ещё не запускались.
+- [x] T04 и T13 закрыты с локальными evidence в task breakdown. T24 закрыта в commit `857e29b`: `VITE_FEED_PAGINATION` и `YASKAPP_FEED_PAGINATION` реализованы с default `false`; оба режима web build и default-off Flutter проверены локально (свидетельства — в task breakdown). Staging rollout и rollback smoke ещё не запускались.
 - [ ] Release Owner и QA Owner ознакомились с остатками T27. AC-01–18, TalkBack и полный API suite не были выполнены; Android feed 100, feed 1 000 и roots 1 000 превысили frame budget; все headless web workload превысили RAF budget. T26 staging load run отменён, server performance budgets не подтверждены. См. [матрицу T27](pagination-evidence/acceptance-matrix.md).
 - [ ] Принять явное Go/No-Go с указанными выше gaps; закрытие T27 по решению пользователя не является результатом PASS этих проверок.
 - [ ] Заполнить staging URL, ответственного оператора и защищённую конфигурацию на самом staging host. Не копировать `.env.staging`, JWT, cursor secret, токены или пользовательские данные в git/evidence.
@@ -54,7 +54,7 @@
 - [ ] При API fault остановить расширение и вернуть предыдущий API image только после проверки совместимости схемы. Не удалять additive API, migrations, legacy replies decoder, snapshot table или cleanup job; не менять cursor secret.
 - [ ] После rollback проверить readiness, first page старого клиента, логи, метрики и возможность открыть ранее сохранённую страницу. Записать фактический результат, включая ошибки и время восстановления.
 - [ ] Обновить legacy replies cursor window от **первого production rollout Android v1 cursor**: start = фактический UTC timestamp production release, end = start + 180 дней. Даты не вычислять по staging запуску; после истечения окна только тогда можно планировать удаление legacy decoder.
-- [ ] Release Owner подписывает итоговое Go/No-Go и отдельное решение о расширении охвата; QA Owner подтверждает evidence. Не помечать T28 завершённой без выполненных staging и rollback checks и заполненного release record.
+- [ ] Release Owner подписывает итоговое Go/No-Go и отдельное решение о расширении охвата; QA Owner подтверждает evidence. Не объявлять выпуск завершённым без выполненных staging и rollback checks и заполненного release record. T28 как задача плана закрыта решением пользователя; эта запись не подтверждает выпуск.
 
 ## Команды staging stack
 
