@@ -1,0 +1,84 @@
+import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router-dom';
+import type { ReactNode } from 'react';
+import { AppLayout } from '../components/AppLayout';
+import { AuthPage } from '../features/auth/AuthPage';
+import { FeedPage } from '../features/feed/FeedPage';
+import { CreatePollPage } from '../features/polls/CreatePollPage';
+import { PollDetailPage } from '../features/comments/PollDetailPage';
+import { MyProfilePage } from '../features/profiles/MyProfilePage';
+import { PublicProfilePage } from '../features/profiles/PublicProfilePage';
+import { SearchPage } from '../features/search/SearchPage';
+import { NotificationsPage } from '../features/notifications/NotificationsPage';
+import { NotificationPreferencesPage } from '../features/notifications/NotificationPreferencesPage';
+import { useSession } from './session-provider';
+import { ScrollRestorationCoordinator } from '../core/scroll/ScrollRestorationCoordinator';
+import { AccountDeletionPage } from '../features/account-deletion/AccountDeletionPage';
+
+export function AccountDeletionBoundary({ children }: { children: ReactNode }) {
+  const { accountDeletionPending } = useSession();
+  const location = useLocation();
+  if (accountDeletionPending) {
+    if (location.pathname !== '/account-deletion') return <Navigate to="/account-deletion" replace />;
+    return <AccountDeletionPage />;
+  }
+  return children;
+}
+
+export function AppRouteRoot() {
+  return <AccountDeletionBoundary><><ScrollRestorationCoordinator /><AppLayout /></></AccountDeletionBoundary>;
+}
+
+function LoadingMain() {
+  return <main id="main-content"><p role="status">Loading your session…</p></main>;
+}
+
+export function PublicOnlyRoute() {
+  const { status, accountDeletionPending } = useSession();
+  if (accountDeletionPending) return <Navigate to="/account-deletion" replace />;
+  if (status === 'loading') return <LoadingMain />;
+  if (status === 'authenticated') return <Navigate to="/" replace />;
+  return <Outlet />;
+}
+
+export function ProtectedRoute() {
+  const { status, accountDeletionPending } = useSession();
+  const location = useLocation();
+  if (accountDeletionPending) return <Navigate to="/account-deletion" replace />;
+  if (status === 'loading') return <LoadingMain />;
+  if (status === 'anonymous') {
+    return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
+  }
+  return <Outlet />;
+}
+
+// The router is intentionally shared with the application bootstrap.
+// eslint-disable-next-line react-refresh/only-export-components
+export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <AppRouteRoot />,
+    children: [
+      { index: true, element: <FeedPage /> },
+      { path: 'account-deletion', element: <AccountDeletionPage /> },
+      { path: 'polls/:pollId', element: <PollDetailPage /> },
+      { path: 'users/:userId', element: <PublicProfilePage /> },
+      {
+        element: <ProtectedRoute />,
+        children: [
+          { path: 'search', element: <SearchPage /> },
+          { path: 'polls/new', element: <CreatePollPage /> },
+          { path: 'me', element: <MyProfilePage /> },
+          { path: 'notifications', element: <NotificationsPage /> },
+          { path: 'settings/notifications', element: <NotificationPreferencesPage /> },
+        ],
+      },
+    ],
+  },
+  {
+    element: <PublicOnlyRoute />,
+    children: [
+      { path: 'login', element: <AuthPage mode="login" /> },
+      { path: 'register', element: <AuthPage mode="register" /> },
+    ],
+  },
+]);

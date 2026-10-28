@@ -1,0 +1,894 @@
+import type { MultipartFile } from '@fastify/multipart';
+import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyRequest } from 'fastify';
+import { z } from 'zod';
+
+import {
+  observePaginationRequest,
+  type PaginationRequestAction,
+  type PaginationSurface,
+} from '../../observability/pagination-logging.js';
+import { AdminCursorError } from '../admin/pagination.js';
+import {
+  createPollCursorOwnerKey,
+  PollPaginationCursorError,
+  PollPaginationExpiredError,
+  POLL_CURSOR_MAX_LENGTH
+} from './poll-pagination.js';
+import {
+  broadcastPollVoteCreated,
+  broadcastPollVoteUpdated,
+  broadcastPollDeleted
+} from '../../realtime/realtime.hub.js';
+import { authenticate, optionalAuthenticate } from '../auth/auth.utils.js';
+import { UserSanctionedError } from '../moderation/sanctions.repository.js';
+import {
+  deletePollImageObject,
+  enqueuePollImageForAccountDeletion,
+  PollImageStorageError,
+  PollImageUploadError,
+  processPollImage
+} from './poll-images.service.js';
+import {
+  PollAlreadyVotedError,
+  PollClosedError,
+  PollCancellationNotAllowedError,
+  PollNotFoundError,
+  cancelVote,
+  createPoll,
+  createPollComment,
+  deletePollComment,
+  deletePoll,
+  getViewablePoll,
+  getPollComment,
+  likePoll,
+  likeComment,
+  listPollComments,
+  listPollCommentReplies,
+  listPopularPublicPollPage,
+  listSubscriptionPolls,
+  unlikePoll,
+  unlikeComment,
+  listNewestPublicPolls,
+  voteOnPoll
+} from './polls.service.js';
+
+const uuidSchema = z.string().uuid();
+
+const listPollsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  sort: z.enum(['newest', 'popular']).default('newest'),
+  cursor: z.string().max(POLL_CURSOR_MAX_LENGTH).optional()
+}).strict();
+
+const createPollSchema = z.object({
+  question: z.string().trim().min(1).max(280),
+  description: z.string().trim().min(1).max(2000).optional(),
+  options: z
+    .array(z.string().trim().min(1).max(160))
+    .min(2)
+    .max(6)
+    .refine((options) => {
+      const normalizedOptions = options.map((option) => option.toLowerCase());
+
+      return new Set(normalizedOptions).size === normalizedOptions.length;
+    }, 'Poll options must be unique.'),
+  visibility: z.enum(['public', 'followers', 'private']).default('public'),
+  endsAt: z
+    .string()
+    .datetime({ offset: true })
+    .refine((value) => new Date(value) > new Date(), 'Poll end date must be in the future.')
+    .optional(),
+  allowVoteCancellation: z.boolean().default(false),
+}).strict();
+
+const voteParamsSchema = z.object({
+  pollId: uuidSchema
+}).strict();
+
+const likeParamsSchema = z.object({
+  pollId: uuidSchema
+}).strict();
+
+const commentsParamsSchema = z.object({
+  pollId: uuidSchema
+}).strict();
+
+const commentLikeParamsSchema = z.object({
+  pollId: uuidSchema,
+  commentId: uuidSchema
+}).strict();
+
+const commentsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(50),
+  order: z.enum(['oldest', 'newest']).default('oldest'),
+  cursor: z.string().max(POLL_CURSOR_MAX_LENGTH).optional()
+}).strict();
+
+const commentRepliesQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  cursor: z.string().max(POLL_CURSOR_MAX_LENGTH).optional()
+}).strict();
+
+const createCommentSchema = z.object({
+  body: z.string().trim().min(1).max(1000),
+  parentCommentId: uuidSchema.optional()
+}).strict();
+
+const voteBodySchema = z.object({
+  optionId: uuidSchema
+}).strict();
+
+function validationError(reply: FastifyReply, error: z.ZodError) {
+  return reply.status(400).send({
+    error: 'validation_error',
+    message: 'Request input is invalid.',
+    details: error.flatten()
+  });
+}
+
+function pollError(reply: FastifyReply, error: unknown) {
+  if (error instanceof PollPaginationExpiredError) {
+    return reply.status(error.statusCode).send({
+      error: error.code,
+      message: error.message
+    });
+  }
+  if (error instanceof PollPaginationCursorError || error instanceof AdminCursorError) {
+    const cursorError = error instanceof PollPaginationCursorError
+      ? error
+      : new PollPaginationCursorError();
+    return reply.status(cursorError.statusCode).send({
+      error: cursorError.code,
+      message: cursorError.message
+    });
+  }
+  if (error instanceof PollNotFoundError) {
+    return reply.status(404).send({
+      error: 'not_found',
+      message: error.message
+    });
+  }
+
+  if (error instanceof PollAlreadyVotedError) {
+    return reply.status(409).send({
+      error: 'already_voted',
+      message: error.message
+    });
+  }
+
+  if (error instanceof PollClosedError) {
+    return reply.status(422).send({
+      error: 'poll_closed',
+      message: error.message
+    });
+  }
+
+  if (error instanceof PollCancellationNotAllowedError) {
+    return reply.status(422).send({
+      error: 'vote_cancellation_not_allowed',
+      message: error.message
+    });
+  }
+
+  if (error instanceof UserSanctionedError) {
+    return reply.status(403).send({ error: 'restricted', message: error.message });
+  }
+
+  if (error instanceof PollImageUploadError) {
+    return reply.status(400).send({ error: error.code, message: error.message });
+  }
+
+  if (error instanceof PollImageStorageError) {
+    return reply.status(503).send({ error: 'poll_image_storage_unavailable', message: error.message });
+  }
+
+
+  throw error;
+}
+
+function pollCursorOwnerForRequest(request: FastifyRequest): string {
+  return request.user?.sub
+    ? createPollCursorOwnerKey({ type: 'user', userId: request.user.sub })
+    : createPollCursorOwnerKey({ type: 'guest', ip: request.ip });
+}
+
+function paginationRequestContext(
+  request: FastifyRequest,
+  surface: PaginationSurface,
+  sort: string | null,
+  hasCursor: boolean,
+) {
+  const pageHeader = request.headers['x-pagination-page'];
+  const pageNumber = typeof pageHeader === 'string' && /^\d{1,5}$/.test(pageHeader)
+    ? Number(pageHeader)
+    : null;
+  const actionHeader = request.headers['x-pagination-action'];
+  const action: PaginationRequestAction = actionHeader === 'retry' || actionHeader === 'refresh' || actionHeader === 'append' || actionHeader === 'refetch'
+    ? actionHeader
+    : hasCursor ? 'append' : 'initial';
+
+  return {
+    surface,
+    sort,
+    pageNumber: pageNumber !== null && pageNumber > 0 ? pageNumber : hasCursor ? null : 1,
+    requestId: request.id,
+    action,
+  } as const;
+}
+
+function requestHasPaginationCursor(request: FastifyRequest): boolean {
+  return typeof request.query === 'object' && request.query !== null &&
+    Object.hasOwn(request.query, 'cursor');
+}
+
+function paginationValidationFailure(code: 'validation_error' | 'pagination_cursor_invalid') {
+  return Object.assign(new Error('Pagination request validation failed.'), { code });
+}
+
+async function logRejectedPaginationRequest(
+  request: FastifyRequest,
+  surface: PaginationSurface,
+  sort: string | null,
+  hasCursor: boolean,
+  error: unknown,
+) {
+  try {
+    await observePaginationRequest(
+      request.log,
+      paginationRequestContext(request, surface, sort, hasCursor),
+      async () => { throw error; },
+    );
+  } catch {
+    // The route below still owns the public error response.
+  }
+}
+
+export async function cleanupUploadedPollImage(
+  objectKey: string,
+  deleteImage: (key: string) => Promise<void> = deletePollImageObject,
+  onCleanupError?: (error: unknown, objectKey: string) => void,
+  enqueueForDeletion?: (objectKey: string) => Promise<void>
+) {
+  try {
+    await deleteImage(objectKey);
+    return true;
+  } catch (error) {
+    onCleanupError?.(error, objectKey);
+    if (enqueueForDeletion) {
+      try {
+        await enqueueForDeletion(objectKey);
+        return true;
+      } catch (enqueueError) {
+        onCleanupError?.(enqueueError, objectKey);
+      }
+    }
+    // Let the route report that cleanup could not be recorded durably.
+    return false;
+  }
+}
+
+async function parseMultipartCreatePoll(request: FastifyRequest) {
+  const fields: Record<string, unknown> = {};
+  let imagePart: Pick<MultipartFile, 'fieldname' | 'mimetype' | 'toBuffer'> | undefined;
+
+  for await (const part of request.parts()) {
+    if (part.type === 'file') {
+      if (part.fieldname !== 'image' || imagePart) {
+        throw new PollImageUploadError('Only one image field is allowed.');
+      }
+
+      const imageBytes = await part.toBuffer();
+      imagePart = {
+        fieldname: part.fieldname,
+        mimetype: part.mimetype,
+        toBuffer: async () => imageBytes
+      };
+      continue;
+    }
+
+    fields[part.fieldname] = part.value;
+  }
+
+  if (fields.options !== undefined && typeof fields.options === 'string') {
+    try {
+      fields.options = JSON.parse(fields.options);
+    } catch (_) {
+      fields.options = undefined;
+    }
+  }
+
+  if (fields.allowVoteCancellation !== undefined) {
+    fields.allowVoteCancellation = fields.allowVoteCancellation === 'true';
+  }
+
+  return { fields, imagePart };
+}
+
+export function registerPollRoutes(app: FastifyInstance) {
+  app.get(
+    '/polls/:pollId',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      const parsedParams = voteParamsSchema.safeParse(request.params);
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      try {
+        const poll = await getViewablePoll(
+          parsedParams.data.pollId,
+          request.user?.sub
+        );
+        return { poll };
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
+
+  app.get(
+    '/polls',
+    {
+      preHandler: optionalAuthenticate
+    },
+    async (request, reply) => {
+      const hasCursor = requestHasPaginationCursor(request);
+      const parsedQuery = listPollsQuerySchema.safeParse(request.query);
+      if (!parsedQuery.success) {
+        const cursorError = parsedQuery.error.issues.some((issue) => issue.path[0] === 'cursor');
+        await logRejectedPaginationRequest(
+          request,
+          'feed',
+          null,
+          hasCursor,
+          cursorError ? new PollPaginationCursorError() : paginationValidationFailure('validation_error'),
+        );
+        return cursorError
+          ? pollError(reply, new PollPaginationCursorError())
+          : validationError(reply, parsedQuery.error);
+      }
+
+      if (parsedQuery.data.sort === 'popular') {
+        try {
+          const ownerIdentity = request.user?.sub
+            ? { type: 'user' as const, userId: request.user.sub }
+            : { type: 'guest' as const, ip: request.ip };
+          return await observePaginationRequest(
+            request.log,
+            paginationRequestContext(request, 'feed', 'popular', hasCursor),
+            () => listPopularPublicPollPage({
+              limit: parsedQuery.data.limit,
+              viewerId: request.user?.sub,
+              cursor: parsedQuery.data.cursor,
+              ownerIdentity,
+              requestId: request.id,
+            }),
+          );
+        } catch (error) {
+          return pollError(reply, error);
+        }
+      }
+
+      try {
+        const owner = request.user?.sub
+          ? createPollCursorOwnerKey({ type: 'user', userId: request.user.sub })
+          : createPollCursorOwnerKey({ type: 'guest', ip: request.ip });
+        return await observePaginationRequest(
+          request.log,
+          paginationRequestContext(request, 'feed', 'newest', hasCursor),
+          () => listNewestPublicPolls({
+            limit: parsedQuery.data.limit,
+            viewerId: request.user?.sub,
+            cursor: parsedQuery.data.cursor,
+            owner,
+          }),
+        );
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
+
+  app.delete(
+    '/polls/:pollId',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      const parsedParams = voteParamsSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      try {
+        await deletePoll({
+          pollId: parsedParams.data.pollId,
+          authorId: request.user.sub
+        });
+
+        broadcastPollDeleted({
+          pollId: parsedParams.data.pollId
+        });
+
+        return reply.status(204).send();
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
+
+  app.post(
+    '/polls',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      let rawBody: unknown = request.body;
+      let imagePart: Pick<MultipartFile, 'fieldname' | 'mimetype' | 'toBuffer'> | undefined;
+
+      try {
+        if (request.isMultipart()) {
+          const multipart = await parseMultipartCreatePoll(request);
+          rawBody = multipart.fields;
+          imagePart = multipart.imagePart;
+        }
+      } catch (error) {
+        return pollError(reply, error);
+      }
+
+      const parsedBody = createPollSchema.safeParse(rawBody);
+
+      if (!parsedBody.success) {
+        return validationError(reply, parsedBody.error);
+      }
+
+      let uploadedImageObjectKey: string | undefined;
+
+      try {
+
+        if (imagePart) {
+          uploadedImageObjectKey = (await processPollImage(request.user.sub, imagePart)).objectKey;
+        }
+
+        const poll = await createPoll({
+          authorId: request.user.sub,
+          ...parsedBody.data,
+          imageObjectKey: uploadedImageObjectKey
+        });
+
+        return reply.status(201).send({
+          poll
+        });
+      } catch (error) {
+        if (uploadedImageObjectKey) {
+          const cleanupRecorded = await cleanupUploadedPollImage(
+            uploadedImageObjectKey,
+            deletePollImageObject,
+              (cleanupError, objectKey) => {
+              request.log.warn(
+                { err: cleanupError, objectKey },
+                'Failed to clean up uploaded poll image after poll creation failed'
+              );
+            },
+            (objectKey) => enqueuePollImageForAccountDeletion(request.user.sub, objectKey)
+          );
+          if (!cleanupRecorded) {
+            return reply.status(503).send({
+              error: 'poll_image_cleanup_pending',
+              message: 'The poll image could not be removed or queued for deletion.'
+            });
+          }
+        }
+
+        return pollError(reply, error);
+      }
+    }
+  );
+
+  app.get(
+    '/polls/subscriptions',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      const hasCursor = requestHasPaginationCursor(request);
+      const parsedQuery = listPollsQuerySchema.safeParse(request.query);
+
+      if (!parsedQuery.success) {
+        const cursorError = parsedQuery.error.issues.some((issue) => issue.path[0] === 'cursor');
+        await logRejectedPaginationRequest(
+          request,
+          'subscriptions',
+          null,
+          hasCursor,
+          cursorError ? new PollPaginationCursorError() : paginationValidationFailure('validation_error'),
+        );
+        return cursorError
+          ? pollError(reply, new PollPaginationCursorError())
+          : validationError(reply, parsedQuery.error);
+      }
+
+      try {
+        const owner = createPollCursorOwnerKey({ type: 'user', userId: request.user.sub });
+        return await observePaginationRequest(
+          request.log,
+          paginationRequestContext(request, 'subscriptions', 'newest', hasCursor),
+          () => listSubscriptionPolls(
+            request.user.sub,
+            parsedQuery.data.limit,
+            parsedQuery.data.cursor,
+            owner,
+          ),
+        );
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
+
+  app.get('/polls/:pollId/comments', { preHandler: optionalAuthenticate }, async (request, reply) => {
+    const hasCursor = requestHasPaginationCursor(request);
+    const parsedParams = commentsParamsSchema.safeParse(request.params);
+
+    if (!parsedParams.success) {
+      await logRejectedPaginationRequest(
+        request,
+        'comments',
+        null,
+        hasCursor,
+        paginationValidationFailure('validation_error'),
+      );
+      return validationError(reply, parsedParams.error);
+    }
+
+    const parsedQuery = commentsQuerySchema.safeParse(request.query);
+
+    if (!parsedQuery.success) {
+      const cursorError = parsedQuery.error.issues.some((issue) => issue.path[0] === 'cursor');
+      await logRejectedPaginationRequest(
+        request,
+        'comments',
+        null,
+        hasCursor,
+        cursorError ? new PollPaginationCursorError() : paginationValidationFailure('validation_error'),
+      );
+      return cursorError
+        ? pollError(reply, new PollPaginationCursorError())
+        : validationError(reply, parsedQuery.error);
+    }
+
+    try {
+      return await observePaginationRequest(
+        request.log,
+        paginationRequestContext(request, 'comments', parsedQuery.data.order, hasCursor),
+        () => listPollComments({
+          pollId: parsedParams.data.pollId,
+          limit: parsedQuery.data.limit,
+          order: parsedQuery.data.order,
+          cursor: parsedQuery.data.cursor,
+          owner: pollCursorOwnerForRequest(request),
+          viewerId: request.user?.sub,
+        }),
+      );
+    } catch (error) {
+      return pollError(reply, error);
+    }
+  });
+
+  app.get(
+    '/polls/:pollId/comments/:commentId/replies',
+    { preHandler: optionalAuthenticate },
+    async (request, reply) => {
+      const hasCursor = requestHasPaginationCursor(request);
+      const parsedParams = commentLikeParamsSchema.safeParse(request.params);
+      if (!parsedParams.success) {
+        await logRejectedPaginationRequest(
+          request,
+          'replies',
+          'oldest',
+          hasCursor,
+          paginationValidationFailure('validation_error'),
+        );
+        return validationError(reply, parsedParams.error);
+      }
+
+      const parsedQuery = commentRepliesQuerySchema.safeParse(request.query);
+      if (!parsedQuery.success) {
+        const cursorError = parsedQuery.error.issues.some((issue) => issue.path[0] === 'cursor');
+        await logRejectedPaginationRequest(
+          request,
+          'replies',
+          'oldest',
+          hasCursor,
+          cursorError ? new PollPaginationCursorError() : paginationValidationFailure('validation_error'),
+        );
+        return cursorError
+          ? pollError(reply, new PollPaginationCursorError())
+          : validationError(reply, parsedQuery.error);
+      }
+
+      try {
+        return await observePaginationRequest(
+          request.log,
+          paginationRequestContext(request, 'replies', 'oldest', hasCursor),
+          () => listPollCommentReplies({
+            pollId: parsedParams.data.pollId,
+            commentId: parsedParams.data.commentId,
+            limit: parsedQuery.data.limit,
+            cursor: parsedQuery.data.cursor,
+            owner: pollCursorOwnerForRequest(request),
+            viewerId: request.user?.sub,
+          }),
+        );
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
+
+  app.post('/polls/:pollId/comments/:commentId/likes', { preHandler: authenticate }, async (request, reply) => {
+    const parsedParams = commentLikeParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) return validationError(reply, parsedParams.error);
+
+    try {
+      const result = await likeComment({
+        pollId: parsedParams.data.pollId,
+        commentId: parsedParams.data.commentId,
+        userId: request.user.sub
+      });
+      return reply.status(201).send(result);
+    } catch (error) {
+      return pollError(reply, error);
+    }
+  });
+
+  app.delete('/polls/:pollId/comments/:commentId', { preHandler: authenticate }, async (request, reply) => {
+    const parsedParams = commentLikeParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) return validationError(reply, parsedParams.error);
+
+    try {
+      await deletePollComment({
+        pollId: parsedParams.data.pollId,
+        commentId: parsedParams.data.commentId,
+        authorId: request.user.sub
+      });
+      return reply.status(204).send();
+    } catch (error) {
+      return pollError(reply, error);
+    }
+  });
+
+  app.delete('/polls/:pollId/comments/:commentId/likes', { preHandler: authenticate }, async (request, reply) => {
+    const parsedParams = commentLikeParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) return validationError(reply, parsedParams.error);
+
+    try {
+      const result = await unlikeComment({
+        pollId: parsedParams.data.pollId,
+        commentId: parsedParams.data.commentId,
+        userId: request.user.sub
+      });
+      return reply.send(result);
+    } catch (error) {
+      return pollError(reply, error);
+    }
+  });
+
+  app.get(
+    '/polls/:pollId/comments/:commentId',
+    { preHandler: authenticate },
+    async (request, reply) => {
+      const parsedParams = commentLikeParamsSchema.safeParse(request.params);
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      try {
+        const comment = await getPollComment({
+          pollId: parsedParams.data.pollId,
+          commentId: parsedParams.data.commentId,
+          viewerId: request.user.sub
+        });
+        return { comment };
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
+
+  app.post(
+    '/polls/:pollId/comments',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      const parsedParams = commentsParamsSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      const parsedBody = createCommentSchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        return validationError(reply, parsedBody.error);
+      }
+
+      try {
+        const result = await createPollComment({
+          pollId: parsedParams.data.pollId,
+          authorId: request.user.sub,
+          body: parsedBody.data.body,
+          parentCommentId: parsedBody.data.parentCommentId
+        });
+
+        return reply.status(201).send({
+          comment: result.comment,
+          poll: result.poll
+        });
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
+
+  app.post(
+    '/polls/:pollId/likes',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      const parsedParams = likeParamsSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      try {
+        const result = await likePoll({
+          pollId: parsedParams.data.pollId,
+          userId: request.user.sub
+        });
+
+        return reply.status(201).send(result);
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
+
+  app.delete(
+    '/polls/:pollId/likes',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      const parsedParams = likeParamsSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      try {
+        const result = await unlikePoll({
+          pollId: parsedParams.data.pollId,
+          userId: request.user.sub
+        });
+
+        return reply.send(result);
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
+
+  app.post(
+    '/polls/:pollId/votes',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      const parsedParams = voteParamsSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      const parsedBody = voteBodySchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        return validationError(reply, parsedBody.error);
+      }
+
+      try {
+        const result = await voteOnPoll({
+          pollId: parsedParams.data.pollId,
+          optionId: parsedBody.data.optionId,
+          voterId: request.user.sub
+        });
+
+        broadcastPollVoteCreated({
+          poll: result.poll,
+          vote: result.vote
+        });
+
+        return reply.status(201).send(result);
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
+
+  app.put(
+    '/polls/:pollId/votes',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      const parsedParams = voteParamsSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      const parsedBody = voteBodySchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        return validationError(reply, parsedBody.error);
+      }
+
+      try {
+        const result = await voteOnPoll({
+          pollId: parsedParams.data.pollId,
+          optionId: parsedBody.data.optionId,
+          voterId: request.user.sub
+        });
+
+        broadcastPollVoteCreated({
+          poll: result.poll,
+          vote: result.vote
+        });
+
+        return reply.status(201).send({
+          poll: result.poll,
+          vote: result.vote
+        });
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
+
+  app.delete(
+    '/polls/:pollId/votes',
+    {
+      preHandler: authenticate
+    },
+    async (request, reply) => {
+      const parsedParams = voteParamsSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        return validationError(reply, parsedParams.error);
+      }
+
+      try {
+        const result = await cancelVote({
+          pollId: parsedParams.data.pollId,
+          voterId: request.user.sub
+        });
+
+        broadcastPollVoteUpdated({
+          poll: result.poll
+        });
+
+        return reply.send(result);
+      } catch (error) {
+        return pollError(reply, error);
+      }
+    }
+  );
+}

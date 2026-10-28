@@ -1,0 +1,2152 @@
+import type { PoolClient } from 'pg';
+import type { PollStateRevisions } from '@yaskapp/shared';
+
+import { db } from '../../config/database.js';
+import { env } from '../../config/env.js';
+import { lockActiveAccount } from '../account-deletion/account-activity.guard.js';
+import { avatarUrlForUser } from '../profiles/avatar-url.js';
+import { createNotification } from '../notifications/notifications.repository.js';
+import { publishNotificationAfterCommit } from '../notifications/notifications.publisher.js';
+import {
+  decodeLegacyReplyCursor,
+  decodePollCursor,
+  encodePollCursor,
+  PollPaginationCursorError,
+  type PollCursorContext,
+  type PollCursorPayload,
+  type PollCursorTuple
+} from './poll-pagination.js';
+
+export type PollVisibility = 'public' | 'followers' | 'private';
+
+export type PollAuthor = {
+  id: string;
+  username: string;
+  displayName: string;
+  avatarObjectKey: string | null;
+  avatarUrl: string | null;
+};
+
+export type PollOption = {
+  id: string;
+  text: string;
+  position: number;
+  votesCount: number;
+};
+
+export type PollComment = {
+  id: string;
+  pollId: string;
+  author: PollAuthor;
+  body: string;
+  likesCount: number;
+  viewerHasLiked: boolean;
+  parentCommentId: string | null;
+  repliesCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Poll = {
+  id: string;
+  authorId: string;
+  author: PollAuthor;
+  question: string;
+  description: string | null;
+  imageUrl: string | null;
+  visibility: PollVisibility;
+  optionsCount: number;
+  votesCount: number;
+  commentsCount: number;
+  likesCount: number;
+  allowVoteCancellation: boolean;
+  viewerHasLiked: boolean;
+  viewerVoteOptionId: string | null;
+  stateRevisions: PollStateRevisions;
+  options: PollOption[];
+  createdAt: string;
+  updatedAt: string;
+  endsAt: string | null;
+};
+
+export type CreatePollRecordInput = {
+  authorId: string;
+  question: string;
+  description?: string;
+  imageObjectKey?: string;
+  visibility: PollVisibility;
+  options: string[];
+  endsAt?: Date;
+  allowVoteCancellation: boolean;
+};
+
+export type CreatePollCommentRecordInput = {
+  pollId: string;
+  authorId: string;
+  body: string;
+  parentCommentId?: string;
+};
+
+export type ListPollCommentRepliesRecordInput = {
+  pollId: string;
+  commentId: string;
+  limit: number;
+  cursor?: string;
+  viewerId?: string;
+  owner: string;
+};
+
+type PollRow = {
+  id: string;
+  author_id: string;
+  author_username: string;
+  author_display_name: string;
+  author_avatar_object_key: string | null;
+  question: string;
+  description: string | null;
+  image_object_key: string | null;
+  visibility: PollVisibility;
+  options_count: number;
+  votes_count: number;
+  comments_count: number;
+  likes_count: number;
+  votes_revision: string;
+  likes_revision: string;
+  comments_revision: string;
+  allow_vote_cancellation: boolean;
+  created_at: Date;
+  updated_at: Date;
+  ends_at: Date | null;
+};
+
+type PollOptionRow = {
+  id: string;
+  poll_id: string;
+  text: string;
+  position: number;
+  votes_count: number;
+};
+
+type PollCommentPageRow = PollCommentRow & {
+  cursor_created_at: string;
+  high_watermark_created_at: string;
+  high_watermark_id: string;
+};
+
+type PollPageCursorRow = {
+  id: string;
+  cursor_created_at: string;
+};
+
+type PollCommentRow = {
+  id: string;
+  poll_id: string;
+  author_id: string;
+  author_username: string;
+  author_display_name: string;
+  author_avatar_object_key: string | null;
+  body: string;
+  likes_count: number;
+  viewer_has_liked: boolean;
+  parent_comment_id: string | null;
+  replies_count: number;
+  created_at: Date;
+  updated_at: Date;
+};
+
+function mapPoll(
+  row: PollRow,
+  options: PollOption[],
+  viewerLikedPollIds: Set<string>,
+  viewerVoteOptionIds: Map<string, string>
+): Poll {
+  return {
+    id: row.id,
+    authorId: row.author_id,
+    author: {
+      id: row.author_id,
+      username: row.author_username,
+      displayName: row.author_display_name,
+      avatarObjectKey: row.author_avatar_object_key,
+      avatarUrl: avatarUrlForUser(row.author_id, row.author_avatar_object_key)
+    },
+    question: row.question,
+    description: row.description,
+    imageUrl: row.image_object_key === null ? null : `/media/polls/${row.id}`,
+    visibility: row.visibility,
+    optionsCount: row.options_count,
+    votesCount: row.votes_count,
+    commentsCount: row.comments_count,
+    likesCount: row.likes_count,
+    stateRevisions: {
+      votes: row.votes_revision,
+      likes: row.likes_revision,
+      comments: row.comments_revision
+    },
+    allowVoteCancellation: row.allow_vote_cancellation,
+    viewerHasLiked: viewerLikedPollIds.has(row.id),
+    viewerVoteOptionId: viewerVoteOptionIds.get(row.id) ?? null,
+    options,
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+    endsAt: row.ends_at?.toISOString() ?? null
+  };
+}
+
+function mapOption(row: PollOptionRow): PollOption {
+  return {
+    id: row.id,
+    text: row.text,
+    position: row.position,
+    votesCount: row.votes_count
+  };
+}
+
+function mapComment(row: PollCommentRow): PollComment {
+  return {
+    id: row.id,
+    pollId: row.poll_id,
+    author: {
+      id: row.author_id,
+      username: row.author_username,
+      displayName: row.author_display_name,
+      avatarObjectKey: row.author_avatar_object_key,
+      avatarUrl: avatarUrlForUser(row.author_id, row.author_avatar_object_key)
+    },
+    body: row.body,
+    likesCount: row.likes_count,
+    viewerHasLiked: row.viewer_has_liked,
+    parentCommentId: row.parent_comment_id ?? null,
+    repliesCount: row.replies_count ?? 0,
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString()
+  };
+}
+
+async function findPollRowsByIds(client: PoolClient, pollIds: string[], visibility?: PollVisibility) {
+  if (pollIds.length === 0) {
+    return [];
+  }
+
+  const result = await client.query<PollRow>(
+    `
+      SELECT
+        p.id,
+        p.author_id,
+        u.username::text AS author_username,
+        pr.display_name AS author_display_name,
+        pr.avatar_object_key AS author_avatar_object_key,
+        p.question,
+        p.description,
+        p.image_object_key,
+        p.visibility,
+        p.options_count,
+        p.votes_count,
+        p.comments_count,
+        p.likes_count,
+        p.votes_revision::text AS votes_revision,
+        p.likes_revision::text AS likes_revision,
+        p.comments_revision::text AS comments_revision,
+        p.allow_vote_cancellation,
+        p.created_at,
+        p.updated_at,
+        p.ends_at
+      FROM polls p
+      JOIN users u ON u.id = p.author_id
+      JOIN profiles pr ON pr.user_id = p.author_id
+      WHERE p.id = ANY($1::uuid[])
+        AND ($2::text IS NULL OR p.visibility::text = $2::text)
+        AND p.deleted_at IS NULL
+        AND u.status = 'active'
+        AND u.deleted_at IS NULL
+      ORDER BY p.created_at DESC, p.id DESC
+    `,
+    [pollIds, visibility ?? null]
+  );
+
+  return result.rows;
+}
+
+async function findOptionRowsByPollIds(client: PoolClient, pollIds: string[]) {
+  if (pollIds.length === 0) {
+    return [];
+  }
+
+  const result = await client.query<PollOptionRow>(
+    `
+      SELECT id, poll_id, text, position, votes_count
+      FROM poll_options
+      WHERE poll_id = ANY($1::uuid[])
+      ORDER BY poll_id, position ASC
+    `,
+    [pollIds]
+  );
+
+  return result.rows;
+}
+
+async function findViewerLikedPollIds(
+  client: PoolClient,
+  pollIds: string[],
+  viewerId: string | undefined
+) {
+  if (!viewerId || pollIds.length === 0) {
+    return new Set<string>();
+  }
+
+  const result = await client.query<{ poll_id: string }>(
+    `
+      SELECT poll_id
+      FROM likes
+      WHERE user_id = $1
+        AND poll_id = ANY($2::uuid[])
+    `,
+    [viewerId, pollIds]
+  );
+
+  return new Set(result.rows.map((row) => row.poll_id));
+}
+
+async function findViewerVoteOptionIds(
+  client: PoolClient,
+  pollIds: string[],
+  viewerId: string | undefined
+) {
+  if (!viewerId || pollIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const result = await client.query<{ poll_id: string; option_id: string }>(
+    `
+      SELECT poll_id, option_id
+      FROM poll_votes
+      WHERE voter_id = $1
+        AND poll_id = ANY($2::uuid[])
+    `,
+    [viewerId, pollIds]
+  );
+
+  return new Map(result.rows.map((row) => [row.poll_id, row.option_id]));
+}
+
+export async function hydratePolls(
+  client: PoolClient,
+  pollIds: string[],
+  viewerId?: string,
+  visibility?: PollVisibility
+) {
+  const pollRows = await findPollRowsByIds(client, pollIds, visibility);
+  const availablePollIds = pollRows.map(({ id }) => id);
+  const optionRows = await findOptionRowsByPollIds(client, availablePollIds);
+  const viewerLikedPollIds = await findViewerLikedPollIds(client, availablePollIds, viewerId);
+  const viewerVoteOptionIds = await findViewerVoteOptionIds(client, availablePollIds, viewerId);
+  const optionsByPollId = new Map<string, PollOption[]>();
+
+  for (const optionRow of optionRows) {
+    const options = optionsByPollId.get(optionRow.poll_id) ?? [];
+    options.push(mapOption(optionRow));
+    optionsByPollId.set(optionRow.poll_id, options);
+  }
+
+  return pollRows.map((row) =>
+    mapPoll(
+      row,
+      optionsByPollId.get(row.id) ?? [],
+      viewerLikedPollIds,
+      viewerVoteOptionIds
+    )
+  );
+}
+
+async function withPollReadSnapshot<T>(client: PoolClient, read: () => Promise<T>) {
+  await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+  try {
+    const result = await read();
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  }
+}
+
+export async function createPollRecord(input: CreatePollRecordInput) {
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+    await lockActiveAccount(client, input.authorId);
+
+    const pollResult = await client.query<{ id: string }>(
+      `
+        INSERT INTO polls (
+          author_id,
+          question,
+          description,
+          image_object_key,
+          visibility,
+          options_count,
+          allow_vote_cancellation,
+          ends_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id
+      `,
+      [
+        input.authorId,
+        input.question,
+        input.description ?? null,
+        input.imageObjectKey ?? null,
+        input.visibility,
+        input.options.length,
+        input.allowVoteCancellation,
+        input.endsAt ?? null
+      ]
+    );
+
+    const pollId = pollResult.rows[0]?.id;
+
+    if (!pollId) {
+      throw new Error('Poll insert did not return an id.');
+    }
+
+    for (const [position, text] of input.options.entries()) {
+      await client.query(
+        `
+          INSERT INTO poll_options (poll_id, text, position)
+          VALUES ($1, $2, $3)
+        `,
+        [pollId, text, position]
+      );
+    }
+
+    await client.query(
+      `
+        UPDATE profiles
+        SET polls_count = polls_count + 1
+        WHERE user_id = $1
+      `,
+      [input.authorId]
+    );
+
+    const [poll] = await hydratePolls(client, [pollId]);
+
+    if (!poll) {
+      throw new Error('Created poll could not be loaded.');
+    }
+
+    await client.query('COMMIT');
+
+    return poll;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deletePollRecord(input: {
+  pollId: string;
+  authorId: string;
+}) {
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+    await lockActiveAccount(client, input.authorId);
+
+    const result = await client.query<{ id: string; image_object_key: string | null }>(
+      `
+        UPDATE polls
+        SET deleted_at = now(), updated_at = now()
+        WHERE id = $1
+          AND author_id = $2
+          AND deleted_at IS NULL
+        RETURNING id, image_object_key
+      `,
+      [input.pollId, input.authorId]
+    );
+
+    if (result.rowCount !== 1) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    await client.query(
+      `
+        UPDATE profiles
+        SET polls_count = GREATEST(polls_count - 1, 0)
+        WHERE user_id = $1
+      `,
+      [input.authorId]
+    );
+
+    await client.query('COMMIT');
+
+    return {
+      status: 'deleted' as const,
+      imageObjectKey: result.rows[0]?.image_object_key ?? null
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deletePollCommentRecord(input: {
+  pollId: string;
+  commentId: string;
+  authorId: string;
+}) {
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+    await lockActiveAccount(client, input.authorId);
+
+    const pollResult = await client.query<{ id: string }>(
+      `
+        SELECT p.id
+        FROM polls p
+        JOIN users poll_author ON poll_author.id = p.author_id
+        WHERE p.id = $1
+          AND poll_author.status = 'active'
+          AND poll_author.deleted_at IS NULL
+          AND p.visibility = 'public'
+          AND p.deleted_at IS NULL
+        FOR UPDATE
+      `,
+      [input.pollId]
+    );
+
+    if (pollResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    const result = await client.query<{ id: string; parent_comment_id: string | null }>(
+      `
+        UPDATE comments c
+        SET deleted_at = now(), updated_at = now()
+        FROM polls p
+        WHERE c.id = $1
+          AND c.poll_id = $2
+          AND c.author_id = $3
+          AND c.deleted_at IS NULL
+          AND p.id = c.poll_id
+          AND p.visibility = 'public'
+          AND p.deleted_at IS NULL
+        RETURNING c.id, c.parent_comment_id
+      `,
+      [input.commentId, input.pollId, input.authorId]
+    );
+
+    if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    let deletedCount = 1;
+    if (result.rows[0]?.parent_comment_id === null) {
+      const repliesResult = await client.query(
+        `
+          UPDATE comments
+          SET deleted_at = now(), updated_at = now()
+          WHERE poll_id = $1
+            AND parent_comment_id = $2
+            AND deleted_at IS NULL
+          RETURNING id
+        `,
+        [input.pollId, input.commentId]
+      );
+      deletedCount += repliesResult.rowCount ?? 0;
+    }
+
+    await client.query(
+      `
+        UPDATE polls
+        SET comments_count = GREATEST(comments_count - $2, 0), comments_revision = comments_revision + 1, updated_at = now()
+        WHERE id = $1
+      `,
+      [input.pollId, deletedCount]
+    );
+
+    await client.query('COMMIT');
+    return { status: 'deleted' as const };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function listPublicPollRecords(
+  limit: number,
+  viewerId?: string,
+  sort: 'newest' | 'popular' = 'newest'
+) {
+  const client = await db.connect();
+
+  try {
+    return await withPollReadSnapshot(client, async () => {
+    const result = await client.query<{ id: string }>(
+      `
+        SELECT id
+        FROM polls
+        WHERE visibility = 'public'
+          AND deleted_at IS NULL
+        ORDER BY
+          CASE WHEN $2 = 'popular' THEN votes_count * 2 + likes_count * 1.5 + comments_count ELSE 0 END DESC,
+          created_at DESC,
+          id DESC
+        LIMIT $1
+      `,
+      [limit, sort]
+    );
+
+    return hydratePolls(
+      client,
+      result.rows.map((row) => row.id),
+      viewerId
+    );
+    });
+  } finally {
+    client.release();
+  }
+}
+
+export async function listVisiblePublicPollRecordsByIds(pollIds: string[], viewerId?: string) {
+  if (pollIds.length === 0) return [];
+
+  const client = await db.connect();
+
+  try {
+    return await withPollReadSnapshot(client, async () => {
+      const polls = await hydratePolls(client, pollIds, viewerId, 'public');
+      const pollsById = new Map(polls.map((poll) => [poll.id, poll]));
+      return pollIds.flatMap((pollId) => {
+        const poll = pollsById.get(pollId);
+        return poll ? [poll] : [];
+      });
+    });
+  } finally {
+    client.release();
+  }
+}
+
+function decodeChronologicalPollCursor(
+  rawCursor: string | undefined,
+  context: PollCursorContext
+): Extract<PollCursorPayload, { boundary: PollCursorTuple }> | undefined {
+  if (rawCursor === undefined) return undefined;
+
+  const payload = decodePollCursor(rawCursor, context);
+  if (!('boundary' in payload)) throw new PollPaginationCursorError();
+  return payload;
+}
+
+function nextPollPageCursor(
+  kind: 'polls' | 'subscriptions',
+  owner: string,
+  sort: 'newest',
+  hasNextPage: boolean,
+  pageRows: PollPageCursorRow[],
+  highWatermark: PollCursorTuple | undefined
+) {
+  const lastRow = pageRows.at(-1);
+  if (!hasNextPage || !lastRow) return null;
+
+  const watermark = highWatermark ?? {
+    createdAt: pageRows[0]!.cursor_created_at,
+    id: pageRows[0]!.id
+  };
+
+  return encodePollCursor({
+    kind,
+    sort,
+    owner,
+    boundary: { createdAt: lastRow.cursor_created_at, id: lastRow.id },
+    highWatermark: watermark
+  });
+}
+
+export async function listNewestPublicPollPageRecords(input: {
+  limit: number;
+  viewerId?: string;
+  cursor?: string;
+  owner: string;
+}) {
+  const context = { kind: 'polls', sort: 'newest', owner: input.owner } as const;
+  const cursor = decodeChronologicalPollCursor(input.cursor, context);
+  const client = await db.connect();
+
+  try {
+    return await withPollReadSnapshot(client, async () => {
+      const result = await client.query<PollPageCursorRow>(
+        `
+          WITH available_polls AS (
+            SELECT p.id, p.created_at
+            FROM polls p
+            JOIN users u ON u.id = p.author_id
+            WHERE p.visibility = 'public'
+              AND p.deleted_at IS NULL
+              AND u.status = 'active'
+              AND u.deleted_at IS NULL
+          ),
+          page_candidates AS (
+            SELECT
+              id,
+              created_at,
+              to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
+            FROM available_polls
+            WHERE ($2::timestamptz IS NULL OR (created_at, id) < ($2::timestamptz, $3::uuid))
+              AND ($4::timestamptz IS NULL OR (created_at, id) <= ($4::timestamptz, $5::uuid))
+            ORDER BY created_at DESC, id DESC
+            LIMIT $1
+          )
+          SELECT id, cursor_created_at
+          FROM page_candidates
+          ORDER BY created_at DESC, id DESC
+        `,
+        [
+          input.limit + 1,
+          cursor?.boundary.createdAt ?? null,
+          cursor?.boundary.id ?? null,
+          cursor?.highWatermark.createdAt ?? null,
+          cursor?.highWatermark.id ?? null
+        ]
+      );
+
+      const hasNextPage = result.rows.length > input.limit;
+      const pageRows = hasNextPage ? result.rows.slice(0, input.limit) : result.rows;
+      return {
+        items: await hydratePolls(client, pageRows.map(({ id }) => id), input.viewerId),
+        nextCursor: nextPollPageCursor(
+          'polls',
+          input.owner,
+          'newest',
+          hasNextPage,
+          pageRows,
+          cursor?.highWatermark
+        )
+      };
+    });
+  } finally {
+    client.release();
+  }
+}
+
+export async function listSubscriptionPollRecords(
+  input: {
+    followerId: string;
+    limit: number;
+    cursor?: string;
+    owner: string;
+  }
+) {
+  const context = { kind: 'subscriptions', sort: 'newest', owner: input.owner } as const;
+  const cursor = decodeChronologicalPollCursor(input.cursor, context);
+  const client = await db.connect();
+
+  try {
+    return await withPollReadSnapshot(client, async () => {
+      const result = await client.query<PollPageCursorRow>(
+        `
+          WITH available_polls AS (
+            SELECT p.id, p.created_at
+            FROM polls p
+            JOIN follows f ON f.followee_id = p.author_id
+            JOIN users u ON u.id = p.author_id
+            WHERE f.follower_id = $1
+              AND p.visibility = 'public'
+              AND p.deleted_at IS NULL
+              AND u.status = 'active'
+              AND u.deleted_at IS NULL
+          ),
+          page_candidates AS (
+            SELECT
+              id,
+              created_at,
+              to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
+            FROM available_polls
+            WHERE ($3::timestamptz IS NULL OR (created_at, id) < ($3::timestamptz, $4::uuid))
+              AND ($5::timestamptz IS NULL OR (created_at, id) <= ($5::timestamptz, $6::uuid))
+            ORDER BY created_at DESC, id DESC
+            LIMIT $2
+          )
+          SELECT id, cursor_created_at
+          FROM page_candidates
+          ORDER BY created_at DESC, id DESC
+        `,
+        [
+          input.followerId,
+          input.limit + 1,
+          cursor?.boundary.createdAt ?? null,
+          cursor?.boundary.id ?? null,
+          cursor?.highWatermark.createdAt ?? null,
+          cursor?.highWatermark.id ?? null
+        ]
+      );
+
+      const hasNextPage = result.rows.length > input.limit;
+      const pageRows = hasNextPage ? result.rows.slice(0, input.limit) : result.rows;
+      return {
+        items: await hydratePolls(client, pageRows.map(({ id }) => id), input.followerId),
+        nextCursor: nextPollPageCursor(
+          'subscriptions',
+          input.owner,
+          'newest',
+          hasNextPage,
+          pageRows,
+          cursor?.highWatermark
+        )
+      };
+    });
+  } finally {
+    client.release();
+  }
+}
+
+export async function listPollRecordsByAuthor(
+  authorId: string,
+  limit: number,
+  viewerId?: string
+) {
+  const client = await db.connect();
+
+  try {
+    return await withPollReadSnapshot(client, async () => {
+    const result = await client.query<{ id: string }>(
+      `
+        SELECT id
+        FROM polls
+        WHERE author_id = $1
+          AND deleted_at IS NULL
+        ORDER BY created_at DESC
+        LIMIT $2
+      `,
+      [authorId, limit]
+    );
+
+    return hydratePolls(
+      client,
+      result.rows.map((row) => row.id),
+      viewerId
+    );
+    });
+  } finally {
+    client.release();
+  }
+}
+
+export async function listPublicPollRecordsByAuthor(
+  authorId: string,
+  limit: number,
+  viewerId?: string
+) {
+  const client = await db.connect();
+
+  try {
+    return await withPollReadSnapshot(client, async () => {
+    const result = await client.query<{ id: string }>(
+      `
+        SELECT id
+        FROM polls
+        WHERE author_id = $1
+          AND visibility = 'public'
+          AND deleted_at IS NULL
+        ORDER BY created_at DESC, id DESC
+        LIMIT $2
+      `,
+      [authorId, limit]
+    );
+
+    return hydratePolls(
+      client,
+      result.rows.map((row) => row.id),
+      viewerId
+    );
+    });
+  } finally {
+    client.release();
+  }
+}
+
+export async function findPollRecordById(pollId: string) {
+  const client = await db.connect();
+
+  try {
+    return await withPollReadSnapshot(client, async () => {
+      const [poll] = await hydratePolls(client, [pollId]);
+      return poll ?? null;
+    });
+  } finally {
+    client.release();
+  }
+}
+
+export async function findViewablePollRecordById(
+  pollId: string,
+  viewerId?: string
+) {
+  const client = await db.connect();
+
+  try {
+    return await withPollReadSnapshot(client, async () => {
+    const result = await client.query<{ id: string }>(
+      `
+        SELECT p.id
+        FROM polls p
+        JOIN users u ON u.id = p.author_id
+        WHERE p.id = $1
+          AND p.deleted_at IS NULL
+          AND u.status = 'active'
+          AND u.deleted_at IS NULL
+          AND (
+            p.visibility = 'public'
+            OR p.author_id = $2
+            OR (
+              p.visibility = 'followers'
+              AND EXISTS (
+                SELECT 1
+                FROM follows f
+                WHERE f.follower_id = $2
+                  AND f.followee_id = p.author_id
+              )
+            )
+          )
+      `,
+      [pollId, viewerId ?? null]
+    );
+
+    if (result.rowCount === 0) return null;
+    const [poll] = await hydratePolls(client, [pollId], viewerId);
+    return poll ?? null;
+    });
+  } finally {
+    client.release();
+  }
+}
+
+export async function findViewablePollImageRecord(
+  pollId: string,
+  viewerId?: string
+) {
+  const result = await db.query<{
+    image_object_key: string | null;
+    visibility: 'public' | 'followers' | 'private';
+  }>(
+    `
+      SELECT p.image_object_key, p.visibility
+      FROM polls p
+      JOIN users u ON u.id = p.author_id
+      WHERE p.id = $1
+        AND p.deleted_at IS NULL
+        AND u.status = 'active'
+        AND u.deleted_at IS NULL
+        AND (
+          p.visibility = 'public'
+          OR p.author_id = $2
+          OR (
+            p.visibility = 'followers'
+            AND EXISTS (
+              SELECT 1
+              FROM follows f
+              WHERE f.follower_id = $2
+                AND f.followee_id = p.author_id
+            )
+          )
+        )
+    `,
+    [pollId, viewerId ?? null]
+  );
+
+  return result.rows[0] ?? null;
+}
+
+type CommentCursorPageContext =
+  | Extract<PollCursorContext, { kind: 'comment-roots' }>
+  | Extract<PollCursorContext, { kind: 'comment-replies' }>;
+
+function nextCommentPageCursor(input: {
+  context: CommentCursorPageContext;
+  pageRows: PollCommentPageRow[];
+  hasNextPage: boolean;
+  highWatermark?: PollCursorTuple;
+}): string | null {
+  const lastRow = input.pageRows.at(-1);
+  if (!input.hasNextPage || !lastRow) return null;
+
+  const highWatermark = input.highWatermark ?? {
+    createdAt: lastRow.high_watermark_created_at,
+    id: lastRow.high_watermark_id
+  };
+  return encodePollCursor({
+    ...input.context,
+    boundary: { createdAt: lastRow.cursor_created_at, id: lastRow.id },
+    highWatermark
+  } as PollCursorPayload);
+}
+
+export async function listPollCommentRecords(input: {
+  pollId: string;
+  limit: number;
+  order: 'newest' | 'oldest';
+  cursor?: string;
+  owner: string;
+  viewerId?: string;
+}) {
+  const context = {
+    kind: 'comment-roots',
+    order: input.order,
+    pollId: input.pollId,
+    owner: input.owner
+  } as const;
+  const cursor = decodeChronologicalPollCursor(input.cursor, context);
+  const client = await db.connect();
+
+  try {
+    return await withPollReadSnapshot(client, async () => {
+      const pollResult = await client.query<{ id: string }>(
+        `
+          SELECT p.id
+          FROM polls p
+          JOIN users poll_author ON poll_author.id = p.author_id
+          WHERE p.id = $1
+            AND poll_author.status = 'active'
+            AND poll_author.deleted_at IS NULL
+            AND p.visibility = 'public'
+            AND p.deleted_at IS NULL
+        `,
+        [input.pollId]
+      );
+
+      if (pollResult.rowCount === 0) return { status: 'not_found' as const };
+
+      const direction = input.order === 'newest' ? 'DESC' : 'ASC';
+      const boundaryComparison = input.order === 'newest' ? '<' : '>';
+      const commentsResult = await client.query<PollCommentPageRow>(
+        `
+          WITH available_comments AS NOT MATERIALIZED (
+            SELECT c.id, c.created_at
+            FROM comments c
+            JOIN users u ON u.id = c.author_id
+            WHERE c.poll_id = $1
+              AND c.parent_comment_id IS NULL
+              AND c.deleted_at IS NULL
+              AND u.status = 'active'
+              AND u.deleted_at IS NULL
+          ),
+          high_watermark AS (
+            SELECT
+              id,
+              created_at AS raw_created_at,
+              to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
+            FROM available_comments
+            ORDER BY raw_created_at DESC, id DESC
+            LIMIT 1
+          ),
+          page_candidates AS MATERIALIZED (
+            SELECT
+              available_comments.id,
+              available_comments.created_at,
+              to_char(available_comments.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
+              high_watermark.cursor_created_at AS high_watermark_created_at,
+              high_watermark.id AS high_watermark_id
+            FROM available_comments
+            CROSS JOIN high_watermark
+            WHERE ($2::timestamptz IS NULL OR (available_comments.created_at, available_comments.id) ${boundaryComparison} ($2::timestamptz, $3::uuid))
+              AND (available_comments.created_at, available_comments.id) <= (
+                COALESCE($4::timestamptz, high_watermark.raw_created_at),
+                COALESCE($5::uuid, high_watermark.id)
+              )
+            ORDER BY available_comments.created_at ${direction}, available_comments.id ${direction}
+            LIMIT $6
+          ),
+          page_rows AS (
+            SELECT
+              c.id,
+              c.poll_id,
+              c.author_id,
+              u.username::text AS author_username,
+              pr.display_name AS author_display_name,
+              pr.avatar_object_key AS author_avatar_object_key,
+              c.body,
+              c.likes_count,
+              EXISTS (
+                SELECT 1 FROM likes l
+                WHERE l.comment_id = c.id AND l.user_id = $7
+              ) AS viewer_has_liked,
+              c.parent_comment_id,
+              (
+                SELECT count(*)::int
+                FROM comments r
+                JOIN users reply_author ON reply_author.id = r.author_id
+                WHERE r.parent_comment_id = c.id
+                  AND r.deleted_at IS NULL
+                  AND reply_author.status = 'active'
+                  AND reply_author.deleted_at IS NULL
+              ) AS replies_count,
+              c.created_at,
+              c.updated_at,
+              page_candidates.cursor_created_at,
+              page_candidates.high_watermark_created_at,
+              page_candidates.high_watermark_id
+            FROM page_candidates
+            JOIN comments c ON c.id = page_candidates.id
+            JOIN users u ON u.id = c.author_id
+            JOIN profiles pr ON pr.user_id = c.author_id
+          )
+          SELECT *
+          FROM page_rows
+          ORDER BY created_at ${direction}, id ${direction}
+        `,
+        [
+          input.pollId,
+          cursor?.boundary.createdAt ?? null,
+          cursor?.boundary.id ?? null,
+          cursor?.highWatermark.createdAt ?? null,
+          cursor?.highWatermark.id ?? null,
+          input.limit + 1,
+          input.viewerId ?? null
+        ]
+      );
+
+      const hasNextPage = commentsResult.rows.length > input.limit;
+      const pageRows = hasNextPage ? commentsResult.rows.slice(0, input.limit) : commentsResult.rows;
+      return {
+        status: 'found' as const,
+        items: pageRows.map(mapComment),
+        nextCursor: nextCommentPageCursor({
+          context,
+          pageRows,
+          hasNextPage,
+          highWatermark: cursor?.highWatermark
+        })
+      };
+    });
+  } finally {
+    client.release();
+  }
+}
+
+export async function listPollCommentReplyRecords(input: ListPollCommentRepliesRecordInput) {
+  const context = {
+    kind: 'comment-replies',
+    order: 'oldest',
+    pollId: input.pollId,
+    rootId: input.commentId,
+    owner: input.owner
+  } as const;
+  const cursor = input.cursor?.startsWith('c1.')
+    ? decodeChronologicalPollCursor(input.cursor, context)
+    : undefined;
+  const legacyBoundary = input.cursor !== undefined && cursor === undefined
+    ? decodeLegacyReplyCursor(input.cursor, { expiresAt: env.LEGACY_REPLIES_CURSOR_V0_EXPIRES_AT })
+    : undefined;
+  const boundary = cursor?.boundary ?? legacyBoundary;
+  const client = await db.connect();
+
+  try {
+    return await withPollReadSnapshot(client, async () => {
+      const rootResult = await client.query<{ id: string }>(
+        `
+          SELECT c.id
+          FROM comments c
+          JOIN polls p ON p.id = c.poll_id
+          JOIN users poll_author ON poll_author.id = p.author_id
+          JOIN users root_author ON root_author.id = c.author_id
+          WHERE c.id = $1
+            AND c.poll_id = $2
+            AND c.parent_comment_id IS NULL
+            AND c.deleted_at IS NULL
+            AND root_author.status = 'active'
+            AND root_author.deleted_at IS NULL
+            AND p.visibility = 'public'
+            AND p.deleted_at IS NULL
+            AND poll_author.status = 'active'
+            AND poll_author.deleted_at IS NULL
+        `,
+        [input.commentId, input.pollId]
+      );
+
+      if (rootResult.rowCount === 0) return { status: 'not_found' as const };
+
+      const repliesResult = await client.query<PollCommentPageRow>(
+        `
+          WITH available_replies AS NOT MATERIALIZED (
+            SELECT c.id, c.created_at
+            FROM comments c
+            JOIN users u ON u.id = c.author_id
+            WHERE c.poll_id = $1
+              AND c.parent_comment_id = $2
+              AND c.deleted_at IS NULL
+              AND u.status = 'active'
+              AND u.deleted_at IS NULL
+          ),
+          high_watermark AS (
+            SELECT
+              id,
+              created_at AS raw_created_at,
+              to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
+            FROM available_replies
+            ORDER BY raw_created_at DESC, id DESC
+            LIMIT 1
+          ),
+          page_candidates AS MATERIALIZED (
+            SELECT
+              available_replies.id,
+              available_replies.created_at,
+              to_char(available_replies.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
+              high_watermark.cursor_created_at AS high_watermark_created_at,
+              high_watermark.id AS high_watermark_id
+            FROM available_replies
+            CROSS JOIN high_watermark
+            WHERE ($3::timestamptz IS NULL OR (available_replies.created_at, available_replies.id) > ($3::timestamptz, $4::uuid))
+              AND (available_replies.created_at, available_replies.id) <= (
+                COALESCE($5::timestamptz, high_watermark.raw_created_at),
+                COALESCE($6::uuid, high_watermark.id)
+              )
+            ORDER BY available_replies.created_at ASC, available_replies.id ASC
+            LIMIT $7
+          ),
+          page_rows AS (
+            SELECT
+              c.id,
+              c.poll_id,
+              c.author_id,
+              u.username::text AS author_username,
+              pr.display_name AS author_display_name,
+              pr.avatar_object_key AS author_avatar_object_key,
+              c.body,
+              c.likes_count,
+              EXISTS (
+                SELECT 1 FROM likes l
+                WHERE l.comment_id = c.id AND l.user_id = $8
+              ) AS viewer_has_liked,
+              c.parent_comment_id,
+              0::int AS replies_count,
+              c.created_at,
+              c.updated_at,
+              page_candidates.cursor_created_at,
+              page_candidates.high_watermark_created_at,
+              page_candidates.high_watermark_id
+            FROM page_candidates
+            JOIN comments c ON c.id = page_candidates.id
+            JOIN users u ON u.id = c.author_id
+            JOIN profiles pr ON pr.user_id = c.author_id
+          )
+          SELECT *
+          FROM page_rows
+          ORDER BY created_at ASC, id ASC
+        `,
+        [
+          input.pollId,
+          input.commentId,
+          boundary?.createdAt ?? null,
+          boundary?.id ?? null,
+          cursor?.highWatermark.createdAt ?? null,
+          cursor?.highWatermark.id ?? null,
+          input.limit + 1,
+          input.viewerId ?? null
+        ]
+      );
+
+      const hasNextPage = repliesResult.rows.length > input.limit;
+      const pageRows = hasNextPage ? repliesResult.rows.slice(0, input.limit) : repliesResult.rows;
+      return {
+        status: 'found' as const,
+        items: pageRows.map(mapComment),
+        nextCursor: nextCommentPageCursor({
+          context,
+          pageRows,
+          hasNextPage,
+          highWatermark: cursor?.highWatermark
+        })
+      };
+    });
+  } finally {
+    client.release();
+  }
+}
+
+export async function findViewablePollCommentRecordById(input: {
+  pollId: string;
+  commentId: string;
+  viewerId: string;
+}) {
+  const client = await db.connect();
+
+  try {
+    const result = await client.query<PollCommentRow>(
+      `
+        SELECT
+          c.id,
+          c.poll_id,
+          c.author_id,
+          u.username::text AS author_username,
+          pr.display_name AS author_display_name,
+          pr.avatar_object_key AS author_avatar_object_key,
+          c.body,
+          c.likes_count,
+          EXISTS (
+            SELECT 1 FROM likes l
+            WHERE l.comment_id = c.id AND l.user_id = $3
+          ) AS viewer_has_liked,
+          c.parent_comment_id,
+          (
+            SELECT count(*)::int
+            FROM comments r
+            WHERE r.parent_comment_id = c.id
+              AND r.deleted_at IS NULL
+          ) AS replies_count,
+          c.created_at,
+          c.updated_at
+        FROM comments c
+        JOIN polls p ON p.id = c.poll_id
+        JOIN users poll_author ON poll_author.id = p.author_id
+        JOIN users u ON u.id = c.author_id
+        JOIN profiles pr ON pr.user_id = c.author_id
+        WHERE c.id = $1
+          AND c.poll_id = $2
+          AND c.deleted_at IS NULL
+          AND (
+            c.parent_comment_id IS NULL
+            OR EXISTS (
+              SELECT 1
+              FROM comments parent
+              WHERE parent.id = c.parent_comment_id
+                AND parent.poll_id = c.poll_id
+                AND parent.parent_comment_id IS NULL
+                AND parent.deleted_at IS NULL
+            )
+          )
+          AND p.deleted_at IS NULL
+          AND p.visibility = 'public'
+          AND poll_author.status = 'active'
+          AND poll_author.deleted_at IS NULL
+          AND u.status = 'active'
+          AND u.deleted_at IS NULL
+      `,
+      [input.commentId, input.pollId, input.viewerId]
+    );
+
+    return result.rows[0] ? mapComment(result.rows[0]) : null;
+  } finally {
+    client.release();
+  }
+}
+
+export async function createPollCommentRecord(input: CreatePollCommentRecordInput) {
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+    await lockActiveAccount(client, input.authorId);
+    let notificationId: string | null = null;
+    let notificationRecipientId: string | null = null;
+    let parentAuthorId: string | null = null;
+
+    const pollResult = await client.query<{ id: string; author_id: string }>(
+      `
+        SELECT id, author_id
+        FROM polls
+        WHERE id = $1
+          AND visibility = 'public'
+          AND deleted_at IS NULL
+        FOR UPDATE
+      `,
+      [input.pollId]
+    );
+
+    if (pollResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    if (input.parentCommentId) {
+      const parentResult = await client.query<{ id: string; author_id: string }>(
+        `
+          SELECT id, author_id
+          FROM comments
+          WHERE id = $1
+            AND poll_id = $2
+            AND parent_comment_id IS NULL
+            AND deleted_at IS NULL
+          FOR UPDATE
+        `,
+        [input.parentCommentId, input.pollId]
+      );
+
+      if (parentResult.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return { status: 'not_found' as const };
+      }
+      parentAuthorId = parentResult.rows[0]?.author_id ?? null;
+    }
+
+    const commentResult = await client.query<PollCommentRow>(
+      `
+        WITH inserted_comment AS (
+          INSERT INTO comments (poll_id, author_id, body, parent_comment_id)
+          VALUES ($1, $2, $3, $4)
+          RETURNING
+            id,
+            poll_id,
+            author_id,
+            body,
+            likes_count,
+            parent_comment_id,
+            created_at,
+            updated_at
+        )
+        SELECT
+          c.id,
+          c.poll_id,
+          c.author_id,
+          u.username::text AS author_username,
+          pr.display_name AS author_display_name,
+          pr.avatar_object_key AS author_avatar_object_key,
+          c.body,
+          c.likes_count,
+          false AS viewer_has_liked,
+          c.parent_comment_id,
+          0::int AS replies_count,
+          c.created_at,
+          c.updated_at
+        FROM inserted_comment c
+        JOIN users u ON u.id = c.author_id
+        JOIN profiles pr ON pr.user_id = c.author_id
+      `,
+      [input.pollId, input.authorId, input.body, input.parentCommentId ?? null]
+    );
+
+    const comment = commentResult.rows[0];
+
+    if (!comment) {
+      await client.query('ROLLBACK');
+      throw new Error('Comment insert did not return a row.');
+    }
+
+    if (input.parentCommentId) {
+      if (parentAuthorId && parentAuthorId !== input.authorId) {
+        notificationRecipientId = parentAuthorId;
+        notificationId = (await createNotification({
+          recipientUserId: parentAuthorId,
+          actorUserId: input.authorId,
+          type: 'comment_reply',
+          pollId: input.pollId,
+          commentId: comment.id,
+          deduplicationKey: `comment_reply:${comment.id}:${parentAuthorId}`
+        }, client)).id;
+      }
+    } else if (pollResult.rows[0].author_id !== input.authorId) {
+      notificationRecipientId = pollResult.rows[0].author_id;
+      notificationId = (await createNotification({
+        recipientUserId: notificationRecipientId,
+        actorUserId: input.authorId,
+        type: 'comment',
+        pollId: input.pollId,
+        commentId: comment.id,
+        deduplicationKey: `comment:${comment.id}:${notificationRecipientId}`
+      }, client)).id;
+    }
+
+    await client.query(
+      `
+        UPDATE polls
+        SET comments_count = comments_count + 1,
+            comments_revision = comments_revision + 1
+        WHERE id = $1
+      `,
+      [input.pollId]
+    );
+
+    const [poll] = await hydratePolls(client, [input.pollId], input.authorId);
+
+    if (!poll) {
+      await client.query('ROLLBACK');
+      throw new Error('Updated poll could not be loaded.');
+    }
+
+    await client.query('COMMIT');
+
+    if (notificationId && notificationRecipientId) {
+      await publishNotificationAfterCommit(notificationRecipientId, notificationId);
+    }
+
+    return {
+      status: 'created' as const,
+      comment: mapComment(comment),
+      poll
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function findCommentForUpdate(client: PoolClient, commentId: string) {
+  const result = await client.query<PollCommentRow>(
+    `
+      SELECT
+        c.id, c.poll_id, c.author_id,
+        u.username::text AS author_username,
+        pr.display_name AS author_display_name,
+        pr.avatar_object_key AS author_avatar_object_key,
+        c.body, c.likes_count,
+        false AS viewer_has_liked,
+        c.parent_comment_id,
+        (
+          SELECT count(*)::int
+          FROM comments r
+          WHERE r.parent_comment_id = c.id
+            AND r.deleted_at IS NULL
+        ) AS replies_count,
+        c.created_at, c.updated_at
+      FROM comments c
+      JOIN polls p ON p.id = c.poll_id
+      JOIN users u ON u.id = c.author_id
+      JOIN profiles pr ON pr.user_id = c.author_id
+      WHERE c.id = $1
+        AND p.visibility = 'public'
+        AND p.deleted_at IS NULL
+        AND c.deleted_at IS NULL
+      FOR UPDATE OF c
+    `,
+    [commentId]
+  );
+
+  return result.rows[0] ?? null;
+}
+
+export async function likeCommentRecord(input: { pollId: string; commentId: string; userId: string }) {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    await lockActiveAccount(client, input.userId);
+    let notificationId: string | null = null;
+    let notificationRecipientId: string | null = null;
+    const comment = await findCommentForUpdate(client, input.commentId);
+    if (!comment || comment.poll_id !== input.pollId) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    const result = await client.query(
+      `INSERT INTO likes (user_id, comment_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [input.userId, input.commentId]
+    );
+    if (result.rowCount === 1) {
+      await client.query(
+        'UPDATE comments SET likes_count = likes_count + 1 WHERE id = $1',
+        [input.commentId]
+      );
+      if (comment.author_id !== input.userId) {
+        notificationRecipientId = comment.author_id;
+        notificationId = (await createNotification({
+          recipientUserId: comment.author_id,
+          actorUserId: input.userId,
+          type: 'like',
+          pollId: input.pollId,
+          commentId: input.commentId,
+          deduplicationKey: `like:comment:${input.commentId}:${input.userId}`
+        }, client)).id;
+      }
+    }
+
+    const updated = await client.query<PollCommentRow>(
+      `
+        SELECT c.id, c.poll_id, c.author_id,
+          u.username::text AS author_username,
+          pr.display_name AS author_display_name,
+          pr.avatar_object_key AS author_avatar_object_key,
+          c.body, c.likes_count, true AS viewer_has_liked,
+          c.parent_comment_id,
+          (
+            SELECT count(*)::int
+            FROM comments r
+            WHERE r.parent_comment_id = c.id
+              AND r.deleted_at IS NULL
+          ) AS replies_count,
+          c.created_at, c.updated_at
+        FROM comments c
+        JOIN users u ON u.id = c.author_id
+        JOIN profiles pr ON pr.user_id = c.author_id
+        WHERE c.id = $1
+      `,
+      [input.commentId]
+    );
+    await client.query('COMMIT');
+    if (notificationId && notificationRecipientId) {
+      await publishNotificationAfterCommit(notificationRecipientId, notificationId);
+    }
+    return { status: 'liked' as const, comment: mapComment(updated.rows[0]) };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function unlikeCommentRecord(input: { pollId: string; commentId: string; userId: string }) {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    await lockActiveAccount(client, input.userId);
+    const comment = await findCommentForUpdate(client, input.commentId);
+    if (!comment || comment.poll_id !== input.pollId) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    const result = await client.query(
+      'DELETE FROM likes WHERE user_id = $1 AND comment_id = $2',
+      [input.userId, input.commentId]
+    );
+    if (result.rowCount === 1) {
+      await client.query(
+        'UPDATE comments SET likes_count = GREATEST(likes_count - 1, 0) WHERE id = $1',
+        [input.commentId]
+      );
+    }
+
+    const updated = await client.query<PollCommentRow>(
+      `
+        SELECT c.id, c.poll_id, c.author_id,
+          u.username::text AS author_username,
+          pr.display_name AS author_display_name,
+          pr.avatar_object_key AS author_avatar_object_key,
+          c.body, c.likes_count, false AS viewer_has_liked,
+          c.parent_comment_id,
+          (
+            SELECT count(*)::int
+            FROM comments r
+            WHERE r.parent_comment_id = c.id
+              AND r.deleted_at IS NULL
+          ) AS replies_count,
+          c.created_at, c.updated_at
+        FROM comments c
+        JOIN users u ON u.id = c.author_id
+        JOIN profiles pr ON pr.user_id = c.author_id
+        WHERE c.id = $1
+      `,
+      [input.commentId]
+    );
+    await client.query('COMMIT');
+    return { status: 'unliked' as const, comment: mapComment(updated.rows[0]) };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function likePollRecord(input: {
+  pollId: string;
+  userId: string;
+}) {
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+    await lockActiveAccount(client, input.userId);
+    let notificationId: string | null = null;
+
+    const pollResult = await client.query<{ id: string; author_id: string }>(
+      `
+        SELECT id, author_id
+        FROM polls
+        WHERE id = $1
+          AND visibility = 'public'
+          AND deleted_at IS NULL
+        FOR UPDATE
+      `,
+      [input.pollId]
+    );
+
+    if (pollResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    const likeResult = await client.query<{ id: string }>(
+      `
+        INSERT INTO likes (user_id, poll_id)
+        VALUES ($1, $2)
+        ON CONFLICT DO NOTHING
+        RETURNING id
+      `,
+      [input.userId, input.pollId]
+    );
+
+    if (likeResult.rowCount === 1) {
+      if (pollResult.rows[0].author_id !== input.userId) {
+        notificationId = (await createNotification({
+          recipientUserId: pollResult.rows[0].author_id,
+          actorUserId: input.userId,
+          type: 'like',
+          pollId: input.pollId,
+          deduplicationKey: `like:poll:${input.pollId}:${input.userId}`
+        }, client)).id;
+      }
+      await client.query(
+        `
+          UPDATE polls
+          SET likes_count = likes_count + 1,
+              likes_revision = likes_revision + 1
+          WHERE id = $1
+        `,
+        [input.pollId]
+      );
+    }
+
+    const [poll] = await hydratePolls(client, [input.pollId], input.userId);
+
+    await client.query('COMMIT');
+
+    if (notificationId) {
+      await publishNotificationAfterCommit(pollResult.rows[0].author_id, notificationId);
+    }
+
+    return {
+      status: 'liked' as const,
+      poll
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function unlikePollRecord(input: {
+  pollId: string;
+  userId: string;
+}) {
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+    await lockActiveAccount(client, input.userId);
+
+    const pollResult = await client.query<{ id: string }>(
+      `
+        SELECT id
+        FROM polls
+        WHERE id = $1
+          AND visibility = 'public'
+          AND deleted_at IS NULL
+        FOR UPDATE
+      `,
+      [input.pollId]
+    );
+
+    if (pollResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    const unlikeResult = await client.query<{ id: string }>(
+      `
+        DELETE FROM likes
+        WHERE user_id = $1
+          AND poll_id = $2
+        RETURNING id
+      `,
+      [input.userId, input.pollId]
+    );
+
+    if (unlikeResult.rowCount === 1) {
+      await client.query(
+        `
+          UPDATE polls
+          SET likes_count = GREATEST(likes_count - 1, 0),
+              likes_revision = likes_revision + 1
+          WHERE id = $1
+        `,
+        [input.pollId]
+      );
+    }
+
+    const [poll] = await hydratePolls(client, [input.pollId], input.userId);
+
+    await client.query('COMMIT');
+
+    return {
+      status: 'unliked' as const,
+      poll
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function createVoteRecord(input: {
+  pollId: string;
+  optionId: string;
+  voterId: string;
+}) {
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+    await lockActiveAccount(client, input.voterId);
+    let notificationId: string | null = null;
+
+    const pollResult = await client.query<{
+      id: string;
+      author_id: string;
+      ends_at: Date | null;
+      option_id: string | null;
+    }>(
+      `
+        SELECT p.id, p.author_id, p.ends_at, po.id AS option_id
+        FROM polls p
+        LEFT JOIN poll_options po
+          ON po.poll_id = p.id
+          AND po.id = $2
+        WHERE p.id = $1
+          AND p.visibility = 'public'
+          AND p.deleted_at IS NULL
+        FOR UPDATE OF p
+      `,
+      [input.pollId, input.optionId]
+    );
+
+    const poll = pollResult.rows[0];
+
+    if (!poll || !poll.option_id) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    if (poll.ends_at && poll.ends_at <= new Date()) {
+      await client.query('ROLLBACK');
+      return { status: 'closed' as const };
+    }
+
+    const voteResult = await client.query<{ id: string }>(
+      `
+        INSERT INTO poll_votes (poll_id, option_id, voter_id)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (poll_id, voter_id) DO NOTHING
+        RETURNING id
+      `,
+      [input.pollId, input.optionId, input.voterId]
+    );
+
+    if (voteResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return { status: 'already_voted' as const };
+    }
+
+    const optionResult = await client.query<{ votes_count: number }>(
+      `
+        UPDATE poll_options
+        SET votes_count = votes_count + 1
+        WHERE id = $1
+        RETURNING votes_count
+      `,
+      [input.optionId]
+    );
+
+    await client.query(
+      `
+        UPDATE polls
+        SET votes_count = votes_count + 1,
+            votes_revision = votes_revision + 1
+        WHERE id = $1
+      `,
+      [input.pollId]
+    );
+
+    if (poll.author_id !== input.voterId) {
+      notificationId = (await createNotification({
+        recipientUserId: poll.author_id,
+        actorUserId: input.voterId,
+        type: 'poll_vote',
+        pollId: input.pollId,
+        deduplicationKey: `poll_vote:${input.pollId}:${input.voterId}`
+      }, client)).id;
+    }
+
+    const [updatedPoll] = await hydratePolls(client, [input.pollId], input.voterId);
+
+    await client.query('COMMIT');
+
+    if (notificationId) {
+      await publishNotificationAfterCommit(poll.author_id, notificationId);
+    }
+
+    return {
+      status: 'created' as const,
+      optionVotesCount: optionResult.rows[0]?.votes_count ?? 0,
+      poll: updatedPoll
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function cancelVoteRecord(input: {
+  pollId: string;
+  voterId: string;
+}) {
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+    await lockActiveAccount(client, input.voterId);
+
+    const pollResult = await client.query<{
+      id: string;
+      ends_at: Date | null;
+      allow_vote_cancellation: boolean;
+    }>(
+      `
+        SELECT p.id, p.ends_at, p.allow_vote_cancellation
+        FROM polls p
+        WHERE p.id = $1
+          AND p.visibility = 'public'
+          AND p.deleted_at IS NULL
+        FOR UPDATE
+      `,
+      [input.pollId]
+    );
+
+    const poll = pollResult.rows[0];
+
+    if (!poll) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    if (poll.ends_at && poll.ends_at <= new Date()) {
+      await client.query('ROLLBACK');
+      return { status: 'closed' as const };
+    }
+
+    if (!poll.allow_vote_cancellation) {
+      await client.query('ROLLBACK');
+      return { status: 'cancellation_not_allowed' as const };
+    }
+
+    const voteResult = await client.query<{ option_id: string }>(
+      `
+        DELETE FROM poll_votes
+        WHERE poll_id = $1
+          AND voter_id = $2
+        RETURNING option_id
+      `,
+      [input.pollId, input.voterId]
+    );
+
+    const optionId = voteResult.rows[0]?.option_id;
+
+    if (optionId) {
+      await client.query(
+        `
+          UPDATE poll_options
+          SET votes_count = GREATEST(votes_count - 1, 0)
+          WHERE id = $1
+        `,
+        [optionId]
+      );
+
+      await client.query(
+        `
+          UPDATE polls
+          SET votes_count = GREATEST(votes_count - 1, 0),
+              votes_revision = votes_revision + 1
+          WHERE id = $1
+        `,
+        [input.pollId]
+      );
+    }
+
+    const [updatedPoll] = await hydratePolls(client, [input.pollId], input.voterId);
+
+    await client.query('COMMIT');
+
+    return {
+      status: 'canceled' as const,
+      poll: updatedPoll
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function setVoteRecord(input: {
+  pollId: string;
+  optionId: string;
+  voterId: string;
+}) {
+  const client = await db.connect();
+
+  try {
+    await client.query('BEGIN');
+    await lockActiveAccount(client, input.voterId);
+
+    const pollResult = await client.query<{
+      id: string;
+      ends_at: Date | null;
+      option_id: string | null;
+    }>(
+      `
+        SELECT p.id, p.ends_at, po.id AS option_id
+        FROM polls p
+        LEFT JOIN poll_options po
+          ON po.poll_id = p.id
+          AND po.id = $2
+        WHERE p.id = $1
+          AND p.visibility = 'public'
+          AND p.deleted_at IS NULL
+        FOR UPDATE OF p
+      `,
+      [input.pollId, input.optionId]
+    );
+
+    const poll = pollResult.rows[0];
+
+    if (!poll || !poll.option_id) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
+
+    if (poll.ends_at && poll.ends_at <= new Date()) {
+      await client.query('ROLLBACK');
+      return { status: 'closed' as const };
+    }
+
+    const currentVoteResult = await client.query<{ option_id: string }>(
+      `
+        SELECT option_id
+        FROM poll_votes
+        WHERE poll_id = $1
+          AND voter_id = $2
+        FOR UPDATE
+      `,
+      [input.pollId, input.voterId]
+    );
+
+    const currentOptionId = currentVoteResult.rows[0]?.option_id;
+    let optionVotesCount = 0;
+
+    if (!currentOptionId) {
+      await client.query(
+        `
+          INSERT INTO poll_votes (poll_id, option_id, voter_id)
+          VALUES ($1, $2, $3)
+        `,
+        [input.pollId, input.optionId, input.voterId]
+      );
+
+      const optionResult = await client.query<{ votes_count: number }>(
+        `
+          UPDATE poll_options
+          SET votes_count = votes_count + 1
+          WHERE id = $1
+          RETURNING votes_count
+        `,
+        [input.optionId]
+      );
+
+      optionVotesCount = optionResult.rows[0]?.votes_count ?? 0;
+
+      await client.query(
+        `
+          UPDATE polls
+          SET votes_count = votes_count + 1,
+              votes_revision = votes_revision + 1
+          WHERE id = $1
+        `,
+        [input.pollId]
+      );
+    } else if (currentOptionId === input.optionId) {
+      const optionResult = await client.query<{ votes_count: number }>(
+        `
+          SELECT votes_count
+          FROM poll_options
+          WHERE id = $1
+        `,
+        [input.optionId]
+      );
+
+      optionVotesCount = optionResult.rows[0]?.votes_count ?? 0;
+    } else {
+      await client.query(
+        `
+          UPDATE poll_votes
+          SET option_id = $1
+          WHERE poll_id = $2
+            AND voter_id = $3
+        `,
+        [input.optionId, input.pollId, input.voterId]
+      );
+
+      await client.query(
+        `
+          UPDATE poll_options
+          SET votes_count = GREATEST(votes_count - 1, 0)
+          WHERE id = $1
+        `,
+        [currentOptionId]
+      );
+
+      const optionResult = await client.query<{ votes_count: number }>(
+        `
+          UPDATE poll_options
+          SET votes_count = votes_count + 1
+          WHERE id = $1
+          RETURNING votes_count
+        `,
+        [input.optionId]
+      );
+
+      optionVotesCount = optionResult.rows[0]?.votes_count ?? 0;
+    }
+
+    if (currentOptionId && currentOptionId !== input.optionId) {
+      await client.query(
+        'UPDATE polls SET votes_revision = votes_revision + 1 WHERE id = $1',
+        [input.pollId]
+      );
+    }
+
+    const [updatedPoll] = await hydratePolls(client, [input.pollId], input.voterId);
+
+    await client.query('COMMIT');
+
+    return {
+      status: 'set' as const,
+      operation: currentOptionId ? ('updated' as const) : ('created' as const),
+      optionVotesCount,
+      poll: updatedPoll
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}

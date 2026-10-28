@@ -1,0 +1,49 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link, Navigate, useNavigate, useNavigationType, useParams } from 'react-router-dom';
+import { followUser, getPublicProfile, listUserPolls, unfollowUser } from '../../api/profiles';
+import type { FollowRelationship, PublicProfile } from '../../api/models';
+import { useSession } from '../../app/session-provider';
+import { fetchPollQuery } from '../polls/poll-state';
+import { AsyncState } from '../../components/AsyncState';
+import { ContentEntryTransition } from '../../components/ContentEntryTransition';
+import { Avatar } from '../../components/Avatar';
+import { PollCard } from '../../components/PollCard';
+import { useListScrollState } from '../../core/scroll/useListScrollState';
+import { EntryMotion } from '../../core/motion/EntryMotion';
+import { followingGenerationQueryKey } from '../../core/pagination/pagination-state';
+
+function replaceFollowState(profile: PublicProfile, relationship: FollowRelationship): PublicProfile { return { ...profile, viewerIsFollowing: relationship.following, profile: { ...profile.profile, followersCount: relationship.followeeFollowersCount } }; }
+
+export function PublicProfilePage() {
+  const { userId = '' } = useParams(); const { status, user, sessionEpoch } = useSession(); const queryClient = useQueryClient(); const navigate = useNavigate();
+  const navigationType = useNavigationType();
+  const profileQuery = useQuery({ queryKey: ['profile', userId], queryFn: ({ signal }) => getPublicProfile(userId, signal), enabled: Boolean(userId) && status !== 'loading' });
+  const pollsQuery = useQuery({ queryKey: ['user-polls', userId], queryFn: ({ signal }) => fetchPollQuery(queryClient, user?.id ?? null, () => listUserPolls(userId, signal), true, signal), enabled: Boolean(userId) && status !== 'loading' });
+  const pollsScroll = useListScrollState(
+    { userId: user?.id ?? null, route: `/users/${userId}`, list: 'user-polls', query: '', filter: userId, sort: '' },
+    { itemIds: pollsQuery.data?.map((poll) => poll.id) ?? [], restoreFocusOnPop: navigationType === 'POP' },
+  );
+  const profileEntryContext = `profile:${sessionEpoch}:${user?.id ?? 'anonymous'}:${userId}`;
+  const followMutation = useMutation({ mutationFn: (following: boolean) => following ? unfollowUser(userId) : followUser(userId), onSuccess: (relationship) => {
+    queryClient.setQueryData<PublicProfile>(['profile', userId], (profile) => profile ? replaceFollowState(profile, relationship) : profile);
+    if (user) queryClient.setQueryData<number>(followingGenerationQueryKey(sessionEpoch, user.id), (generation) => (generation ?? 0) + 1);
+  } });
+  if (user?.id === userId) return <Navigate to="/me" replace />;
+  if (profileQuery.isPending && !profileQuery.data) return <main id="main-content"><AsyncState state="loading" kind="user" rows={1} /></main>;
+  if (!profileQuery.data) return <main id="main-content"><AsyncState state="error" error={profileQuery.error} onRetry={() => void profileQuery.refetch()} /></main>;
+  const profile = profileQuery.data; const name = profile.profile.displayName || profile.username;
+  return <main id="main-content" className="profile-page">
+    <section className="profile-header" aria-labelledby="profile-name">
+      <Avatar name={name} src={profile.profile.avatarUrl} size={72} />
+      <div><h1 id="profile-name">{name}</h1><p>@{profile.username}</p>{profile.profile.bio ? <p>{profile.profile.bio}</p> : null}{profile.profile.countryCode ? <p>Country: {profile.profile.countryCode}</p> : null}</div>
+      <div className="profile-actions">{status === 'anonymous' ? <Link className="button" to={`/login?next=${encodeURIComponent(`/users/${userId}`)}`}>Login to follow</Link> : null}{user ? <button className="button" type="button" aria-pressed={profile.viewerIsFollowing} disabled={followMutation.isPending} onClick={() => followMutation.mutate(profile.viewerIsFollowing)}>{profile.viewerIsFollowing ? 'Following' : 'Follow'}</button> : null}<p className="profile-summary">{profile.profile.pollsCount} polls · {profile.profile.followersCount} followers · {profile.profile.followingCount} following</p></div>
+    </section>
+    <dl className="profile-stats" aria-label="Profile statistics"><div><dt>Polls</dt><dd>{profile.profile.pollsCount}</dd></div><div><dt>Followers</dt><dd>{profile.profile.followersCount}</dd></div><div><dt>Following</dt><dd>{profile.profile.followingCount}</dd></div></dl>
+    {followMutation.isError ? <p role="alert">{followMutation.error instanceof Error ? followMutation.error.message : 'Could not update follow status.'}</p> : null}
+    <section className="profile-polls" ref={pollsScroll.listRef} role="region" aria-label={`Polls by ${name}`} aria-busy={pollsQuery.isFetching}><h2 id="authored-polls">Polls by {name}</h2>{pollsQuery.isError && !pollsQuery.data ? <AsyncState state="error" error={pollsQuery.error} onRetry={() => void pollsQuery.refetch()} /> : null}{pollsQuery.data?.length === 0 ? <AsyncState state="empty" emptyMessage="This user has not posted any polls yet." /> : null}<ContentEntryTransition loading={pollsQuery.isPending && !pollsQuery.data} kind="poll" rows={2}>{pollsQuery.data?.map((poll, index) => <EntryMotion key={poll.id} contextKey={profileEntryContext} itemId={poll.id} visible indexInBatch={index}>
+      <PollCard poll={poll} viewerId={user?.id} onOpenComments={(openedPoll) => navigate(`/polls/${openedPoll.id}`)} />
+    </EntryMotion>)}</ContentEntryTransition></section>
+    {pollsQuery.isError && pollsQuery.data ? <AsyncState state="error" error={pollsQuery.error} onRetry={() => void pollsQuery.refetch()} /> : null}{pollsQuery.isFetching && pollsQuery.data ? <AsyncState state="refreshing" kind="poll" /> : null}
+    {profileQuery.isError ? <AsyncState state="error" error={profileQuery.error} onRetry={() => void profileQuery.refetch()} /> : null}{profileQuery.isFetching && profileQuery.data ? <AsyncState state="refreshing" kind="user" /> : null}
+  </main>;
+}
