@@ -20,7 +20,7 @@
 
 ## Gate перед staging
 
-- [ ] Закрыть T04, T13 и T24 либо внести отдельные письменные исключения Release Owner. На commit `4165cdf` задача T24 открыта, а поиск `VITE_FEED_PAGINATION` и `YASKAPP_FEED_PAGINATION` в исходниках не находит реализации; build-time controls ещё нельзя использовать для безопасного включения/отката.
+- [ ] Закрыть T04 и T13 либо внести отдельные письменные исключения Release Owner. T24 закрыта в commit `aaabd6e`: `VITE_FEED_PAGINATION` и `YASKAPP_FEED_PAGINATION` реализованы с default `false`; оба режима web build и default-off Flutter проверены локально (свидетельства — в task breakdown). Staging rollout и rollback smoke ещё не запускались.
 - [ ] Release Owner и QA Owner ознакомились с остатками T27. AC-01–18, TalkBack и полный API suite не были выполнены; Android feed 100, feed 1 000 и roots 1 000 превысили frame budget; все headless web workload превысили RAF budget. T26 staging load run отменён, server performance budgets не подтверждены. См. [матрицу T27](pagination-evidence/acceptance-matrix.md).
 - [ ] Принять явное Go/No-Go с указанными выше gaps; закрытие T27 по решению пользователя не является результатом PASS этих проверок.
 - [ ] Заполнить staging URL, ответственного оператора и защищённую конфигурацию на самом staging host. Не копировать `.env.staging`, JWT, cursor secret, токены или пользовательские данные в git/evidence.

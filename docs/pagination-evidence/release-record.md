@@ -9,7 +9,7 @@
 | Prepared | 2026-10-28 |
 | Staging verification start / end (UTC) | NOT RUN |
 | Limited rollout start / end (UTC) | NOT RUN |
-| Source commit reviewed | `4165cdf` — T27 pagination profiling and anchor fix |
+| Source commit reviewed | `aaabd6e` — T24 pagination rollout flags and popular/expired client work; includes T27 base |
 | API build / image digest | Не собран для T28 |
 | Web build ID | Не собран для T28 |
 | Android build ID | Не собран для T28 |
@@ -21,7 +21,7 @@
 | API/DB Operator | Не назначен |
 | Web Release Engineer | Не назначен |
 | Android Release Engineer | Не назначен |
-| Pagination build flags | В исходниках `4165cdf` не найдены; T24 остаётся открытой |
+| Pagination build flags | Реализованы в T24 commit `aaabd6e`: web `VITE_FEED_PAGINATION` и Flutter `YASKAPP_FEED_PAGINATION`, оба default `false`. Локальные builds с web `false`/`true`, web disabled-mode test и Flutter default-off проверены; см. T24 в [task breakdown](../superpowers/plans/2026-10-19-feed-comments-pagination-task-breakdown.md). Staging builds не запускались |
 | Legacy replies window | Не начато. Начало — timestamp первого production Android v1 cursor release; конец — +180 дней UTC |
 
 ## Результаты release verification
@@ -41,7 +41,7 @@
 
 T27 закрыта решением пользователя 2026-10-28 с частичными evidence. AC-01–18, TalkBack speech checks и полный API suite не запускались. Android workloads Feed 100 (35.90%), Feed 1 000 (10.83%) и roots 1 000 (5.12%) превысили порог 5%; headless web RAF workload показал 25.45–36.82% интервалов >16.7 ms. T26 staging load run не проводился, поэтому server performance targets остаются непроверенными. Подробности — [acceptance matrix](acceptance-matrix.md).
 
-Другие release blockers по текущему task breakdown: T04, T13 и T24 открыты. В частности, отсутствующие build-time flags не дают безопасно ограничить или выключить новую автодогрузку. Staging setup здесь не доступен: нет target URL и локального `services/api/.env.staging`.
+Другие release blockers по текущему task breakdown: T04 и T13 открыты. T24 закрыта в commit `aaabd6e`; локально проверены build-time flags с default `false`, но staging rollout и rollback smoke ещё не выполнялись. Staging setup здесь не доступен: нет target URL и локального `services/api/.env.staging`.
 
 **Release decision:** HOLD. Не расширять охват и не объявлять rollout готовым. Требуются named owners, staging target/access, закрытие или явное письменное принятие blockers и выполненные проверки из [release checklist](../pagination-release-checklist.md).
 
@@ -51,8 +51,8 @@ T27 закрыта решением пользователя 2026-10-28 с ча�
 |---|---|---|---|
 | Старый web/Android client → новый additive API | NOT RUN — staging target отсутствует | — | — |
 | Старый replies cursor → новый API | NOT RUN | — | — |
-| Новый web/Android client → legacy `{ items }` response | NOT RUN — T24 flags не реализованы | — | — |
-| Pagination flag off → первая страница, без append | NOT RUN — T24 flags не реализованы | — | — |
+| Новый web/Android client → legacy `{ items }` response | NOT RUN — staging target отсутствует | — | — |
+| Pagination flag off → первая страница, без append | NOT RUN на staging; локально web disabled-mode test и Flutter controller default-off проверяют первую страницу без append | См. T24 в [task breakdown](../superpowers/plans/2026-10-19-feed-comments-pagination-task-breakdown.md) | — |
 | API health, migrations 034/035, snapshot cleanup | NOT RUN | — | — |
 | Metrics observation window | NOT RUN — endpoint/build отсутствуют | — | — |
 
