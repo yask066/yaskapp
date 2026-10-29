@@ -62,6 +62,7 @@ The route rows below name the owner; this table maps each owner to its planned A
 | `POST /notifications/read-all` | UB-16 | Read-all touches only the viewer's available rows. | Suppressed rows do not reappear or affect the available unread count. |
 | `POST /reports` | UB-15 | Reporting a known blocked content ID remains possible; response does not reveal hidden content. | Control: A can report B after block without an auto-report or hidden payload. |
 | `GET /reports/mine` | UB-15 | Report ownership and evidence retention remain independent of personal blocks. | A can read their own report status; hidden B content is not added to the response. |
+| `GET /moderation/cases/:caseId` | UB-15 | Moderator case access and evidence retention follow moderator permissions independently of a target's personal block. | Control: the moderator fixture is blocked by B and can still read a case for B's comment; a non-moderator remains denied. |
 | `POST /auth/account-deletion/verification` | UB-15 | Verification stays available regardless of personal block state. | Deletion preparation succeeds; it does not retain extra block PII in the verification response. |
 | `GET /auth/account-deletion/status` | UB-15 | Status is private to the deleting account. | A cannot obtain B's status by any block or username-reuse path. |
 | `DELETE /auth/me` | UB-15 | Deletion clears block lifecycle data and does not transfer it to a reused username. | After delete/re-registration with the same username, the new UUID has no old relationship. |
@@ -89,4 +90,4 @@ The current API has no `GET /notifications/:id` route. UB-16's direct-read requi
 
 ## Explicitly unchanged surfaces
 
-Auth/session routes and moderation-only policy/case routes do not themselves act on another user's readable content. Their ordinary ownership, authentication, authorization, and deletion checks remain in force. In particular, UB-15 verifies moderator permissions separately; moderator role does not bypass user-block policy on ordinary profile, poll, or comment APIs.
+Auth/session routes and moderation-only policy and action routes retain their ordinary ownership and permission checks. The case-read control above verifies that an account's personal block does not remove a moderator's permission to review evidence; moderator role does not bypass user-block policy on ordinary profile, poll, or comment APIs.

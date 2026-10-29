@@ -31,6 +31,14 @@ test('user_blocking_fixture_expands_the_approved_scenario_matrix_deterministical
   assert.deepEqual(alpha.blockStates.map(({ blockedByA, blockedByB }) => [blockedByA, blockedByB]), [
     [false, false], [true, false], [false, true], [true, true]
   ]);
+  assert.deepEqual(alpha.moderationControl, {
+    moderatorKey: 'moderator',
+    targetOwnerKey: 'B',
+    targetType: 'comment',
+    targetId: alpha.comments.root.id,
+    blockerKey: 'B',
+    blockedKey: 'moderator'
+  });
 
   for (const authorKey of ['A', 'B', 'C']) {
     assert.deepEqual(
@@ -73,14 +81,24 @@ test('user_blocking_fixture_seed_is_repeatable_and_cleanup_is_limited_to_owned_i
   const beta = await seedUserBlockingFixtures(database, 'fixture-beta');
   const foreignUserId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
   const foreignPollId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  const fixtureAccountId = expandUserBlockingFixtures('fixture-alpha').accounts.find((account) => account.key === 'A')!.id;
   database.rows.get('users')?.set(foreignUserId, { id: foreignUserId, username: 'outside_fixture' });
   database.rows.get('polls')?.set(foreignPollId, { id: foreignPollId });
+  database.rows.get('follows')?.set('external-follow', {
+    follower_id: foreignUserId,
+    followee_id: fixtureAccountId
+  });
 
   assert.deepEqual(alpha.ids.accounts, expandUserBlockingFixtures('fixture-alpha').ids.accounts);
   assert.notDeepEqual(alpha.ids.accounts, beta.ids.accounts);
   assert.equal(database.rows.get('notifications')?.size, alpha.ids.notifications.length + beta.ids.notifications.length);
   assert.equal(database.rows.get('notification_push_jobs')?.size, alpha.ids.pushJobs.length + beta.ids.pushJobs.length);
 
+  await assert.rejects(cleanupUserBlockingFixtures(database, alpha), /outside the fixture/);
+  assert.equal(database.rows.get('follows')?.has('external-follow'), true);
+  assert.equal(database.rows.get('users')?.has(fixtureAccountId), true);
+
+  database.rows.get('follows')?.delete('external-follow');
   await cleanupUserBlockingFixtures(database, alpha);
 
   for (const [table, ids] of Object.entries(alpha.idsByTable)) {
@@ -103,6 +121,20 @@ class MemoryFixtureDatabase implements UserBlockingFixtureDatabase {
       query: async (sql: string, values: unknown[] = []) => {
         if (/^\s*(BEGIN|COMMIT|ROLLBACK)\b/i.test(sql)) return { rows: [], rowCount: 0 };
 
+        if (/^\s*SELECT 1\s+FROM follows f/i.test(sql)) {
+          const accountIds = new Set(values[0] as string[]);
+          const ownedPairs = new Set(
+            (JSON.parse(String(values[1])) as Array<{ follower_id: string; followee_id: string }>)
+              .map(({ follower_id, followee_id }) => `${follower_id}:${followee_id}`)
+          );
+          const rows = this.rows.get('follows') ?? new Map<string, Record<string, unknown>>();
+          const externalRows = [...rows.values()].filter((row) => {
+            const touchesFixture = accountIds.has(String(row.follower_id)) || accountIds.has(String(row.followee_id));
+            return touchesFixture && !ownedPairs.has(`${String(row.follower_id)}:${String(row.followee_id)}`);
+          });
+          return { rows: externalRows.slice(0, 1), rowCount: externalRows.length ? 1 : 0 };
+        }
+
         const insert = sql.match(/^\s*INSERT INTO ([a-z_]+)/i);
         if (insert) {
           const table = insert[1]!;
@@ -114,6 +146,16 @@ class MemoryFixtureDatabase implements UserBlockingFixtureDatabase {
           }
           this.rows.set(table, rows);
           return { rows: [], rowCount: records.length };
+        }
+
+        if (/^\s*DELETE FROM follows f\s+USING jsonb_to_recordset/i.test(sql)) {
+          const pairs = JSON.parse(String(values[0])) as Array<{ follower_id: string; followee_id: string }>;
+          const ownedPairs = new Set(pairs.map(({ follower_id, followee_id }) => `${follower_id}:${followee_id}`));
+          const rows = this.rows.get('follows') ?? new Map<string, Record<string, unknown>>();
+          for (const [key, row] of rows) {
+            if (ownedPairs.has(`${String(row.follower_id)}:${String(row.followee_id)}`)) rows.delete(key);
+          }
+          return { rows: [], rowCount: pairs.length };
         }
 
         const deletion = sql.match(/^\s*DELETE FROM ([a-z_]+) WHERE ([a-z_]+) = ANY/i);

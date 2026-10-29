@@ -106,6 +106,14 @@ export type ExpandedUserBlockingFixtures = {
     blockedByA: boolean;
     blockedByB: boolean;
   }>;
+  moderationControl: {
+    moderatorKey: 'moderator';
+    targetOwnerKey: 'B';
+    targetType: 'comment';
+    targetId: string;
+    blockerKey: 'B';
+    blockedKey: 'moderator';
+  };
   polls: FixturePoll[];
   pollOptions: Array<{ source_id: string; id: string; poll_id: string; text: string; position: number }>;
   comments: {
@@ -328,6 +336,14 @@ export function expandUserBlockingFixtures(seed: string): ExpandedUserBlockingFi
     currentUserId: accountId('reusedUsername')
   };
   const comments = { root, replies };
+  const moderationControl = {
+    moderatorKey: 'moderator' as const,
+    targetOwnerKey: 'B' as const,
+    targetType: 'comment' as const,
+    targetId: root.id,
+    blockerKey: 'B' as const,
+    blockedKey: 'moderator' as const
+  };
   const ids = {
     accounts: accounts.map((account) => account.id),
     polls: polls.map((poll) => poll.id),
@@ -362,6 +378,7 @@ export function expandUserBlockingFixtures(seed: string): ExpandedUserBlockingFi
     profiles,
     follows,
     blockStates: blockStates.map((state) => ({ ...state })),
+    moderationControl,
     polls,
     pollOptions,
     comments,
@@ -477,13 +494,37 @@ export async function cleanupUserBlockingFixtures(
   const client = await database.connect();
   try {
     await client.query('BEGIN');
+    const fixtureFollowPairs = fixture.idsByTable.follows.map((pair) => {
+      const [follower_id, followee_id] = pair.split(':');
+      if (!follower_id || !followee_id) throw new Error('Invalid fixture follow identifier.');
+      return { follower_id, followee_id };
+    });
+    const externalFollows = await client.query(
+      `SELECT 1
+       FROM follows f
+       WHERE (f.follower_id = ANY($1::uuid[]) OR f.followee_id = ANY($1::uuid[]))
+         AND NOT EXISTS (
+           SELECT 1
+           FROM jsonb_to_recordset($2::jsonb) AS fixture_record(follower_id uuid, followee_id uuid)
+           WHERE fixture_record.follower_id = f.follower_id
+             AND fixture_record.followee_id = f.followee_id
+         )
+       LIMIT 1`,
+      [fixture.ids.accounts, JSON.stringify(fixtureFollowPairs)]
+    ) as { rows?: unknown[] };
+    if (externalFollows.rows?.length) {
+      throw new Error('Refusing fixture cleanup: follow rows outside the fixture reference fixture accounts.');
+    }
     await client.query('DELETE FROM notification_push_jobs WHERE id = ANY($1::uuid[])', [fixture.ids.pushJobs]);
     await client.query('DELETE FROM notifications WHERE id = ANY($1::uuid[])', [fixture.ids.notifications]);
     await client.query('DELETE FROM comments WHERE id = ANY($1::uuid[])', [fixture.ids.comments]);
     await client.query('DELETE FROM poll_options WHERE id = ANY($1::uuid[])', [fixture.ids.pollOptions]);
     await client.query(
-      'DELETE FROM follows WHERE follower_id = ANY($1::uuid[]) OR followee_id = ANY($1::uuid[])',
-      [fixture.ids.accounts]
+      `DELETE FROM follows f
+       USING jsonb_to_recordset($1::jsonb) AS fixture_record(follower_id uuid, followee_id uuid)
+       WHERE fixture_record.follower_id = f.follower_id
+         AND fixture_record.followee_id = f.followee_id`,
+      [JSON.stringify(fixtureFollowPairs)]
     );
     await client.query('DELETE FROM profiles WHERE user_id = ANY($1::uuid[])', [fixture.ids.accounts]);
     await client.query('DELETE FROM polls WHERE id = ANY($1::uuid[])', [fixture.ids.polls]);
