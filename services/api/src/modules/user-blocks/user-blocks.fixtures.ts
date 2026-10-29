@@ -499,6 +499,15 @@ export async function cleanupUserBlockingFixtures(
       if (!follower_id || !followee_id) throw new Error('Invalid fixture follow identifier.');
       return { follower_id, followee_id };
     });
+    // FK inserts take KEY SHARE locks; hold stronger locks through the check and account deletion.
+    await client.query(
+      `SELECT id
+       FROM users
+       WHERE id = ANY($1::uuid[])
+       ORDER BY id
+       FOR UPDATE`,
+      [fixture.ids.accounts]
+    );
     const externalFollows = await client.query(
       `SELECT 1
        FROM follows f

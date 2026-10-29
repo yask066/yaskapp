@@ -94,7 +94,11 @@ test('user_blocking_fixture_seed_is_repeatable_and_cleanup_is_limited_to_owned_i
   assert.equal(database.rows.get('notifications')?.size, alpha.ids.notifications.length + beta.ids.notifications.length);
   assert.equal(database.rows.get('notification_push_jobs')?.size, alpha.ids.pushJobs.length + beta.ids.pushJobs.length);
 
+  const cleanupStart = database.queryLog.length;
   await assert.rejects(cleanupUserBlockingFixtures(database, alpha), /outside the fixture/);
+  const cleanupQueries = database.queryLog.slice(cleanupStart);
+  assert.match(cleanupQueries[1]!, /SELECT id\s+FROM users[\s\S]*FOR UPDATE/);
+  assert.match(cleanupQueries[2]!, /SELECT 1[\s\S]*FROM follows/);
   assert.equal(database.rows.get('follows')?.has('external-follow'), true);
   assert.equal(database.rows.get('users')?.has(fixtureAccountId), true);
 
@@ -115,11 +119,19 @@ test('user_blocking_fixture_seed_is_repeatable_and_cleanup_is_limited_to_owned_i
 
 class MemoryFixtureDatabase implements UserBlockingFixtureDatabase {
   readonly rows = new Map<string, Map<string, Record<string, unknown>>>();
+  readonly queryLog: string[] = [];
 
   async connect() {
     return {
       query: async (sql: string, values: unknown[] = []) => {
+        this.queryLog.push(sql);
         if (/^\s*(BEGIN|COMMIT|ROLLBACK)\b/i.test(sql)) return { rows: [], rowCount: 0 };
+
+        if (/^\s*SELECT id\s+FROM users[\s\S]*FOR UPDATE/i.test(sql)) {
+          const ids = new Set(values[0] as string[]);
+          const rows = this.rows.get('users') ?? new Map<string, Record<string, unknown>>();
+          return { rows: [...rows.values()].filter((row) => ids.has(String(row.id))), rowCount: ids.size };
+        }
 
         if (/^\s*SELECT 1\s+FROM follows f/i.test(sql)) {
           const accountIds = new Set(values[0] as string[]);
