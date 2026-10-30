@@ -9,8 +9,10 @@ describe('global responsive polish', () => {
   });
 
   it('stacks action groups and expands their buttons on narrow screens', () => {
-    expect(styles).toContain('.poll-card__actions, .form-actions { align-items: stretch; flex-direction: column; }');
-    expect(styles).toContain('.poll-card__actions .button, .form-actions .button { width: 100%; }');
+    expect(styles).toContain('.form-actions { align-items: stretch; flex-direction: column; }');
+    expect(styles).toContain('.form-actions .button { width: 100%; }');
+    // Poll reactions stay in one row: stacking them separated each icon from its count.
+    expect(styles).not.toMatch(/\.poll-card__actions[^{]*\{[^}]*flex-direction: column/);
   });
 
   it('reserves stable media, result, pending, and count geometry for poll cards', () => {

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigationType, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useNavigationType, useSearchParams } from 'react-router-dom';
 import { search } from '../../api/search';
 import { PollCard } from '../../components/PollCard';
 import { Avatar } from '../../components/Avatar';
@@ -8,6 +8,7 @@ import { AsyncState } from '../../components/AsyncState';
 import { ContentEntryTransition } from '../../components/ContentEntryTransition';
 import { useSession } from '../../app/session-provider';
 import { fetchPollQuery } from '../polls/poll-state';
+import { usePollMutations } from '../polls/usePollMutations';
 import { useListScrollState } from '../../core/scroll/useListScrollState';
 import { EntryMotion } from '../../core/motion/EntryMotion';
 type SearchType = 'all' | 'polls' | 'users'; type SearchSort = 'relevance' | 'newest' | 'popular';
@@ -15,6 +16,8 @@ export function SearchPage() {
   const { user, status, sessionEpoch } = useSession();
   const navigationType = useNavigationType();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const pollMutations = usePollMutations();
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState(() => searchParams.get('q') ?? '');
   const [type, setType] = useState<SearchType>(() => searchParams.get('type') === 'polls' || searchParams.get('type') === 'users' ? searchParams.get('type') as SearchType : 'all');
@@ -60,7 +63,7 @@ export function SearchPage() {
       <div className="search-results" ref={searchScroll.listRef} aria-busy={searchQuery.isFetching}>
         <section className="feed-list" aria-label="Poll results">
           {searchQuery.data?.items.filter((item) => item.type === 'poll').map((item, index) => <EntryMotion key={`poll-${item.poll.id}`} contextKey={searchEntryContext} itemId={`poll:${item.poll.id}`} visible indexInBatch={index}>
-            <PollCard poll={item.poll} viewerId={user?.id} />
+            <PollCard poll={item.poll} viewerId={user?.id} isVoting={pollMutations.isVoting(item.poll.id)} isLiking={pollMutations.isLiking(item.poll.id)} onVote={user ? (id, optionId) => pollMutations.vote({ pollId: id, optionId }) : undefined} onCancelVote={user ? pollMutations.cancelVote : undefined} onLike={user ? (id, viewerHasLiked) => pollMutations.toggleLike({ pollId: id, viewerHasLiked }) : undefined} onDelete={user ? pollMutations.deletePoll : undefined} onOpenComments={(openedPoll) => navigate(`/polls/${openedPoll.id}`)} />
           </EntryMotion>)}
         </section>
         <section className="people-results" aria-label="User results">

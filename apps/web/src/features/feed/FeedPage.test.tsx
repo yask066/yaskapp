@@ -781,7 +781,6 @@ test('pagination flag off keeps the first page and hides continuation', async ()
       ? cursorPage([{ ...poll, question: 'First page with pagination disabled?' }], 'cursor-1')
       : cursorPage([{ ...poll, id: 'poll-2', question: 'Unexpected second page?' }], null);
   }));
-  const user = userEvent.setup();
   try {
     renderFeed();
 
@@ -997,4 +996,34 @@ test('offers Refresh instead of a dead Load more button when the server repeats 
   expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Refresh this feed' })).toBeEnabled();
   expect(cursors).toEqual([null, 'cursor-1']);
+});
+
+test('follows a suggested person and refreshes the suggestions', async () => {
+  const followed: string[] = [];
+  let usersRequests = 0;
+  const suggested = {
+    id: 'user-2', username: 'real-user', status: 'active', viewerIsFollowing: false,
+    profile: { displayName: 'Real User', pollsCount: 4, followersCount: 12, followingCount: 2, countryCode: 'BY', bio: null, avatarObjectKey: null, avatarUrl: null },
+  };
+  server.use(
+    http.get('/auth/me', () => HttpResponse.json({ user: authenticatedUser })),
+    http.get('/polls', () => HttpResponse.json({ items: [poll] })),
+    http.get('/users', () => {
+      usersRequests += 1;
+      return HttpResponse.json({ items: [{ ...suggested, viewerIsFollowing: followed.length > 0 }] });
+    }),
+    http.post('/users/:userId/follow', ({ params }) => {
+      followed.push(String(params.userId));
+      return HttpResponse.json({ following: true, followerFollowingCount: 1, followeeFollowersCount: 13 });
+    }),
+  );
+  const user = userEvent.setup();
+  renderFeed();
+
+  expect(await screen.findByText('Real User')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Follow' }));
+
+  await waitFor(() => expect(followed).toEqual(['user-2']));
+  await waitFor(() => expect(screen.queryByText('Real User')).not.toBeInTheDocument());
+  expect(usersRequests).toBe(2);
 });

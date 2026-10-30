@@ -93,17 +93,17 @@ export const PollCard = memo(forwardRef<HTMLElement, PollCardProps>(function Pol
             })()
           ))}
         </fieldset>
-        {!onVote ? <p id={`poll-${poll.id}-vote-help`}>{voteHelp}</p> : null}
+        {!onVote ? <p className="poll-card__help" id={`poll-${poll.id}-vote-help`}>{voteHelp}</p> : null}
       </section>
       <footer className="poll-actions poll-card__actions">
         <button className={`poll-action-button${poll.viewerHasLiked ? ' is-liked' : ''}`} type="button" disabled={!onLike || isLiking} onClick={handleLike} aria-label={`Like (${formatFullCount(poll.likesCount)})`} aria-pressed={poll.viewerHasLiked} aria-busy={isLiking || undefined} aria-describedby={onLike ? undefined : `poll-${poll.id}-like-help`}>
           <MaterialIcon className="poll-action-icon" name={poll.viewerHasLiked ? 'favorite' : 'favorite_border'} /><span className="poll-action-label">Like</span> <span className="poll-action-count"><AnimatedCount value={poll.likesCount} enabled={reactionsEnabled} formatValue={formatCompactCount} /></span>{isLiking ? <span className="sr-only" role="status" aria-label="Updating like">Updating like…</span> : null}
         </button>
-        {!onLike ? <p id={`poll-${poll.id}-like-help`}>{likeHelp}</p> : null}
+        {!onLike ? <p className="poll-card__help" id={`poll-${poll.id}-like-help`}>{likeHelp}</p> : null}
         <button className="poll-action-button" type="button" disabled={!onOpenComments} onClick={() => onOpenComments?.(poll)} aria-label={`Comments (${formatFullCount(poll.commentsCount)})`} aria-describedby={onOpenComments ? undefined : `poll-${poll.id}-comments-help`}>
           <MaterialIcon className="poll-action-icon" name="mode_comment_outlined" /><span className="poll-action-label">Comments</span> <span className="poll-action-count">{formatCompactCount(poll.commentsCount)}</span>
         </button>
-        {!onOpenComments ? <p id={`poll-${poll.id}-comments-help`}>Comments are not available yet.</p> : null}
+        {!onOpenComments ? <p className="poll-card__help" id={`poll-${poll.id}-comments-help`}>Comments are not available yet.</p> : null}
       </footer>
     </article>
   );

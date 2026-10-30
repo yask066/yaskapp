@@ -68,3 +68,16 @@ test('staging Compose builds and exposes the public web service', () => {
   assert.match(stagingCompose, /web:\s*[\s\S]*?dockerfile: apps\/web\/Dockerfile/);
   assert.match(stagingCompose, /web:\s*[\s\S]*?expose:\s*- "80"/);
 });
+
+test('page loads of SPA routes that share an API prefix are served by the web client', () => {
+  const developmentIpSite = caddyfile.split('{$STAGING_API_DOMAIN')[0];
+  const publicWebHost = caddyfile.split('{$WEB_HOST:web-staging.example.com}')[1];
+
+  for (const site of [developmentIpSite, publicWebHost]) {
+    assert.match(site, /@spaNavigation\s*\{\s*method GET HEAD\s*header Accept \*text\/html\*\s*\}/);
+    for (const path of ['/polls*', '/users*', '/search*', '/notifications*']) {
+      const handler = new RegExp(`handle ${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{\\s*reverse_proxy @spaNavigation web:80\\s*reverse_proxy api:3000\\s*\\}`);
+      assert.match(site, handler);
+    }
+  }
+});

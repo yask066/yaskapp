@@ -27,3 +27,7 @@ test('Vite proxies the browser API paths used by the client', () => {
     assert.match(viteConfig, new RegExp(`'${path}':\\s*apiProxy`));
   }
 });
+
+test('Vite serves the SPA for page loads of routes that share an API prefix', () => {
+  assert.match(viteConfig, /bypass:[\s\S]*?text\/html[\s\S]*?'\/index\.html'/);
+});
