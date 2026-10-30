@@ -66,3 +66,18 @@ test('groups the poll editor into focused form sections', () => {
   expect(screen.getByRole('form', { name: 'Create a poll' })).toHaveClass('form-panel');
   expect(screen.getByRole('group', { name: 'Options' })).toHaveClass('poll-editor__options');
 });
+
+test('shows validation errors only after the first submit attempt', async () => {
+  const user = userEvent.setup();
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={['/polls/new']}>
+        <Routes><Route path="/polls/new" element={<CreatePollPage />} /></Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Create poll' }));
+  expect(screen.getByRole('alert')).toHaveTextContent('Question must contain 1 to 280 characters.');
+});

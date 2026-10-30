@@ -88,7 +88,6 @@ export function AuthPage({ mode }: AuthPageProps) {
           <input id="displayName" name="displayName" autoComplete="name" aria-describedby="display-name-description" />
         </> : null}
         {serverError ? <p className="auth-server-error" role="alert">{serverError}</p> : null}
-        {!isRegistration ? <a className="forgot-password-link" href="#forgot-password">Forgot password?</a> : null}
         {!isRegistration ? <Link className="forgot-password-link" to="/account-deletion">Delete a locked account</Link> : null}
         <button className="auth-submit button button--primary" type="submit" disabled={pending}>{pending ? 'Submitting…' : isRegistration ? 'Create account' : 'Sign in'}</button>
           </form>

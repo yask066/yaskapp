@@ -4,6 +4,7 @@ import { followUser, getPublicProfile, listUserPolls, unfollowUser } from '../..
 import type { FollowRelationship, PublicProfile } from '../../api/models';
 import { useSession } from '../../app/session-provider';
 import { fetchPollQuery } from '../polls/poll-state';
+import { usePollMutations } from '../polls/usePollMutations';
 import { AsyncState } from '../../components/AsyncState';
 import { ContentEntryTransition } from '../../components/ContentEntryTransition';
 import { Avatar } from '../../components/Avatar';
@@ -17,6 +18,7 @@ function replaceFollowState(profile: PublicProfile, relationship: FollowRelation
 export function PublicProfilePage() {
   const { userId = '' } = useParams(); const { status, user, sessionEpoch } = useSession(); const queryClient = useQueryClient(); const navigate = useNavigate();
   const navigationType = useNavigationType();
+  const pollMutations = usePollMutations();
   const profileQuery = useQuery({ queryKey: ['profile', userId], queryFn: ({ signal }) => getPublicProfile(userId, signal), enabled: Boolean(userId) && status !== 'loading' });
   const pollsQuery = useQuery({ queryKey: ['user-polls', userId], queryFn: ({ signal }) => fetchPollQuery(queryClient, user?.id ?? null, () => listUserPolls(userId, signal), true, signal), enabled: Boolean(userId) && status !== 'loading' });
   const pollsScroll = useListScrollState(
@@ -36,12 +38,12 @@ export function PublicProfilePage() {
     <section className="profile-header" aria-labelledby="profile-name">
       <Avatar name={name} src={profile.profile.avatarUrl} size={72} />
       <div><h1 id="profile-name">{name}</h1><p>@{profile.username}</p>{profile.profile.bio ? <p>{profile.profile.bio}</p> : null}{profile.profile.countryCode ? <p>Country: {profile.profile.countryCode}</p> : null}</div>
-      <div className="profile-actions">{status === 'anonymous' ? <Link className="button" to={`/login?next=${encodeURIComponent(`/users/${userId}`)}`}>Login to follow</Link> : null}{user ? <button className="button" type="button" aria-pressed={profile.viewerIsFollowing} disabled={followMutation.isPending} onClick={() => followMutation.mutate(profile.viewerIsFollowing)}>{profile.viewerIsFollowing ? 'Following' : 'Follow'}</button> : null}<p className="profile-summary">{profile.profile.pollsCount} polls · {profile.profile.followersCount} followers · {profile.profile.followingCount} following</p></div>
+      <div className="profile-actions">{status === 'anonymous' ? <Link className="button" to={`/login?next=${encodeURIComponent(`/users/${userId}`)}`}>Login to follow</Link> : null}{user ? <button className={profile.viewerIsFollowing ? 'button' : 'button button--primary'} type="button" aria-pressed={profile.viewerIsFollowing} disabled={followMutation.isPending} onClick={() => followMutation.mutate(profile.viewerIsFollowing)}>{profile.viewerIsFollowing ? 'Following' : 'Follow'}</button> : null}</div>
     </section>
     <dl className="profile-stats" aria-label="Profile statistics"><div><dt>Polls</dt><dd>{profile.profile.pollsCount}</dd></div><div><dt>Followers</dt><dd>{profile.profile.followersCount}</dd></div><div><dt>Following</dt><dd>{profile.profile.followingCount}</dd></div></dl>
     {followMutation.isError ? <p role="alert">{followMutation.error instanceof Error ? followMutation.error.message : 'Could not update follow status.'}</p> : null}
     <section className="profile-polls" ref={pollsScroll.listRef} role="region" aria-label={`Polls by ${name}`} aria-busy={pollsQuery.isFetching}><h2 id="authored-polls">Polls by {name}</h2>{pollsQuery.isError && !pollsQuery.data ? <AsyncState state="error" error={pollsQuery.error} onRetry={() => void pollsQuery.refetch()} /> : null}{pollsQuery.data?.length === 0 ? <AsyncState state="empty" emptyMessage="This user has not posted any polls yet." /> : null}<ContentEntryTransition loading={pollsQuery.isPending && !pollsQuery.data} kind="poll" rows={2}>{pollsQuery.data?.map((poll, index) => <EntryMotion key={poll.id} contextKey={profileEntryContext} itemId={poll.id} visible indexInBatch={index}>
-      <PollCard poll={poll} viewerId={user?.id} onOpenComments={(openedPoll) => navigate(`/polls/${openedPoll.id}`)} />
+      <PollCard poll={poll} viewerId={user?.id} isVoting={pollMutations.isVoting(poll.id)} isLiking={pollMutations.isLiking(poll.id)} onVote={user ? (id, optionId) => pollMutations.vote({ pollId: id, optionId }) : undefined} onCancelVote={user ? pollMutations.cancelVote : undefined} onLike={user ? (id, viewerHasLiked) => pollMutations.toggleLike({ pollId: id, viewerHasLiked }) : undefined} onDelete={user ? pollMutations.deletePoll : undefined} onOpenComments={(openedPoll) => navigate(`/polls/${openedPoll.id}`)} />
     </EntryMotion>)}</ContentEntryTransition></section>
     {pollsQuery.isError && pollsQuery.data ? <AsyncState state="error" error={pollsQuery.error} onRetry={() => void pollsQuery.refetch()} /> : null}{pollsQuery.isFetching && pollsQuery.data ? <AsyncState state="refreshing" kind="poll" /> : null}
     {profileQuery.isError ? <AsyncState state="error" error={profileQuery.error} onRetry={() => void profileQuery.refetch()} /> : null}{profileQuery.isFetching && profileQuery.data ? <AsyncState state="refreshing" kind="user" /> : null}

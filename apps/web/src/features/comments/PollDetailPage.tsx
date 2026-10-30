@@ -76,10 +76,10 @@ export function PollDetailPage() {
     <main id="main-content" className="detail-page">
       {pollQuery.isPending && !pollQuery.data ? <AsyncState state="loading" kind="poll" rows={1} /> : null}
       {pollQuery.isError && !pollQuery.data ? <AsyncState state="error" error={pollQuery.error} onRetry={() => void pollQuery.refetch()} /> : null}
-      {pollQuery.data ? <PollCard poll={pollQuery.data} viewerId={user?.id} isVoting={pollMutations.isVoting(pollId)} isLiking={pollMutations.isLiking(pollId)} onVote={user ? (id, optionId) => pollMutations.vote({ pollId: id, optionId }) : undefined} onCancelVote={user ? pollMutations.cancelVote : undefined} onLike={user ? (id, viewerHasLiked) => pollMutations.toggleLike({ pollId: id, viewerHasLiked }) : undefined} onDelete={user ? pollMutations.deletePoll : undefined} /> : null}
+      {pollQuery.data ? <PollCard poll={pollQuery.data} viewerId={user?.id} isVoting={pollMutations.isVoting(pollId)} isLiking={pollMutations.isLiking(pollId)} onVote={user ? (id, optionId) => pollMutations.vote({ pollId: id, optionId }) : undefined} onCancelVote={user ? pollMutations.cancelVote : undefined} onLike={user ? (id, viewerHasLiked) => pollMutations.toggleLike({ pollId: id, viewerHasLiked }) : undefined} onDelete={user ? pollMutations.deletePoll : undefined} onOpenComments={() => document.getElementById('comments-heading')?.scrollIntoView?.({ block: 'start' })} /> : null}
       <section className="comments-section" aria-labelledby="comments-heading">
         <header className="page-heading"><h1 id="comments-heading">Comments</h1></header>
-        {user ? <CommentForm onSubmit={async (body) => { await createMutation.mutateAsync({ body, epoch: pollSessionEpoch(queryClient) }); }} /> : <Link to={`/login?next=${encodeURIComponent(`/polls/${pollId}`)}`}>Login</Link>}
+        {user ? <CommentForm onSubmit={async (body) => { await createMutation.mutateAsync({ body, epoch: pollSessionEpoch(queryClient) }); }} /> : <p className="comments-sign-in"><Link to={`/login?next=${encodeURIComponent(`/polls/${pollId}`)}`}>Login</Link> to join the discussion.</p>}
         {pollId ? <CommentList
           pollId={pollId}
           currentUserId={user?.id}

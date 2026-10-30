@@ -7,6 +7,14 @@ http://{$STAGING_PUBLIC_IP:127.0.0.1} {
         Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
     }
 
+    # Browser page loads of SPA routes that share a prefix with the API
+    # (/polls/:id, /users/:id, /search, /notifications) must return the web app;
+    # fetch() requests do not send Accept: text/html and still reach the API.
+    @spaNavigation {
+        method GET HEAD
+        header Accept *text/html*
+    }
+
     handle /admin {
         redir /admin/ 308
     }
@@ -27,21 +35,25 @@ http://{$STAGING_PUBLIC_IP:127.0.0.1} {
         reverse_proxy api:3000
     }
     handle /polls* {
+        reverse_proxy @spaNavigation web:80
         reverse_proxy api:3000
     }
     handle /users* {
+        reverse_proxy @spaNavigation web:80
         reverse_proxy api:3000
     }
     handle /profiles* {
         reverse_proxy api:3000
     }
     handle /search* {
+        reverse_proxy @spaNavigation web:80
         reverse_proxy api:3000
     }
     handle /media/* {
         reverse_proxy api:3000
     }
     handle /notifications* {
+        reverse_proxy @spaNavigation web:80
         reverse_proxy api:3000
     }
     handle /notification-preferences* {
@@ -106,25 +118,37 @@ http://{$STAGING_PUBLIC_IP:127.0.0.1} {
         Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
     }
 
+    # Browser page loads of SPA routes that share a prefix with the API
+    # (/polls/:id, /users/:id, /search, /notifications) must return the web app;
+    # fetch() requests do not send Accept: text/html and still reach the API.
+    @spaNavigation {
+        method GET HEAD
+        header Accept *text/html*
+    }
+
     handle /auth/* {
         reverse_proxy api:3000
     }
     handle /polls* {
+        reverse_proxy @spaNavigation web:80
         reverse_proxy api:3000
     }
     handle /users* {
+        reverse_proxy @spaNavigation web:80
         reverse_proxy api:3000
     }
     handle /profiles* {
         reverse_proxy api:3000
     }
     handle /search* {
+        reverse_proxy @spaNavigation web:80
         reverse_proxy api:3000
     }
     handle /media/* {
         reverse_proxy api:3000
     }
     handle /notifications* {
+        reverse_proxy @spaNavigation web:80
         reverse_proxy api:3000
     }
     handle /notification-preferences* {

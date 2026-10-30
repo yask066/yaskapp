@@ -6,6 +6,9 @@ export default defineConfig(({ mode }) => {
   const apiProxy = {
     target: env.VITE_API_PROXY_TARGET ?? 'http://localhost:3000',
     changeOrigin: true,
+    // SPA routes such as /polls/:id share prefixes with the API; page loads go to the app.
+    bypass: (request: { headers: { accept?: string } }) =>
+      request.headers.accept?.includes('text/html') ? '/index.html' : undefined,
   };
 
   return {

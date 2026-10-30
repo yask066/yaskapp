@@ -23,6 +23,7 @@ export function CreatePollPage() {
   const [options, setOptions] = useState(['', '']);
   const [allowVoteCancellation, setAllowVoteCancellation] = useState(true);
   const [image, setImage] = useState<File>();
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const validationError = validate(question, options);
   const createMutation = useMutation({
     mutationFn: () => createPoll({ question: question.trim(), options: options.map((option) => option.trim()), allowVoteCancellation, image }),
@@ -34,6 +35,7 @@ export function CreatePollPage() {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setSubmitAttempted(true);
     if (!validationError && !createMutation.isPending) createMutation.mutate();
   }
 
@@ -43,7 +45,7 @@ export function CreatePollPage() {
       <form className="form-panel" aria-label="Create a poll" onSubmit={submit} noValidate>
         <div className="field"><label htmlFor="poll-question">Question</label>
         <textarea id="poll-question" value={question} maxLength={280} onChange={(event) => setQuestion(event.target.value)} required />
-        <p>{question.length}/280</p>
+        <p className="field-hint">{question.length}/280</p>
         </div><fieldset className="poll-editor__options">
           <legend>Options</legend>
           {options.map((option, index) => <div className="field-row" key={index}>
@@ -51,14 +53,14 @@ export function CreatePollPage() {
             <input id={`poll-option-${index}`} value={option} onChange={(event) => setOptions((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} required />
             {options.length > minimumOptions ? <button type="button" onClick={() => setOptions((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Remove option {index + 1}</button> : null}
           </div>)}
-          {options.length < maximumOptions ? <button className="button" type="button" onClick={() => setOptions((current) => [...current, ''])}>Add option</button> : null}
+          {options.length < maximumOptions ? <button className="button poll-editor__add-option" type="button" onClick={() => setOptions((current) => [...current, ''])}>Add option</button> : null}
         </fieldset>
-        <label className="field"><span><input type="checkbox" checked={allowVoteCancellation} onChange={(event) => setAllowVoteCancellation(event.target.checked)} /> Allow voters to cancel their vote</span></label>
+        <label className="field field--checkbox"><span><input type="checkbox" checked={allowVoteCancellation} onChange={(event) => setAllowVoteCancellation(event.target.checked)} /> Allow voters to cancel their vote</span></label>
         <div className="field"><label htmlFor="poll-image">Image</label>
         <input id="poll-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setImage(event.target.files?.[0])} />
-        </div>{validationError ? <p className="inline-alert" role="alert">{validationError}</p> : null}
+        </div>{validationError && submitAttempted ? <p className="inline-alert" role="alert">{validationError}</p> : null}
         {createMutation.error ? <p className="inline-alert" role="alert">{mutationErrorMessage(createMutation.error)}</p> : null}
-        <div className="form-actions"><button className="button button--primary" type="submit" disabled={Boolean(validationError) || createMutation.isPending}>{createMutation.isPending ? 'Creating poll…' : 'Create poll'}</button></div>
+        <div className="form-actions"><button className="button button--primary" type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? 'Creating poll…' : 'Create poll'}</button></div>
       </form>
     </main>
   );
