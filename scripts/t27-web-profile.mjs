@@ -9,12 +9,13 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 const repo = process.cwd();
 const dist = resolve(repo, 'apps/web/dist');
-const evidence = resolve(repo, 'docs/pagination-evidence');
+const evidence = resolve(repo, '.tmp/pagination-evidence');
 const tempRoot = process.env.T27_TEMP_DIR || join(tmpdir(), 'yaskapp-t27');
 const chromePath = process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 if (!existsSync(join(dist, 'index.html'))) throw new Error('Build the production web app before capture.');
 if (!existsSync(chromePath)) throw new Error('Chrome not found: ' + chromePath);
 mkdirSync(tempRoot, { recursive: true });
+mkdirSync(evidence, { recursive: true });
 const profileDir = join(tempRoot, 't27-chrome-' + process.pid);
 mkdirSync(profileDir, { recursive: true });
 
@@ -307,7 +308,7 @@ const tracePage = async (name, count) => {
     droppedFrameEvents: Array.isArray(parsed.traceEvents) ? parsed.traceEvents.filter((event) => event.name === 'DroppedFrame').length : null,
     beginFrameEvents: Array.isArray(parsed.traceEvents) ? parsed.traceEvents.filter((event) => event.name === 'BeginFrame').length : null,
     droppedFramePercent: Array.isArray(parsed.traceEvents) ? round(parsed.traceEvents.filter((event) => event.name === 'DroppedFrame').length * 100 / Math.max(1, parsed.traceEvents.filter((event) => event.name === 'BeginFrame').length)) : null,
-    tracePath: 'docs/pagination-evidence/' + file.split(/[\\/]/).at(-1),
+    tracePath: '.tmp/pagination-evidence/' + file.split(/[\\/]/).at(-1),
     traceBytesGzip: compressed.length,
     traceSha256: createHash('sha256').update(compressed).digest('hex'),
   };
@@ -402,7 +403,7 @@ const traceComments = async (name, count, withBranches = false) => {
     beginFrameEvents: begins,
     droppedFramePercent: round(dropped * 100 / Math.max(1, begins)),
     traceEventCount: parsed.traceEvents.length,
-    tracePath: 'docs/pagination-evidence/' + file.split(/[\\/]/).at(-1),
+    tracePath: '.tmp/pagination-evidence/' + file.split(/[\\/]/).at(-1),
     traceBytesGzip: compressed.length,
     traceSha256: createHash('sha256').update(compressed).digest('hex'),
   };

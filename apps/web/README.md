@@ -1,49 +1,36 @@
-# Yaskapp public web client
+# Публичный web
 
-The Vite application is served locally by the development server and as static
-files in staging.
+Подготовка API и инфраструктуры — в [корневом README](../../README.md#локальный-запуск).
+Команды из корня репозитория:
 
-## Local development
-
-Start the API and web development servers from the repository root:
-
-```bash
-npm run api:dev
+```sh
 npm run dev -w @yaskapp/web
+npm run build -w @yaskapp/web
 ```
 
-`VITE_API_PROXY_TARGET` changes the API target used by Vite's local `/api`
-proxy. It defaults to `http://localhost:3000`.
+`VITE_API_PROXY_TARGET` задаёт адрес API для dev proxy, по умолчанию
+`http://localhost:3000`. `VITE_API_BASE_URL` задаёт явный адрес API в собранном клиенте;
+для staging за Caddy оставить пустым, чтобы использовать текущий origin.
 
-`VITE_API_BASE_URL` changes the API base URL used by the built client. Leave
-it unset for same-origin requests through the staging web host.
+Авторизация — HttpOnly cookie `yaskapp_session`. Запросы отправляются с credentials;
+JWT не сохраняется в JavaScript storage.
 
-Motion rollout is controlled at build time by `VITE_REACTIONS_MOTION` and
-`VITE_ENTRY_MOTION`. Both default to off; only the exact value `true` enables a
-flag. Set them in the web build environment, then build and deploy the static
-client:
+## Флаги сборки
 
-```bash
-VITE_REACTIONS_MOTION=true VITE_ENTRY_MOTION=false npm run build -w @yaskapp/web
+`VITE_FEED_PAGINATION`, `VITE_REACTIONS_MOTION` и `VITE_ENTRY_MOTION` по умолчанию
+выключены. Только строка `true` включает соответствующий режим.
+
+Например, для локальной проверки реакций в PowerShell:
+
+```powershell
+$env:VITE_REACTIONS_MOTION = "true"
+npm run build -w @yaskapp/web
+Remove-Item Env:VITE_REACTIONS_MOTION
 ```
 
-Roll out reactions first, then entry motion after its smoke checks. To roll
-back, set the affected value to `false` (or leave it unset), rebuild, and
-deploy that build. These values are embedded in the generated files; there is
-no remote kill switch.
+Bash: `VITE_REACTIONS_MOTION=true npm run build -w @yaskapp/web`.
+Флаг встраивается в bundle; для отката пересобрать с `false` или без переменной.
+Dockerfile не объявляет build args этих флагов: переменные окружения хоста сами
+по себе не попадут в Docker build.
 
-Browser authentication uses an HttpOnly `yaskapp_session` cookie. The browser
-client sends requests with credentials and never reads or stores the JWT in
-JavaScript storage. The API also retains bearer-token responses for native
-clients during the migration.
-
-## Staging
-
-The public client is available at `WEB_HOST` (default:
-`web-staging.example.com`). Add its HTTPS origin to `CORS_ORIGINS` in
-`services/api/.env.staging` before deployment.
-
-For the temporary HTTP IP route, set `STAGING_PUBLIC_IP` in the same API
-environment. The API also trusts its exact `http://<STAGING_PUBLIC_IP>` origin
-for cookie-session writes, logout, and WebSocket connections. Rebuild and
-recreate the API containers after updating their code or environment.
+Условия включения и проверки — в [чек-листе выпуска](../../docs/staging-smoke-test.md).
