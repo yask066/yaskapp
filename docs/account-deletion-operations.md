@@ -1,131 +1,88 @@
-# Account Deletion Operations
+# Удаление аккаунтов
 
-## Current runtime: application database
+## Как это работает
 
-Self-service deletion is enabled by default (`ACCOUNT_DELETION_ENABLED=true`).
-Keep `ACCOUNT_DELETION_JOURNAL_ENABLED=false`: acceptance, account access
-revocation, cleanup steps, media manifest and outbox events are committed in
-one transaction in the application's existing PostgreSQL database. Neither a
-separate journal server nor cloud credentials are required. Redis and the
-existing self-hosted media storage remain the application's usual dependencies.
+По умолчанию `ACCOUNT_DELETION_ENABLED=true`, а
+`ACCOUNT_DELETION_JOURNAL_ENABLED=false`. Операция, отзыв доступа,
+шаги очистки, список медиа и outbox сохраняются одной транзакцией в основной
+PostgreSQL. Обычному развёртыванию отдельный журнал не нужен.
 
-The client verifies the password, explicitly confirms deletion with
-`DELETE /auth/me`, and retains a limited status receipt. Acceptance immediately
-revokes sessions and hides the account's content. The durable worker completes
-the existing seven cleanup steps and removes the user row. A retry returns the
-same operation. A process restart does not discard queued work.
+1. `POST /auth/account-deletion/verification` проверяет пароль. Для активной
+   сессии передаётся `password`, для отдельного входа, в том числе заблокированного
+   аккаунта, — `login` и `password`.
+2. Клиент получает `deletionToken` и `statusToken` с разными полномочиями.
+   Проверка пароля ещё не удаляет аккаунт.
+3. `DELETE /auth/me` с `Authorization: Bearer <deletionToken>` и
+   `{"confirm":true}` принимает удаление. Доступ отзывается, контент скрывается.
+4. Worker выполняет семь шагов очистки и удаляет строку пользователя.
+   `GET /auth/account-deletion/status` с `statusToken` работает и после удаления.
 
-## Deployment
+Статусы: `not_started → pending → processing/retrying → completed`.
+При timeout клиент проверяет статус: потерянный ответ не означает отказ операции.
+Повторное принятие возвращает ту же операцию. Токены не передаются в URL и логи;
+клиент сохраняет только квитанцию, необходимую для сверки.
+Точные поля — в [общем контракте](../packages/shared/src/account-deletion.ts).
 
-The normal staging stack includes `account-deletion-worker`; no extra overlay
-or journal env files are needed:
+## Worker и остановка новых запросов
+
+Локально:
 
 ```sh
-docker compose -f infra/docker/docker-compose.staging.yml up -d --build
-docker compose -f infra/docker/docker-compose.staging.yml ps
+npm run account-deletion:worker -w @yaskapp/api
+```
+
+В staging worker уже входит в [основной Compose](../infra/docker/docker-compose.staging.yml):
+
+```sh
 docker compose -f infra/docker/docker-compose.staging.yml logs --since 15m api account-deletion-worker
 ```
 
-The deployment runs database migrations before starting the API and worker.
-The older `docker-compose.account-deletion.staging.yml` remains a compatibility
-overlay for database-only deletion. If an old journal reconciler container
-exists, stop that service before applying the updated stack; it is no longer
-part of the deployment. Do not remove application or media volumes.
+Чтобы временно запретить новые удаления, задать переменную интерполяции Compose
+`ACCOUNT_DELETION_ENABLED=false` и пересоздать API. Worker продолжает уже принятые
+операции. При сбое процесса очередь сохраняется в БД.
 
-For local development, start the normal PostgreSQL, Redis and media services,
-run the migrations and API, then run the worker in another terminal:
+## Закрытый архив на 30 дней
 
-```sh
-npm run db:migrate
-npm run api:dev
-# In another terminal, from services/api so dotenv reads its .env:
-npm run account-deletion:worker
-```
+При самостоятельном и административном удалении транзакция сохраняет ограниченный
+архив для superadmin: идентификаторы и текст профиля, недавние IP, связанные дела,
+обжалования, санкции и содержимое жалоб. Повторное удаление не продлевает срок.
 
-The staging API can temporarily stop accepting new deletions with the Compose
-interpolation variable `ACCOUNT_DELETION_ENABLED=false`. Keep the worker running
-to finish already accepted requests. Outside Compose the API reads the same
-variable from its environment. `/health/ready` checks the usual application
-services; a separate journal is not checked in database-only mode.
+Архив не содержит паролей, хэшей паролей, сессий, токенов, аватаров, медиа и
+контента без жалоб. Восстановить аккаунт из него нельзя. Открытие записи аудируется,
+ответы помечаются `Cache-Control: no-store`. Обычные пользователи и модераторы
+доступа не имеют.
 
-## Verification
+По истечении 30 дней чтение закрывается независимо от работы worker.
+Worker физически удаляет просроченный архив, журнал доступа и старую историю IP;
+его остановка задерживает физическую очистку. История IP тоже хранится 30 дней.
 
-Use a dedicated database whose name contains `test` and a dedicated media test
-bucket. Set `DATABASE_URL` and `ACCOUNT_DELETION_TEST_DATABASE_URL` to that same
-database, plus the test Redis/media configuration. Apply migrations and run:
+Superadmin может запретить IP из действующего архива с указанием причины.
+Такие запреты и журнал действий независимы от архива и действуют до отмены.
+Собственный текущий IP оператора заблокировать нельзя. Проверяются новые HTTP-запросы
+и WebSocket handshakes; уже открытые WebSocket принудительно не отключаются.
+Health и маршруты удаления остаются доступны.
 
-```sh
-cd services/api
-node --import tsx --test --test-reporter spec src/modules/account-deletion/account-deletion.local.e2e.integration.test.ts
-```
+## Резервные копии
 
-This test uses real runtime adapters without journal settings. It checks native
-bearer sessions, browser cookies, blocked-account credentials, retries,
-cross-instance access revocation, hidden content, API restart, all cleanup
-steps, removed database rows, rejected login and retention.
+В обычном режиме состояние удаления входит в backup основной БД. Старый backup
+может вернуть ранее удалённые данные; автоматической независимой сверки нет.
+До открытия трафика после восстановления нужно проверить удаления, произошедшие
+после даты копии. Порядок backup/restore — в [эксплуатации](moderation-domain-deployment.md#резервные-копии).
 
-## Closed moderation archive (30 days)
+Код отдельного PostgreSQL-журнала и инструменты переноса оставлены для установок,
+которые его уже используют. Такой режим включается явно и требует URL, идентификатора,
+ключа подписи и полномочий retention. Его процедуры восстановления нельзя применять
+к обычному развёртыванию по умолчанию.
 
-Migration `033_deleted_account_archive.sql` adds the archive, IP history,
-archive access log, independent IP bans and ban action log to the application
-database. Both self-service acceptance and administrative deletion snapshot
-the record in the same transaction as the account closure. A failed closure
-rolls the archive back; a repeated closure does not extend its expiry.
+## Проверка
 
-Superadmins see **Deleted accounts** and **IP bans** in the moderation panel.
-Ordinary users and moderators have no archive/ban permission. Lists can be
-searched by username, email or account UUID. Opening a record is audited; all
-archive/ban API responses are marked `Cache-Control: no-store`. The browser
-keeps no archive in local storage and clears displayed records on logout.
-
-The archive contains account identifiers/profile text, recently recorded IPs,
-related moderation cases, reported text content, report descriptions, notes,
-sanctions and appeals as they stood at deletion. It excludes passwords,
-password hashes, sessions, tokens, avatars, media objects and unreported
-content. It cannot restore an account. Client deletion notices explain this
-30-day exception.
-
-IP encounters are recorded at successful registration/login and deletion
-verification, with a rolling 30-day history. Old IPs and already deleted
-accounts cannot be reconstructed retrospectively. IPv4-mapped IPv6 addresses
-are normalized. The API trusts forwarding headers only from private,
-link-local and loopback proxy peers; keep the API container private behind
-Caddy, which establishes the client forwarding chain.
-
-Archives are excluded from reads and ban creation at `expires_at`, even when
-the cleanup worker is stopped. The existing worker purges expired archives,
-their access logs and stale live IP history during its periodic retention
-pass. That pass runs before optional independent-journal retention, so a
-journal outage does not extend archive retention. Worker outages can delay
-physical cleanup; keep the worker running and monitor its errors.
-
-An IP ban can be created only for an address in an unexpired archive, with an
-explicit reason. Blocking the operator's current address is rejected. Bans
-and their action logs are independent of the archive and remain until revoked
-in **IP bans**. Enforcement checks incoming API requests, including
-registration/login and new realtime handshakes; existing upgraded connections
-are not forcibly disconnected by this change. Health and deletion-only routes
-remain available. A shared IP may belong to other people, so the UI asks for
-explicit confirmation. This is an IP restriction, not proof of a person's
-identity or a restriction on their future addresses.
-
-Run the additional integration test using the same isolated environment:
+Для интеграционных тестов нужна отдельная БД с `test` в имени и отдельный media bucket.
+`DATABASE_URL` и `ACCOUNT_DELETION_TEST_DATABASE_URL` должны указывать на одну
+тестовую БД. После миграций, из `services/api`:
 
 ```sh
-node --import tsx --test --test-reporter spec src/modules/account-deletion/account-deletion.archive.integration.test.ts
+node --import tsx --test src/modules/account-deletion/account-deletion.local.e2e.integration.test.ts src/modules/account-deletion/account-deletion.archive.integration.test.ts
 ```
 
-## Backups and previous journal tooling
-
-Deletion state now shares the application's database and backup lifecycle.
-Restoring an older database backup also restores its older deletion state;
-there is no independent replay guarantee in this mode. Apply the application's
-backup and restore policy accordingly.
-
-The independent PostgreSQL journal code and offline migration/restore tools
-remain available for existing installations. They are not used in the normal
-deployment. An installation deliberately retaining that older architecture must
-explicitly set `ACCOUNT_DELETION_JOURNAL_ENABLED=true` and configure its journal
-URL, identity, signing key and worker retention credentials; missing settings
-fail closed. Historical separate-journal release drills in the smoke-test
-record describe that optional architecture, not database-only acceptance.
+На staging проверить удаление тестового аккаунта, отзыв доступа на втором клиенте,
+восстановление worker после рестарта и достижение `completed`.

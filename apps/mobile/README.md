@@ -1,30 +1,31 @@
-# Yaskapp mobile client
+# Мобильное приложение
 
-## Motion rollout
+Сначала подготовить API по [корневому README](../../README.md#локальный-запуск).
+Команды выполняются из `apps/mobile`:
 
-Reactions and entry motion are independent build-time flags. Both default to
-off. For a local run with reactions enabled and entry motion disabled:
-
-```bash
-flutter run \
-  --dart-define=YASKAPP_REACTIONS_MOTION=true \
-  --dart-define=YASKAPP_ENTRY_MOTION=false
+```sh
+flutter pub get
+flutter run --dart-define=API_BASE_URL=http://192.168.0.10:3000 --dart-define=API_WEBSOCKET_URL=ws://192.168.0.10:3000/realtime
 ```
 
-Use the same defines when producing a release build, for example:
+Заменить `192.168.0.10` на доступный телефону адрес компьютера с API.
+Для Android Emulator обычно подходит `10.0.2.2`. Оба адреса должны вести
+в одно окружение; для HTTPS использовать `https://` и `wss://`.
 
-```bash
-flutter build appbundle --release \
-  --dart-define=YASKAPP_REACTIONS_MOTION=true \
-  --dart-define=YASKAPP_ENTRY_MOTION=false
+Значения в [ApiConfig](lib/src/core/config/api_config.dart) сейчас указывают на
+HTTP staging `5.44.44.197`. Перед локальной или release-сборкой задавать адреса явно.
+
+## Флаги сборки
+
+`YASKAPP_FEED_PAGINATION`, `YASKAPP_REACTIONS_MOTION` и `YASKAPP_ENTRY_MOTION`
+по умолчанию `false`. Пример проверки реакций:
+
+```sh
+flutter run --dart-define=API_BASE_URL=http://192.168.0.10:3000 --dart-define=API_WEBSOCKET_URL=ws://192.168.0.10:3000/realtime --dart-define=YASKAPP_REACTIONS_MOTION=true
 ```
 
-Enable reactions on a verified build first, then entry motion after its smoke
-checks. To roll back, build and distribute a new APK/app bundle with the
-affected flag set to `false` or omitted. These values are compiled into the
-application; there is no remote kill switch.
+Те же `--dart-define` используются с `flutter build apk` или
+`flutter build appbundle --release`. Для отката нужно собрать и распространить
+новую версию с `false` или без флага; удалённого переключателя нет.
 
-## Local development
-
-Run `flutter pub get`, then `flutter run` from this directory. See the
-[Flutter documentation](https://docs.flutter.dev/) for SDK setup.
+Проверки и ограничения выпуска — в [общем чек-листе](../../docs/staging-smoke-test.md).

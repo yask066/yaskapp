@@ -1,236 +1,79 @@
 # Yaskapp
 
-Social network focused on polls, voting, and real-time discussion.
+Социальная сеть вокруг опросов: публикации, голосование, обсуждения и подписки.
+В репозитории есть Flutter-приложение, публичный React web, панель модерации и общий API.
 
-## Stack
+## С чего начать
 
-- Frontend: Flutter
-- Backend: Node.js + TypeScript
-- Database: PostgreSQL
-- Cache and queues: Redis
-- Object storage: S3-compatible storage
-- Real-time: WebSocket
+| Задача | Где читать |
+| --- | --- |
+| Запустить проект | Инструкция ниже |
+| Понять возможности и ограничения | [Продукт](docs/product-notes.md) |
+| Найти код, API и схему данных | [Архитектура](docs/architecture.md) |
+| Развернуть сервер, настроить push и резервные копии | [Эксплуатация](docs/moderation-domain-deployment.md) |
+| Разобраться с удалением аккаунтов | [Удаление аккаунтов](docs/account-deletion-operations.md) |
+| Проверить сборку перед выпуском | [Проверки](docs/staging-smoke-test.md) |
+| Продолжить личную блокировку пользователей | [Требования и статус](docs/prd-user-blocking.md) |
 
-## Repository Layout
+## Локальный запуск
 
-```text
-apps/
-  mobile/              Flutter client
-services/
-  api/                 Node.js API and WebSocket service
-packages/
-  shared/              Shared contracts and types
-infra/
-  docker/              Local infrastructure configuration
-docs/                  Product and architecture notes
+Нужны Node.js 20+, npm и Docker Compose. Для мобильного клиента — Flutter
+с Dart, совместимым с [pubspec.yaml](apps/mobile/pubspec.yaml).
+
+Команды выполняются из корня репозитория; каждый сервер работает в своём терминале.
+
+1. Установить зависимости и подготовить окружение:
+
+   ```sh
+   npm ci
+   cp services/api/.env.example services/api/.env
+   docker compose -f infra/docker/docker-compose.yml up -d
+   npm run shared:build
+   ```
+
+   В PowerShell вместо `cp` можно использовать
+   `Copy-Item services/api/.env.example services/api/.env`.
+   Существующий `.env` перезаписывать не нужно.
+
+2. Открыть [консоль MinIO](http://localhost:9001), войти с локальными
+   `yaskapp` / `yaskapp-secret` и создать bucket `yaskapp-media`.
+   Имя должно совпадать с `S3_BUCKET` в `.env`.
+
+3. Применить миграции и запустить API:
+
+   ```sh
+   npm run db:migrate
+   npm run db:check
+   npm run api:dev
+   ```
+
+   [Проверка готовности](http://localhost:3000/health/ready) должна вернуть `200`.
+   Ответ `503` означает проблему с PostgreSQL, Redis или хранилищем.
+
+4. В другом терминале запустить web:
+
+   ```sh
+   npm run dev -w @yaskapp/web
+   ```
+
+   Открыть адрес из вывода Vite, обычно [localhost:5173](http://localhost:5173).
+   Запросы идут через dev proxy на API `localhost:3000`.
+
+Мобильный запуск и адрес API для телефона — в [README Flutter](apps/mobile/README.md).
+Настройки web — в [README web](apps/web/README.md), модерации —
+в [README панели](apps/moderation-web/README.md).
+
+Чтобы локально завершались удаления аккаунтов, запустить ещё один процесс:
+
+```sh
+npm run account-deletion:worker -w @yaskapp/api
 ```
 
-## Local Infrastructure
+## Работа с документацией
 
-Copy the API env example and start the local dependencies:
+Обновляем существующий раздел вместе с изменением поведения. Отдельный документ
+нужен только для самостоятельной темы, на которую есть ссылка отсюда.
+Логи, трассировки и снимки проверок храним в `.tmp/` или прикладываем к релизу.
 
-```bash
-cp services/api/.env.example services/api/.env
-docker compose -f infra/docker/docker-compose.yml up -d
-```
-
-The initial Compose file starts PostgreSQL, Redis, and MinIO for local development.
-The local stack remains separate from staging and continues to publish the
-development ports `5432`, `6379`, `9000`, and `9001` for local tools.
-
-The API also has a staging container definition. Copy the staging environment
-example to `services/api/.env.staging`, fill in real staging credentials, and
-replace `STAGING_API_DOMAIN` with a DNS name pointing to the staging host, then
-start it from the repository root:
-
-```bash
-docker compose -f infra/docker/docker-compose.staging.yml up -d --build
-```
-
-Before a domain is available, set `STAGING_PUBLIC_IP` in
-`services/api/.env.staging` to the VPS public IP. The staging stack then serves
-the public web client at `http://<STAGING_PUBLIC_IP>/`; the moderation panel is
-available at `/admin`. Pass the same address to Flutter through
-`API_BASE_URL` and `API_WEBSOCKET_URL`. This is an HTTP-only development
-route; switch to the domain-based HTTPS configuration before production use.
-The API trusts the exact `http://<STAGING_PUBLIC_IP>` origin for cookie-session
-writes, logout, and WebSocket connections when this IP is explicitly configured.
-Other browser origins must still be listed in `CORS_ORIGINS`.
-
-PowerShell example:
-
-```powershell
-$env:YASKAPP_BACKEND_HOST = "5.44.44.197"
-flutter run `
-  --dart-define=API_BASE_URL="http://$env:YASKAPP_BACKEND_HOST" `
-  --dart-define=API_WEBSOCKET_URL="ws://$env:YASKAPP_BACKEND_HOST/realtime"
-```
-
-The staging Compose flow runs the `migrate` job after PostgreSQL is healthy and
-starts the API only after that job exits successfully.
-
-The public web client is served from `https://<WEB_HOST>` (the example uses
-`web-staging.example.com`). Set `WEB_HOST` in `services/api/.env.staging` and
-include `https://<WEB_HOST>` in `CORS_ORIGINS`. For local browser development,
-run `npm run api:dev` and `npm run dev -w @yaskapp/web`; use
-`VITE_API_PROXY_TARGET` to change the development proxy target, or
-`VITE_API_BASE_URL` to call an explicit API base URL. Browser tokens remain in
-The web client uses an HttpOnly cookie session; browser JavaScript does not
-read or persist JWTs. Bearer tokens remain supported for native clients.
-Session cookies use `Secure` on HTTPS requests, including HTTPS terminated by
-Caddy. The temporary HTTP staging IP route uses cookies without `Secure`,
-even though its API runs with `NODE_ENV=production`.
-
-API readiness is available at `/health/ready`. It returns `200` only when the
-process, PostgreSQL, and Redis are ready; otherwise it returns `503`. Docker
-uses this endpoint before allowing Caddy to depend on the API.
-
-API logs use structured output and redact authorization/cookie headers,
-passwords, tokens, JWT secrets, and S3/MinIO secret values. Do not add raw
-request bodies or environment dumps to staging logs.
-
-The staging services use `restart: unless-stopped`. They recover after a
-process crash and after a host reboot when Docker is enabled at boot. Verify
-recovery with:
-
-```bash
-docker compose -f infra/docker/docker-compose.staging.yml ps
-docker compose -f infra/docker/docker-compose.staging.yml logs --tail=100 api
-```
-
-Staging service operations:
-
-```bash
-# Start or update the full staging stack
-docker compose -f infra/docker/docker-compose.staging.yml up -d --build
-
-# Inspect service state
-docker compose -f infra/docker/docker-compose.staging.yml ps
-
-# Follow API logs
-docker compose -f infra/docker/docker-compose.staging.yml logs -f api
-
-# Restart the API only
-docker compose -f infra/docker/docker-compose.staging.yml restart api
-
-# Stop the staging stack without deleting named volumes
-docker compose -f infra/docker/docker-compose.staging.yml down
-```
-
-Staging API rollback:
-
-```bash
-# Before deploying, preserve the current image under a release tag
-docker tag yaskapp-api:staging yaskapp-api:previous-2026-07-23
-
-# Build and deploy the new API image
-docker compose -f infra/docker/docker-compose.staging.yml up -d --build
-
-# If the new release fails smoke testing, restore the previous image
-docker tag yaskapp-api:previous-2026-07-23 yaskapp-api:staging
-docker compose -f infra/docker/docker-compose.staging.yml up -d --no-build
-```
-
-Keep the previous image tag until the new release passes migrations, health
-checks, and the staging smoke checklist.
-
-Database backup and restore instructions are in
-[docs/staging-database-backups.md](docs/staging-database-backups.md). The
-PostgreSQL volume is persistent, but backups must be exported to protected
-storage outside the repository.
-
-If a migration fails, the job exits with a non-zero status. Because the API
-depends on `migrate` with `service_completed_successfully`, the new API
-container is not started and the deployment must be fixed or rolled back.
-
-The resulting endpoints are:
-
-```text
-https://<STAGING_API_DOMAIN>
-wss://<STAGING_API_DOMAIN>/realtime
-```
-
-Caddy terminates TLS on ports `80` and `443` and reverse-proxies both HTTP and
-WebSocket traffic to the internal `api:3000` service. The API container is not
-published directly to the host. PostgreSQL is also internal-only and persists
-its data in the `postgres-staging-data` named volume.
-Redis is also internal-only, uses `redis://redis:6379`, and persists its AOF
-data in the `redis-staging-data` named volume.
-MinIO provides the private S3-compatible staging storage and creates the
-configured bucket through the `minio-init` service. Its data persists in the
-`minio-staging-data` named volume.
-
-Only Caddy publishes host ports in staging (`80` and `443`). PostgreSQL,
-Redis, the MinIO API, and the MinIO console remain private to the Compose
-network and are not reachable directly from the public internet.
-
-The API service receives its staging dependencies from
-`services/api/.env.staging`: `DATABASE_URL` points to `postgres`, `REDIS_URL`
-points to `redis`, and the `S3_*` settings point to the private `minio`
-service and the configured staging bucket.
-
-`JWT_SECRET` and `PAGINATION_CURSOR_SECRET` must be replaced with independently
-generated values before starting staging. Generate the cursor secret with at
-least 32 random bytes (for example, `openssl rand -base64 48`) and use the same
-value on every API replica. Rotating it invalidates active pagination cursors.
-The `.env.staging` file is ignored by Git, and production mode rejects the
-development default or a `replace-with` placeholder.
-
-## Database
-
-The first schema migration is in `services/api/src/db/migrations/001_initial_social_schema.sql`.
-It creates users, profiles, polls, poll options, votes, comments, likes, follows, and notifications.
-
-Run migrations after PostgreSQL is available:
-
-```bash
-npm run db:migrate
-```
-
-Check the API database connection:
-
-```bash
-npm run db:check
-```
-
-## Auth MVP
-
-Initial auth endpoints:
-
-- `POST /auth/register`
-- `POST /auth/login`
-- `GET /auth/me`
-
-Use the returned access token as a bearer token:
-
-```http
-Authorization: Bearer <accessToken>
-```
-
-## Flutter API Environment
-
-The mobile app reads backend addresses at compile time. For a local phone run:
-
-```bash
-flutter run \
-  --dart-define=API_BASE_URL=http://192.168.0.10:3000 \
-  --dart-define=API_WEBSOCKET_URL=ws://192.168.0.10:3000/realtime
-```
-
-In PowerShell, use one line:
-
-```powershell
-flutter run --dart-define=API_BASE_URL=http://192.168.0.10:3000 --dart-define=API_WEBSOCKET_URL=ws://192.168.0.10:3000/realtime
-```
-
-Both values should point to the same backend environment.
-
-For staging, replace the example domain with the real staging DNS name:
-
-```powershell
-flutter run --dart-define=API_BASE_URL=https://api-staging.example.com --dart-define=API_WEBSOCKET_URL=wss://api-staging.example.com/realtime
-```
-
-Use [docs/staging-smoke-test.md](docs/staging-smoke-test.md) to verify the
-complete MVP flow after a staging deployment. A staging release is complete
-only after the checklist passes and its release record is filled in.
+Старые планы и отчёты доступны в Git: `git log --all -- docs`,
+содержимое файла — `git show <commit>:<path>`.

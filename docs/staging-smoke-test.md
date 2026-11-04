@@ -1,78 +1,96 @@
-# Staging MVP Smoke Test
+# Проверки перед выпуском
 
-Run this checklist after deploying a new staging API version. Replace the
-example domain with the real staging DNS name. The Flutter client must use the
-same values through `--dart-define`.
+## Автоматические проверки
 
-## Configuration
+Из корня репозитория после `npm ci`:
 
-```powershell
-$baseUrl = 'https://api-staging.example.com'
-$websocketUrl = 'wss://api-staging.example.com/realtime'
+```sh
+npm run api:typecheck
+npm run api:test
+npm run typecheck -w @yaskapp/web
+npm run lint -w @yaskapp/web
+npm run test -w @yaskapp/web -- --run
+npm run build -w @yaskapp/web
+node --test infra/docker/test/*.test.mjs apps/web/test/smoke.test.mjs apps/moderation-web/test/smoke.test.mjs
 ```
 
-Start the mobile app with:
+API-тесты применяют миграции и меняют данные: нужны отдельные тестовые PostgreSQL,
+Redis и media bucket. Некоторые integration suites требуют дополнительных
+переменных и пропускаются без них; итог «passed» не заменяет проверку skipped.
+Конфигурация CI — в [ci.yml](../.github/workflows/ci.yml).
 
-```powershell
-flutter run `
-  --dart-define=API_BASE_URL=$baseUrl `
-  --dart-define=API_WEBSOCKET_URL=$websocketUrl
+Из `apps/mobile`:
+
+```sh
+flutter pub get
+flutter analyze
+flutter test
+flutter build apk --debug
 ```
 
-## Checklist
+iOS-сборка и проверка VoiceOver выполняются отдельно на macOS/Xcode и iPhone.
 
-- [ ] `GET $baseUrl/health/ready` returns HTTP `200` with database, Redis, and
-      storage status set to connected.
-- [ ] Register a fresh staging user.
-- [ ] Log in and confirm the Flutter home screen loads the feed.
-- [ ] Create a public poll from Flutter and confirm it appears in the feed.
-- [ ] Vote in the poll and verify the selected option, total votes, and
-      percentages update without a full feed reload.
-- [ ] Like the poll and unlike it; verify the count and icon update.
-- [ ] Open the poll comments, post a comment, and confirm the comments count
-      updates when returning to the feed.
-- [ ] Open the profile and confirm the user profile and `My polls` load.
-- [ ] From a second client, vote on the same poll and confirm the first client
-      receives the real-time poll update over `wss://`.
-- [ ] Submit an invalid comment or unauthenticated request and confirm the API
-      returns a safe error without exposing secrets.
-- [ ] Review API logs and confirm authorization headers, passwords, tokens,
-      JWT secrets, and storage secrets are redacted.
+## Ручная проверка staging
 
-## Operations
+Использовать тестовые аккаунты A и B, web и мобильный клиент.
 
-Inspect recent service logs from the staging host:
+- [ ] Все сервисы подняты, миграции завершены, `/health/ready` возвращает `200`.
+- [ ] Регистрация, вход, выход и повторный вход работают; обычный аккаунт не получает административный доступ.
+- [ ] Изменение профиля и аватара видно после перезапуска клиента.
+- [ ] A создаёт опрос с изображением; B голосует и ставит лайк. Счётчики согласованы на двух клиентах, повтор запроса не создаёт дубликат.
+- [ ] Подписка добавляет опросы в подписную ленту; отмена обновляет счётчики.
+- [ ] Поиск находит профиль и опрос; пустой результат и ошибка сети отображаются понятно.
+- [ ] B комментирует опрос A; A отвечает на корень B. Уведомление об ответе открывает нужную ветку; удалённая цель показывает нейтральное состояние.
+- [ ] Голос, комментарий, ответ, лайк и подписка создают ожидаемые уведомления. Read/read-all согласованы между клиентами; отключённый push не отправляется.
+- [ ] После потери сети, reconnect и возврата из фона уведомления сверяются по HTTP. Проверка проходит при двух API-репликах.
+- [ ] Жалоба появляется в модерации; роли, санкции и апелляции работают по полномочиям.
+- [ ] Удаление отдельного тестового аккаунта отзывает доступ на другом клиенте и достигает `completed`; перезапуск worker не теряет операцию.
+- [ ] При большом тексте, клавиатуре и screen reader доступны основные действия и сообщения ошибок.
+- [ ] В логах нет секретов; backup создан и пробное восстановление проверено.
 
-```bash
-docker compose -f infra/docker/docker-compose.staging.yml logs --tail=100 api
-docker compose -f infra/docker/docker-compose.staging.yml logs --tail=100 https
-```
+## Пагинация и анимации: отдельные условия выпуска
 
-Docker rotates each service's JSON logs at 10 MB per file and keeps five files.
-The API readiness endpoint checks PostgreSQL, Redis, and the MinIO bucket.
+| Возможность | Флаги web / Flutter | Условие |
+| --- | --- | --- |
+| Догрузка ленты | `VITE_FEED_PAGINATION` / `YASKAPP_FEED_PAGINATION` | По умолчанию `false`. Проверить старый и новый API/клиент, глубокие и разреженные страницы, истёкшие снимки, scroll и откат. |
+| Реакции | `VITE_REACTIONS_MOTION` / `YASKAPP_REACTIONS_MOTION` | По умолчанию `false`. Нужны измерения на устройстве с выключенным/включённым флагом. |
+| Появление элементов | `VITE_ENTRY_MOTION` / `YASKAPP_ENTRY_MOTION` | По умолчанию `false`. Включать после проверки реакций; учитывать reduced motion, фон и доступность. |
 
-## Release Record
+Все флаги задаются при сборке; изменение окружения запущенного контейнера их не
+переключает. Для отката нужна новая сборка с `false`.
+Команды — в [web README](../apps/web/README.md) и [Flutter README](../apps/mobile/README.md).
 
-Run this checklist after the API image, migrations, and reverse proxy have
-started successfully. Do not mark the deployment complete until every required
-item passes and the release record contains `Result: PASS`.
+Подтверждённые ограничения прежних проверок:
 
-Record these values with each staging verification:
+- **Пагинация, 28 октября 2026:** staging, rollout/rollback, полный API suite и
+  TalkBack speech checks не выполнены. Серверные нагрузочные цели не проверены.
+  Некоторые Android-сценарии превышали порог 5% поздних кадров, headless web
+  не подтвердил плавность на физическом экране. Задачи закрыты административно;
+  разрешения на выпуск нет.
+  Цели до выпуска: p95 хронологического чтения и продолжения popular ≤ 500 мс
+  при 20 читателях, создания полного popular snapshot ≤ 1,5 с;
+  среднее время глубокой страницы ≤ 2× первой. Для 1 000 карточек/корней
+  и раскрытых веток — менее 5% кадров сверх бюджета 60 Гц на Android и web.
+- **Анимации, 10 октября 2026:** AC-12 и G0 не пройдены. В одной диагностической паре
+  на 60 Гц поздних кадров было 13,26% без motion и 20,44% с реакциями.
+  Нужна полная матрица 3 × 30 секунд на том же устройстве: не более 1% поздних кадров
+  и прирост не более 0,5 процентного пункта, плюс проверки lifecycle и доступности.
+  Shimmer не добавляется.
+- **Личная блокировка:** пока не реализована; собственная [матрица приёмки](prd-user-blocking.md#приёмка)
+  обязательна до выпуска.
 
-```text
-API version:
-Database migration version:
-Staging domain:
-Smoke test date:
-Tester:
-Result:
-```
+Старые замеры сохранены в Git, новые логи и трассировки — в `.tmp/`.
+Профилировщик `node scripts/t27-web-profile.mjs` требует production web build и Chrome;
+результат пишет в `.tmp/pagination-evidence`. Это синтетическая проверка, не staging.
+Нагрузочный runner — [pagination-load.mjs](../scripts/pagination-load.mjs);
+ему нужны отдельная тестовая БД и тестовые токены.
 
-## Account Deletion Release Gate
+`LEGACY_REPLIES_CURSOR_V0_EXPIRES_AT` задаётся после первого production-релиза
+Android с v1-курсорами: timestamp релиза + 180 дней UTC. До него переменная не задана.
 
-The self-service account deletion flow remains disabled until its product
-retention decisions, AD-14 independent-journal/backup restore exercise, and
-all AC-01–AC-17 evidence are approved. Follow
-[`account-deletion-smoke-test.md`](account-deletion-smoke-test.md) on staging.
-Do not use production accounts for these checks. A rollout stop disables only
-new verification and acceptance; the worker must continue accepted deletions.
+## Запись результата
+
+В задаче выпуска или описании релиза сохранить: commit, digest образов, версии
+web/мобильных сборок, миграции, окружение, устройства, дату, проверяющего и результат.
+Непроведённые проверки записываются как непроведённые; для выпуска нужны результаты
+обязательных сценариев и явное решение по оставшимся ограничениям.
