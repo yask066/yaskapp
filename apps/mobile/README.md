@@ -12,8 +12,11 @@ flutter run --dart-define=API_BASE_URL=http://192.168.0.10:3000 --dart-define=AP
 Для Android Emulator обычно подходит `10.0.2.2`. Оба адреса должны вести
 в одно окружение; для HTTPS использовать `https://` и `wss://`.
 
-Значения в [ApiConfig](lib/src/core/config/api_config.dart) сейчас указывают на
-HTTP staging `5.44.44.197`. Перед локальной или release-сборкой задавать адреса явно.
+Значения по умолчанию в [ApiConfig](lib/src/core/config/api_config.dart):
+`https://api.yaskapp.org` для API и `wss://api.yaskapp.org/realtime` для WebSocket.
+Для другого окружения задавать `API_BASE_URL` и `API_WEBSOCKET_URL` через
+`--dart-define`. После изменения адресов нужно пересобрать приложение;
+существующая установленная сборка продолжит использовать прежние значения.
 
 ## Флаги сборки
 

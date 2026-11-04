@@ -2,10 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yaskapp_mobile/src/core/config/api_config.dart';
 
 void main() {
-  test('uses the staging VPS endpoints when no deployment overrides are provided', () {
+  test('uses the HTTPS domain endpoints when no deployment overrides are provided', () {
     const config = ApiConfig();
-    const expectedBaseUrl = 'http://5.44.44.197';
-    const expectedWebsocketUrl = 'ws://5.44.44.197/realtime';
+    const expectedBaseUrl = 'https://api.yaskapp.org';
+    const expectedWebsocketUrl = 'wss://api.yaskapp.org/realtime';
 
     expect(config.baseUrl, expectedBaseUrl);
     expect(config.websocketUrl, expectedWebsocketUrl);

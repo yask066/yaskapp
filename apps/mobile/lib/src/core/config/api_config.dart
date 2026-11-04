@@ -2,11 +2,11 @@ class ApiConfig {
   const ApiConfig({
     this.baseUrl = const String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: 'http://5.44.44.197',
+      defaultValue: 'https://api.yaskapp.org',
     ),
     this.websocketUrl = const String.fromEnvironment(
       'API_WEBSOCKET_URL',
-      defaultValue: 'ws://5.44.44.197/realtime',
+      defaultValue: 'wss://api.yaskapp.org/realtime',
     ),
   });
 
