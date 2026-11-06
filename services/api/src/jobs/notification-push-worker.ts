@@ -50,7 +50,7 @@ export function createFirebasePushProvider(): PushProvider {
         });
         return 'sent';
       } catch (error) {
-        const code = (error as { errorInfo?: { code?: string } }).errorInfo?.code;
+        const code = (error as { code?: string } | null)?.code;
         if (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token') return 'invalid_token';
         throw error;
       }

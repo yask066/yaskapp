@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, test, type TestContext } from 'node:test';
+import { deleteApp, initializeApp } from 'firebase-admin/app';
+import { FirebaseMessagingError, getMessaging, type Message } from 'firebase-admin/messaging';
 
 const databaseUrl = process.env.NOTIFICATION_WORKER_TEST_DATABASE_URL;
 
@@ -11,7 +13,7 @@ if (!databaseUrl) {
 } else {
   process.env.NODE_ENV = 'test';
   process.env.DATABASE_URL = databaseUrl;
-  const [{ db }, { deliverPendingPushNotifications }] = await Promise.all([
+  const [{ db }, { createFirebasePushProvider, deliverPendingPushNotifications }] = await Promise.all([
     import('../config/database.js'),
     import('./notification-push-worker.js')
   ]);
@@ -91,6 +93,42 @@ if (!databaseUrl) {
     assert.equal(job.attempts, 1);
     assert.ok(job.sent_at);
     assert.equal(calls, 1);
+  });
+
+  test('an expired device is revoked without retrying a successful delivery', async (context) => {
+    const id = await createJob(context);
+    const userId = (await db.query('SELECT recipient_user_id FROM notification_push_jobs WHERE id = $1', [id])).rows[0].recipient_user_id;
+    await db.query("UPDATE notification_devices SET last_seen_at = now() WHERE user_id = $1", [userId]);
+    const expiredToken = randomUUID();
+    await db.query(
+      `INSERT INTO notification_devices (user_id, token, platform, last_seen_at)
+       VALUES ($1, $2, 'android', now() - interval '1 day')`, [userId, expiredToken]
+    );
+    const app = initializeApp({ projectId: 'push-worker-test' });
+    context.after(() => deleteApp(app));
+    const sentTokens: string[] = [];
+    context.mock.method(getMessaging(app), 'send', async (message: Message) => {
+      assert.ok('token' in message);
+      sentTokens.push(message.token);
+      if (message.token === expiredToken) {
+        throw new FirebaseMessagingError({ code: 'registration-token-not-registered', message: 'NotRegistered' });
+      }
+      assert.equal(message.token, userId);
+      return 'projects/push-worker-test/messages/success';
+    });
+    const provider = createFirebasePushProvider();
+
+    assert.deepEqual(await deliverPendingPushNotifications(provider), { processed: 1, delivered: 1 });
+    assert.deepEqual(await deliverPendingPushNotifications(provider), { processed: 0, delivered: 0 });
+    const job = await readJob(id);
+    assert.equal(job.status, 'sent');
+    assert.equal(job.attempts, 1);
+    assert.ok(job.sent_at);
+    assert.equal(job.last_error, null);
+    const devices = (await db.query('SELECT token, revoked_at FROM notification_devices WHERE user_id = $1', [userId])).rows;
+    assert.ok(devices.find((device) => device.token === expiredToken).revoked_at);
+    assert.equal(devices.find((device) => device.token === userId).revoked_at, null);
+    assert.deepEqual(sentTokens, [userId, expiredToken]);
   });
 
   test('recovering an expired sending lease counts another attempt', async (context) => {

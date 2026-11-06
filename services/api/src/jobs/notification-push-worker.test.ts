@@ -1,8 +1,37 @@
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
+import { deleteApp, initializeApp } from 'firebase-admin/app';
+import { FirebaseMessagingError, getMessaging } from 'firebase-admin/messaging';
 
 import { db } from '../config/database.js';
-import { deliverClaimedPushJob, deliverPendingPushNotifications, pushRetryDelaySeconds, shouldRetryPushJob } from './notification-push-worker.js';
+import { createFirebasePushProvider, deliverClaimedPushJob, deliverPendingPushNotifications, pushRetryDelaySeconds, shouldRetryPushJob } from './notification-push-worker.js';
+
+for (const code of ['registration-token-not-registered', 'invalid-registration-token']) {
+  test(`Firebase provider classifies ${code} as an invalid token`, async (context) => {
+    const app = initializeApp({ projectId: 'push-worker-test' });
+    context.after(() => deleteApp(app));
+    context.mock.method(getMessaging(app), 'send', async () => {
+      throw new FirebaseMessagingError({ code, message: 'NotRegistered' });
+    });
+
+    assert.equal(await createFirebasePushProvider().send({
+      token: 'expired-device-token', platform: 'android',
+      data: { notificationId: 'notification-1', type: 'follow' }
+    }), 'invalid_token');
+  });
+}
+
+test('Firebase provider propagates transient errors for retry', async (context) => {
+  const app = initializeApp({ projectId: 'push-worker-test' });
+  context.after(() => deleteApp(app));
+  const error = new FirebaseMessagingError({ code: 'server-unavailable', message: 'Unavailable' });
+  context.mock.method(getMessaging(app), 'send', async () => { throw error; });
+
+  await assert.rejects(createFirebasePushProvider().send({
+    token: 'active-device-token', platform: 'android',
+    data: { notificationId: 'notification-1', type: 'follow' }
+  }), (actual) => actual === error);
+});
 
 test('push retries use bounded exponential backoff', () => {
   assert.equal(pushRetryDelaySeconds(1), 1);
