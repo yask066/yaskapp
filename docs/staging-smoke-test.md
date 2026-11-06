@@ -19,6 +19,11 @@ Redis и media bucket. Некоторые integration suites требуют до
 переменных и пропускаются без них; итог «passed» не заменяет проверку skipped.
 Конфигурация CI — в [ci.yml](../.github/workflows/ci.yml).
 
+Для интеграционных тестов push-worker нужна отдельная мигрированная БД:
+`NOTIFICATION_WORKER_TEST_DATABASE_URL` задаёт её URL. Затем из `services/api`
+выполнить `node --import tsx --test src/jobs/notification-push-worker.integration.test.ts`.
+Эти тесты обрабатывают всю push-очередь указанной БД; CI запускает их отдельно.
+
 Из `apps/mobile`:
 
 ```sh

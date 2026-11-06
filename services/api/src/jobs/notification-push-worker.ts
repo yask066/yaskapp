@@ -131,6 +131,17 @@ export async function deliverPendingPushNotifications(provider: PushProvider, li
   let delivered = 0;
   try {
     await client.query('BEGIN');
+    await client.query(
+      `UPDATE notification_push_jobs
+       SET status = 'failed', claimed_at = NULL, last_error = 'Push delivery lease expired.'
+       WHERE id IN (
+         SELECT id FROM notification_push_jobs
+         WHERE status = 'sending' AND attempts >= max_attempts
+           AND claimed_at < now() - ($1::text || ' seconds')::interval
+         FOR UPDATE SKIP LOCKED
+       )`,
+      [SENDING_LEASE_SECONDS]
+    );
     const jobs = await client.query<ClaimedPushJob>(
       `WITH claimed AS (
         SELECT id FROM notification_push_jobs
@@ -139,7 +150,8 @@ export async function deliverPendingPushNotifications(provider: PushProvider, li
           AND attempts < max_attempts
         ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT $1
       )
-      UPDATE notification_push_jobs j SET status = 'sending', claimed_at = now(), last_error = NULL
+      UPDATE notification_push_jobs j SET status = 'sending', attempts = j.attempts + 1,
+        claimed_at = now(), last_error = NULL
       FROM claimed WHERE j.id = claimed.id
       RETURNING j.id, j.notification_id AS "notificationId", j.recipient_user_id AS "recipientUserId",
         j.type, j.poll_id AS "pollId", j.comment_id AS "commentId", j.attempts, j.max_attempts AS "maxAttempts"`,

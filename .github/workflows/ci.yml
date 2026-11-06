@@ -62,6 +62,18 @@ jobs:
           docker run --network host --rm minio/mc:latest mb --ignore-existing ci/yaskapp-media
       - run: npm run api:typecheck
       - run: npm run api:test
+      - name: Create push worker test database
+        env:
+          PGPASSWORD: yaskapp
+        run: createdb --host=127.0.0.1 --username=yaskapp yaskapp_push_worker
+      - name: Push worker integration tests
+        working-directory: services/api
+        env:
+          DATABASE_URL: postgres://yaskapp:yaskapp@localhost:5432/yaskapp_push_worker
+          NOTIFICATION_WORKER_TEST_DATABASE_URL: postgres://yaskapp:yaskapp@localhost:5432/yaskapp_push_worker
+        run: |
+          npm run db:migrate
+          node --import tsx --test src/jobs/notification-push-worker.integration.test.ts
       - name: Create poll feed snapshot test database
         env:
           PGPASSWORD: yaskapp
@@ -80,7 +92,7 @@ jobs:
           npm run lint -w @yaskapp/web
           npm run test -w @yaskapp/web -- --run
           npm run build -w @yaskapp/web
-          node --test infra/docker/test/ip-admin-routing.test.mjs apps/web/test/smoke.test.mjs
+          node --test infra/docker/test/*.test.mjs apps/web/test/smoke.test.mjs
       - name: Moderation web syntax and smoke tests
         working-directory: apps/moderation-web
         run: |

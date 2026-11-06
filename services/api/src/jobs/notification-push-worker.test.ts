@@ -23,6 +23,7 @@ test('claimed_push_cannot_recreate_job_after_account_close', async (context: Tes
     return {
       async query(sql: string) {
         if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql)) return { rows: [] };
+        if (sql.includes("last_error = 'Push delivery lease expired.'")) return { rows: [] };
         if (sql.includes('WITH claimed AS')) {
           return { rows: [{
             id: 'job-1', notificationId: 'notification-1', recipientUserId: 'deleted-user',

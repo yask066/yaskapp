@@ -7,12 +7,15 @@ const repositoryRoot = join(import.meta.dirname, '..', '..', '..');
 const lockfile = JSON.parse(
   readFileSync(join(repositoryRoot, 'package-lock.json'), 'utf8'),
 );
+const packageJson = JSON.parse(
+  readFileSync(join(repositoryRoot, 'package.json'), 'utf8'),
+);
 
 test('API Linux builds resolve the esbuild binary matching the tsx host', () => {
-  const esbuild = lockfile.packages['node_modules/esbuild'];
-  const linuxBinary = lockfile.packages['node_modules/@esbuild/linux-x64'];
+  const esbuild = lockfile.packages['services/api/node_modules/esbuild'];
+  const linuxBinary = lockfile.packages['services/api/node_modules/@esbuild/linux-x64'];
 
-  assert.equal(esbuild.version, '0.28.1');
+  assert.equal(esbuild.version, packageJson.overrides.esbuild);
   assert.equal(
     linuxBinary.version,
     esbuild.optionalDependencies['@esbuild/linux-x64'],

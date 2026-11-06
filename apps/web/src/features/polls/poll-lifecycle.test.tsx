@@ -79,6 +79,8 @@ test('logout/relogin ignores the previous viewer read even when transport ignore
 });
 
 test.each(['foreground', 'online', 'connection.ready'])('reconciles cached Poll by HTTP on %s and cleans up after unmount', async (trigger) => {
+  focusManager.setFocused(true);
+  onlineManager.setOnline(true);
   const sockets: RealtimeWebSocket[] = [];
   vi.stubGlobal('WebSocket', class {
     readyState = 1; onopen = null; onmessage = null; onerror = null; onclose = null;
