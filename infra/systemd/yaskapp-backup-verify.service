@@ -1,0 +1,18 @@
+[Unit]
+Description=Yaskapp isolated PostgreSQL and MinIO restore drill
+Requires=docker.service
+After=docker.service yaskapp-backup.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /usr/local/libexec/yaskapp-backup/staging_backup.py verify
+ExecStopPost=/usr/bin/python3 /usr/local/libexec/yaskapp-backup/staging_backup.py cleanup
+TimeoutStartSec=60min
+TimeoutStopSec=180
+KillMode=control-group
+NoNewPrivileges=true
+ProtectHome=true

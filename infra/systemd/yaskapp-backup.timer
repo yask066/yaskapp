@@ -1,0 +1,10 @@
+[Unit]
+Description=Yaskapp daily encrypted backup at 04:00 Minsk
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 Europe/Minsk
+Persistent=false
+Unit=yaskapp-backup.service
+
+[Install]
+WantedBy=timers.target

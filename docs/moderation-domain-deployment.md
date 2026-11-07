@@ -104,6 +104,10 @@ systemctl list-timers yaskapp-avatar-cleanup.timer --no-pager
 
 ## Резервные копии
 
+Для ежедневной согласованной копии PostgreSQL и MinIO с еженедельной проверкой
+восстановления см. [настройку backup БД и медиа](../infra/backup/README.md).
+Эта схема использует локальный зашифрованный restic-репозиторий на VPS.
+
 Тома Docker не заменяют backup. Текущий [backup-postgres.sh](../infra/docker/backup-postgres.sh)
 создаёт dump, проверяет его через `pg_restore`, шифрует GPG и сверяет checksum
 копии на отдельном смонтированном хранилище. AWS и отдельный журнал удаления
