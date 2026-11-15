@@ -13,6 +13,7 @@
 | Развернуть сервер, настроить push и резервные копии | [Эксплуатация](docs/moderation-domain-deployment.md) |
 | Разобраться с удалением аккаунтов | [Удаление аккаунтов](docs/account-deletion-operations.md) |
 | Проверить сборку перед выпуском | [Проверки](docs/staging-smoke-test.md) |
+| Разрабатывать в staging и выпускать через Merge | [Процесс выпуска](infra/release/README.md) |
 | Продолжить личную блокировку пользователей | [Требования и статус](docs/prd-user-blocking.md) |
 
 ## Локальный запуск

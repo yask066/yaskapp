@@ -1,5 +1,19 @@
 # Мобильное приложение
 
+Для отдельной тестовой установки CI собирает **Yaskapp Test** с суффиксом
+applicationId `.test`, тестовым API и отключённым Firebase push.
+Сборка доступна в артефакте `android-test-<SHA>` workflow CI/Staging.
+Локально задайте переменную окружения `ORG_GRADLE_PROJECT_yaskappTestBuild=true`
+и выполните:
+
+```sh
+flutter build apk --debug --dart-define=API_BASE_URL=https://api-test.yaskapp.org --dart-define=API_WEBSOCKET_URL=wss://api-test.yaskapp.org/realtime --dart-define=YASKAPP_PUSH_ENABLED=false
+```
+
+После сборки уберите `ORG_GRADLE_PROJECT_yaskappTestBuild` из окружения терминала.
+Обычная сборка сохраняет прежний applicationId и включённый push.
+Тестовые адреса начнут работать после [настройки окружения](../../infra/release/README.md).
+
 Сначала подготовить API по [корневому README](../../README.md#локальный-запуск).
 Команды выполняются из `apps/mobile`:
 

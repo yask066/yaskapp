@@ -1,0 +1,21 @@
+# Compose >= 2.24.4. Use with the existing base in a SEPARATE /opt/yaskapp-test checkout.
+# Its services/api/.env.staging must contain independent test credentials.
+name: yaskapp-test
+services:
+  api:
+    deploy:
+      replicas: 1
+  notification-worker:
+    profiles: [test-push-disabled]
+  https:
+    ports: !reset []
+    volumes: !override
+      - ../release/Caddyfile.test:/etc/caddy/Caddyfile:ro
+    networks:
+      default:
+      test-ingress:
+        aliases: [yaskapp-test-gateway]
+networks:
+  test-ingress:
+    external: true
+    name: yaskapp-test-ingress
