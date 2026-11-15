@@ -7,12 +7,18 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 class FirebasePushService {
-  FirebasePushService({FirebaseMessaging? messaging}) : _messaging = messaging;
+  FirebasePushService({
+    FirebaseMessaging? messaging,
+    this.enabled =
+        const bool.fromEnvironment('YASKAPP_PUSH_ENABLED', defaultValue: true),
+  }) : _messaging = messaging;
 
+  final bool enabled;
   final FirebaseMessaging? _messaging;
   FirebaseMessaging get _instance => _messaging ?? FirebaseMessaging.instance;
 
   Future<void> initialize() async {
+    if (!enabled) return;
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     await _instance.setAutoInitEnabled(true);
     await _instance.requestPermission(
@@ -28,10 +34,12 @@ class FirebasePushService {
     );
   }
 
-  Future<String?> getToken() => _instance.getToken();
+  Future<String?> getToken() =>
+      enabled ? _instance.getToken() : Future.value(null);
 
-  Stream<String> get onTokenRefresh => _instance.onTokenRefresh;
+  Stream<String> get onTokenRefresh =>
+      enabled ? _instance.onTokenRefresh : const Stream.empty();
 
   Stream<RemoteMessage> get onMessageOpenedApp =>
-      FirebaseMessaging.onMessageOpenedApp;
+      enabled ? FirebaseMessaging.onMessageOpenedApp : const Stream.empty();
 }

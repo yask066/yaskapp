@@ -1,0 +1,12 @@
+{
+  "enabled": false,
+  "environment": "production",
+  "project_root": "/opt/yaskapp",
+  "project_name": "yaskapp-staging",
+  "env_file": "/opt/yaskapp/services/api/.env.staging",
+  "compose_files": ["/opt/yaskapp/infra/docker/docker-compose.staging.yml"],
+  "services": ["api", "web", "moderation-web", "account-deletion-worker", "notification-worker", "poll-feed-snapshot-cleanup"],
+  "smoke_urls": ["https://api.yaskapp.org/health/ready", "https://yaskapp.org/", "https://moderation.yaskapp.org/"],
+  "backup_module": "/usr/local/libexec/yaskapp-backup/staging_backup.py",
+  "backup_config": "/etc/yaskapp/backup/config.json"
+}

@@ -1,5 +1,10 @@
 # Сервер: развёртывание и обслуживание
 
+Автоматизированный процесс staging → Merge → production и его первичная
+настройка описаны в [инструкции выпуска](../infra/release/README.md).
+Историческое имя Compose `yaskapp-staging` может принадлежать основному сайту;
+новой тестовой копии нужен отдельный project и отдельные тома.
+
 Команды ниже выполняются из корня репозитория на Linux-сервере.
 Конфигурация: [staging Compose](../infra/docker/docker-compose.staging.yml),
 [Caddyfile](../infra/docker/Caddyfile), [пример переменных](../services/api/.env.staging.example).
