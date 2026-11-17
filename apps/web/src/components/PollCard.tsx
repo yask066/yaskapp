@@ -24,9 +24,11 @@ interface PollCardProps {
 
 export const PollCard = memo(forwardRef<HTMLElement, PollCardProps>(function PollCard({ poll, viewerId, onVote, onCancelVote, onLike, onDelete, onOpenComments, isVoting = false, isLiking = false, className, style, 'data-entry-motion': entryMotionState }, ref) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [justVoted, setJustVoted] = useState(false);
   const { reactionsMotion, reduceMotion } = useMotionSettings();
   const reactionsEnabled = reactionsMotion && !reduceMotion;
   const likeAnimation = useRef<Animation | null>(null);
+  const previousVoteRef = useRef<string | null>(poll.viewerVoteOptionId);
   const authorName = poll.author.displayName || poll.author.username;
   const isClosed = Boolean(poll.endsAt && new Date(poll.endsAt).getTime() <= Date.now());
   const hasVoted = Boolean(poll.viewerVoteOptionId);
@@ -46,6 +48,22 @@ export const PollCard = memo(forwardRef<HTMLElement, PollCardProps>(function Pol
     };
   }, [reactionsEnabled]);
 
+  useEffect(() => {
+    const previousVote = previousVoteRef.current;
+    const currentVote = poll.viewerVoteOptionId;
+    previousVoteRef.current = currentVote;
+
+    if (!currentVote || previousVote === currentVote || reduceMotion) {
+      return undefined;
+    }
+
+    setJustVoted(true);
+    const timer = window.setTimeout(() => {
+      setJustVoted(false);
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [poll.viewerVoteOptionId, reduceMotion]);
+
   function handleLike(event: MouseEvent<HTMLButtonElement>) {
     if (reactionsEnabled && typeof event.currentTarget.animate === 'function') {
       likeAnimation.current?.cancel();
@@ -58,7 +76,7 @@ export const PollCard = memo(forwardRef<HTMLElement, PollCardProps>(function Pol
   }
 
   return (
-    <article ref={ref} className={`poll-card${reactionsEnabled ? ' poll-card--reactions' : ''}${className ? ` ${className}` : ''}`} style={style} data-entry-motion={entryMotionState} data-list-item-id={poll.id} tabIndex={-1} aria-labelledby={`poll-${poll.id}-question`}>
+    <article ref={ref} className={`poll-card${reactionsEnabled ? ' poll-card--reactions' : ''}${justVoted ? ' poll-card--just-voted' : ''}${className ? ` ${className}` : ''}`} style={style} data-entry-motion={entryMotionState} data-list-item-id={poll.id} tabIndex={-1} aria-labelledby={`poll-${poll.id}-question`}>
       <header className="poll-card-header poll-card__meta">
         <Avatar name={authorName} src={poll.author.avatarUrl} />
         <div className="poll-author-meta">
@@ -83,7 +101,7 @@ export const PollCard = memo(forwardRef<HTMLElement, PollCardProps>(function Pol
               const percentage = poll.votesCount ? Math.min(100, Math.round((option.votesCount / poll.votesCount) * 100)) : 0;
               const canVote = Boolean(onVote) && !hasVoted && !isClosed && !isVoting;
               const isPendingOption = isVoting && poll.viewerVoteOptionId === option.id;
-              return <button className={`poll-option${poll.viewerVoteOptionId === option.id ? ' is-selected' : ''}${hasVoted ? ' is-results' : ''}`} key={option.id} type="button" disabled={!canVote} onClick={() => onVote?.(poll.id, option.id)} aria-label={`${option.text} (${formatVotes(option.votesCount)})`} aria-describedby={onVote ? undefined : `poll-${poll.id}-vote-help`}>
+              return <button className={`poll-option${poll.viewerVoteOptionId === option.id ? ' is-selected' : ''}${hasVoted ? ' is-results' : ''}${isPendingOption ? ' is-pending' : ''}`} key={option.id} type="button" disabled={!canVote} onClick={() => onVote?.(poll.id, option.id)} aria-label={`${option.text} (${formatVotes(option.votesCount)})`} aria-describedby={onVote ? undefined : `poll-${poll.id}-vote-help`}>
                 <span className="poll-option-label poll-option__content">{option.text}</span>
                 <span className="poll-option-votes"><AnimatedCount value={option.votesCount} enabled={reactionsEnabled} formatValue={(count) => formatVotes(count, true)} /></span>
                 <span className="poll-option-percent"><AnimatedCount value={percentage} enabled={reactionsEnabled} formatValue={(count) => `${count}%`} /></span>
