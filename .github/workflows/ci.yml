@@ -17,6 +17,7 @@ jobs:
       - run: npm ci
       - name: Public web checks
         run: |
+          npm run shared:build
           npm run typecheck -w @yaskapp/web
           npm run lint -w @yaskapp/web
           npm run test -w @yaskapp/web -- --run

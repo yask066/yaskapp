@@ -21,7 +21,7 @@
     "account-deletion:journal-init": "tsx src/jobs/initialize-account-deletion-journal.ts",
     "account-deletion:journal-import-legacy": "tsx src/jobs/run-import-account-deletion-cloud-journal.ts",
     "account-deletion:journal-reapply": "tsx src/jobs/reapply-account-deletions.ts",
-    "test": "npm run db:migrate && node --import tsx --test --test-reporter spec \"src/**/*.test.ts\"",
+    "test": "npm run db:migrate && node --import tsx --test --test-reporter spec $(find src -name '*.test.ts' | sort)",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "poll-feed-snapshots:cleanup": "tsx src/jobs/cleanup-poll-feed-snapshots.ts"
   },
