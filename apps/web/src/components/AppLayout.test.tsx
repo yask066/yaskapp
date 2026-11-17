@@ -73,25 +73,15 @@ test('marks only the current primary destination', () => {
   expect(within(navigation).getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current');
 });
 
-test('provides keyboard-native account dropdown menu and sign out controls', async () => {
+test('provides keyboard-native account navigation and sign out controls', async () => {
   const user = userEvent.setup();
 
   renderLayout();
 
   const accountNavigation = screen.getByRole('navigation', { name: 'Account navigation' });
-  const trigger = within(accountNavigation).getByRole('button', { name: /Account menu for Member/i });
-  expect(trigger).toHaveAttribute('aria-expanded', 'false');
-  expect(within(accountNavigation).queryByRole('link', { name: 'Profile' })).not.toBeInTheDocument();
+  expect(within(accountNavigation).getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/me');
   expect(screen.queryByRole('menu')).not.toBeInTheDocument();
 
-  await user.click(trigger);
-  expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  expect(within(accountNavigation).getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/me');
-
-  await user.keyboard('{Escape}');
-  expect(trigger).toHaveAttribute('aria-expanded', 'false');
-
-  await user.click(trigger);
   await user.click(within(accountNavigation).getByRole('button', { name: 'Sign out' }));
   expect(signOut).toHaveBeenCalledOnce();
 });
@@ -152,14 +142,4 @@ test('omits the empty primary navigation for anonymous and loading sessions', ()
   sessionStatus = 'loading';
   renderLayout();
   expect(screen.queryByRole('navigation', { name: 'Primary navigation' })).not.toBeInTheDocument();
-});
-
-test('submits header search to /search and hides the duplicate header search input on /search', async () => {
-  const user = userEvent.setup();
-  renderLayout('/');
-
-  const searchInput = screen.getByRole('searchbox', { name: 'Search polls, users or topics' });
-  await user.type(searchInput, 'climate{Enter}');
-
-  expect(screen.queryByRole('searchbox', { name: 'Search polls, users or topics' })).not.toBeInTheDocument();
 });

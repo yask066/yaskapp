@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useNavigationType, useSearchParams } from 'react-router-dom';
 import { search } from '../../api/search';
@@ -25,13 +25,6 @@ export function SearchPage() {
   const submittedQ = searchParams.get('q')?.trim() || '';
   const submittedType = searchParams.get('type') === 'polls' || searchParams.get('type') === 'users' ? searchParams.get('type') as SearchType : 'all';
   const submittedSort = searchParams.get('sort') === 'newest' || searchParams.get('sort') === 'popular' ? searchParams.get('sort') as SearchSort : 'relevance';
-  useEffect(() => {
-    if (submittedQ) {
-      setQuery(submittedQ);
-      setType(submittedType);
-      setSort(submittedSort);
-    }
-  }, [submittedQ, submittedType, submittedSort]);
   const submitted = submittedQ.length >= 2 ? { q: submittedQ, type: submittedType, sort: submittedSort } : null;
   const searchQuery = useQuery({
     queryKey: ['search', sessionEpoch, submitted],
@@ -56,7 +49,7 @@ export function SearchPage() {
     <main id="main-content" className="search-page">
       <header className="page-heading"><div><p className="eyebrow">Explore</p><h1>Search</h1></div></header>
       <form className="search-panel" role="search" onSubmit={submit}>
-        <label>Search<input placeholder="Search polls, users or topics…" value={query} onChange={(event) => { setQuery(event.target.value); if (submitted) setSearchParams({}, { replace: true }); }} minLength={2} required /></label>
+        <label>Search<input value={query} onChange={(event) => { setQuery(event.target.value); if (submitted) setSearchParams({}, { replace: true }); }} minLength={2} required /></label>
         <label>Result type<select value={type} onChange={(event) => { setType(event.target.value as SearchType); if (submitted) setSearchParams({}, { replace: true }); }}><option value="all">All</option><option value="polls">Polls</option><option value="users">Users</option></select></label>
         <label>Sort<select value={sort} onChange={(event) => { setSort(event.target.value as SearchSort); if (submitted) setSearchParams({}, { replace: true }); }}><option value="relevance">Relevance</option><option value="newest">Newest</option><option value="popular">Popular</option></select></label>
         <div className="search-actions"><button className="button button--primary" type="submit" disabled={searchQuery.isFetching || query.trim().length < 2 || status === 'loading'}>Search</button></div>
