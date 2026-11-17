@@ -6,7 +6,29 @@ on:
   pull_request:
 
 jobs:
-  api-and-web:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Public web checks
+        run: |
+          npm run typecheck -w @yaskapp/web
+          npm run lint -w @yaskapp/web
+          npm run test -w @yaskapp/web -- --run
+          npm run build -w @yaskapp/web
+          node --test infra/docker/test/*.test.mjs apps/web/test/smoke.test.mjs
+      - name: Moderation web syntax and smoke tests
+        working-directory: apps/moderation-web
+        run: |
+          node --check src/main.js
+          node --test test/smoke.test.mjs
+
+  api:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -29,12 +51,6 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
-      minio:
-        image: minio/minio:latest
-        env:
-          MINIO_ROOT_USER: yaskapp
-          MINIO_ROOT_PASSWORD: yaskapp-secret
-        ports: ['9000:9000']
 
     env:
       NODE_ENV: test
@@ -55,11 +71,31 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: Create MinIO test bucket
+      - name: Start MinIO and create test bucket
+        working-directory: services/api
         run: |
+          docker run -d --name ci-minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=yaskapp \
+            -e MINIO_ROOT_PASSWORD=yaskapp-secret \
+            cgr.dev/chainguard/minio:latest server /data
           for i in {1..30}; do curl -fsS http://127.0.0.1:9000/minio/health/live && break || sleep 2; done
-          docker run --network host --rm minio/mc:latest alias set ci http://127.0.0.1:9000 yaskapp yaskapp-secret
-          docker run --network host --rm minio/mc:latest mb --ignore-existing ci/yaskapp-media
+          node --input-type=module -e "
+            import { S3Client, CreateBucketCommand } from '@aws-sdk/client-s3';
+            const s3 = new S3Client({
+              endpoint: process.env.S3_ENDPOINT,
+              region: process.env.S3_REGION,
+              forcePathStyle: true,
+              credentials: {
+                accessKeyId: process.env.S3_ACCESS_KEY_ID,
+                secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+              },
+            });
+            try {
+              await s3.send(new CreateBucketCommand({ Bucket: process.env.S3_BUCKET }));
+            } catch (error) {
+              if (error?.name !== 'BucketAlreadyOwnedByYou' && error?.name !== 'BucketAlreadyExists') throw error;
+            }
+          "
       - run: npm run api:typecheck
       - run: npm run api:test
       - name: Create push worker test database
@@ -86,15 +122,3 @@ jobs:
         run: |
           npm run db:migrate
           node --import tsx --test src/modules/polls/poll-feed-snapshots.test.ts
-      - name: Public web checks
-        run: |
-          npm run typecheck -w @yaskapp/web
-          npm run lint -w @yaskapp/web
-          npm run test -w @yaskapp/web -- --run
-          npm run build -w @yaskapp/web
-          node --test infra/docker/test/*.test.mjs apps/web/test/smoke.test.mjs
-      - name: Moderation web syntax and smoke tests
-        working-directory: apps/moderation-web
-        run: |
-          node --check src/main.js
-          node --test test/smoke.test.mjs
