@@ -1,0 +1,63 @@
+name: Production
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      vars.PRODUCTION_DEPLOY_ENABLED == 'true' && github.event.pull_request.merged == true &&
+      github.event.pull_request.head.ref == 'staging' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Verify source and staging evidence
+        id: evidence
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node infra/release/github.mjs promote
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-${{ steps.evidence.outputs.source_sha }}
+          run-id: ${{ steps.evidence.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify manifest
+        env:
+          SOURCE_SHA: ${{ steps.evidence.outputs.source_sha }}
+          SOURCE_TREE: ${{ steps.evidence.outputs.source_tree }}
+        run: |
+          PYTHONPATH=infra/release python3 -c 'import json,os; from release import verify_promotion; verify_promotion(json.load(open("release.json")), os.environ["SOURCE_SHA"], os.environ["SOURCE_TREE"])'
+      - name: Deploy tested images
+        env:
+          SOURCE_SHA: ${{ steps.evidence.outputs.source_sha }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: bash infra/release/ssh-deploy.sh production "$SOURCE_SHA" release.json
+      - uses: actions/create-github-app-token@v2
+        id: app
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      - name: Synchronize main into staging
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: node infra/release/github.mjs sync

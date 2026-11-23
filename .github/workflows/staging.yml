@@ -1,0 +1,99 @@
+name: Staging
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-pipeline
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+  build:
+    needs: verify
+    if: vars.STAGING_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      api: ${{ steps.api.outputs.digest }}
+      web: ${{ steps.web.outputs.digest }}
+      moderation: ${{ steps.moderation.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        id: api
+        with:
+          context: .
+          file: services/api/Dockerfile
+          push: true
+          tags: ghcr.io/yask066/yaskapp-api:${{ github.sha }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+      - uses: docker/build-push-action@v6
+        id: web
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          tags: ghcr.io/yask066/yaskapp-web:${{ github.sha }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+      - uses: docker/build-push-action@v6
+        id: moderation
+        with:
+          context: .
+          file: apps/moderation-web/Dockerfile
+          push: true
+          tags: ghcr.io/yask066/yaskapp-moderation-web:${{ github.sha }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+      - name: Record immutable release
+        env:
+          API_DIGEST: ${{ steps.api.outputs.digest }}
+          WEB_DIGEST: ${{ steps.web.outputs.digest }}
+          MODERATION_DIGEST: ${{ steps.moderation.outputs.digest }}
+        run: python3 infra/release/release.py --sequence "$GITHUB_RUN_NUMBER" --api "$API_DIGEST" --web "$WEB_DIGEST" --moderation-web "$MODERATION_DIGEST" --output release.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: candidate-${{ github.sha }}
+          path: release.json
+          retention-days: 90
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: candidate-${{ github.sha }}
+      - name: Deploy and verify test environment
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: bash infra/release/ssh-deploy.sh staging "$GITHUB_SHA" release.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ github.sha }}
+          path: release.json
+          retention-days: 90
+      - uses: actions/create-github-app-token@v2
+        id: app
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      - name: Prepare release PR
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: node infra/release/github.mjs pr

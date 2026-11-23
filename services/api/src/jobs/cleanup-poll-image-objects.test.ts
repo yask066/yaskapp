@@ -1,19 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   isCleanupCliInvocation,
   selectOrphanedPollImageKeys
 } from './cleanup-poll-image-objects.js';
 
-test('detects cleanup CLI invocation when Windows uses backslashes', () => {
-  assert.equal(
-    isCleanupCliInvocation(
-      'file:///D:/yaskapp/services/api/dist/jobs/cleanup-poll-image-objects.js',
-      'D:\\yaskapp\\services\\api\\dist\\jobs\\cleanup-poll-image-objects.js'
-    ),
-    true
-  );
+test('detects cleanup CLI invocation with a native filesystem path', () => {
+  const moduleUrl = new URL('./test directory/cleanup-poll-image-objects.js', import.meta.url);
+  assert.equal(isCleanupCliInvocation(moduleUrl.href, fileURLToPath(moduleUrl)), true);
 });
 
 test('poll image cleanup selects only old unreferenced normalized objects', () => {

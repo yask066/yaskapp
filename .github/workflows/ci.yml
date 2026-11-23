@@ -4,6 +4,10 @@ on:
   push:
     branches: [main, master]
   pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   web:
@@ -79,7 +83,8 @@ jobs:
             -e MINIO_ROOT_USER=yaskapp \
             -e MINIO_ROOT_PASSWORD=yaskapp-secret \
             cgr.dev/chainguard/minio:latest server /data
-          for i in {1..30}; do curl -fsS http://127.0.0.1:9000/minio/health/live && break || sleep 2; done
+          curl --fail --silent --show-error --max-time 2 --retry 30 --retry-all-errors \
+            --retry-delay 2 --retry-max-time 65 http://127.0.0.1:9000/minio/health/live
           node --input-type=module -e "
             import { S3Client, CreateBucketCommand } from '@aws-sdk/client-s3';
             const s3 = new S3Client({
@@ -123,3 +128,50 @@ jobs:
         run: |
           npm run db:migrate
           node --import tsx --test src/modules/polls/poll-feed-snapshots.test.ts
+
+  release-tooling:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: python3 -m unittest discover -s infra/release -p 'test_*.py'
+      - run: node --test infra/release/*.test.mjs
+      - name: Validate isolated Compose configuration
+        run: |
+          cp services/api/.env.staging.example services/api/.env.staging
+          docker compose -f infra/docker/docker-compose.staging.yml -f infra/release/compose.test.yml config --quiet
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.5'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - name: Build separate Android test application
+        env:
+          ORG_GRADLE_PROJECT_yaskappTestBuild: 'true'
+        run: >-
+          flutter build apk --debug
+          --dart-define=API_BASE_URL=https://api-test.yaskapp.org
+          --dart-define=API_WEBSOCKET_URL=wss://api-test.yaskapp.org/realtime
+          --dart-define=YASKAPP_PUSH_ENABLED=false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-test-${{ github.sha }}
+          path: apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30

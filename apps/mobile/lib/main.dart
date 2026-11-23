@@ -15,8 +15,10 @@ Future<void> main() async {
   if (kProfileMode && const bool.fromEnvironment('M17_AC12_PROBE')) {
     Ac12FrameTimingProbe.install();
   }
-  await Firebase.initializeApp();
-  await FirebasePushService().initialize();
+  if (const bool.fromEnvironment('YASKAPP_PUSH_ENABLED', defaultValue: true)) {
+    await Firebase.initializeApp();
+    await FirebasePushService().initialize();
+  }
   runApp(YaskappApp(
     reactionsMotion: _motionFlags.reactionsMotion,
     entryMotion: _motionFlags.entryMotion,
