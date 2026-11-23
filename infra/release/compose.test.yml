@@ -2,6 +2,10 @@
 # Its services/api/.env.staging must contain independent test credentials.
 name: yaskapp-test
 services:
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+  minio-init:
+    image: cgr.dev/chainguard/minio-client:latest-dev
   api:
     deploy:
       replicas: 1

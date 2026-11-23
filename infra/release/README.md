@@ -138,7 +138,7 @@ runner применяет миграции перед стартом API. Produc
 4. Провести контролируемый отказ readiness и возврат предыдущих образов на
    тестовом стенде. После этого зарегистрировать production baseline.
 5. Защитить main: PR required, запрет force push/delete, обязательные
-   `api-and-web`, `release-tooling`, `mobile`, `release-ready`, strict up-to-date;
+   `api`, `web`, `release-tooling`, `mobile`, `release-ready`, strict up-to-date;
    запрет обычного admin bypass. Проверить реальные имена checks в GitHub перед
    сохранением правил. Не требовать reviewer от второго человека.
 6. Включить production server config и `PRODUCTION_DEPLOY_ENABLED=true`.
