@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import tempfile
 import time
 import urllib.request
 
@@ -22,12 +23,16 @@ def read(path):
 
 
 def save(path, data):
-    temporary = path.with_suffix('.tmp')
-    with temporary.open('w') as output:
-        json.dump(data, output, indent=2)
-        output.flush()
-        os.fsync(output.fileno())
-    os.replace(temporary, path)
+    output = tempfile.NamedTemporaryFile(mode='w', dir=path.parent, prefix=f'.{path.name}.', delete=False)
+    temporary = Path(output.name)
+    try:
+        with output:
+            json.dump(data, output, indent=2)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def perform(host, state, manifest):
@@ -97,10 +102,11 @@ def secure_file(path):
 
 
 @contextmanager
-def locked(path):
+def locked(path, *, blocking=False):
     import fcntl
+    mode = fcntl.LOCK_EX if blocking else fcntl.LOCK_EX | fcntl.LOCK_NB
     with path.open('a') as handle:
-        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(handle, mode)
         yield
 
 
