@@ -68,9 +68,11 @@ sudo bash infra/release/install.sh production yaskapp-deploy-prod
 
 Установка не запускает deploy и не включает environments. `install.sh`
 разрешает только проверенную команду submit для нужного окружения через sudo.
-Upload идёт в отдельный incoming; manifest копируется в root-owned requests.
-systemd продолжает deploy при обрыве SSH. Повторный завершённый запрос — no-op;
-незавершённый запрос требует проверки оператора.
+GitHub Actions передаёт манифест через SSH. Runner сохраняет его в root-owned
+requests и обрабатывает запросы одного SHA последовательно. Повтор с тем же
+манифестом после успешного deploy завершается без повторной выкладки.
+systemd продолжает deploy при обрыве SSH. Незавершённый запрос требует проверки
+оператора.
 
 Создать root-owned `/etc/yaskapp/release/production.json` по
 `config.example.json`, первоначально с `enabled: false`. Указать фактические
@@ -148,7 +150,7 @@ runner применяет миграции перед стартом API. Produc
 
 Текущие/предыдущие manifests: `/var/lib/yaskapp-release/<environment>/current.json`
 и `previous.json`; фаза и запрошенная версия — `attempt.json`. Логи:
-`journalctl -u yaskapp-release-<environment>-<SHA>`. GitHub сохраняет release
+`journalctl -u 'yaskapp-release-<environment>-<SHA>*'`. GitHub сохраняет release
 manifest 90 дней; сервер сохраняет requests и состояние независимо от GitHub.
 Копировать release config/manifests в отдельную резервную копию настройки:
 существующий backup не гарантирует включение новых файлов `/etc/yaskapp/release`.
