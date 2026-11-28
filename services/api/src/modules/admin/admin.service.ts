@@ -61,7 +61,11 @@ export async function unblockUser(actorId: string, targetUserId: string, audit: 
 export async function deleteAdminUser(actorId: string, targetUserId: string, audit: UserAudit) {
   const result = await deleteAdminUserRecord(actorId, targetUserId, { actorUserId: actorId, ...audit });
   userMutationError(result.status);
-  return { status: result.status, userId: targetUserId };
+  return {
+    status: result.status,
+    userId: targetUserId,
+    operationId: 'operationId' in result ? result.operationId : undefined
+  };
 }
 
 export async function changeUserRole(actorId: string, targetUserId: string, role: UserRole, audit: UserAudit) {

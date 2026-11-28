@@ -14,7 +14,7 @@ async function loadDeletion(client: PoolClient, operationId: string) {
   if (!userId) throw new Error('account_deletion_operation_not_found');
   const [targets, ownedPolls, ownedComments] = await Promise.all([
     client.query<{ target_type: 'poll' | 'comment'; target_id: string }>(
-    `SELECT target_type, target_id FROM account_deletion_content_targets
+    `SELECT target_type, target_id FROM account_deletion_deleted_content_targets
       WHERE operation_id = $1 ORDER BY target_type, target_id`,
     [operationId]
     ),
@@ -80,17 +80,23 @@ async function purgeModerationBatch(client: PoolClient, userId: string, pollIds:
 
   const foreignAppeals = await client.query(
     `WITH batch AS (
-       SELECT a.id
+       SELECT a.id,
+              (s.user_id = $1 OR s.case_id = ANY($2::uuid[])) AS redact_reason
          FROM appeals a
          JOIN sanctions s ON s.id = a.sanction_id
         WHERE a.user_id <> $1 AND (
           s.user_id = $1 OR s.created_by_user_id = $1 OR s.revoked_by_user_id = $1
           OR a.resolved_by_user_id = $1 OR s.case_id = ANY($2::uuid[])
-        ) AND (a.reason <> $3 OR a.decision_note IS NOT NULL OR a.resolved_by_user_id = $1)
+        ) AND (
+          ((s.user_id = $1 OR s.case_id = ANY($2::uuid[])) AND a.reason <> $3)
+          OR a.decision_note IS NOT NULL
+          OR a.resolved_by_user_id = $1
+        )
         ORDER BY a.created_at, a.id LIMIT $4 FOR UPDATE OF a
      )
      UPDATE appeals a
-        SET reason = $3, decision_note = NULL,
+        SET reason = CASE WHEN batch.redact_reason THEN $3 ELSE a.reason END,
+            decision_note = NULL,
             resolved_by_user_id = CASE WHEN a.resolved_by_user_id = $1 THEN NULL ELSE a.resolved_by_user_id END
        FROM batch WHERE a.id = batch.id`,
     [userId, caseIds, REDACTED_TEXT, PURGE_BATCH_SIZE]
@@ -139,7 +145,8 @@ async function purgeModerationBatch(client: PoolClient, userId: string, pollIds:
      )
      UPDATE sanctions s
         SET user_id = CASE WHEN s.user_id = $1 THEN NULL ELSE s.user_id END,
-            created_by_user_id = NULL, revoked_by_user_id = NULL,
+            created_by_user_id = CASE WHEN s.created_by_user_id = $1 THEN NULL ELSE s.created_by_user_id END,
+            revoked_by_user_id = CASE WHEN s.revoked_by_user_id = $1 THEN NULL ELSE s.revoked_by_user_id END,
             reason = $4, metadata = '{}'::jsonb
        FROM batch WHERE s.id = batch.id`,
     [userId, caseIds, PURGE_BATCH_SIZE, REDACTED_TEXT]

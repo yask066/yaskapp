@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { checkDatabaseConnection } from '../../config/database.js';
 import { checkRedisConnection } from '../../config/redis.js';
@@ -14,6 +14,28 @@ type HealthReadinessChecks = {
   assertJournalReady: typeof assertAccountDeletionJournalReady;
 };
 
+function isInternalIp(rawIp: string | undefined): boolean {
+  if (!rawIp) return false;
+  const ip = rawIp.startsWith('::ffff:') ? rawIp.slice(7) : rawIp;
+  return (
+    ip === '127.0.0.1' ||
+    ip === '::1' ||
+    ip.startsWith('10.') ||
+    ip.startsWith('192.168.') ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(ip) ||
+    ip.startsWith('fc') ||
+    ip.startsWith('fd')
+  );
+}
+
+async function requireInternalHealthAccess(request: FastifyRequest, reply: FastifyReply) {
+  if (env.NODE_ENV === 'test' || isInternalIp(request.ip)) return;
+  return reply.status(403).send({
+    error: 'forbidden',
+    message: 'Internal health endpoint is restricted.'
+  });
+}
+
 export function registerHealthRoutes(app: FastifyInstance, checks: Partial<HealthReadinessChecks> = {}) {
   const readiness = {
     checkDatabaseConnection,
@@ -22,23 +44,35 @@ export function registerHealthRoutes(app: FastifyInstance, checks: Partial<Healt
     assertJournalReady: assertAccountDeletionJournalReady,
     ...checks
   };
+  let cachedReady: { expiresAt: number; payload: Record<string, unknown> } | null = null;
 
   app.get('/health', async () => ({
     status: 'ok',
     service: 'api'
   }));
 
-  app.get('/health/db', async () => {
-    const database = await checkDatabaseConnection();
-
-    return {
-      status: 'ok',
-      service: 'api',
-      database
-    };
+  app.get('/health/db', { preHandler: requireInternalHealthAccess }, async (request, reply) => {
+    try {
+      const database = await readiness.checkDatabaseConnection();
+      return {
+        status: 'ok',
+        service: 'api',
+        database: { connected: database.connected }
+      };
+    } catch (error) {
+      request.log.error({ err: error }, 'Database health check failed');
+      return reply.code(503).send({
+        status: 'unavailable',
+        service: 'api'
+      });
+    }
   });
 
   app.get('/health/ready', async (request, reply) => {
+    if (env.NODE_ENV !== 'test' && cachedReady && cachedReady.expiresAt > Date.now()) {
+      return cachedReady.payload;
+    }
+
     try {
       const [database, redis, storage] = await Promise.all([
         readiness.checkDatabaseConnection(),
@@ -48,14 +82,19 @@ export function registerHealthRoutes(app: FastifyInstance, checks: Partial<Healt
           ? readiness.assertJournalReady() : Promise.resolve()
       ]);
 
-      return {
+      const payload = {
         status: 'ready',
         service: 'api',
-        database,
-        redis,
-        storage
+        database: { connected: database.connected },
+        redis: { connected: redis.connected },
+        storage: { connected: storage.connected }
       };
+      if (env.NODE_ENV !== 'test') {
+        cachedReady = { expiresAt: Date.now() + 1_000, payload };
+      }
+      return payload;
     } catch (error) {
+      cachedReady = null;
       const errorCode = error && typeof error === 'object' && 'code' in error && typeof error.code === 'string'
         ? error.code
         : undefined;
@@ -69,7 +108,7 @@ export function registerHealthRoutes(app: FastifyInstance, checks: Partial<Healt
     }
   });
 
-  app.get('/health/metrics', async () => ({
+  app.get('/health/metrics', { preHandler: requireInternalHealthAccess }, async () => ({
     status: 'ok',
     service: 'api',
     notifications: getNotificationMetrics()

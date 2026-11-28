@@ -5,8 +5,11 @@ import {
   broadcastCommentDeleted,
   broadcastPollDeleted,
   broadcastUserBlocked,
-  broadcastUserUnblocked
+  broadcastUserUnblocked,
+  disconnectUser
 } from '../../realtime/realtime.hub.js';
+import { realtimeBus } from '../../realtime/realtime.bus.js';
+import { dispatchPendingDeletionEvents } from '../account-deletion/account-deletion.events.js';
 import { authenticate } from '../auth/auth.utils.js';
 import { permissionsForRole, requirePermission } from '../auth/permissions.js';
 import {
@@ -181,7 +184,11 @@ export function registerAdminRoutes(app: FastifyInstance) {
       if (!parsedQuery.success) {
         return reply.status(400).send({ error: 'validation_error', message: 'Request input is invalid.' });
       }
-      return reply.send(await listAdminUsers(parsedQuery.data));
+      try {
+        return reply.send(await listAdminUsers(parsedQuery.data));
+      } catch (error) {
+        return adminError(reply, error);
+      }
     }
   );
 
@@ -236,11 +243,18 @@ export function registerAdminRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: 'validation_error', message: 'Request input is invalid.' });
       }
       try {
-        await deleteAdminUser(request.user.sub, parsedParams.data.userId, {
+        const deleted = await deleteAdminUser(request.user.sub, parsedParams.data.userId, {
           actorRole: (await request.getCurrentUser())?.role ?? 'user',
           reason: parsedBody.data.reason,
           requestId: request.id
         });
+        if (deleted.status === 'updated' && deleted.operationId) {
+          disconnectUser(parsedParams.data.userId, 'account_deleted', {
+            type: 'account.deleted',
+            payload: { userId: parsedParams.data.userId, operationId: deleted.operationId }
+          });
+          void dispatchPendingDeletionEvents().catch(() => undefined);
+        }
         return reply.status(204).send();
       } catch (error) {
         return adminError(reply, error);
@@ -285,7 +299,11 @@ export function registerAdminRoutes(app: FastifyInstance) {
         });
       }
 
-      return reply.send(await listAdminAudit(parsedQuery.data));
+      try {
+        return reply.send(await listAdminAudit(parsedQuery.data));
+      } catch (error) {
+        return adminError(reply, error);
+      }
     }
   );
 
@@ -304,7 +322,11 @@ export function registerAdminRoutes(app: FastifyInstance) {
         });
       }
 
-      return reply.send(await listAdminPolls(parsedQuery.data));
+      try {
+        return reply.send(await listAdminPolls(parsedQuery.data));
+      } catch (error) {
+        return adminError(reply, error);
+      }
     }
   );
 
@@ -430,6 +452,13 @@ export function registerAdminRoutes(app: FastifyInstance) {
         );
         if (result.status === 'blocked') {
           broadcastUserBlocked({ userId: parsedParams.data.userId });
+          disconnectUser(parsedParams.data.userId, 'session_revoked');
+          void realtimeBus
+            .publish(parsedParams.data.userId, {
+              type: 'session.revoked',
+              payload: { userId: parsedParams.data.userId, reason: 'blocked' }
+            })
+            .catch(() => undefined);
         }
         const user = await getBlockedUser(parsedParams.data.userId);
 

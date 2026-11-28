@@ -117,6 +117,27 @@ export async function getDeletionPermission(
   } : null;
 }
 
+export async function isOperationJournalConfirmed(
+  operationId: string,
+  executor: Executor = db
+): Promise<boolean> {
+  const result = await executor.query<{ confirmed: boolean }>(
+    'SELECT journal_confirmed_at IS NOT NULL AS confirmed FROM account_deletion_operations WHERE id = $1',
+    [operationId]
+  );
+  return result.rows[0]?.confirmed === true;
+}
+
+export async function markOperationJournalConfirmed(
+  operationId: string,
+  executor: Executor = db
+): Promise<void> {
+  await executor.query(
+    'UPDATE account_deletion_operations SET journal_confirmed_at = COALESCE(journal_confirmed_at, now()) WHERE id = $1',
+    [operationId]
+  );
+}
+
 export async function consumeDeletionPermission(tokenHash: string, client: PoolClient) {
   const result = await client.query(
     `UPDATE account_deletion_permissions SET consumed_at = COALESCE(consumed_at, now())

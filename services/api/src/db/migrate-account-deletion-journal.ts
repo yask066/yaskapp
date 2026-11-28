@@ -1,9 +1,9 @@
-import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import pg from 'pg';
 import type { Pool, PoolClient } from 'pg';
+import { calculateMigrationChecksum, matchesMigrationChecksum } from './migration-checksum.js';
 
 const migrationsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'journal-migrations');
 const migrationLockId = 7_450_291_318;
@@ -20,7 +20,7 @@ async function listMigrationFiles(directory: string): Promise<MigrationFile[]> {
     .sort((left, right) => left.localeCompare(right));
   return Promise.all(names.map(async (name) => {
     const sql = await readFile(path.join(directory, name), 'utf8');
-    return { name, checksum: createHash('sha256').update(sql).digest('hex'), sql };
+    return { name, checksum: calculateMigrationChecksum(sql), sql };
   }));
 }
 
@@ -86,7 +86,7 @@ export async function runAccountDeletionJournalMigrations(
 
     for (const migration of migrations) {
       const checksum = applied.get(migration.name);
-      if (checksum !== undefined && checksum !== migration.checksum) {
+      if (checksum !== undefined && checksum !== null && !matchesMigrationChecksum(migration.sql, checksum)) {
         throw new Error(`Applied journal migration ${migration.name} was modified.`);
       }
     }

@@ -125,8 +125,8 @@ export async function followUserRecord(
     );
   }
 
-  return withTransaction(async (client) => {
-    let notificationId: string | null = null;
+  let notificationId: string | null = null;
+  const result = await withTransaction(async (client) => {
     const userIds = [input.followerId, input.followeeId].sort();
     await lockFollowAccounts(client, input.followerId, input.followeeId);
     const existingUsers = await lockUserProfiles(client, userIds);
@@ -174,7 +174,7 @@ export async function followUserRecord(
       );
     }
 
-    const result = {
+    return {
       following: true,
       ...(await readFollowCounts(
         client,
@@ -182,11 +182,12 @@ export async function followUserRecord(
         input.followeeId
       ))
     };
-    if (notificationId) {
-      await publishNotificationAfterCommit(input.followeeId, notificationId);
-    }
-    return result;
   });
+
+  if (notificationId) {
+    await publishNotificationAfterCommit(input.followeeId, notificationId);
+  }
+  return result;
 }
 
 export async function unfollowUserRecord(

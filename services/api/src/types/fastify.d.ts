@@ -11,6 +11,8 @@ declare module '@fastify/jwt' {
       sub: string;
       username: string;
       sessionVersion: number;
+      iat?: number;
+      exp?: number;
     };
   }
 }

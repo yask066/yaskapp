@@ -16,6 +16,8 @@ export type { SearchInput as SearchRepositoryInput } from './search.types.js';
 
 type Query = { text: string; values: unknown[] };
 
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function normalizedQuery(query: string) {
   return query.trim().replace(/\s+/g, ' ');
 }
@@ -125,6 +127,7 @@ export function buildPollSearchQuery(input: SearchInput): Query {
           '[]'::json
         ) AS options,
         p.created_at,
+        to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
         p.updated_at,
         p.ends_at,
         ${scoreExpression} AS score
@@ -168,6 +171,7 @@ export function buildUserSearchQuery(input: SearchInput): Query {
         u.username::text AS username,
         u.status,
         u.created_at,
+        to_char(u.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
         u.updated_at,
         pr.display_name,
         pr.bio,
@@ -185,7 +189,17 @@ export function buildUserSearchQuery(input: SearchInput): Query {
       JOIN profiles pr ON pr.user_id = u.id
       WHERE u.status = 'active'
         AND u.deleted_at IS NULL
-        AND (u.username::text ILIKE $2 ESCAPE '\\' OR pr.display_name ILIKE $3 ESCAPE '\\')
+        AND u.id IN (
+          SELECT u.id
+          FROM users u
+          WHERE u.status = 'active'
+            AND u.deleted_at IS NULL
+            AND u.username::text ILIKE $2 ESCAPE '\\'
+          UNION
+          SELECT pr.user_id
+          FROM profiles pr
+          WHERE pr.display_name ILIKE $3 ESCAPE '\\'
+        )
         ${cursor}
       ORDER BY ${orderBy}
       LIMIT ${limitPlaceholder}
@@ -228,7 +242,7 @@ export function buildPopularUsersQuery(viewerId: string, limit: number): Query {
 
 export function encodeSearchCursor(cursor: SearchCursor) {
   const payload = Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
-  const signature = createHmac('sha256', env.JWT_SECRET).update(payload).digest('base64url');
+  const signature = createHmac('sha256', env.PAGINATION_CURSOR_SECRET).update(payload).digest('base64url');
   return `${payload}.${signature}`;
 }
 
@@ -236,12 +250,16 @@ export function decodeSearchCursor(
   value: string,
   expected?: { query: string; type: SearchInput['type']; sort: SearchInput['sort'] }
 ): SearchCursor {
-  const [payload, signature] = value.split('.');
+  const parts = value.split('.');
+  if (parts.length !== 2) {
+    throw new Error('Invalid search cursor.');
+  }
+  const [payload, signature] = parts;
   if (!payload || !signature) {
     throw new Error('Invalid search cursor.');
   }
 
-  const expectedSignature = createHmac('sha256', env.JWT_SECRET)
+  const expectedSignature = createHmac('sha256', env.PAGINATION_CURSOR_SECRET)
     .update(payload)
     .digest();
   const actualSignature = Buffer.from(signature, 'base64url');
@@ -268,7 +286,7 @@ export function decodeSearchCursor(
     typeof cursor.createdAt !== 'string' ||
     Number.isNaN(Date.parse(cursor.createdAt)) ||
     typeof cursor.id !== 'string' ||
-    cursor.id.trim().length === 0 ||
+    !uuidPattern.test(cursor.id) ||
     ('score' in cursor && (typeof cursor.score !== 'number' || !Number.isFinite(cursor.score)))
   ) {
     throw new Error('Invalid search cursor.');
@@ -297,6 +315,7 @@ export function decodeSearchCursor(
 export function mapPollSearchRow(row: SearchPollRow): SearchPollRecord {
   return {
     score: Number(row.score),
+    cursorCreatedAt: row.cursor_created_at ?? row.created_at.toISOString(),
     poll: {
       id: row.id,
       authorId: row.author_id,
@@ -334,6 +353,7 @@ export function mapPollSearchRow(row: SearchPollRow): SearchPollRecord {
 export function mapUserSearchRow(row: SearchUserRow): SearchUserRecord {
   return {
     score: Number(row.score),
+    cursorCreatedAt: row.cursor_created_at ?? row.created_at.toISOString(),
     user: {
       id: row.id,
       username: row.username,

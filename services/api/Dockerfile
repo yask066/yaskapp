@@ -6,7 +6,7 @@ COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/package.json
 COPY services/api/package.json services/api/package.json
 
-RUN npm ci
+RUN npm ci --workspace @yaskapp/api --workspace @yaskapp/shared
 
 COPY packages/shared packages/shared
 COPY services/api services/api
@@ -25,11 +25,12 @@ COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/package.json
 COPY services/api/package.json services/api/package.json
 
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --workspace @yaskapp/api --workspace @yaskapp/shared
 
 COPY --from=build /app/packages/shared/dist packages/shared/dist
 COPY --from=build /app/services/api/dist services/api/dist
 COPY --from=build /app/services/api/src/db/migrations services/api/dist/db/migrations
+COPY --from=build /app/services/api/src/db/journal-migrations services/api/dist/db/journal-migrations
 
 USER node
 EXPOSE 3000

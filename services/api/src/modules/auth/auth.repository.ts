@@ -1,4 +1,4 @@
-import type { PoolClient } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 
 import { db } from '../../config/database.js';
 import { avatarUrlForUser } from '../profiles/avatar-url.js';
@@ -239,8 +239,13 @@ export async function findUserByIdWithPassword(userId: string) {
   return row ? mapUserWithPassword(row) : null;
 }
 
-export async function findAuthenticatedUserById(userId: string) {
-  const result = await db.query<UserWithProfileRow>(
+type AuthQueryExecutor = Pick<Pool | PoolClient, 'query'>;
+
+export async function findAuthenticatedUserWithSessionById(
+  userId: string,
+  executor: AuthQueryExecutor = db
+): Promise<{ user: AuthenticatedUser; sessionVersion: number } | null> {
+  const result = await executor.query<UserWithProfileRow & { session_version: number }>(
     `
       SELECT
         u.id,
@@ -270,11 +275,18 @@ export async function findAuthenticatedUserById(userId: string) {
 
   const row = result.rows[0];
 
-  return row ? mapAuthenticatedUser(row) : null;
+  return row
+    ? { user: mapAuthenticatedUser(row), sessionVersion: Number(row.session_version ?? 0) }
+    : null;
 }
 
-export async function findUserById(userId: string) {
-  const user = await findAuthenticatedUserById(userId);
+export async function findAuthenticatedUserById(userId: string, executor: AuthQueryExecutor = db) {
+  const record = await findAuthenticatedUserWithSessionById(userId, executor);
+  return record ? record.user : null;
+}
+
+export async function findUserById(userId: string, executor: AuthQueryExecutor = db) {
+  const user = await findAuthenticatedUserById(userId, executor);
 
   if (!user) {
     return null;

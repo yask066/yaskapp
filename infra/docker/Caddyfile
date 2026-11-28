@@ -65,10 +65,19 @@ http://{$STAGING_PUBLIC_IP:127.0.0.1} {
     handle /realtime* {
         reverse_proxy api:3000
     }
+    handle /health/metrics* {
+        respond 403
+    }
+    handle /health/db* {
+        respond 403
+    }
     handle /health* {
         reverse_proxy api:3000
     }
     handle /moderation/* {
+        reverse_proxy api:3000
+    }
+    handle /reports* {
         reverse_proxy api:3000
     }
     handle /appeals* {
@@ -80,7 +89,21 @@ http://{$STAGING_PUBLIC_IP:127.0.0.1} {
 }
 
 {$STAGING_API_DOMAIN:api-staging.example.com} {
-    reverse_proxy api:3000
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+    }
+
+    handle /health/metrics* {
+        respond 403
+    }
+    handle /health/db* {
+        respond 403
+    }
+    handle {
+        reverse_proxy api:3000
+    }
 }
 
 {$MODERATION_HOST:moderation-staging.example.com} {
@@ -158,6 +181,12 @@ http://{$STAGING_PUBLIC_IP:127.0.0.1} {
         reverse_proxy api:3000
     }
     handle /realtime* {
+        reverse_proxy api:3000
+    }
+    handle /reports* {
+        reverse_proxy api:3000
+    }
+    handle /appeals* {
         reverse_proxy api:3000
     }
     handle {

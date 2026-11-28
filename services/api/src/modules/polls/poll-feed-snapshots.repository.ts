@@ -7,6 +7,7 @@ import { recordPaginationMetric } from '../../observability/pagination-logging.j
 import { createPollCursorOwnerKey } from './poll-pagination.js';
 
 const maximumActiveSnapshotsPerOwner = 3;
+const maximumSnapshotItems = 2_000;
 const snapshotPageLimit = 50;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ownerKeyPattern = /^[A-Za-z0-9_-]{43}$/;
@@ -113,8 +114,13 @@ export async function createFeedSnapshot(identity: PollCursorOwnerIdentity, requ
        WHERE p.visibility = 'public'
          AND p.deleted_at IS NULL
          AND u.status = 'active'
-         AND u.deleted_at IS NULL`,
-      [snapshotId]
+         AND u.deleted_at IS NULL
+       ORDER BY
+         (p.votes_count * 2 + p.likes_count * 1.5 + p.comments_count) DESC,
+         p.created_at DESC,
+         p.id DESC
+       LIMIT $2`,
+      [snapshotId, maximumSnapshotItems]
     );
 
     await client.query(
@@ -212,12 +218,24 @@ export async function readFeedSnapshotPage(input: ReadFeedSnapshotPageInput): Pr
   };
 }
 
-export async function deleteExpiredFeedSnapshots(): Promise<number> {
-  const result = await db.query(
-    `DELETE FROM poll_feed_snapshots
-     WHERE expires_at <= clock_timestamp()
-     RETURNING id`
-  );
+export async function deleteExpiredFeedSnapshots(batchSize = 500): Promise<number> {
+  let totalDeleted = 0;
+  for (;;) {
+    const result = await db.query(
+      `WITH doomed AS (
+         SELECT id
+         FROM poll_feed_snapshots
+         WHERE expires_at <= clock_timestamp()
+         LIMIT $1
+       )
+       DELETE FROM poll_feed_snapshots
+       WHERE id IN (SELECT id FROM doomed)`,
+      [batchSize]
+    );
+    const deleted = result.rowCount ?? 0;
+    totalDeleted += deleted;
+    if (deleted < batchSize) break;
+  }
 
-  return result.rowCount ?? 0;
+  return totalDeleted;
 }

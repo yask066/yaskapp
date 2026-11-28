@@ -68,7 +68,14 @@ test('logout clears the cookie session and mutating cookie requests require a tr
   });
   assert.equal(csrfResponse.statusCode, 403, csrfResponse.body);
 
-  const logout = await app.inject({ method: 'POST', url: '/auth/logout', headers: { cookie } });
+  const logoutWithoutOrigin = await app.inject({ method: 'POST', url: '/auth/logout', headers: { cookie } });
+  assert.equal(logoutWithoutOrigin.statusCode, 403, logoutWithoutOrigin.body);
+
+  const logout = await app.inject({
+    method: 'POST',
+    url: '/auth/logout',
+    headers: { cookie, origin: 'http://localhost:5173' }
+  });
   assert.equal(logout.statusCode, 204, logout.body);
   assert.match(String(logout.headers['set-cookie'] ?? ''), /yaskapp_session=/);
 

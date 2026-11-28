@@ -88,6 +88,7 @@ test('search route parser applies defaults and rejects invalid or unknown query 
   assert.equal(parseSearchQuery({ q: 'x' }).success, false);
   assert.equal(parseSearchQuery({ q: 'climate', type: 'groups' }).success, false);
   assert.equal(parseSearchQuery({ q: 'climate', limit: 0 }).success, false);
+  assert.equal(parseSearchQuery({ q: 'climate', cursor: 'a'.repeat(2049) }).success, false);
   assert.equal(parseSearchQuery({ q: 'climate', unknown: 'value' }).success, false);
 });
 
@@ -131,7 +132,7 @@ test('search service rejects a cursor bound to a different query context', async
   const cursor = encodeSearchCursor({
     score: 0.8,
     createdAt: '2026-08-30T09:00:00.000Z',
-    id: 'user-1',
+    id: '11111111-1111-4111-8111-111111111111',
     query: 'other query',
     type: 'users',
     sort: 'popular'

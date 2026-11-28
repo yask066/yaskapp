@@ -37,8 +37,10 @@ type NotificationRow = {
   created_at: Date;
   poll_deleted_at: Date | null;
   poll_author_deleted_at: Date | null;
+  poll_author_status?: string | null;
   comment_deleted_at: Date | null;
   comment_author_deleted_at: Date | null;
+  comment_author_status?: string | null;
 };
 
 const displayPayloadKeys = new Set(['displayName', 'pollQuestion', 'optionLabel', 'commentExcerpt']);
@@ -52,11 +54,15 @@ function safeDisplayPayload(payload: Record<string, unknown>) {
 }
 
 export function mapNotification(row: NotificationRow): NotificationRecord {
+  const pollAuthorActive = row.poll_author_deleted_at === null
+    && (row.poll_author_status === undefined || row.poll_author_status === 'active');
+  const commentAuthorActive = row.comment_author_deleted_at === null
+    && (row.comment_author_status === undefined || row.comment_author_status === 'active');
   const targetAvailable = row.comment_id !== null
     ? row.comment_deleted_at === null && row.poll_deleted_at === null
-      && row.poll_author_deleted_at === null && row.comment_author_deleted_at === null
+      && pollAuthorActive && commentAuthorActive
     : row.poll_id !== null
-      ? row.poll_deleted_at === null && row.poll_author_deleted_at === null
+      ? row.poll_deleted_at === null && pollAuthorActive
       : row.actor_id !== null && row.actor_status === 'active' && row.actor_deleted_at === null;
   const actorAvailable = row.actor_id === null || (row.actor_status === 'active' && row.actor_deleted_at === null);
   return {
@@ -91,8 +97,10 @@ const notificationSelect = `
   actor.status AS actor_status,
   poll.deleted_at AS poll_deleted_at,
   poll_author.deleted_at AS poll_author_deleted_at,
+  poll_author.status AS poll_author_status,
   comment.deleted_at AS comment_deleted_at,
-  comment_author.deleted_at AS comment_author_deleted_at
+  comment_author.deleted_at AS comment_author_deleted_at,
+  comment_author.status AS comment_author_status
 FROM notifications n
 LEFT JOIN users actor ON actor.id = n.actor_user_id
 LEFT JOIN profiles actor_profile ON actor_profile.user_id = actor.id

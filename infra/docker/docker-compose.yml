@@ -28,7 +28,7 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio:latest
+    image: ${MINIO_IMAGE:-cgr.dev/chainguard/minio:latest}
     container_name: yaskapp-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"

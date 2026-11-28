@@ -446,6 +446,23 @@ export async function createPollRecord(input: CreatePollRecordInput) {
   }
 }
 
+function pollVisibilityClause(viewerParam: string) {
+  return `(
+    p.visibility = 'public'
+    OR (${viewerParam}::uuid IS NOT NULL AND p.author_id = ${viewerParam}::uuid)
+    OR (
+      p.visibility = 'followers'
+      AND ${viewerParam}::uuid IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM follows f
+        WHERE f.follower_id = ${viewerParam}::uuid
+          AND f.followee_id = p.author_id
+      )
+    )
+  )`;
+}
+
 export async function deletePollRecord(input: {
   pollId: string;
   authorId: string;
@@ -456,14 +473,18 @@ export async function deletePollRecord(input: {
     await client.query('BEGIN');
     await lockActiveAccount(client, input.authorId);
 
-    const result = await client.query<{ id: string; image_object_key: string | null }>(
+    const result = await client.query<{
+      id: string;
+      image_object_key: string | null;
+      visibility: PollVisibility;
+    }>(
       `
         UPDATE polls
         SET deleted_at = now(), updated_at = now()
         WHERE id = $1
           AND author_id = $2
           AND deleted_at IS NULL
-        RETURNING id, image_object_key
+        RETURNING id, image_object_key, visibility
       `,
       [input.pollId, input.authorId]
     );
@@ -486,7 +507,8 @@ export async function deletePollRecord(input: {
 
     return {
       status: 'deleted' as const,
-      imageObjectKey: result.rows[0]?.image_object_key ?? null
+      imageObjectKey: result.rows[0]?.image_object_key ?? null,
+      visibility: result.rows[0]?.visibility ?? 'public'
     };
   } catch (error) {
     await client.query('ROLLBACK');
@@ -515,11 +537,11 @@ export async function deletePollCommentRecord(input: {
         WHERE p.id = $1
           AND poll_author.status = 'active'
           AND poll_author.deleted_at IS NULL
-          AND p.visibility = 'public'
+          AND ${pollVisibilityClause('$2')}
           AND p.deleted_at IS NULL
-        FOR UPDATE
+        FOR UPDATE OF p
       `,
-      [input.pollId]
+      [input.pollId, input.authorId]
     );
 
     if (pollResult.rowCount === 0) {
@@ -537,7 +559,6 @@ export async function deletePollCommentRecord(input: {
           AND c.author_id = $3
           AND c.deleted_at IS NULL
           AND p.id = c.poll_id
-          AND p.visibility = 'public'
           AND p.deleted_at IS NULL
         RETURNING c.id, c.parent_comment_id
       `,
@@ -579,41 +600,6 @@ export async function deletePollCommentRecord(input: {
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
-  } finally {
-    client.release();
-  }
-}
-
-export async function listPublicPollRecords(
-  limit: number,
-  viewerId?: string,
-  sort: 'newest' | 'popular' = 'newest'
-) {
-  const client = await db.connect();
-
-  try {
-    return await withPollReadSnapshot(client, async () => {
-    const result = await client.query<{ id: string }>(
-      `
-        SELECT id
-        FROM polls
-        WHERE visibility = 'public'
-          AND deleted_at IS NULL
-        ORDER BY
-          CASE WHEN $2 = 'popular' THEN votes_count * 2 + likes_count * 1.5 + comments_count ELSE 0 END DESC,
-          created_at DESC,
-          id DESC
-        LIMIT $1
-      `,
-      [limit, sort]
-    );
-
-    return hydratePolls(
-      client,
-      result.rows.map((row) => row.id),
-      viewerId
-    );
-    });
   } finally {
     client.release();
   }
@@ -762,7 +748,7 @@ export async function listSubscriptionPollRecords(
             JOIN follows f ON f.followee_id = p.author_id
             JOIN users u ON u.id = p.author_id
             WHERE f.follower_id = $1
-              AND p.visibility = 'public'
+              AND p.visibility IN ('public', 'followers')
               AND p.deleted_at IS NULL
               AND u.status = 'active'
               AND u.deleted_at IS NULL
@@ -843,6 +829,42 @@ export async function listPollRecordsByAuthor(
   }
 }
 
+export async function listViewablePollRecordsByAuthor(
+  authorId: string,
+  limit: number,
+  viewerId?: string
+) {
+  const client = await db.connect();
+
+  try {
+    return await withPollReadSnapshot(client, async () => {
+      const result = await client.query<{ id: string }>(
+        `
+          SELECT p.id
+          FROM polls p
+          JOIN users u ON u.id = p.author_id
+          WHERE p.author_id = $1
+            AND p.deleted_at IS NULL
+            AND u.status = 'active'
+            AND u.deleted_at IS NULL
+            AND ${pollVisibilityClause('$3')}
+          ORDER BY p.created_at DESC, p.id DESC
+          LIMIT $2
+        `,
+        [authorId, limit, viewerId ?? null]
+      );
+
+      return hydratePolls(
+        client,
+        result.rows.map((row) => row.id),
+        viewerId
+      );
+    });
+  } finally {
+    client.release();
+  }
+}
+
 export async function listPublicPollRecordsByAuthor(
   authorId: string,
   limit: number,
@@ -870,19 +892,6 @@ export async function listPublicPollRecordsByAuthor(
       result.rows.map((row) => row.id),
       viewerId
     );
-    });
-  } finally {
-    client.release();
-  }
-}
-
-export async function findPollRecordById(pollId: string) {
-  const client = await db.connect();
-
-  try {
-    return await withPollReadSnapshot(client, async () => {
-      const [poll] = await hydratePolls(client, [pollId]);
-      return poll ?? null;
     });
   } finally {
     client.release();
@@ -1019,10 +1028,10 @@ export async function listPollCommentRecords(input: {
           WHERE p.id = $1
             AND poll_author.status = 'active'
             AND poll_author.deleted_at IS NULL
-            AND p.visibility = 'public'
+            AND ${pollVisibilityClause('$2')}
             AND p.deleted_at IS NULL
         `,
-        [input.pollId]
+        [input.pollId, input.viewerId ?? null]
       );
 
       if (pollResult.rowCount === 0) return { status: 'not_found' as const };
@@ -1166,12 +1175,12 @@ export async function listPollCommentReplyRecords(input: ListPollCommentRepliesR
             AND c.deleted_at IS NULL
             AND root_author.status = 'active'
             AND root_author.deleted_at IS NULL
-            AND p.visibility = 'public'
+            AND ${pollVisibilityClause('$3')}
             AND p.deleted_at IS NULL
             AND poll_author.status = 'active'
             AND poll_author.deleted_at IS NULL
         `,
-        [input.commentId, input.pollId]
+        [input.commentId, input.pollId, input.viewerId ?? null]
       );
 
       if (rootResult.rowCount === 0) return { status: 'not_found' as const };
@@ -1301,8 +1310,11 @@ export async function findViewablePollCommentRecordById(input: {
           (
             SELECT count(*)::int
             FROM comments r
+            JOIN users reply_author ON reply_author.id = r.author_id
             WHERE r.parent_comment_id = c.id
               AND r.deleted_at IS NULL
+              AND reply_author.status = 'active'
+              AND reply_author.deleted_at IS NULL
           ) AS replies_count,
           c.created_at,
           c.updated_at
@@ -1319,14 +1331,17 @@ export async function findViewablePollCommentRecordById(input: {
             OR EXISTS (
               SELECT 1
               FROM comments parent
+              JOIN users parent_author ON parent_author.id = parent.author_id
               WHERE parent.id = c.parent_comment_id
                 AND parent.poll_id = c.poll_id
                 AND parent.parent_comment_id IS NULL
                 AND parent.deleted_at IS NULL
+                AND parent_author.status = 'active'
+                AND parent_author.deleted_at IS NULL
             )
           )
           AND p.deleted_at IS NULL
-          AND p.visibility = 'public'
+          AND ${pollVisibilityClause('$3')}
           AND poll_author.status = 'active'
           AND poll_author.deleted_at IS NULL
           AND u.status = 'active'
@@ -1353,14 +1368,17 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
 
     const pollResult = await client.query<{ id: string; author_id: string }>(
       `
-        SELECT id, author_id
-        FROM polls
-        WHERE id = $1
-          AND visibility = 'public'
-          AND deleted_at IS NULL
-        FOR UPDATE
+        SELECT p.id, p.author_id
+        FROM polls p
+        JOIN users poll_author ON poll_author.id = p.author_id
+        WHERE p.id = $1
+          AND poll_author.status = 'active'
+          AND poll_author.deleted_at IS NULL
+          AND ${pollVisibilityClause('$2')}
+          AND p.deleted_at IS NULL
+        FOR UPDATE OF p
       `,
-      [input.pollId]
+      [input.pollId, input.authorId]
     );
 
     if (pollResult.rowCount === 0) {
@@ -1371,13 +1389,16 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
     if (input.parentCommentId) {
       const parentResult = await client.query<{ id: string; author_id: string }>(
         `
-          SELECT id, author_id
-          FROM comments
-          WHERE id = $1
-            AND poll_id = $2
-            AND parent_comment_id IS NULL
-            AND deleted_at IS NULL
-          FOR UPDATE
+          SELECT c.id, c.author_id
+          FROM comments c
+          JOIN users parent_author ON parent_author.id = c.author_id
+          WHERE c.id = $1
+            AND c.poll_id = $2
+            AND c.parent_comment_id IS NULL
+            AND c.deleted_at IS NULL
+            AND parent_author.status = 'active'
+            AND parent_author.deleted_at IS NULL
+          FOR UPDATE OF c
         `,
         [input.parentCommentId, input.pollId]
       );
@@ -1492,7 +1513,7 @@ export async function createPollCommentRecord(input: CreatePollCommentRecordInpu
   }
 }
 
-async function findCommentForUpdate(client: PoolClient, commentId: string) {
+async function findCommentForUpdate(client: PoolClient, commentId: string, viewerId: string) {
   const result = await client.query<PollCommentRow>(
     `
       SELECT
@@ -1506,21 +1527,29 @@ async function findCommentForUpdate(client: PoolClient, commentId: string) {
         (
           SELECT count(*)::int
           FROM comments r
+          JOIN users reply_author ON reply_author.id = r.author_id
           WHERE r.parent_comment_id = c.id
             AND r.deleted_at IS NULL
+            AND reply_author.status = 'active'
+            AND reply_author.deleted_at IS NULL
         ) AS replies_count,
         c.created_at, c.updated_at
       FROM comments c
       JOIN polls p ON p.id = c.poll_id
+      JOIN users poll_author ON poll_author.id = p.author_id
       JOIN users u ON u.id = c.author_id
       JOIN profiles pr ON pr.user_id = c.author_id
       WHERE c.id = $1
-        AND p.visibility = 'public'
+        AND ${pollVisibilityClause('$2')}
+        AND poll_author.status = 'active'
+        AND poll_author.deleted_at IS NULL
+        AND u.status = 'active'
+        AND u.deleted_at IS NULL
         AND p.deleted_at IS NULL
         AND c.deleted_at IS NULL
       FOR UPDATE OF c
     `,
-    [commentId]
+    [commentId, viewerId]
   );
 
   return result.rows[0] ?? null;
@@ -1533,7 +1562,7 @@ export async function likeCommentRecord(input: { pollId: string; commentId: stri
     await lockActiveAccount(client, input.userId);
     let notificationId: string | null = null;
     let notificationRecipientId: string | null = null;
-    const comment = await findCommentForUpdate(client, input.commentId);
+    const comment = await findCommentForUpdate(client, input.commentId, input.userId);
     if (!comment || comment.poll_id !== input.pollId) {
       await client.query('ROLLBACK');
       return { status: 'not_found' as const };
@@ -1572,8 +1601,11 @@ export async function likeCommentRecord(input: { pollId: string; commentId: stri
           (
             SELECT count(*)::int
             FROM comments r
+            JOIN users reply_author ON reply_author.id = r.author_id
             WHERE r.parent_comment_id = c.id
               AND r.deleted_at IS NULL
+              AND reply_author.status = 'active'
+              AND reply_author.deleted_at IS NULL
           ) AS replies_count,
           c.created_at, c.updated_at
         FROM comments c
@@ -1601,7 +1633,7 @@ export async function unlikeCommentRecord(input: { pollId: string; commentId: st
   try {
     await client.query('BEGIN');
     await lockActiveAccount(client, input.userId);
-    const comment = await findCommentForUpdate(client, input.commentId);
+    const comment = await findCommentForUpdate(client, input.commentId, input.userId);
     if (!comment || comment.poll_id !== input.pollId) {
       await client.query('ROLLBACK');
       return { status: 'not_found' as const };
@@ -1629,8 +1661,11 @@ export async function unlikeCommentRecord(input: { pollId: string; commentId: st
           (
             SELECT count(*)::int
             FROM comments r
+            JOIN users reply_author ON reply_author.id = r.author_id
             WHERE r.parent_comment_id = c.id
               AND r.deleted_at IS NULL
+              AND reply_author.status = 'active'
+              AND reply_author.deleted_at IS NULL
           ) AS replies_count,
           c.created_at, c.updated_at
         FROM comments c
@@ -1663,14 +1698,17 @@ export async function likePollRecord(input: {
 
     const pollResult = await client.query<{ id: string; author_id: string }>(
       `
-        SELECT id, author_id
-        FROM polls
-        WHERE id = $1
-          AND visibility = 'public'
-          AND deleted_at IS NULL
-        FOR UPDATE
+        SELECT p.id, p.author_id
+        FROM polls p
+        JOIN users poll_author ON poll_author.id = p.author_id
+        WHERE p.id = $1
+          AND poll_author.status = 'active'
+          AND poll_author.deleted_at IS NULL
+          AND ${pollVisibilityClause('$2')}
+          AND p.deleted_at IS NULL
+        FOR UPDATE OF p
       `,
-      [input.pollId]
+      [input.pollId, input.userId]
     );
 
     if (pollResult.rowCount === 0) {
@@ -1710,6 +1748,10 @@ export async function likePollRecord(input: {
     }
 
     const [poll] = await hydratePolls(client, [input.pollId], input.userId);
+    if (!poll) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
 
     await client.query('COMMIT');
 
@@ -1741,14 +1783,17 @@ export async function unlikePollRecord(input: {
 
     const pollResult = await client.query<{ id: string }>(
       `
-        SELECT id
-        FROM polls
-        WHERE id = $1
-          AND visibility = 'public'
-          AND deleted_at IS NULL
-        FOR UPDATE
+        SELECT p.id
+        FROM polls p
+        JOIN users poll_author ON poll_author.id = p.author_id
+        WHERE p.id = $1
+          AND poll_author.status = 'active'
+          AND poll_author.deleted_at IS NULL
+          AND ${pollVisibilityClause('$2')}
+          AND p.deleted_at IS NULL
+        FOR UPDATE OF p
       `,
-      [input.pollId]
+      [input.pollId, input.userId]
     );
 
     if (pollResult.rowCount === 0) {
@@ -1779,6 +1824,10 @@ export async function unlikePollRecord(input: {
     }
 
     const [poll] = await hydratePolls(client, [input.pollId], input.userId);
+    if (!poll) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
 
     await client.query('COMMIT');
 
@@ -1809,21 +1858,28 @@ export async function createVoteRecord(input: {
     const pollResult = await client.query<{
       id: string;
       author_id: string;
-      ends_at: Date | null;
+      is_closed: boolean;
       option_id: string | null;
     }>(
       `
-        SELECT p.id, p.author_id, p.ends_at, po.id AS option_id
+        SELECT
+          p.id,
+          p.author_id,
+          (p.ends_at IS NOT NULL AND p.ends_at <= now()) AS is_closed,
+          po.id AS option_id
         FROM polls p
+        JOIN users poll_author ON poll_author.id = p.author_id
         LEFT JOIN poll_options po
           ON po.poll_id = p.id
           AND po.id = $2
         WHERE p.id = $1
-          AND p.visibility = 'public'
+          AND poll_author.status = 'active'
+          AND poll_author.deleted_at IS NULL
+          AND ${pollVisibilityClause('$3')}
           AND p.deleted_at IS NULL
         FOR UPDATE OF p
       `,
-      [input.pollId, input.optionId]
+      [input.pollId, input.optionId, input.voterId]
     );
 
     const poll = pollResult.rows[0];
@@ -1833,7 +1889,7 @@ export async function createVoteRecord(input: {
       return { status: 'not_found' as const };
     }
 
-    if (poll.ends_at && poll.ends_at <= new Date()) {
+    if (poll.is_closed) {
       await client.query('ROLLBACK');
       return { status: 'closed' as const };
     }
@@ -1884,6 +1940,10 @@ export async function createVoteRecord(input: {
     }
 
     const [updatedPoll] = await hydratePolls(client, [input.pollId], input.voterId);
+    if (!updatedPoll) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
 
     await client.query('COMMIT');
 
@@ -1916,18 +1976,24 @@ export async function cancelVoteRecord(input: {
 
     const pollResult = await client.query<{
       id: string;
-      ends_at: Date | null;
+      is_closed: boolean;
       allow_vote_cancellation: boolean;
     }>(
       `
-        SELECT p.id, p.ends_at, p.allow_vote_cancellation
+        SELECT
+          p.id,
+          (p.ends_at IS NOT NULL AND p.ends_at <= now()) AS is_closed,
+          p.allow_vote_cancellation
         FROM polls p
+        JOIN users poll_author ON poll_author.id = p.author_id
         WHERE p.id = $1
-          AND p.visibility = 'public'
+          AND poll_author.status = 'active'
+          AND poll_author.deleted_at IS NULL
+          AND ${pollVisibilityClause('$2')}
           AND p.deleted_at IS NULL
-        FOR UPDATE
+        FOR UPDATE OF p
       `,
-      [input.pollId]
+      [input.pollId, input.voterId]
     );
 
     const poll = pollResult.rows[0];
@@ -1937,7 +2003,7 @@ export async function cancelVoteRecord(input: {
       return { status: 'not_found' as const };
     }
 
-    if (poll.ends_at && poll.ends_at <= new Date()) {
+    if (poll.is_closed) {
       await client.query('ROLLBACK');
       return { status: 'closed' as const };
     }
@@ -1981,166 +2047,15 @@ export async function cancelVoteRecord(input: {
     }
 
     const [updatedPoll] = await hydratePolls(client, [input.pollId], input.voterId);
+    if (!updatedPoll) {
+      await client.query('ROLLBACK');
+      return { status: 'not_found' as const };
+    }
 
     await client.query('COMMIT');
 
     return {
       status: 'canceled' as const,
-      poll: updatedPoll
-    };
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
-export async function setVoteRecord(input: {
-  pollId: string;
-  optionId: string;
-  voterId: string;
-}) {
-  const client = await db.connect();
-
-  try {
-    await client.query('BEGIN');
-    await lockActiveAccount(client, input.voterId);
-
-    const pollResult = await client.query<{
-      id: string;
-      ends_at: Date | null;
-      option_id: string | null;
-    }>(
-      `
-        SELECT p.id, p.ends_at, po.id AS option_id
-        FROM polls p
-        LEFT JOIN poll_options po
-          ON po.poll_id = p.id
-          AND po.id = $2
-        WHERE p.id = $1
-          AND p.visibility = 'public'
-          AND p.deleted_at IS NULL
-        FOR UPDATE OF p
-      `,
-      [input.pollId, input.optionId]
-    );
-
-    const poll = pollResult.rows[0];
-
-    if (!poll || !poll.option_id) {
-      await client.query('ROLLBACK');
-      return { status: 'not_found' as const };
-    }
-
-    if (poll.ends_at && poll.ends_at <= new Date()) {
-      await client.query('ROLLBACK');
-      return { status: 'closed' as const };
-    }
-
-    const currentVoteResult = await client.query<{ option_id: string }>(
-      `
-        SELECT option_id
-        FROM poll_votes
-        WHERE poll_id = $1
-          AND voter_id = $2
-        FOR UPDATE
-      `,
-      [input.pollId, input.voterId]
-    );
-
-    const currentOptionId = currentVoteResult.rows[0]?.option_id;
-    let optionVotesCount = 0;
-
-    if (!currentOptionId) {
-      await client.query(
-        `
-          INSERT INTO poll_votes (poll_id, option_id, voter_id)
-          VALUES ($1, $2, $3)
-        `,
-        [input.pollId, input.optionId, input.voterId]
-      );
-
-      const optionResult = await client.query<{ votes_count: number }>(
-        `
-          UPDATE poll_options
-          SET votes_count = votes_count + 1
-          WHERE id = $1
-          RETURNING votes_count
-        `,
-        [input.optionId]
-      );
-
-      optionVotesCount = optionResult.rows[0]?.votes_count ?? 0;
-
-      await client.query(
-        `
-          UPDATE polls
-          SET votes_count = votes_count + 1,
-              votes_revision = votes_revision + 1
-          WHERE id = $1
-        `,
-        [input.pollId]
-      );
-    } else if (currentOptionId === input.optionId) {
-      const optionResult = await client.query<{ votes_count: number }>(
-        `
-          SELECT votes_count
-          FROM poll_options
-          WHERE id = $1
-        `,
-        [input.optionId]
-      );
-
-      optionVotesCount = optionResult.rows[0]?.votes_count ?? 0;
-    } else {
-      await client.query(
-        `
-          UPDATE poll_votes
-          SET option_id = $1
-          WHERE poll_id = $2
-            AND voter_id = $3
-        `,
-        [input.optionId, input.pollId, input.voterId]
-      );
-
-      await client.query(
-        `
-          UPDATE poll_options
-          SET votes_count = GREATEST(votes_count - 1, 0)
-          WHERE id = $1
-        `,
-        [currentOptionId]
-      );
-
-      const optionResult = await client.query<{ votes_count: number }>(
-        `
-          UPDATE poll_options
-          SET votes_count = votes_count + 1
-          WHERE id = $1
-          RETURNING votes_count
-        `,
-        [input.optionId]
-      );
-
-      optionVotesCount = optionResult.rows[0]?.votes_count ?? 0;
-    }
-
-    if (currentOptionId && currentOptionId !== input.optionId) {
-      await client.query(
-        'UPDATE polls SET votes_revision = votes_revision + 1 WHERE id = $1',
-        [input.pollId]
-      );
-    }
-
-    const [updatedPoll] = await hydratePolls(client, [input.pollId], input.voterId);
-
-    await client.query('COMMIT');
-
-    return {
-      status: 'set' as const,
-      operation: currentOptionId ? ('updated' as const) : ('created' as const),
-      optionVotesCount,
       poll: updatedPoll
     };
   } catch (error) {

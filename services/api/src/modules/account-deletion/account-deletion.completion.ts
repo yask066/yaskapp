@@ -203,22 +203,28 @@ export function createAccountDeletionCompletionService(input: {
   media: AccountDeletionCompletionMedia;
 }) {
   return {
-    async verifyAndCompleteDeletion(operationId: string): Promise<{ done: boolean }> {
+    async verifyAndCompleteDeletion(operationId: string): Promise<{ done: boolean; retryAfterSeconds?: number; errorCode?: string }> {
       const operation = await input.repository.getOperation(operationId);
       if (!operation) throw new Error('account_deletion_operation_not_found');
       if (operation.status === 'completed') return { done: true };
       if (operation.status !== 'processing' || !await input.repository.arePreviousStepsComplete(operationId)) {
-        return { done: false };
+        return { done: false, retryAfterSeconds: 5, errorCode: 'pre_completion_steps_incomplete' };
       }
 
       const discovered = await input.media.discover(operationId);
-      if (!discovered.done) return { done: false };
+      if (!discovered.done) return { done: false, retryAfterSeconds: 5, errorCode: 'media_discovery_incomplete' };
       const purged = await input.media.purge(operationId);
-      if (!purged.done || !await input.media.verifyEmpty(operationId)) return { done: false };
-      if (await input.repository.hasDatabaseRemainders(operationId, operation.userId)) return { done: false };
+      if (!purged.done || !await input.media.verifyEmpty(operationId)) {
+        return { done: false, retryAfterSeconds: 5, errorCode: 'media_remainders_detected' };
+      }
+      if (await input.repository.hasDatabaseRemainders(operationId, operation.userId)) {
+        return { done: false, retryAfterSeconds: 10, errorCode: 'database_remainders_detected' };
+      }
 
       await input.repository.deleteUser(operation.userId);
-      if (await input.repository.hasPostDeleteRemainders(operationId, operation.userId)) return { done: false };
+      if (await input.repository.hasPostDeleteRemainders(operationId, operation.userId)) {
+        return { done: false, retryAfterSeconds: 10, errorCode: 'post_delete_remainders_detected' };
+      }
 
       await input.repository.removeManifest(operationId);
       await input.repository.removeContentTargets(operationId);

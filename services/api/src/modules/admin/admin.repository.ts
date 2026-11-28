@@ -1,8 +1,13 @@
 import { db } from '../../config/database.js';
+import { lockActiveAccount } from '../account-deletion/account-activity.guard.js';
 import { findUserById } from '../auth/auth.repository.js';
 import type { UserRole } from '../auth/auth.repository.js';
 import { recordAdminAudit } from './audit.repository.js';
 import { decodeAdminCursor, pageWithCursor } from './pagination.js';
+
+function escapeLikePattern(value: string) {
+  return value.replace(/[\\%_]/g, '\\$&');
+}
 
 export type BlockUserResult =
   | { status: 'blocked' | 'already_blocked' }
@@ -39,36 +44,38 @@ export async function blockUser(
   try {
     await client.query('BEGIN');
 
-    const actorResult = await client.query<{ role: string }>(
-      `
-        SELECT role
-        FROM users
-        WHERE id = $1
-          AND deleted_at IS NULL
-        FOR UPDATE
-      `,
-      [actorId]
-    );
-    const targetResult = await client.query<{
-      status: 'active' | 'blocked' | 'deleted';
-      role: string;
-    }>(
-      `
-        SELECT status, role
-        FROM users
-        WHERE id = $1
-          AND deleted_at IS NULL
-        FOR UPDATE
-      `,
-      [targetUserId]
-    );
+    const locked = new Map<string, { status: 'active' | 'blocked' | 'deleted'; role: string }>();
+    for (const userId of [...new Set([actorId, targetUserId])].sort()) {
+      const rowResult = await client.query<{
+        id: string;
+        status: 'active' | 'blocked' | 'deleted';
+        role: string;
+      }>(
+        `
+          SELECT id, status, role
+          FROM users
+          WHERE id = $1
+            AND deleted_at IS NULL
+          FOR UPDATE
+        `,
+        [userId]
+      );
+      if (rowResult.rows[0]) {
+        locked.set(userId, rowResult.rows[0]);
+      }
+    }
 
-    const actor = actorResult.rows[0];
-    const target = targetResult.rows[0];
+    const actor = locked.get(actorId);
+    const target = locked.get(targetUserId);
 
     if (!actor || !target) {
       await client.query('ROLLBACK');
       return { status: 'not_found' };
+    }
+
+    if (actor.status !== 'active' || (actor.role !== 'moderator' && actor.role !== 'superadmin')) {
+      await client.query('ROLLBACK');
+      return { status: 'protected' };
     }
 
     if (actorId === targetUserId) {
@@ -90,7 +97,7 @@ export async function blockUser(
     await client.query(
       `
         UPDATE users
-        SET status = 'blocked', updated_at = now()
+        SET status = 'blocked', session_version = session_version + 1, updated_at = now()
         WHERE id = $1
       `,
       [targetUserId]
@@ -165,8 +172,8 @@ export async function listAdminPolls(input: {
   const conditions = ['TRUE'];
 
   if (input.query) {
-    values.push(`%${input.query}%`);
-    conditions.push(`p.question ILIKE $${values.length}`);
+    values.push(`%${escapeLikePattern(input.query)}%`);
+    conditions.push(`p.question ILIKE $${values.length} ESCAPE '\\'`);
   }
 
   if (input.status === 'active') {
@@ -284,6 +291,9 @@ export async function deleteAdminPoll(
 
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, audit.actorUserId);
+    const actorRow = await client.query<{ role: UserRole }>('SELECT role FROM users WHERE id = $1', [audit.actorUserId]);
+    const actorRole = actorRow.rows[0]?.role ?? audit.actorRole;
     const result = await client.query<{ id: string }>(
       `
         UPDATE polls
@@ -298,6 +308,7 @@ export async function deleteAdminPoll(
     if (result.rowCount === 1) {
       await recordAdminAudit(client, {
         ...audit,
+        actorRole,
         action: 'poll.deleted_by_admin',
         targetType: 'poll',
         targetId: pollId
@@ -331,6 +342,9 @@ export async function deleteAdminComment(
 
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, audit.actorUserId);
+    const actorRow = await client.query<{ role: UserRole }>('SELECT role FROM users WHERE id = $1', [audit.actorUserId]);
+    const actorRole = actorRow.rows[0]?.role ?? audit.actorRole;
 
     const pollRef = await client.query<{ poll_id: string }>(
       'SELECT poll_id FROM comments WHERE id = $1',
@@ -396,6 +410,7 @@ export async function deleteAdminComment(
 
     await recordAdminAudit(client, {
       ...audit,
+      actorRole,
       action: 'comment.deleted_by_admin',
       targetType: 'comment',
       targetId: commentId,

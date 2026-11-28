@@ -13,7 +13,7 @@ async function loadDeletion(client: PoolClient, operationId: string) {
   if (!userId) throw new Error('account_deletion_operation_not_found');
   const [targets, ownedPolls, ownedComments] = await Promise.all([
     client.query<{ target_type: 'poll' | 'comment'; target_id: string }>(
-    `SELECT target_type, target_id FROM account_deletion_content_targets
+    `SELECT target_type, target_id FROM account_deletion_deleted_content_targets
       WHERE operation_id = $1 ORDER BY target_type, target_id`,
     [operationId]
     ),

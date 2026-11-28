@@ -226,6 +226,7 @@ test('rejects malformed and expired legacy replies cursors', () => {
 test('requires a dedicated production cursor secret of at least 32 bytes', () => {
   const productionEnv: NodeJS.ProcessEnv = {
     NODE_ENV: 'production',
+    CORS_ORIGINS: 'https://app.example.com',
     DATABASE_URL: 'postgres://test:test@127.0.0.1:5432/test',
     REDIS_URL: 'redis://127.0.0.1:6379',
     JWT_SECRET: 'jwt-secret-that-is-not-the-cursor-key',

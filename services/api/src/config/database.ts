@@ -6,7 +6,15 @@ export const db = new pg.Pool({
   connectionString: env.DATABASE_URL,
   max: 10,
   idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 5_000
+  connectionTimeoutMillis: 5_000,
+  statement_timeout: 10_000,
+  query_timeout: 10_000
+});
+
+db.on('error', (error) => {
+  if (env.NODE_ENV !== 'test') {
+    console.error('[db] Unexpected idle client error:', error.message);
+  }
 });
 
 export type Database = typeof db;

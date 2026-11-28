@@ -54,6 +54,16 @@ export async function isActiveAccount(userId: string) {
   return result.rows[0]?.active === true;
 }
 
+export async function findActiveAccountIds(userIds: readonly string[]): Promise<Set<string>> {
+  if (userIds.length === 0) return new Set();
+  const result = await db.query<{ id: string }>(
+    `SELECT id FROM users
+      WHERE id = ANY($1::uuid[]) AND status = 'active' AND deleted_at IS NULL`,
+    [[...new Set(userIds)]]
+  );
+  return new Set(result.rows.map((row) => row.id));
+}
+
 export async function lockActiveAccounts(client: PoolClient, userIds: readonly string[]): Promise<void> {
   const orderedIds = [...new Set(userIds)].sort();
   for (const userId of orderedIds) {

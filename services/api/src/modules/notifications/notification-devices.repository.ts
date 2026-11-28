@@ -6,16 +6,38 @@ import { withActiveAccountTransaction } from '../account-deletion/account-activi
 type QueryExecutor = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>;
 export type DevicePlatform = 'android' | 'ios';
 
+const MAX_ACTIVE_DEVICES_PER_USER = 20;
+
 export async function registerNotificationDevice(userId: string, token: string, platform: DevicePlatform, executor: QueryExecutor = db): Promise<{ id: string }> {
   if (executor === db) {
     return withActiveAccountTransaction(userId, (client) => registerNotificationDevice(userId, token, platform, client));
   }
+  // Prevent cross-account push leakage when a device switches accounts without explicit revoke.
+  await executor.query(
+    `UPDATE notification_devices
+        SET revoked_at = now()
+      WHERE token = $1 AND user_id <> $2 AND revoked_at IS NULL`,
+    [token, userId]
+  );
   const result = await executor.query<{ id: string }>(
     `INSERT INTO notification_devices (user_id, token, platform, last_seen_at, revoked_at)
      VALUES ($1, $2, $3, now(), NULL)
      ON CONFLICT (user_id, token) DO UPDATE SET platform = EXCLUDED.platform, last_seen_at = now(), revoked_at = NULL
      RETURNING id`,
     [userId, token, platform]
+  );
+  // Cap active devices per user to prevent unbounded push fan-out.
+  await executor.query(
+    `UPDATE notification_devices
+        SET revoked_at = now()
+      WHERE id IN (
+        SELECT id
+        FROM notification_devices
+        WHERE user_id = $1 AND revoked_at IS NULL
+        ORDER BY last_seen_at DESC, id DESC
+        OFFSET $2
+      )`,
+    [userId, MAX_ACTIVE_DEVICES_PER_USER]
   );
   return { id: result.rows[0].id };
 }

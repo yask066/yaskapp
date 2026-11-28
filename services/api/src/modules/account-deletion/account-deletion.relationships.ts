@@ -171,17 +171,30 @@ async function recountPollRelationships(client: PoolClient, operationId: string,
   return { votes: votes.rowCount ?? 0, pollLikes: likes.rowCount ?? 0, commentLikes: commentLikes.rowCount ?? 0 };
 }
 
-async function deleteAccountFollows(client: PoolClient, userId: string) {
+const FOLLOW_BATCH_SIZE = 100;
+
+async function deleteAccountFollowsBatch(client: PoolClient, userId: string): Promise<boolean> {
   const affectedProfiles = await client.query<{ user_id: string }>(
     `SELECT DISTINCT CASE WHEN follower_id = $1 THEN followee_id ELSE follower_id END AS user_id
-     FROM follows WHERE follower_id = $1 OR followee_id = $1 ORDER BY user_id`,
-    [userId]
+     FROM follows
+     WHERE follower_id = $1 OR followee_id = $1
+     ORDER BY user_id
+     LIMIT $2`,
+    [userId, FOLLOW_BATCH_SIZE]
   );
-  const profiles = [...new Set([userId, ...affectedProfiles.rows.map((row) => row.user_id)])].sort();
+  const peerIds = affectedProfiles.rows.map((row) => row.user_id);
+  const profiles = [...new Set([userId, ...peerIds])].sort();
   // Follow mutations lock accounts before profiles; acceptance has already drained any
   // mutation involving the deleted account, and the sorted profile lock serializes recounts.
   await client.query('SELECT user_id FROM profiles WHERE user_id = ANY($1::uuid[]) ORDER BY user_id FOR UPDATE', [profiles]);
-  await client.query('DELETE FROM follows WHERE follower_id = $1 OR followee_id = $1', [userId]);
+  if (peerIds.length > 0) {
+    await client.query(
+      `DELETE FROM follows
+       WHERE (follower_id = $1 AND followee_id = ANY($2::uuid[]))
+          OR (followee_id = $1 AND follower_id = ANY($2::uuid[]))`,
+      [userId, peerIds]
+    );
+  }
   await client.query(
     `UPDATE profiles p
      SET followers_count = (SELECT count(*)::int FROM follows WHERE followee_id = p.user_id),
@@ -189,6 +202,12 @@ async function deleteAccountFollows(client: PoolClient, userId: string) {
      WHERE p.user_id = ANY($1::uuid[])`,
     [profiles]
   );
+
+  const remaining = await client.query<{ exists: boolean }>(
+    'SELECT EXISTS (SELECT 1 FROM follows WHERE follower_id = $1 OR followee_id = $1) AS exists',
+    [userId]
+  );
+  return remaining.rows[0]?.exists === true;
 }
 
 export async function purgeAccountRelationships(operationId: string): Promise<{ done: boolean }> {
@@ -226,7 +245,11 @@ export async function purgeAccountRelationships(operationId: string): Promise<{ 
       return { done: false };
     }
 
-    await deleteAccountFollows(client, userId);
+    const hasMoreFollows = await deleteAccountFollowsBatch(client, userId);
+    if (hasMoreFollows) {
+      await client.query('COMMIT');
+      return { done: false };
+    }
     await client.query('DELETE FROM poll_votes WHERE voter_id = $1', [userId]);
     await client.query('DELETE FROM likes WHERE user_id = $1', [userId]);
     await client.query('COMMIT');

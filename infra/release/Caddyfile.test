@@ -1,74 +1,72 @@
 # Internal HTTP gateway; TLS terminates at the existing production Caddy.
 :80 {
-    @testApi host api-test.yaskapp.org
-    handle @testApi {
-        reverse_proxy api:3000
-    }
-    @testModeration host moderation-test.yaskapp.org
-    handle @testModeration {
-        @moderationApi path /auth/* /moderation/* /admin/* /appeals*
-        handle @moderationApi {
-            reverse_proxy api:3000
-        }
-        handle {
-            reverse_proxy moderation-web:80
-        }
-    }
-    handle {
+	@testApi host api-test.yaskapp.org
+	handle @testApi {
+		reverse_proxy api:3000
+	}
+	@testModeration host moderation-test.yaskapp.org
+	handle @testModeration {
+		@moderationApi path /auth/* /moderation/* /admin/* /appeals*
+		handle @moderationApi {
+			reverse_proxy api:3000
+		}
+		handle {
+			reverse_proxy moderation-web:80
+		}
+	}
+	handle {
+		header {
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "DENY"
+			Referrer-Policy "no-referrer"
+			Permissions-Policy "camera=(), microphone=(), geolocation=()"
+			Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		}
 
-    header {
-        X-Content-Type-Options "nosniff"
-        X-Frame-Options "DENY"
-        Referrer-Policy "no-referrer"
-        Permissions-Policy "camera=(), microphone=(), geolocation=()"
-        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
-    }
+		# Browser page loads of SPA routes that share a prefix with the API
+		# (/polls/:id, /users/:id, /search, /notifications) must return the web app;
+		# fetch() requests do not send Accept: text/html and still reach the API.
+		@spaNavigation {
+			method GET HEAD
+			header Accept *text/html*
+		}
 
-    # Browser page loads of SPA routes that share a prefix with the API
-    # (/polls/:id, /users/:id, /search, /notifications) must return the web app;
-    # fetch() requests do not send Accept: text/html and still reach the API.
-    @spaNavigation {
-        method GET HEAD
-        header Accept *text/html*
-    }
-
-    handle /auth/* {
-        reverse_proxy api:3000
-    }
-    handle /polls* {
-        reverse_proxy @spaNavigation web:80
-        reverse_proxy api:3000
-    }
-    handle /users* {
-        reverse_proxy @spaNavigation web:80
-        reverse_proxy api:3000
-    }
-    handle /profiles* {
-        reverse_proxy api:3000
-    }
-    handle /search* {
-        reverse_proxy @spaNavigation web:80
-        reverse_proxy api:3000
-    }
-    handle /media/* {
-        reverse_proxy api:3000
-    }
-    handle /notifications* {
-        reverse_proxy @spaNavigation web:80
-        reverse_proxy api:3000
-    }
-    handle /notification-preferences* {
-        reverse_proxy api:3000
-    }
-    handle /notification-devices* {
-        reverse_proxy api:3000
-    }
-    handle /realtime* {
-        reverse_proxy api:3000
-    }
-    handle {
-        reverse_proxy web:80
-    }
-
-    }
+		handle /auth/* {
+			reverse_proxy api:3000
+		}
+		handle /polls* {
+			reverse_proxy @spaNavigation web:80
+			reverse_proxy api:3000
+		}
+		handle /users* {
+			reverse_proxy @spaNavigation web:80
+			reverse_proxy api:3000
+		}
+		handle /profiles* {
+			reverse_proxy api:3000
+		}
+		handle /search* {
+			reverse_proxy @spaNavigation web:80
+			reverse_proxy api:3000
+		}
+		handle /media/* {
+			reverse_proxy api:3000
+		}
+		handle /notifications* {
+			reverse_proxy @spaNavigation web:80
+			reverse_proxy api:3000
+		}
+		handle /notification-preferences* {
+			reverse_proxy api:3000
+		}
+		handle /notification-devices* {
+			reverse_proxy api:3000
+		}
+		handle /realtime* {
+			reverse_proxy api:3000
+		}
+		handle {
+			reverse_proxy web:80
+		}
+	}
 }

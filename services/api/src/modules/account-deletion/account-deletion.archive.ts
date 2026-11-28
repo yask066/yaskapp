@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg';
 import { db } from '../../config/database.js';
+import { lockActiveAccount } from './account-activity.guard.js';
 import { AdminCursorError, decodeAdminCursor, pageWithCursor } from '../admin/pagination.js';
 
 export async function snapshotDeletedAccount(
@@ -83,6 +84,7 @@ export async function readDeletedAccountArchive(userId: string, actorId: string)
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, actorId);
     const result = await client.query<ArchiveRow>(
       'SELECT * FROM deleted_account_archives WHERE user_id = $1 AND expires_at > now() FOR SHARE', [userId]);
     if (!result.rows[0]) { await client.query('COMMIT'); return null; }

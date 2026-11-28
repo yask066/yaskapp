@@ -20,6 +20,8 @@ import {
   broadcastPollVoteUpdated,
   broadcastPollDeleted
 } from '../../realtime/realtime.hub.js';
+import { rateLimit } from '../../config/rate-limit.js';
+import { assertUserCanCreatePoll } from '../moderation/sanctions.repository.js';
 import { authenticate, optionalAuthenticate } from '../auth/auth.utils.js';
 import { UserSanctionedError } from '../moderation/sanctions.repository.js';
 import {
@@ -309,7 +311,7 @@ export function registerPollRoutes(app: FastifyInstance) {
   app.get(
     '/polls/:pollId',
     {
-      preHandler: authenticate
+      preHandler: optionalAuthenticate
     },
     async (request, reply) => {
       const parsedParams = voteParamsSchema.safeParse(request.params);
@@ -405,14 +407,16 @@ export function registerPollRoutes(app: FastifyInstance) {
       }
 
       try {
-        await deletePoll({
+        const deleted = await deletePoll({
           pollId: parsedParams.data.pollId,
           authorId: request.user.sub
         });
 
-        broadcastPollDeleted({
-          pollId: parsedParams.data.pollId
-        });
+        if (deleted.visibility === 'public') {
+          broadcastPollDeleted({
+            pollId: parsedParams.data.pollId
+          });
+        }
 
         return reply.status(204).send();
       } catch (error) {
@@ -424,7 +428,15 @@ export function registerPollRoutes(app: FastifyInstance) {
   app.post(
     '/polls',
     {
-      preHandler: authenticate
+      preHandler: [
+        authenticate,
+        rateLimit({
+          keyPrefix: 'poll-create',
+          limit: 20,
+          windowMs: 15 * 60_000,
+          keyBy: 'user'
+        })
+      ]
     },
     async (request, reply) => {
       let rawBody: unknown = request.body;
@@ -437,6 +449,12 @@ export function registerPollRoutes(app: FastifyInstance) {
           imagePart = multipart.imagePart;
         }
       } catch (error) {
+        if (error instanceof app.multipartErrors.RequestFileTooLargeError) {
+          return reply.status(400).send({
+            error: 'poll_image_too_large',
+            message: 'Poll image must be 5 MB or smaller.'
+          });
+        }
         return pollError(reply, error);
       }
 
@@ -449,6 +467,7 @@ export function registerPollRoutes(app: FastifyInstance) {
       let uploadedImageObjectKey: string | undefined;
 
       try {
+        await assertUserCanCreatePoll(request.user.sub);
 
         if (imagePart) {
           uploadedImageObjectKey = (await processPollImage(request.user.sub, imagePart)).objectKey;

@@ -143,6 +143,7 @@ export function registerProfileRoutes(app: FastifyInstance) {
       const object = await getObject(objectKey);
 
       reply.header('content-type', object.ContentType ?? 'image/webp');
+      reply.header('x-content-type-options', 'nosniff');
       reply.header('cache-control', 'public, max-age=300');
 
       if (object.ContentLength !== undefined) {
@@ -150,10 +151,21 @@ export function registerProfileRoutes(app: FastifyInstance) {
       }
 
       return reply.send(object.Body);
-    } catch (_) {
-      return reply.status(404).send({
-        error: 'not_found',
-        message: 'Avatar not found.'
+    } catch (error) {
+      const errorName = typeof error === 'object' && error !== null && 'name' in error ? String(error.name) : '';
+      const statusCode = typeof error === 'object' && error !== null && '$metadata' in error
+        ? (error.$metadata as { httpStatusCode?: number } | undefined)?.httpStatusCode
+        : undefined;
+      if (errorName === 'NoSuchKey' || errorName === 'NotFound' || statusCode === 404) {
+        return reply.status(404).send({
+          error: 'not_found',
+          message: 'Avatar not found.'
+        });
+      }
+      request.log.error({ err: error }, 'Failed to fetch avatar object from storage');
+      return reply.status(503).send({
+        error: 'storage_unavailable',
+        message: 'Media storage is temporarily unavailable.'
       });
     }
   });

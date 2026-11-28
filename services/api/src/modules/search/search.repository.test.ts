@@ -133,15 +133,16 @@ test('search repository escapes ILIKE wildcards in user queries', () => {
 });
 
 test('search repository decodes opaque cursor values and maps poll/user rows', () => {
+  const rowId = '11111111-1111-4111-8111-111111111111';
   const encoded = encodeSearchCursor({
     score: 0.75,
     createdAt: '2026-08-30T09:00:00.000Z',
-    id: 'row-1'
+    id: rowId
   });
   assert.deepEqual(decodeSearchCursor(encoded), {
     score: 0.75,
     createdAt: '2026-08-30T09:00:00.000Z',
-    id: 'row-1'
+    id: rowId
   });
 
   const poll = mapPollSearchRow({
@@ -206,28 +207,31 @@ test('search repository decodes opaque cursor values and maps poll/user rows', (
 });
 
 test('search repository rejects cursors with invalid pagination values', () => {
+  const validId = '11111111-1111-4111-8111-111111111111';
   for (const cursor of [
-    { score: 0.75, createdAt: 'not-a-date', id: 'row-1' },
+    { score: 0.75, createdAt: 'not-a-date', id: validId },
     { score: 0.75, createdAt: '2026-08-30T09:00:00.000Z', id: '' },
-    { score: Infinity, createdAt: '2026-08-30T09:00:00.000Z', id: 'row-1' }
+    { score: 0.75, createdAt: '2026-08-30T09:00:00.000Z', id: 'not-a-uuid' },
+    { score: Infinity, createdAt: '2026-08-30T09:00:00.000Z', id: validId }
   ]) {
-    const encoded = Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+    const encoded = encodeSearchCursor(cursor);
     assert.throws(() => decodeSearchCursor(encoded), /Invalid search cursor/);
   }
 });
 
-test('search repository rejects tampered cursors', () => {
+test('search repository rejects tampered cursors and extra dot segments', () => {
   const encoded = encodeSearchCursor({
     createdAt: '2026-08-30T09:00:00.000Z',
-    id: 'row-1'
+    id: '11111111-1111-4111-8111-111111111111'
   });
   const [encodedPayload] = encoded.split('.');
   const payload = JSON.parse(Buffer.from(encodedPayload!, 'base64url').toString('utf8')) as {
     createdAt: string;
     id: string;
   };
-  payload.id = 'row-2';
+  payload.id = '22222222-2222-4222-8222-222222222222';
   const tampered = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
 
   assert.throws(() => decodeSearchCursor(tampered), /Invalid search cursor/);
+  assert.throws(() => decodeSearchCursor(`${encoded}.extra`), /Invalid search cursor/);
 });

@@ -1,15 +1,40 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { db } from '../../config/database.js';
-import { findAuthenticatedUserById } from './auth.repository.js';
-import { isTrustedOrigin, sessionCookieName } from './auth.cookies.js';
+import {
+  findAuthenticatedUserWithSessionById,
+  type AuthenticatedUser
+} from './auth.repository.js';
+import { isTrustedCookieMutationRequest, sessionCookieName } from './auth.cookies.js';
+import { getActiveUserSanctions, userHasSanction } from '../moderation/sanctions.repository.js';
 import { env } from '../../config/env.js';
 import type { Pool } from 'pg';
+
+const currentUserCache = new WeakMap<
+  FastifyRequest,
+  { userId: string; promise: Promise<{ user: AuthenticatedUser; sessionVersion: number } | null> }
+>();
+
+function loadCachedAuthenticatedRecord(request: FastifyRequest) {
+  const userId = request.user.sub;
+  const cached = currentUserCache.get(request);
+  if (cached && cached.userId === userId) {
+    return cached.promise;
+  }
+  const promise = findAuthenticatedUserWithSessionById(userId);
+  currentUserCache.set(request, { userId, promise });
+  return promise;
+}
 
 function assertTrustedCookieOrigin(request: FastifyRequest, reply: FastifyReply) {
   const hasCookieSession = Boolean(request.cookies?.[sessionCookieName]);
   const usesBearer = /^Bearer\s/i.test(request.headers.authorization ?? '');
-  if (hasCookieSession && !usesBearer && !['GET', 'HEAD', 'OPTIONS'].includes(request.method) && !isTrustedOrigin(request.headers.origin, env.CORS_ORIGINS, env.STAGING_PUBLIC_IP)) {
+  if (
+    hasCookieSession &&
+    !usesBearer &&
+    !['GET', 'HEAD', 'OPTIONS'].includes(request.method) &&
+    !isTrustedCookieMutationRequest(request.headers, env.CORS_ORIGINS, env.STAGING_PUBLIC_IP)
+  ) {
     return reply.status(403).send({
       error: 'csrf_origin_rejected',
       message: 'The request origin is not trusted.'
@@ -28,9 +53,13 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
     });
   }
 
-  const user = await request.getCurrentUser();
+  const record = await loadCachedAuthenticatedRecord(request);
 
-  if (!user || user.status !== 'active' || await isSessionRevoked(user.id, request.user.sessionVersion)) {
+  if (
+    !record ||
+    record.user.status !== 'active' ||
+    record.sessionVersion !== Number(request.user.sessionVersion ?? 0)
+  ) {
     return reply.status(401).send({
       error: 'unauthorized',
       message: 'Authentication is required.'
@@ -56,7 +85,8 @@ export async function optionalAuthenticate(
   request: FastifyRequest,
   reply: FastifyReply
 ) {
-  if (!request.headers.authorization) {
+  const usesBearer = /^Bearer\s/i.test(request.headers.authorization ?? '');
+  if (!usesBearer) {
     if (!request.cookies?.[sessionCookieName]) return;
     if (assertTrustedCookieOrigin(request, reply)) return;
   }
@@ -70,9 +100,13 @@ export async function optionalAuthenticate(
     });
   }
 
-  const user = await request.getCurrentUser();
+  const record = await loadCachedAuthenticatedRecord(request);
 
-  if (!user || user.status !== 'active' || await isSessionRevoked(user.id, request.user.sessionVersion)) {
+  if (
+    !record ||
+    record.user.status !== 'active' ||
+    record.sessionVersion !== Number(request.user.sessionVersion ?? 0)
+  ) {
     return reply.status(401).send({
       error: 'unauthorized',
       message: 'Authentication is required.'
@@ -81,21 +115,28 @@ export async function optionalAuthenticate(
 }
 
 export async function authenticateForAppeal(request: FastifyRequest, reply: FastifyReply) {
+  if (assertTrustedCookieOrigin(request, reply)) return;
   try {
     await request.jwtVerify();
   } catch {
     return reply.status(401).send({ error: 'unauthorized', message: 'Authentication is required.' });
   }
-  const user = await request.getCurrentUser();
-  // Ban and account-recovery flows revoke ordinary sessions. Keep the signed
-  // pre-revocation token usable only for the narrowly scoped appeal endpoint.
-  if (!user || user.status !== 'active') {
+  const record = await loadCachedAuthenticatedRecord(request);
+  // Ban flows revoke ordinary sessions. Keep a revoked signed token usable for
+  // /appeals only when the account actually has an active ban sanction (not after logout).
+  if (!record || record.user.status !== 'active') {
     return reply.status(401).send({ error: 'unauthorized', message: 'Authentication is required.' });
+  }
+  if (record.sessionVersion !== Number(request.user.sessionVersion ?? 0)) {
+    const sanctions = await getActiveUserSanctions(record.user.id);
+    const hasBan = userHasSanction(sanctions, 'temporary_ban') || userHasSanction(sanctions, 'permanent_ban');
+    if (!hasBan) {
+      return reply.status(401).send({ error: 'unauthorized', message: 'Authentication is required.' });
+    }
   }
 }
 
 export async function getCurrentUser(request: FastifyRequest) {
-  const userId = request.user.sub;
-
-  return findAuthenticatedUserById(userId);
+  const record = await loadCachedAuthenticatedRecord(request);
+  return record ? record.user : null;
 }

@@ -12,7 +12,10 @@ import { registerAccountDeletionRoutes, type AccountDeletionJournalRouteOverride
 import { getCurrentUser } from './modules/auth/auth.utils.js';
 import { registerAdminRoutes } from './modules/admin/admin.routes.js';
 import { registerDeletedAccountArchiveRoutes } from './modules/admin/admin.archive.routes.js';
-import { enforcePlatformIpBan } from './modules/account-deletion/account-deletion.ip.js';
+import {
+  enforcePlatformIpBan,
+  invalidatePlatformIpBanCache
+} from './modules/account-deletion/account-deletion.ip.js';
 import {
   buildAdminFailureLog,
   isAdminFailureRequest
@@ -79,8 +82,8 @@ export function buildApp(options: { accountDeletionJournal?: AccountDeletionJour
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof app.multipartErrors.RequestFileTooLargeError) {
       return reply.status(400).send({
-        error: 'poll_image_too_large',
-        message: 'Poll image file must be 5 MB or smaller.'
+        error: 'file_too_large',
+        message: 'Uploaded file must be 5 MB or smaller.'
       });
     }
 
@@ -122,10 +125,22 @@ export function buildApp(options: { accountDeletionJournal?: AccountDeletionJour
     });
   });
 
+  const stagingOrigin = env.STAGING_PUBLIC_IP
+    ? `http://${env.STAGING_PUBLIC_IP.includes(':') ? `[${env.STAGING_PUBLIC_IP}]` : env.STAGING_PUBLIC_IP}`
+    : undefined;
+  const corsOrigins = env.CORS_ORIGINS === '*'
+    ? [
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        ...(stagingOrigin ? [stagingOrigin] : [])
+      ]
+    : [
+        ...env.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean),
+        ...(stagingOrigin ? [stagingOrigin] : [])
+      ];
+
   app.register(cors, {
-    origin: env.CORS_ORIGINS === '*'
-      ? true
-      : env.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean),
+    origin: corsOrigins,
     credentials: true,
     allowedHeaders: [
       'Content-Type',
@@ -134,6 +149,7 @@ export function buildApp(options: { accountDeletionJournal?: AccountDeletionJour
       'X-Request-ID',
       'X-Pagination-Page',
       'X-Pagination-Action',
+      'Idempotency-Key',
     ],
     exposedHeaders: ['X-Request-ID'],
   });
@@ -162,14 +178,19 @@ export function buildApp(options: { accountDeletionJournal?: AccountDeletionJour
     return getCurrentUser(this);
   });
 
-  app.register(websocket);
+  app.register(websocket, {
+    options: {
+      maxPayload: 1024
+    }
+  });
 
   app.addHook(
     'onRequest',
     rateLimit({
       keyPrefix: 'api',
       limit: 120,
-      windowMs: 60_000
+      windowMs: 60_000,
+      skip: (request) => request.url.split('?', 1)[0] === '/health'
     })
   );
 
@@ -209,13 +230,21 @@ export function buildApp(options: { accountDeletionJournal?: AccountDeletionJour
   registerRealtimeRoutes(app);
 
   app.addHook('onReady', async () => {
-    const receiveRealtimeMessage = ({ recipientUserId, event }: { recipientUserId: string; event: import('@yaskapp/shared').RealtimeEvent }) => {
+    const receiveRealtimeMessage = ({ recipientUserId, event }: { recipientUserId: string; event: import('./realtime/realtime.bus.js').RealtimeBusEvent }) => {
       if (recipientUserId === '*') {
         if (event.type === 'poll.vote.updated') broadcastPollVoteUpdated(event.payload);
+        if (event.type === 'ip_ban.changed') invalidatePlatformIpBanCache();
         return;
       }
       if (event.type === 'account.deleted') {
         disconnectUser(event.payload.userId, 'account_deleted', event);
+        return;
+      }
+      if (event.type === 'session.revoked') {
+        disconnectUser(event.payload.userId, 'session_revoked');
+        return;
+      }
+      if (event.type === 'ip_ban.changed') {
         return;
       }
       if (event.type === 'notification.created') {
@@ -224,18 +253,38 @@ export function buildApp(options: { accountDeletionJournal?: AccountDeletionJour
           countUnread: countUnreadNotifications
         }).then((currentEvent) => {
           if (currentEvent) return sendToUser(recipientUserId, currentEvent);
-        }).catch(() => undefined);
+        }).catch((error) => {
+          app.log.warn({ err: error }, 'Failed to refresh realtime notification event');
+        });
         return;
       }
-      void sendToUser(recipientUserId, event)?.catch(() => undefined);
+      void sendToUser(recipientUserId, event)?.catch((error) => {
+        app.log.warn({ err: error }, 'Failed to deliver realtime event to user');
+      });
     };
-    void realtimeBus.start(receiveRealtimeMessage).catch(() => undefined);
+
+    const startRealtimeBus = () =>
+      realtimeBus.start(receiveRealtimeMessage).then(
+        () => {
+          if (realtimeRetryTimer) {
+            clearInterval(realtimeRetryTimer);
+            realtimeRetryTimer = undefined;
+          }
+        },
+        (error) => {
+          app.log.warn({ err: error }, 'Realtime bus failed to start; will retry');
+        }
+      );
+
+    void startRealtimeBus();
     realtimeRetryTimer = setInterval(() => {
-      void realtimeBus.start(receiveRealtimeMessage).catch(() => undefined);
+      void startRealtimeBus();
     }, 1_000);
     realtimeRetryTimer.unref?.();
     deletionEventsTimer = setInterval(() => {
-      void dispatchPendingDeletionEvents().catch(() => undefined);
+      void dispatchPendingDeletionEvents().catch((error) => {
+        app.log.warn({ err: error }, 'Failed to dispatch pending account deletion events');
+      });
     }, 1_000);
     deletionEventsTimer.unref?.();
   });

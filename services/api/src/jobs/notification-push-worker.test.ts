@@ -59,6 +59,20 @@ test('claimed_push_cannot_recreate_job_after_account_close', async (context: Tes
             type: 'poll_comment', pollId: 'poll-1', commentId: null, attempts: 1, maxAttempts: 8
           }] };
         }
+        if (sql.includes('FROM notification_push_jobs j')) {
+          return {
+            rows: [{
+              actor_user_id: null,
+              type: 'poll_comment',
+              poll_id: 'poll-1',
+              comment_id: null,
+              poll_deleted_at: null,
+              comment_deleted_at: null,
+              poll_author_id: 'author-1',
+              comment_author_id: null
+            }]
+          };
+        }
         if (sql.includes('SELECT status, deleted_at FROM users')) {
           return { rows: [{ status: 'deleted', deleted_at: new Date() }] };
         }

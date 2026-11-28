@@ -71,26 +71,44 @@ async function collectDatabaseMetrics(executor: typeof db, now: Date): Promise<A
               WHERE (audit.target_type = 'poll' AND audit.target_id IN (SELECT target_id FROM account_deletion_deleted_content_targets WHERE target_type = 'poll'))
                  OR (audit.target_type = 'comment' AND audit.target_id IN (SELECT target_id FROM account_deletion_deleted_content_targets WHERE target_type = 'comment'))) AS content_references,
          (SELECT count(*)::int FROM polls poll
-           WHERE poll.votes_count <> (SELECT count(*)::int FROM poll_votes WHERE poll_id = poll.id)
+           WHERE poll.id IN (
+             SELECT target_id FROM account_deletion_counter_targets WHERE target_type = 'poll'
+             UNION
+             SELECT target_id FROM account_deletion_content_targets WHERE target_type = 'poll'
+           )
+           AND (poll.votes_count <> (SELECT count(*)::int FROM poll_votes WHERE poll_id = poll.id)
               OR poll.likes_count <> (SELECT count(*)::int FROM likes WHERE poll_id = poll.id)
               OR poll.comments_count <> (
                 SELECT count(*)::int FROM comments comment
                 JOIN users author ON author.id = comment.author_id
                 WHERE comment.poll_id = poll.id AND comment.deleted_at IS NULL
                   AND author.status = 'active' AND author.deleted_at IS NULL
-              ))
+              )))
            + (SELECT count(*)::int FROM poll_options option
-              WHERE option.votes_count <> (SELECT count(*)::int FROM poll_votes WHERE option_id = option.id))
+              WHERE option.poll_id IN (
+                SELECT target_id FROM account_deletion_counter_targets WHERE target_type = 'poll'
+                UNION
+                SELECT target_id FROM account_deletion_content_targets WHERE target_type = 'poll'
+              )
+              AND option.votes_count <> (SELECT count(*)::int FROM poll_votes WHERE option_id = option.id))
            + (SELECT count(*)::int FROM comments comment
-              WHERE comment.replies_count <> (
+              WHERE comment.id IN (
+                SELECT target_id FROM account_deletion_counter_targets WHERE target_type = 'comment'
+                UNION
+                SELECT target_id FROM account_deletion_content_targets WHERE target_type = 'comment'
+              )
+              AND (comment.replies_count <> (
                 SELECT count(*)::int FROM comments reply
                 JOIN users author ON author.id = reply.author_id
                 WHERE reply.parent_comment_id = comment.id AND reply.deleted_at IS NULL
                   AND author.status = 'active' AND author.deleted_at IS NULL
-              ) OR comment.likes_count <> (SELECT count(*)::int FROM likes WHERE comment_id = comment.id))
+              ) OR comment.likes_count <> (SELECT count(*)::int FROM likes WHERE comment_id = comment.id)))
            + (SELECT count(*)::int FROM profiles profile
-              WHERE profile.followers_count <> (SELECT count(*)::int FROM follows WHERE followee_id = profile.user_id)
-                 OR profile.following_count <> (SELECT count(*)::int FROM follows WHERE follower_id = profile.user_id))
+              WHERE profile.user_id IN (
+                SELECT target_id FROM account_deletion_counter_targets WHERE target_type = 'profile'
+              )
+              AND (profile.followers_count <> (SELECT count(*)::int FROM follows WHERE followee_id = profile.user_id)
+                 OR profile.following_count <> (SELECT count(*)::int FROM follows WHERE follower_id = profile.user_id)))
            AS counter_discrepancies`
     ),
     executor.query<{ retry_older_than_hour: number; deadline_exceeded: number }>(

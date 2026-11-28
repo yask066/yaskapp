@@ -1,8 +1,14 @@
+import type { Pool, PoolClient } from 'pg';
+
 import { db } from '../../config/database.js';
 import { withActiveAccountTransaction } from '../account-deletion/account-activity.guard.js';
 import { avatarUrlForUser } from './avatar-url.js';
 import { searchPopularUserRecords } from '../search/search.repository.js';
 import type { PublicUser, UserWithProfileRow } from '../auth/auth.repository.js';
+
+export class ProfileCountryClearNotAllowedError extends Error {}
+
+type QueryExecutor = Pick<Pool | PoolClient, 'query'>;
 
 type UpdateProfileInput = {
   userId: string;
@@ -47,8 +53,12 @@ export async function findProfileCountryCode(userId: string) {
   return result.rows[0]?.country_code;
 }
 
-export async function updateAvatarObjectKey(userId: string, objectKey: string) {
-  const result = await db.query(
+export async function updateAvatarObjectKey(
+  userId: string,
+  objectKey: string,
+  executor: QueryExecutor = db
+) {
+  const result = await executor.query(
     `
       UPDATE profiles
       SET avatar_object_key = $2
@@ -61,8 +71,8 @@ export async function updateAvatarObjectKey(userId: string, objectKey: string) {
   return result.rowCount === 1;
 }
 
-export async function clearAvatarObjectKey(userId: string) {
-  const result = await db.query(
+export async function clearAvatarObjectKey(userId: string, executor: QueryExecutor = db) {
+  const result = await executor.query(
     `
       UPDATE profiles
       SET avatar_object_key = NULL
@@ -75,8 +85,8 @@ export async function clearAvatarObjectKey(userId: string) {
   return result.rowCount === 1;
 }
 
-export async function findAvatarObjectKey(userId: string) {
-  const result = await db.query<{ avatar_object_key: string | null }>(
+export async function findAvatarObjectKey(userId: string, executor: QueryExecutor = db) {
+  const result = await executor.query<{ avatar_object_key: string | null }>(
     `
       SELECT p.avatar_object_key
       FROM profiles p
@@ -176,7 +186,6 @@ export async function findPublicProfileRecord(userId: string, viewerId?: string)
       JOIN profiles p ON p.user_id = u.id
       WHERE u.id = $1
         AND u.status = 'active'
-        AND u.status = 'active'
         AND u.deleted_at IS NULL
       LIMIT 1
     `,
@@ -268,6 +277,18 @@ export async function listPopularProfileRecords(viewerId: string, limit: number)
 
 export async function updateProfileRecord(input: UpdateProfileInput) {
   const row = await withActiveAccountTransaction(input.userId, async (client) => {
+    if ('countryCode' in input && input.countryCode === null) {
+      const current = await client.query<{ country_code: string | null }>(
+        'SELECT country_code FROM profiles WHERE user_id = $1 FOR UPDATE',
+        [input.userId]
+      );
+      if (current.rows[0] && current.rows[0].country_code !== null) {
+        throw new ProfileCountryClearNotAllowedError(
+          'Country cannot be cleared after it has been selected.'
+        );
+      }
+    }
+
     const result = await client.query<UserWithProfileRow>(
       `
         WITH updated_profile AS (

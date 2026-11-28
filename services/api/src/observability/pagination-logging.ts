@@ -53,7 +53,21 @@ export function safeRequestSerializer(request: {
 }
 
 export function createPaginationLogEntry(input: PaginationLogEntry): PaginationLogEntry {
-  const entry: PaginationLogEntry = {
+  const entry: {
+    event: PaginationEventName;
+    surface: PaginationSurface;
+    sort: string | null;
+    pageNumber: number | null;
+    durationMs: number | null;
+    itemCount: number | null;
+    errorCode: string | null;
+    requestId: string;
+    deduplicatedCount?: number;
+    storedItemCount?: number;
+    activeSnapshotCount?: number;
+    deletedSnapshotCount?: number;
+    snapshotLifetimeSeconds?: number;
+  } = {
     event: input.event,
     surface: input.surface,
     sort: input.sort,
@@ -65,18 +79,19 @@ export function createPaginationLogEntry(input: PaginationLogEntry): PaginationL
   };
 
   if (input.deduplicatedCount !== undefined) {
-    return { ...entry, deduplicatedCount: input.deduplicatedCount };
+    entry.deduplicatedCount = input.deduplicatedCount;
   }
   if (input.storedItemCount !== undefined) {
-    return {
-      ...entry,
-      storedItemCount: input.storedItemCount,
-      activeSnapshotCount: input.activeSnapshotCount,
-      snapshotLifetimeSeconds: input.snapshotLifetimeSeconds,
-    };
+    entry.storedItemCount = input.storedItemCount;
+  }
+  if (input.activeSnapshotCount !== undefined) {
+    entry.activeSnapshotCount = input.activeSnapshotCount;
+  }
+  if (input.snapshotLifetimeSeconds !== undefined) {
+    entry.snapshotLifetimeSeconds = input.snapshotLifetimeSeconds;
   }
   if (input.deletedSnapshotCount !== undefined) {
-    return { ...entry, deletedSnapshotCount: input.deletedSnapshotCount };
+    entry.deletedSnapshotCount = input.deletedSnapshotCount;
   }
   return entry;
 }

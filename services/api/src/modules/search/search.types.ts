@@ -44,6 +44,7 @@ export type SearchPollRow = {
   viewer_vote_option_id: string | null;
   options: PollOption[];
   created_at: Date;
+  cursor_created_at?: string;
   updated_at: Date;
   ends_at: Date | null;
   score: number;
@@ -54,6 +55,7 @@ export type SearchUserRow = {
   username: string;
   status: 'active';
   created_at: Date;
+  cursor_created_at?: string;
   updated_at: Date;
   display_name: string;
   bio: string | null;
@@ -66,12 +68,12 @@ export type SearchUserRow = {
   score: number;
 };
 
-export type SearchPollRecord = { poll: Poll; score: number };
-export type SearchUserRecord = { user: PublicProfile; score: number };
+export type SearchPollRecord = { poll: Poll; score: number; cursorCreatedAt?: string };
+export type SearchUserRecord = { user: PublicProfile; score: number; cursorCreatedAt?: string };
 
 export type SearchResult =
-  | { type: 'poll'; poll: Poll; score: number }
-  | { type: 'user'; user: PublicProfile; score: number };
+  | { type: 'poll'; poll: Poll; score: number; cursorCreatedAt?: string }
+  | { type: 'user'; user: PublicProfile; score: number; cursorCreatedAt?: string };
 
 export type SearchPage = {
   items: SearchResult[];

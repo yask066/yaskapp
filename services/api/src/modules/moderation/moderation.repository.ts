@@ -248,6 +248,10 @@ export async function listUserReports(input: {
   return pageWithCursor(result.rows.map(mapReport), input.limit);
 }
 
+function escapeLikePattern(value: string) {
+  return value.replace(/[\\%_]/g, '\\$&');
+}
+
 export async function listModerationCases(input: {
   status?: ModerationCaseStatus;
   category?: ReportCategory;
@@ -272,22 +276,32 @@ export async function listModerationCases(input: {
   if (input.unassigned) conditions.push('mc.assigned_to_user_id IS NULL');
   if (input.targetType) add('mc.target_type = ?', input.targetType);
   if (input.search) {
-    values.push(`%${input.search}%`);
+    values.push(`%${escapeLikePattern(input.search)}%`);
     const searchPlaceholder = `$${values.length}`;
     conditions.push(`(
-      mc.id::text ILIKE ${searchPlaceholder}
-      OR mc.target_id::text ILIKE ${searchPlaceholder}
+      mc.id::text ILIKE ${searchPlaceholder} ESCAPE '\\'
+      OR mc.target_id::text ILIKE ${searchPlaceholder} ESCAPE '\\'
       OR EXISTS (
-        SELECT 1 FROM reports search_report
-        WHERE search_report.target_type = mc.target_type
-          AND search_report.target_id = mc.target_id
-          AND (search_report.category::text ILIKE ${searchPlaceholder} OR search_report.description ILIKE ${searchPlaceholder})
+        SELECT 1
+        FROM moderation_case_reports search_link
+        JOIN reports search_report ON search_report.id = search_link.report_id
+        WHERE search_link.case_id = mc.id
+          AND (
+            search_report.category::text ILIKE ${searchPlaceholder} ESCAPE '\\'
+            OR search_report.description ILIKE ${searchPlaceholder} ESCAPE '\\'
+          )
       )
     )`);
   }
   if (input.category) {
     values.push(input.category);
-    conditions.push(`EXISTS (SELECT 1 FROM reports category_report WHERE category_report.target_type = mc.target_type AND category_report.target_id = mc.target_id AND category_report.category = $${values.length})`);
+    conditions.push(`EXISTS (
+      SELECT 1
+      FROM moderation_case_reports category_link
+      JOIN reports category_report ON category_report.id = category_link.report_id
+      WHERE category_link.case_id = mc.id
+        AND category_report.category = $${values.length}
+    )`);
   }
   if (input.cursor) {
     const cursor = decodeAdminCursor(input.cursor);
@@ -338,7 +352,8 @@ export async function getModerationCase(caseId: string) {
          FROM reports r
          JOIN moderation_case_reports mcr ON mcr.report_id = r.id
         WHERE mcr.case_id = $1
-        ORDER BY r.created_at ASC, r.id ASC`,
+        ORDER BY r.created_at ASC, r.id ASC
+        LIMIT 200`,
       [caseId]
     ),
     db.query<{
@@ -350,7 +365,8 @@ export async function getModerationCase(caseId: string) {
       `SELECT id, author_user_id, body, created_at
          FROM moderation_case_notes
         WHERE case_id = $1
-        ORDER BY created_at ASC, id ASC`,
+        ORDER BY created_at ASC, id ASC
+        LIMIT 200`,
       [caseId]
     ),
     moderationCase.target_type === 'user' && moderationCase.target_id
@@ -435,6 +451,12 @@ async function mutateCase(
         caseId
       ]
     );
+    await client.query(
+      `UPDATE reports
+          SET status = $1, updated_at = now()
+        WHERE id IN (SELECT report_id FROM moderation_case_reports WHERE case_id = $2)`,
+      [nextStatus, caseId]
+    );
     await recordAdminAudit(client, {
       actorUserId,
       actorRole,
@@ -451,6 +473,164 @@ async function mutateCase(
     client.release();
   }
   return getModerationCase(caseId);
+}
+
+export async function removeModeratedContentAtomically(input: {
+  caseId: string;
+  targetType: 'poll' | 'comment';
+  targetId: string;
+  actorUserId: string;
+  actorRole: UserRole;
+  reason: string;
+  requestId?: string;
+}): Promise<
+  | { status: 'deleted'; targetType: 'poll'; visibility: 'public' | 'followers' | 'private' }
+  | { status: 'deleted'; targetType: 'comment'; pollId: string }
+  | { status: 'already_deleted' }
+> {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    await lockActiveAccount(client, input.actorUserId);
+    const actorRow = await client.query<{ role: UserRole }>('SELECT role FROM users WHERE id = $1', [input.actorUserId]);
+    const actorRole = actorRow.rows[0]?.role ?? input.actorRole;
+
+    const currentCase = await client.query<CaseRow & { resolution_code: string | null }>(
+      `SELECT id, target_type, target_id, status, priority,
+              assigned_to_user_id, created_at, updated_at, resolved_at, resolution_code
+         FROM moderation_cases
+        WHERE id = $1
+        FOR UPDATE`,
+      [input.caseId]
+    );
+    const moderationCase = currentCase.rows[0];
+    if (!moderationCase) {
+      throw new ModerationCaseNotFoundError('Moderation case was not found.');
+    }
+    if (moderationCase.target_type !== input.targetType || moderationCase.target_id !== input.targetId) {
+      throw new ModerationCaseConflictError('Case target does not match content target.');
+    }
+    if (moderationCase.status === 'resolved' && moderationCase.resolution_code === 'content_removed') {
+      await client.query('COMMIT');
+      return { status: 'already_deleted' };
+    }
+    if (['resolved', 'dismissed', 'duplicate'].includes(moderationCase.status)) {
+      throw new ModerationCaseConflictError('Moderation case is already closed.');
+    }
+
+    let result:
+      | { status: 'deleted'; targetType: 'poll'; visibility: 'public' | 'followers' | 'private' }
+      | { status: 'deleted'; targetType: 'comment'; pollId: string }
+      | { status: 'already_deleted' };
+
+    if (input.targetType === 'poll') {
+      const deleted = await client.query<{ id: string; visibility: 'public' | 'followers' | 'private' }>(
+        `UPDATE polls
+            SET deleted_at = now(), updated_at = now()
+          WHERE id = $1 AND deleted_at IS NULL
+          RETURNING id, visibility`,
+        [input.targetId]
+      );
+      if (deleted.rowCount === 1) {
+        await recordAdminAudit(client, {
+          actorUserId: input.actorUserId,
+          actorRole,
+          action: 'poll.deleted_by_admin',
+          targetType: 'poll',
+          targetId: input.targetId,
+          reason: input.reason,
+          requestId: input.requestId
+        });
+        result = {
+          status: 'deleted',
+          targetType: 'poll',
+          visibility: deleted.rows[0]?.visibility ?? 'public'
+        };
+      } else {
+        const exists = await client.query<{ id: string }>('SELECT id FROM polls WHERE id = $1', [input.targetId]);
+        if (exists.rowCount !== 1) {
+          throw new ModerationTargetNotFoundError('Poll was not found.');
+        }
+        result = { status: 'already_deleted' };
+      }
+    } else {
+      const pollRef = await client.query<{ poll_id: string }>('SELECT poll_id FROM comments WHERE id = $1', [input.targetId]);
+      const pollId = pollRef.rows[0]?.poll_id;
+      if (!pollId) {
+        throw new ModerationTargetNotFoundError('Comment was not found.');
+      }
+      const lockedPoll = await client.query('SELECT id FROM polls WHERE id = $1 FOR UPDATE', [pollId]);
+      if (lockedPoll.rowCount === 0) {
+        throw new ModerationTargetNotFoundError('Comment was not found.');
+      }
+      const lockedComment = await client.query<{ poll_id: string; deleted_at: Date | null }>(
+        'SELECT poll_id, deleted_at FROM comments WHERE id = $1 AND poll_id = $2 FOR UPDATE',
+        [input.targetId, pollId]
+      );
+      const comment = lockedComment.rows[0];
+      if (!comment) {
+        throw new ModerationTargetNotFoundError('Comment was not found.');
+      }
+      if (comment.deleted_at) {
+        result = { status: 'already_deleted' };
+      } else {
+        await client.query('UPDATE comments SET deleted_at = now(), updated_at = now() WHERE id = $1', [input.targetId]);
+        await client.query(
+          `UPDATE polls
+              SET comments_count = GREATEST(comments_count - 1, 0),
+                  comments_revision = comments_revision + 1,
+                  updated_at = now()
+            WHERE id = $1`,
+          [comment.poll_id]
+        );
+        await recordAdminAudit(client, {
+          actorUserId: input.actorUserId,
+          actorRole,
+          action: 'comment.deleted_by_admin',
+          targetType: 'comment',
+          targetId: input.targetId,
+          reason: input.reason,
+          requestId: input.requestId,
+          metadata: { pollId: comment.poll_id }
+        });
+        result = { status: 'deleted', targetType: 'comment', pollId: comment.poll_id };
+      }
+    }
+
+    await client.query(
+      `UPDATE moderation_cases
+          SET assigned_to_user_id = $1,
+              status = 'resolved',
+              resolution_code = 'content_removed',
+              resolution_note = $2,
+              resolved_at = now()
+        WHERE id = $3`,
+      [moderationCase.assigned_to_user_id ?? input.actorUserId, input.reason, input.caseId]
+    );
+    await client.query(
+      `UPDATE reports
+          SET status = 'resolved', updated_at = now()
+        WHERE id IN (SELECT report_id FROM moderation_case_reports WHERE case_id = $1)`,
+      [input.caseId]
+    );
+    await recordAdminAudit(client, {
+      actorUserId: input.actorUserId,
+      actorRole,
+      action: 'moderation.case_resolved',
+      targetType: 'case',
+      targetId: input.caseId,
+      reason: input.reason,
+      requestId: input.requestId
+    });
+
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export function assignModerationCase(caseId: string, actorUserId: string, actorRole: UserRole) {

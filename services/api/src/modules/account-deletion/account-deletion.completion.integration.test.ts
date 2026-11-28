@@ -47,7 +47,11 @@ function fixture(options: {
 
 test('remaining_object_prevents_completed', async () => {
   const { state, service } = fixture({ mediaEmpty: false });
-  assert.deepEqual(await service.verifyAndCompleteDeletion('operation-1'), { done: false });
+  assert.deepEqual(await service.verifyAndCompleteDeletion('operation-1'), {
+    done: false,
+    retryAfterSeconds: 5,
+    errorCode: 'media_remainders_detected'
+  });
   assert.equal(state.userExists, true);
   assert.equal(state.manifestRemoved, false);
   assert.deepEqual(state.mediaCalls, ['discover', 'purge', 'verify']);
@@ -64,14 +68,22 @@ test('user_physical_delete_preserves_receipt', async () => {
 
 test('incomplete_cleanup_step_prevents_identity_delete', async () => {
   const { state, service } = fixture({ stepsComplete: false });
-  assert.deepEqual(await service.verifyAndCompleteDeletion('operation-1'), { done: false });
+  assert.deepEqual(await service.verifyAndCompleteDeletion('operation-1'), {
+    done: false,
+    retryAfterSeconds: 5,
+    errorCode: 'pre_completion_steps_incomplete'
+  });
   assert.equal(state.userExists, true);
   assert.deepEqual(state.mediaCalls, []);
 });
 
 test('database_remainder_prevents_identity_delete', async () => {
   const { state, service } = fixture({ residues: true });
-  assert.deepEqual(await service.verifyAndCompleteDeletion('operation-1'), { done: false });
+  assert.deepEqual(await service.verifyAndCompleteDeletion('operation-1'), {
+    done: false,
+    retryAfterSeconds: 10,
+    errorCode: 'database_remainders_detected'
+  });
   assert.equal(state.userExists, true);
   assert.equal(state.manifestRemoved, false);
 });

@@ -19,7 +19,11 @@ const INITIAL_RETRY_SECONDS = 5;
 const MAX_RETRY_SECONDS = 15 * 60;
 
 export type DeletionStepKey = typeof DELETION_STEP_ORDER[number];
-export type DeletionStepResult = { done: boolean };
+export type DeletionStepResult = {
+  done: boolean;
+  retryAfterSeconds?: number;
+  errorCode?: string;
+};
 export type DeletionStepHandler = (operationId: string) => Promise<DeletionStepResult>;
 export type ClaimedDeletionOperation = { operationId: string; attempts: number; leaseOwner: string };
 
@@ -259,11 +263,12 @@ async function runStepWithLeaseRenewal(
 }
 
 export async function processDeletionBatch(
-  input: { limit: number; now: Date },
+  input: { limit: number; now: Date; nowProvider?: () => Date },
   dependencies: AccountDeletionWorkerDependencies = { repository: databaseRepository, handlers: accountDeletionStepHandlers }
 ): Promise<{ processed: number; completed: number; retrying: number }> {
+  const currentNow = () => input.nowProvider?.() ?? input.now;
   const limit = Math.max(1, Math.min(Math.floor(input.limit), DELETION_WORK_BATCH_SIZE));
-  const claimed = await dependencies.repository.claim(limit, input.now, randomUUID());
+  const claimed = await dependencies.repository.claim(limit, currentNow(), randomUUID());
   let completed = 0;
   let retrying = 0;
 
@@ -276,7 +281,7 @@ export async function processDeletionBatch(
           if (!await dependencies.repository.allStepsCompleted(operation.operationId)) {
             throw new AccountDeletionStepError('required_steps_missing');
           }
-          if (!await dependencies.repository.completeOperation(operation.operationId, operation.leaseOwner, input.now)) {
+          if (!await dependencies.repository.completeOperation(operation.operationId, operation.leaseOwner, currentNow())) {
             throw new AccountDeletionStepError('completion_blocked');
           }
           completed += 1;
@@ -286,35 +291,53 @@ export async function processDeletionBatch(
         if (!handler) throw new AccountDeletionStepError('step_handler_unavailable');
 
         activeStep = stepKey;
-        if (!await dependencies.repository.markStepProcessing(operation.operationId, stepKey, operation.leaseOwner, input.now)) {
+        if (!await dependencies.repository.markStepProcessing(operation.operationId, stepKey, operation.leaseOwner, currentNow())) {
           throw new AccountDeletionStepError('lease_lost');
         }
         const result = await runStepWithLeaseRenewal(operation, handler, dependencies.repository);
         if (result.done) {
-          if (!await dependencies.repository.markStepCompleted(operation.operationId, stepKey, operation.leaseOwner, input.now)) {
+          if (!await dependencies.repository.markStepCompleted(operation.operationId, stepKey, operation.leaseOwner, currentNow())) {
             throw new AccountDeletionStepError('lease_lost');
           }
           activeStep = null;
           continue;
         }
 
-        if (!await dependencies.repository.markStepPending(operation.operationId, stepKey, operation.leaseOwner, input.now)) {
+        if (result.retryAfterSeconds !== undefined) {
+          const code = errorCode(new AccountDeletionStepError(result.errorCode ?? 'step_retry_pending'));
+          const delaySeconds = Math.max(1, Math.min(result.retryAfterSeconds, MAX_RETRY_SECONDS));
+          const now = currentNow();
+          await dependencies.repository.markStepRetrying(operation.operationId, stepKey, operation.leaseOwner, now, delaySeconds, code);
+          const scheduled = await dependencies.repository.retryOperation(
+            operation.operationId,
+            operation.leaseOwner,
+            now,
+            delaySeconds,
+            code
+          );
+          if (scheduled) retrying += 1;
+          activeStep = null;
+          break;
+        }
+
+        if (!await dependencies.repository.markStepPending(operation.operationId, stepKey, operation.leaseOwner, currentNow())) {
           throw new AccountDeletionStepError('lease_lost');
         }
         activeStep = null;
-        await dependencies.repository.yieldOperation(operation.operationId, operation.leaseOwner, input.now);
+        await dependencies.repository.yieldOperation(operation.operationId, operation.leaseOwner, currentNow());
         break;
       }
     } catch (error) {
       const code = errorCode(error);
       const delaySeconds = retryDelaySeconds(operation.attempts + 1);
+      const now = currentNow();
       if (activeStep) {
-        await dependencies.repository.markStepRetrying(operation.operationId, activeStep, operation.leaseOwner, input.now, delaySeconds, code);
+        await dependencies.repository.markStepRetrying(operation.operationId, activeStep, operation.leaseOwner, now, delaySeconds, code);
       }
       const scheduled = await dependencies.repository.retryOperation(
         operation.operationId,
         operation.leaseOwner,
-        input.now,
+        now,
         delaySeconds,
         code
       );
