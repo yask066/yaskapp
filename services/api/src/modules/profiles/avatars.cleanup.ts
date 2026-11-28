@@ -33,26 +33,30 @@ export async function cleanupOrphanedAvatars(input?: {
 }) {
   const dryRun = input?.dryRun ?? false;
   const gracePeriodHours = input?.gracePeriodHours ?? defaultGracePeriodHours;
-  const referencedResult = await db.query<{ avatar_object_key: string }>(
-    `
-      SELECT avatar_object_key
-      FROM profiles
-      WHERE avatar_object_key IS NOT NULL
-    `
-  );
-  const referencedKeys = new Set(
-    referencedResult.rows.map((row) => row.avatar_object_key)
-  );
+  // List S3 BEFORE checking PostgreSQL so concurrently uploaded avatars are never deleted.
   const objects = await listObjects(avatarPrefix);
-  const orphanedKeys = selectOrphanedAvatarKeys(
-    objects,
-    referencedKeys,
-    new Date(),
-    gracePeriodHours
-  );
+  const candidates = selectOrphanedAvatarKeys(objects, new Set(), new Date(), gracePeriodHours);
+  const referencedKeys = new Set<string>();
+  const orphanedKeys: string[] = [];
 
-  if (!dryRun && orphanedKeys.length > 0) {
-    await deleteObjects(orphanedKeys);
+  for (let offset = 0; offset < candidates.length; offset += 500) {
+    const batch = candidates.slice(offset, offset + 500);
+    const referencedResult = await db.query<{ avatar_object_key: string }>(
+      `
+        SELECT avatar_object_key
+        FROM profiles
+        WHERE avatar_object_key = ANY($1::text[])
+      `,
+      [batch]
+    );
+    for (const row of referencedResult.rows) {
+      referencedKeys.add(row.avatar_object_key);
+    }
+    const batchOrphans = batch.filter((key) => !referencedKeys.has(key));
+    if (!dryRun && batchOrphans.length > 0) {
+      await deleteObjects(batchOrphans);
+    }
+    orphanedKeys.push(...batchOrphans);
   }
 
   return {

@@ -74,16 +74,18 @@ async function applyMigration(client: PoolClient, migration: MigrationFile) {
     );
     await client.query('COMMIT');
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => undefined);
     throw error;
   }
 }
 
 async function migrate() {
   const client = await db.connect();
+  let lockAcquired = false;
 
   try {
     await client.query('SELECT pg_advisory_lock($1::bigint)', [migrationLockId]);
+    lockAcquired = true;
     await ensureMigrationsTable(client);
 
     const appliedMigrations = await getAppliedMigrations(client);
@@ -135,8 +137,16 @@ async function migrate() {
 
     console.log(`Applied ${pendingMigrations.length} database migration(s).`);
   } finally {
-    await client.query('SELECT pg_advisory_unlock($1::bigint)', [migrationLockId]);
-    client.release();
+    let releaseWithError: boolean | undefined;
+    try {
+      if (lockAcquired) {
+        await client.query('SELECT pg_advisory_unlock($1::bigint)', [migrationLockId]);
+      }
+    } catch {
+      releaseWithError = true;
+    } finally {
+      client.release(releaseWithError);
+    }
   }
 }
 

@@ -15,6 +15,7 @@ const envSchema = z
   PORT: z.coerce.number().int().positive().default(3000),
   HOST: z.string().default('0.0.0.0'),
   CORS_ORIGINS: z.string().default('*'),
+  COOKIE_SECURE: z.enum(['true', 'false']).optional().transform((value) => (value === undefined ? undefined : value === 'true')),
   STAGING_PUBLIC_IP: z.string().ip().optional(),
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
@@ -30,7 +31,7 @@ const envSchema = z
   S3_BUCKET: z.string().min(1),
   S3_ACCESS_KEY_ID: z.string().min(1),
   S3_SECRET_ACCESS_KEY: z.string().min(1),
-  S3_FORCE_PATH_STYLE: z.coerce.boolean().default(true),
+  S3_FORCE_PATH_STYLE: z.enum(['true', 'false']).default('true').transform((value) => value === 'true'),
   ACCOUNT_DELETION_ENABLED: z.enum(['true', 'false']).default('true').transform((value) => value === 'true'),
   ACCOUNT_DELETION_JOURNAL_ENABLED: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
   ACCOUNT_DELETION_JOURNAL_DATABASE_URL: journalDatabaseUrlSchema.optional(),
@@ -85,16 +86,27 @@ const envSchema = z
         });
       }
     }
+    if (
+      config.NODE_ENV === 'production' &&
+      config.CORS_ORIGINS.split(',').some((origin) => origin.trim() === '*')
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['CORS_ORIGINS'],
+        message: 'Wildcard CORS_ORIGINS is not allowed in production.'
+      });
+    }
+
     const isPlaceholder = config.JWT_SECRET.includes('replace-with');
 
     if (
       config.NODE_ENV === 'production' &&
-      (config.JWT_SECRET === developmentJwtSecret || isPlaceholder)
+      (config.JWT_SECRET === developmentJwtSecret || isPlaceholder || Buffer.byteLength(config.JWT_SECRET, 'utf8') < 32)
     ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['JWT_SECRET'],
-        message: 'A real staging or production JWT_SECRET is required.'
+        message: 'A real staging or production JWT_SECRET of at least 32 bytes is required.'
       });
     }
     const paginationSecretIsPlaceholder =

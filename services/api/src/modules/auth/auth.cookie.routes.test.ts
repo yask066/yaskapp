@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import Fastify from 'fastify';
 import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
@@ -9,13 +9,19 @@ import { hashPassword } from './password.js';
 process.env.NODE_ENV = 'test';
 process.env.STAGING_PUBLIC_IP = '5.44.44.197';
 
-const [{ env }, { registerAuthRoutes }, { db }, { getCurrentUser }, { registerPollRoutes }] = await Promise.all([
+const [{ env }, { registerAuthRoutes }, { db }, { getCurrentUser }, { registerPollRoutes }, { closeRedisConnection }, { realtimeBus }] = await Promise.all([
   import('../../config/env.js'),
   import('./auth.routes.js'),
   import('../../config/database.js'),
   import('./auth.utils.js'),
-  import('../polls/polls.routes.js')
+  import('../polls/polls.routes.js'),
+  import('../../config/redis.js'),
+  import('../../realtime/realtime.bus.js')
 ]);
+
+after(async () => {
+  await Promise.all([closeRedisConnection(), realtimeBus.close()]);
+});
 
 test('a production login stays authenticated over HTTP and HTTPS cookie sessions', async (context) => {
   const previousEnvironment = env.NODE_ENV;

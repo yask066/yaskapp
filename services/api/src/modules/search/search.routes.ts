@@ -8,7 +8,7 @@ const searchQuerySchema = z.object({
   q: z.string().trim().min(2).max(100),
   type: z.enum(['all', 'polls', 'users']).default('all'),
   sort: z.enum(['relevance', 'newest', 'popular']).default('relevance'),
-  cursor: z.string().min(1).optional(),
+  cursor: z.string().min(1).max(2048).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20)
 }).strict();
 

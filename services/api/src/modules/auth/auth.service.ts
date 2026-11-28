@@ -11,6 +11,7 @@ import { hashPassword, verifyPassword } from './password.js';
 import { assertUserCanAuthenticate } from '../moderation/sanctions.repository.js';
 
 const tokenExpiresIn = '7d';
+const dummyPasswordHash = '$2a$12$C6UzMDM.H6dfI/f/IKcEe.4d/Mg7u9tC9J6YhJKVQn9Z3p0e4D6Wm';
 
 export class ConflictError extends Error {}
 
@@ -97,8 +98,12 @@ export async function registerUser(app: FastifyInstance, input: RegisterInput) {
 export async function signInUser(app: FastifyInstance, input: LoginInput) {
   const login = input.login.trim().toLowerCase();
   const account = await findUserByEmailOrUsername(login);
+  const passwordMatches = await verifyPassword(
+    input.password,
+    account?.passwordHash ?? dummyPasswordHash
+  );
 
-  if (!account) {
+  if (!account || !passwordMatches) {
     throw new AuthenticationError('Invalid login or password.');
   }
 
@@ -111,12 +116,6 @@ export async function signInUser(app: FastifyInstance, input: LoginInput) {
   } catch (error) {
     if (error instanceof Error) throw new AuthenticationError(error.message);
     throw error;
-  }
-
-  const passwordMatches = await verifyPassword(input.password, account.passwordHash);
-
-  if (!passwordMatches) {
-    throw new AuthenticationError('Invalid login or password.');
   }
 
   await markUserSeen(account.user.id);

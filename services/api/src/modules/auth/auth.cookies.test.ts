@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { isTrustedOrigin, parseCookieHeader, serializeSessionCookie } from './auth.cookies.js';
+import { isTrustedCookieMutationRequest, isTrustedOrigin, parseCookieHeader, serializeSessionCookie } from './auth.cookies.js';
 
 test('parses the session cookie without exposing unrelated cookie values', () => {
   assert.deepEqual(parseCookieHeader('theme=dark; yaskapp_session=jwt.value; empty='), {
@@ -56,4 +56,31 @@ test('staging IP trust preserves the restricted wildcard development origins', (
   assert.equal(isTrustedOrigin('http://localhost:5173', '*', '5.44.44.197'), true);
   assert.equal(isTrustedOrigin('http://127.0.0.1:5173', '*', '5.44.44.197'), true);
   assert.equal(isTrustedOrigin('https://evil.example', '*', '5.44.44.197'), false);
+});
+
+test('isTrustedCookieMutationRequest requires trusted Origin, Referer, or Sec-Fetch-Site: same-origin', () => {
+  const configured = 'https://web-staging.example.com';
+  assert.equal(isTrustedCookieMutationRequest({ origin: 'https://web-staging.example.com' }, configured), true);
+  assert.equal(isTrustedCookieMutationRequest({ origin: 'https://evil.example' }, configured), false);
+  assert.equal(
+    isTrustedCookieMutationRequest({ referer: 'https://web-staging.example.com/polls/1' }, configured),
+    true
+  );
+  assert.equal(
+    isTrustedCookieMutationRequest({ referer: 'https://evil.example/attack' }, configured),
+    false
+  );
+  assert.equal(
+    isTrustedCookieMutationRequest({ 'sec-fetch-site': 'same-origin' }, configured),
+    true
+  );
+  assert.equal(
+    isTrustedCookieMutationRequest({ 'sec-fetch-site': 'cross-site' }, configured),
+    false
+  );
+  assert.equal(
+    isTrustedCookieMutationRequest({ origin: 'https://evil.example', 'sec-fetch-site': 'same-origin' }, configured),
+    false
+  );
+  assert.equal(isTrustedCookieMutationRequest({}, configured), false);
 });

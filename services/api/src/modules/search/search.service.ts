@@ -63,7 +63,7 @@ function sortResults(items: SearchResult[], sort: SearchSort) {
 function toCursor(item: SearchResult, query: string, type: SearchType, sort: SearchSort) {
   return {
     ...(sort === 'newest' ? {} : { score: item.score }),
-    createdAt: item.type === 'poll' ? item.poll.createdAt : item.user.createdAt,
+    createdAt: item.cursorCreatedAt ?? (item.type === 'poll' ? item.poll.createdAt : item.user.createdAt),
     id: item.type === 'poll' ? item.poll.id : item.user.id,
     query,
     type,
@@ -121,24 +121,14 @@ export async function searchWithRepositories(input: {
 
   const sorted = sortResults(records, sort);
   const hasNextPage = sorted.length > limit;
-  const items = sorted.slice(0, limit);
+  const items = sorted.slice(0, limit).map(({ cursorCreatedAt: _cursorCreatedAt, ...item }) => item);
 
   return {
     items,
-    nextCursor: hasNextPage && items[items.length - 1]
-      ? encodeSearchCursor(toCursor(items[items.length - 1], query, type, sort))
+    nextCursor: hasNextPage && sorted[limit - 1]
+      ? encodeSearchCursor(toCursor(sorted[limit - 1], query, type, sort))
       : null
   };
-}
-
-export function parseSearchCursor(value: string | undefined) {
-  if (value === undefined) return undefined;
-
-  try {
-    return decodeSearchCursor(value);
-  } catch {
-    throw new SearchValidationError('Search cursor is invalid.');
-  }
 }
 
 export async function search(input: Omit<Parameters<typeof searchWithRepositories>[0], 'repositories'>) {

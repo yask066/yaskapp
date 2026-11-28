@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import type { RealtimeEvent } from '@yaskapp/shared';
 
-import { RealtimeBus, realtimeChannel, type RedisClientLike } from './realtime.bus.js';
+import { RealtimeBus, realtimeChannel, type RealtimeBusEvent, type RedisClientLike } from './realtime.bus.js';
 import { addRealtimeClient, sendToUser } from './realtime.hub.js';
 
 class FakeRedis implements RedisClientLike {
@@ -69,40 +69,60 @@ function event(): RealtimeEvent {
   };
 }
 
-test('publishes a recipient envelope and delivers it to the subscriber', async () => {
+test('publishes a recipient envelope, ignores self-echo, and delivers remote messages', async () => {
   const publisher = new FakeRedis();
   const subscriber = new FakeRedis();
-  const received: Array<{ recipientUserId: string; event: RealtimeEvent }> = [];
-  const bus = new RealtimeBus({ createPublisher: () => publisher, createSubscriber: () => subscriber });
+  const received: Array<{ recipientUserId: string; event: RealtimeBusEvent; originId?: string }> = [];
+  const bus = new RealtimeBus({
+    createPublisher: () => publisher,
+    createSubscriber: () => subscriber,
+    instanceId: 'node-a'
+  });
 
   await bus.start((message) => received.push(message));
   await bus.publish('user-1', event());
 
   assert.deepEqual(JSON.parse(publisher.published[0]?.message ?? ''), {
     recipientUserId: 'user-1',
-    event: event()
+    event: event(),
+    originId: 'node-a'
   });
-  assert.deepEqual(received, []);
+  // Self-echo from the same bus instance must be suppressed
   subscriber.emit(realtimeChannel, publisher.published[0]?.message ?? '');
-  assert.deepEqual(received, [{ recipientUserId: 'user-1', event: event() }]);
+  assert.deepEqual(received, []);
+
+  // Message from a remote node is delivered
+  subscriber.emit(
+    realtimeChannel,
+    JSON.stringify({ recipientUserId: 'user-1', event: event(), originId: 'node-b' })
+  );
+  assert.deepEqual(received, [{ recipientUserId: 'user-1', event: event(), originId: 'node-b' }]);
   await bus.close();
 });
 
-test('publishes a broadcast envelope for all realtime nodes', async () => {
+test('publishes a broadcast envelope for all remote realtime nodes', async () => {
   const publisher = new FakeRedis();
   const subscriber = new FakeRedis();
-  const received: Array<{ recipientUserId: string; event: RealtimeEvent }> = [];
-  const bus = new RealtimeBus({ createPublisher: () => publisher, createSubscriber: () => subscriber });
+  const received: Array<{ recipientUserId: string; event: RealtimeBusEvent; originId?: string }> = [];
+  const bus = new RealtimeBus({
+    createPublisher: () => publisher,
+    createSubscriber: () => subscriber,
+    instanceId: 'node-a'
+  });
 
   await bus.start((message) => received.push(message));
   await bus.publishBroadcast(event());
-  subscriber.emit(realtimeChannel, publisher.published[0]?.message ?? '');
-
   assert.deepEqual(JSON.parse(publisher.published[0]?.message ?? ''), {
     recipientUserId: '*',
-    event: event()
+    event: event(),
+    originId: 'node-a'
   });
-  assert.deepEqual(received, [{ recipientUserId: '*', event: event() }]);
+
+  subscriber.emit(
+    realtimeChannel,
+    JSON.stringify({ recipientUserId: '*', event: event(), originId: 'node-b' })
+  );
+  assert.deepEqual(received, [{ recipientUserId: '*', event: event(), originId: 'node-b' }]);
   await bus.close();
 });
 

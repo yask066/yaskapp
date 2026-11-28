@@ -254,39 +254,151 @@ test('realtime comment deletion events broadcast only comment and poll ids', () 
   });
 });
 
-test('realtime user moderation events broadcast only the user id', () => {
-  const messages: string[] = [];
-  const remove = addRealtimeClient({
-    readyState: 1,
-    send: (message) => messages.push(message)
-  });
-  messages.length = 0;
+test('realtime user moderation events are delivered only to the affected user and moderators', () => {
+  const moderatorMessages: string[] = [];
+  const targetMessages: string[] = [];
+  const bystanderMessages: string[] = [];
+  const removeMod = addRealtimeClient(
+    { readyState: 1, send: (message) => moderatorMessages.push(message) },
+    'mod-1',
+    { role: 'moderator' }
+  );
+  const removeTarget = addRealtimeClient(
+    { readyState: 1, send: (message) => targetMessages.push(message) },
+    'user-blocked',
+    { role: 'user' }
+  );
+  const removeBystander = addRealtimeClient(
+    { readyState: 1, send: (message) => bystanderMessages.push(message) },
+    'user-other',
+    { role: 'user' }
+  );
+  moderatorMessages.length = 0;
+  targetMessages.length = 0;
+  bystanderMessages.length = 0;
 
   broadcastUserBlocked({ userId: 'user-blocked' });
   broadcastUserUnblocked({ userId: 'user-unblocked' });
 
-  assert.deepEqual(messages.map((message) => JSON.parse(message)), [
+  assert.deepEqual(moderatorMessages.map((message) => JSON.parse(message)), [
     { type: 'user.blocked', payload: { userId: 'user-blocked' } },
     { type: 'user.unblocked', payload: { userId: 'user-unblocked' } }
   ]);
-  remove();
+  assert.deepEqual(targetMessages.map((message) => JSON.parse(message)), [
+    { type: 'user.blocked', payload: { userId: 'user-blocked' } }
+  ]);
+  assert.deepEqual(bystanderMessages, []);
+  removeMod();
+  removeTarget();
+  removeBystander();
 });
 
-test('realtime moderation events contain identifiers and state only', () => {
-  const messages: string[] = [];
-  const remove = addRealtimeClient({ readyState: 1, send: (message) => messages.push(message) });
-  messages.length = 0;
+test('realtime moderation events are restricted to affected user and moderators and never reach unauthenticated or unrelated users', () => {
+  const moderatorMessages: string[] = [];
+  const affectedMessages: string[] = [];
+  const unrelatedMessages: string[] = [];
+  const guestMessages: string[] = [];
+  const removeMod = addRealtimeClient({ readyState: 1, send: (message) => moderatorMessages.push(message) }, 'mod-2', { role: 'superadmin' });
+  const removeAffected = addRealtimeClient({ readyState: 1, send: (message) => affectedMessages.push(message) }, 'user-1', { role: 'user' });
+  const removeUnrelated = addRealtimeClient({ readyState: 1, send: (message) => unrelatedMessages.push(message) }, 'user-2', { role: 'user' });
+  const removeGuest = addRealtimeClient({ readyState: 1, send: (message) => guestMessages.push(message) });
+  moderatorMessages.length = 0;
+  affectedMessages.length = 0;
+  unrelatedMessages.length = 0;
+  guestMessages.length = 0;
+
   broadcastModerationSanctionCreated({ sanctionId: 'sanction-1', userId: 'user-1', sanctionType: 'permanent_ban', status: 'active' });
   broadcastModerationSanctionRevoked({ sanctionId: 'sanction-1', userId: 'user-1', sanctionType: 'permanent_ban' });
   broadcastModerationAppealCreated({ appealId: 'appeal-1', sanctionId: 'sanction-1', userId: 'user-1' });
   broadcastModerationAppealResolved({ appealId: 'appeal-1', sanctionId: 'sanction-1', userId: 'user-1', status: 'revoked' });
-  remove();
-  assert.deepEqual(messages.map((message) => JSON.parse(message)), [
+
+  removeMod();
+  removeAffected();
+  removeUnrelated();
+  removeGuest();
+
+  const expected = [
     { type: 'moderation.sanction_created', payload: { sanctionId: 'sanction-1', userId: 'user-1', sanctionType: 'permanent_ban', status: 'active' } },
     { type: 'moderation.sanction_revoked', payload: { sanctionId: 'sanction-1', userId: 'user-1', sanctionType: 'permanent_ban' } },
     { type: 'moderation.appeal_created', payload: { appealId: 'appeal-1', sanctionId: 'sanction-1', userId: 'user-1' } },
     { type: 'moderation.appeal_resolved', payload: { appealId: 'appeal-1', sanctionId: 'sanction-1', userId: 'user-1', status: 'revoked' } }
-  ]);
+  ];
+  assert.deepEqual(moderatorMessages.map((message) => JSON.parse(message)), expected);
+  assert.deepEqual(affectedMessages.map((message) => JSON.parse(message)), expected);
+  assert.deepEqual(unrelatedMessages, []);
+  assert.deepEqual(guestMessages, []);
+});
+
+test('non-public poll vote events are not broadcast globally', () => {
+  const messages: string[] = [];
+  const remove = addRealtimeClient({ readyState: 1, send: (message) => messages.push(message) }, 'user-bystander');
+  messages.length = 0;
+
+  const privatePoll = {
+    id: 'poll-private',
+    authorId: 'author-1',
+    author: { id: 'author-1', username: 'author', displayName: 'Author', avatarObjectKey: null, avatarUrl: null },
+    question: 'Secret question',
+    description: null,
+    imageUrl: null,
+    visibility: 'private',
+    optionsCount: 2,
+    votesCount: 1,
+    commentsCount: 0,
+    likesCount: 0,
+    allowVoteCancellation: false,
+    viewerHasLiked: false,
+    viewerVoteOptionId: null,
+    stateRevisions: { votes: '1', likes: '0', comments: '0' },
+    options: [],
+    createdAt: '2026-08-23T10:00:00.000Z',
+    updatedAt: '2026-08-23T10:00:00.000Z',
+    endsAt: null
+  } as Poll;
+
+  broadcastPollVoteCreated({ poll: privatePoll, vote: { pollId: 'poll-private', optionId: 'o1', votesCount: 1 } });
+  broadcastPollVoteUpdated({ poll: { ...privatePoll, visibility: 'followers' } });
+
+  assert.deepEqual(messages, []);
+  remove();
+});
+
+test('expired sessions and per-user connection limits are enforced without crashing on send failures', async () => {
+  const hub = new RealtimeHub({
+    maxSocketsPerUser: 2,
+    findActiveUsers: async () => {
+      throw new Error('transient DB outage');
+    }
+  });
+  const closes: string[] = [];
+  const nowSec = Math.floor(Date.now() / 1000);
+  hub.addRealtimeClient(
+    { readyState: 1, send: () => undefined, close: (_code, reason) => closes.push(reason ?? '') },
+    'user-exp',
+    { exp: nowSec - 10 }
+  );
+  hub.addRealtimeClient(
+    { readyState: 1, send: () => undefined, close: (_code, reason) => closes.push(reason ?? '') },
+    'user-exp',
+    { exp: nowSec + 3600 }
+  );
+  // Third socket exceeds maxSocketsPerUser=2
+  hub.addRealtimeClient(
+    { readyState: 1, send: () => undefined, close: (_code, reason) => closes.push(reason ?? '') },
+    'user-exp',
+    { exp: nowSec + 3600 }
+  );
+  assert.deepEqual(closes, ['too_many_connections']);
+
+  // Transient DB failure during sweep must NOT disconnect active sockets
+  await hub.sweepInactiveRealtimeClients();
+  assert.equal(hub.getConnectionMetrics().activeSockets, 2);
+
+  // Idle/expiry sweep disconnects expired socket only
+  hub.sweepIdleRealtimeClients(Date.now());
+  assert.equal(hub.getConnectionMetrics().activeSockets, 1);
+  assert.deepEqual(closes, ['too_many_connections', 'session_expired']);
+  hub.reset();
 });
 
 test('notification events are delivered only to the matching user', () => {

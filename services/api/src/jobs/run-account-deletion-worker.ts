@@ -1,4 +1,7 @@
+import { closeAccountDeletionJournalDatabase } from '../config/account-deletion-journal-database.js';
 import { closeDatabaseConnection } from '../config/database.js';
+import { closeRedisConnection } from '../config/redis.js';
+import { closeStorageConnection } from '../config/storage.js';
 import {
   accountDeletionStepHandlers,
   assertDeletionStepHandlersReady,
@@ -24,7 +27,11 @@ async function run() {
   assertDeletionStepHandlersReady(accountDeletionStepHandlers);
   while (!stopping) {
     try {
-      const result = await processDeletionBatch({ limit: 100, now: new Date() });
+      const result = await processDeletionBatch({
+        limit: 10,
+        now: new Date(),
+        nowProvider: () => new Date()
+      });
       await dispatchPendingRelationshipEvents();
       const now = Date.now();
       if (now - lastMetricsAt >= METRICS_INTERVAL_MS) {
@@ -43,9 +50,15 @@ async function run() {
           }));
         }
       }
-      if (result.processed === 0) await wait(POLL_INTERVAL_MS);
-    } catch {
-      console.error('Account deletion worker batch failed; it will retry.');
+      if (result.processed === 0 || (result.completed === 0 && result.retrying > 0)) {
+        await wait(POLL_INTERVAL_MS);
+      }
+    } catch (error) {
+      console.error(JSON.stringify({
+        event: 'account_deletion.worker_batch_failed',
+        message: error instanceof Error ? error.message : String(error),
+        code: typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : undefined
+      }));
       await wait(POLL_INTERVAL_MS);
     }
   }
@@ -56,4 +69,11 @@ run()
     console.error(error instanceof Error ? error.message : 'Account deletion worker could not start.');
     process.exitCode = 1;
   })
-  .finally(closeDatabaseConnection);
+  .finally(async () => {
+    await Promise.allSettled([
+      closeDatabaseConnection(),
+      closeAccountDeletionJournalDatabase(),
+      closeRedisConnection()
+    ]);
+    closeStorageConnection();
+  });

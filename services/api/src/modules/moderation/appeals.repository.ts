@@ -10,6 +10,7 @@ export type AppealStatus = 'open' | 'upheld' | 'reduced' | 'revoked' | 'request_
 
 export class AppealNotFoundError extends Error {}
 export class AppealConflictError extends Error {}
+export class AppealPermissionError extends Error {}
 
 type AppealRow = {
   id: string;
@@ -40,6 +41,17 @@ function mapAppeal(row: AppealRow) {
 }
 
 async function claimIdempotency(client: PoolClient, actorUserId: string, key: string, fingerprint: string) {
+  await client.query(
+    `DELETE FROM moderation_idempotency_keys
+      WHERE actor_user_id = $1 AND idempotency_key = $2 AND expires_at <= now()`,
+    [actorUserId, key]
+  );
+  await client.query(
+    `INSERT INTO moderation_idempotency_keys (actor_user_id, idempotency_key, request_fingerprint, expires_at)
+     VALUES ($1, $2, $3, now() + interval '24 hours')
+     ON CONFLICT (actor_user_id, idempotency_key) DO NOTHING`,
+    [actorUserId, key, fingerprint]
+  );
   const existing = await client.query<{ request_fingerprint: string; response: unknown }>(
     'SELECT request_fingerprint, response FROM moderation_idempotency_keys WHERE actor_user_id = $1 AND idempotency_key = $2 FOR UPDATE',
     [actorUserId, key]
@@ -47,13 +59,7 @@ async function claimIdempotency(client: PoolClient, actorUserId: string, key: st
   if (existing.rows[0]) {
     if (existing.rows[0].request_fingerprint !== fingerprint) throw new AppealConflictError('Idempotency-Key was already used with a different request.');
     if (existing.rows[0].response) return { replayed: true, response: existing.rows[0].response as { appeal: ReturnType<typeof mapAppeal> } };
-    return { replayed: false };
   }
-  await client.query(
-    `INSERT INTO moderation_idempotency_keys (actor_user_id, idempotency_key, request_fingerprint, expires_at)
-     VALUES ($1, $2, $3, now() + interval '24 hours')`,
-    [actorUserId, key, fingerprint]
-  );
   return { replayed: false };
 }
 
@@ -105,7 +111,16 @@ export async function createAppeal(input: { sanctionId: string; userId: string; 
     return { replayed: false as const, ...response };
   } catch (error) {
     await client.query('ROLLBACK');
-    if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') throw new AppealConflictError('An active appeal already exists for this sanction.');
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === '23505' &&
+      'constraint' in error &&
+      error.constraint === 'appeals_one_open_per_sanction_idx'
+    ) {
+      throw new AppealConflictError('An active appeal already exists for this sanction.');
+    }
     throw error;
   } finally {
     client.release();
@@ -144,7 +159,22 @@ export async function resolveAppeal(input: {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
-    await lockActiveAccount(client, input.actorUserId);
+    const preview = await client.query<{ user_id: string }>(
+      'SELECT user_id FROM appeals WHERE id = $1',
+      [input.appealId]
+    );
+    const appealUserId = preview.rows[0]?.user_id;
+    const orderedUserIds = [...new Set([input.actorUserId, ...(appealUserId ? [appealUserId] : [])])].sort();
+    for (const userId of orderedUserIds) {
+      if (userId === input.actorUserId) {
+        await lockActiveAccount(client, userId);
+      } else {
+        await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
+      }
+    }
+    const actorRow = await client.query<{ role: UserRole }>('SELECT role FROM users WHERE id = $1 AND deleted_at IS NULL', [input.actorUserId]);
+    const actorRole = actorRow.rows[0]?.role;
+    if (!actorRole) throw new AppealPermissionError('You do not have permission to resolve appeals.');
     const idempotency = await claimIdempotency(client, input.actorUserId, input.idempotencyKey, input.fingerprint);
     if (idempotency.replayed) { await client.query('COMMIT'); return { replayed: true as const, ...idempotency.response }; }
     const result = await client.query<AppealRow & { sanction_user_id: string | null; sanction_type: string }>(
@@ -157,6 +187,21 @@ export async function resolveAppeal(input: {
     );
     const appeal = result.rows[0];
     if (!appeal) throw new AppealNotFoundError('Appeal was not found.');
+    if (appeal.user_id === input.actorUserId) {
+      throw new AppealPermissionError('You cannot resolve your own appeal.');
+    }
+    if (input.status === 'reduced' || input.status === 'revoked') {
+      if (appeal.sanction_type === 'permanent_ban' && actorRole !== 'superadmin') {
+        throw new AppealPermissionError('Only a superadmin can revoke or reduce a permanent ban.');
+      }
+      if (appeal.sanction_user_id) {
+        const targetRow = await client.query<{ role: UserRole }>('SELECT role FROM users WHERE id = $1 AND deleted_at IS NULL', [appeal.sanction_user_id]);
+        const targetRole = targetRow.rows[0]?.role;
+        if (targetRole === 'superadmin' || (targetRole && actorRole !== 'superadmin' && targetRole !== 'user')) {
+          throw new AppealPermissionError('You do not have permission to revoke sanctions on this account.');
+        }
+      }
+    }
     if (appeal.status !== 'open') throw new AppealConflictError('Appeal has already been resolved.');
     const resolved = (await client.query<AppealRow>(
       `UPDATE appeals SET status = $1, decision_note = $2, resolved_by_user_id = $3, resolved_at = now()
@@ -173,13 +218,19 @@ export async function resolveAppeal(input: {
           WHERE id = $2 AND status = 'active'`,
         [input.actorUserId, appeal.sanction_id]
       );
+      if (appeal.sanction_type === 'strike') {
+        await client.query(
+          `UPDATE user_strikes SET status = 'revoked' WHERE sanction_id = $1 AND status = 'active'`,
+          [appeal.sanction_id]
+        );
+      }
       if ((appeal.sanction_type === 'temporary_ban' || appeal.sanction_type === 'permanent_ban') && appeal.sanction_user_id) {
         await client.query('UPDATE users SET session_version = session_version + 1 WHERE id = $1', [appeal.sanction_user_id]);
       }
     }
     await recordAdminAudit(client, {
       actorUserId: input.actorUserId,
-      actorRole: input.actorRole,
+      actorRole,
       action: 'moderation.appeal_resolved',
       targetType: 'user',
       targetId: appeal.user_id,

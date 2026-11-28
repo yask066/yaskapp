@@ -10,10 +10,31 @@ test('last_superadmin_mutation_is_serialized_before_user_locks', async (context)
     async query(sql: string, values: unknown[] = []) {
       statements.push(sql);
       if (sql.includes('SELECT id, role, status, deleted_at FROM users')) {
+        return { rows: [{ id: values[0], role: 'superadmin', status: 'active', deleted_at: null }] };
+      }
+      if (sql.includes('count(*)::text AS count FROM users')) return { rows: [{ count: '1' }] };
+      return { rows: [], rowCount: 0 };
+    },
+    release() {}
+  } as never));
+
+  const result = await deleteAdminUser('actor', 'target', {
+    actorUserId: 'actor', actorRole: 'superadmin', reason: 'test'
+  });
+
+  assert.deepEqual(result, { status: 'last_superadmin' });
+  const advisoryLockIndex = statements.findIndex((sql) => sql.includes('pg_advisory_xact_lock'));
+  const firstUserLockIndex = statements.findIndex((sql) => sql.includes('FOR UPDATE'));
+  assert.ok(advisoryLockIndex >= 0 && advisoryLockIndex < firstUserLockIndex);
+});
+
+test('non_superadmin_actor_is_rejected_inside_delete_transaction', async (context) => {
+  context.mock.method(db, 'connect', async () => ({
+    async query(sql: string, values: unknown[] = []) {
+      if (sql.includes('SELECT id, role, status, deleted_at FROM users')) {
         const isActor = values[0] === 'actor';
         return { rows: [{ id: values[0], role: isActor ? 'moderator' : 'superadmin', status: 'active', deleted_at: null }] };
       }
-      if (sql.includes('count(*)::text AS count FROM users')) return { rows: [{ count: '1' }] };
       return { rows: [], rowCount: 0 };
     },
     release() {}
@@ -23,8 +44,5 @@ test('last_superadmin_mutation_is_serialized_before_user_locks', async (context)
     actorUserId: 'actor', actorRole: 'moderator', reason: 'test'
   });
 
-  assert.deepEqual(result, { status: 'last_superadmin' });
-  const advisoryLockIndex = statements.findIndex((sql) => sql.includes('pg_advisory_xact_lock'));
-  const firstUserLockIndex = statements.findIndex((sql) => sql.includes('FOR UPDATE'));
-  assert.ok(advisoryLockIndex >= 0 && advisoryLockIndex < firstUserLockIndex);
+  assert.deepEqual(result, { status: 'protected' });
 });

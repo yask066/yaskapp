@@ -10,6 +10,7 @@ export type SanctionStatus = 'active' | 'expired' | 'revoked';
 
 export class SanctionTargetNotFoundError extends Error {}
 export class SanctionCaseConflictError extends Error {}
+export class SanctionPermissionError extends Error {}
 export class IdempotencyConflictError extends Error {}
 export class UserSanctionedError extends Error {
   constructor(public readonly capability: 'login' | 'poll' | 'comment', message: string) {
@@ -160,12 +161,53 @@ async function insertSanction(client: PoolClient, input: {
   return mapSanction(sanction);
 }
 
+async function loadLockedRole(client: PoolClient, userId: string): Promise<UserRole | null> {
+  const result = await client.query<{ role: UserRole }>(
+    'SELECT role FROM users WHERE id = $1 AND deleted_at IS NULL',
+    [userId]
+  );
+  return result.rows[0]?.role ?? null;
+}
+
+function assertCanSanctionTarget(actorUserId: string, actorRole: UserRole, targetUserId: string, targetRole: UserRole) {
+  if (actorUserId === targetUserId) {
+    throw new SanctionPermissionError('You cannot issue a sanction against your own account.');
+  }
+  if (targetRole === 'superadmin') {
+    throw new SanctionPermissionError('You do not have permission to sanction a superadmin account.');
+  }
+  if (actorRole !== 'superadmin' && targetRole !== 'user') {
+    throw new SanctionPermissionError('Only a superadmin can sanction a moderator account.');
+  }
+}
+
+function assertCanRevokeSanction(
+  actorUserId: string,
+  actorRole: UserRole,
+  sanctionType: SanctionType,
+  targetUserId: string | null,
+  targetRole: UserRole | null
+) {
+  if (targetUserId && actorUserId === targetUserId) {
+    throw new SanctionPermissionError('You cannot revoke a sanction on your own account.');
+  }
+  if (sanctionType === 'permanent_ban' && actorRole !== 'superadmin') {
+    throw new SanctionPermissionError('Only a superadmin can revoke a permanent ban.');
+  }
+  if (targetRole === 'superadmin') {
+    throw new SanctionPermissionError('You do not have permission to modify sanctions on a superadmin account.');
+  }
+  if (targetRole && actorRole !== 'superadmin' && targetRole !== 'user') {
+    throw new SanctionPermissionError('Only a superadmin can revoke sanctions on a moderator account.');
+  }
+}
+
 async function evaluateStrikePolicy(client: PoolClient, input: {
   userId: string;
   caseId: string;
   actorUserId: string;
   actorRole: UserRole;
-}) {
+}): Promise<boolean> {
   const policy = await getPolicy(client);
   const activeStrikes = await client.query<{ count: number }>(
     `SELECT count(*)::int AS count FROM user_strikes
@@ -179,7 +221,7 @@ async function evaluateStrikePolicy(client: PoolClient, input: {
     : strikeCount >= policy.posting_restriction_strikes
       ? 'posting_restriction'
       : null;
-  if (!automaticType) return;
+  if (!automaticType) return false;
   const existing = await client.query<{ id: string }>(
     `SELECT id FROM sanctions
       WHERE user_id = $1 AND type = $2 AND status = 'active'
@@ -187,7 +229,7 @@ async function evaluateStrikePolicy(client: PoolClient, input: {
       LIMIT 1`,
     [input.userId, automaticType]
   );
-  if (existing.rows[0]) return;
+  if (existing.rows[0]) return false;
   const durationHours = automaticType === 'temporary_ban'
     ? policy.default_temporary_ban_hours
     : policy.default_restriction_hours;
@@ -201,7 +243,11 @@ async function evaluateStrikePolicy(client: PoolClient, input: {
   );
   const sanction = result.rows[0];
   if (!sanction) throw new Error('Policy sanction insert did not return a row.');
-  if (automaticType === 'temporary_ban') await client.query('UPDATE users SET session_version = session_version + 1 WHERE id = $1', [input.userId]);
+  let sessionRevoked = false;
+  if (automaticType === 'temporary_ban') {
+    await client.query('UPDATE users SET session_version = session_version + 1 WHERE id = $1', [input.userId]);
+    sessionRevoked = true;
+  }
   await recordAdminAudit(client, {
     actorUserId: input.actorUserId,
     actorRole: input.actorRole,
@@ -211,6 +257,7 @@ async function evaluateStrikePolicy(client: PoolClient, input: {
     reason,
     metadata: { sanctionId: sanction.id, caseId: input.caseId, strikeCount, sanctionType: automaticType }
   });
+  return sessionRevoked;
 }
 
 async function finalizeIdempotency(client: PoolClient, actorUserId: string, key: string, fingerprint: string, response: unknown, statusCode = 201) {
@@ -237,6 +284,26 @@ export async function issueSanction(input: {
   try {
     await client.query('BEGIN');
     await lockActiveAccounts(client, [input.actorUserId, input.userId]);
+    const actorRole = await loadLockedRole(client, input.actorUserId);
+    const targetRole = await loadLockedRole(client, input.userId);
+    if (!actorRole || !targetRole) {
+      throw new SanctionTargetNotFoundError('Sanction target was not found.');
+    }
+    assertCanSanctionTarget(input.actorUserId, actorRole, input.userId, targetRole);
+    if (input.type === 'permanent_ban' && actorRole !== 'superadmin') {
+      throw new SanctionPermissionError('Only a superadmin can issue a permanent ban.');
+    }
+    await client.query(
+      `DELETE FROM moderation_idempotency_keys
+        WHERE actor_user_id = $1 AND idempotency_key = $2 AND expires_at <= now()`,
+      [input.actorUserId, input.idempotencyKey]
+    );
+    await client.query(
+      `INSERT INTO moderation_idempotency_keys (actor_user_id, idempotency_key, request_fingerprint, expires_at)
+       VALUES ($1, $2, $3, now() + interval '24 hours')
+       ON CONFLICT (actor_user_id, idempotency_key) DO NOTHING`,
+      [input.actorUserId, input.idempotencyKey, input.fingerprint]
+    );
     const existing = await client.query<{ request_fingerprint: string; status_code: number | null; response: unknown }>(
       `SELECT request_fingerprint, status_code, response
          FROM moderation_idempotency_keys
@@ -248,35 +315,31 @@ export async function issueSanction(input: {
       if (existing.rows[0].request_fingerprint !== input.fingerprint) throw new IdempotencyConflictError('Idempotency-Key was already used with a different request.');
       if (existing.rows[0].response) {
         await client.query('COMMIT');
-        return { replayed: true as const, sanction: existing.rows[0].response as Sanction };
+        return { replayed: true as const, sessionRevoked: false, ...(existing.rows[0].response as { sanction: Sanction }) };
       }
-    } else {
-      await client.query(
-        `INSERT INTO moderation_idempotency_keys (actor_user_id, idempotency_key, request_fingerprint, expires_at)
-         VALUES ($1, $2, $3, now() + interval '24 hours')`,
-        [input.actorUserId, input.idempotencyKey, input.fingerprint]
-      );
     }
 
     const expiresAt = input.expiresAt;
     if (input.type === 'temporary_ban' && !expiresAt) throw new SanctionCaseConflictError('Temporary ban duration is required.');
     if (input.type === 'permanent_ban' && expiresAt) throw new SanctionCaseConflictError('Permanent ban cannot have an expiry.');
-    const sanction = await insertSanction(client, input);
+    const sanction = await insertSanction(client, { ...input, actorRole });
+    let sessionRevoked = false;
     if (input.type === 'strike') {
       await client.query(
         `INSERT INTO user_strikes (user_id, case_id, sanction_id, expires_at)
          VALUES ($1, $2, $3, now() + ($4::text || ' days')::interval)`,
         [input.userId, input.caseId, sanction.id, (await getPolicy(client)).strike_retention_days]
       );
-      await evaluateStrikePolicy(client, input);
+      sessionRevoked = await evaluateStrikePolicy(client, { ...input, actorRole });
     }
     if (input.type === 'temporary_ban' || input.type === 'permanent_ban') {
       await client.query('UPDATE users SET session_version = session_version + 1 WHERE id = $1', [input.userId]);
+      sessionRevoked = true;
     }
     const response = { sanction };
     await finalizeIdempotency(client, input.actorUserId, input.idempotencyKey, input.fingerprint, response);
     await client.query('COMMIT');
-    return { replayed: false as const, ...response };
+    return { replayed: false as const, sessionRevoked, ...response };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -289,7 +352,37 @@ export async function revokeSanction(input: { sanctionId: string; actorUserId: s
   const client = await db.connect();
   try {
     await client.query('BEGIN');
-    await lockActiveAccount(client, input.actorUserId);
+    const preview = await client.query<{ user_id: string | null }>(
+      'SELECT user_id FROM sanctions WHERE id = $1',
+      [input.sanctionId]
+    );
+    const targetUserId = preview.rows[0]?.user_id ?? null;
+    if (targetUserId) {
+      const orderedIds = [...new Set([input.actorUserId, targetUserId])].sort();
+      for (const userId of orderedIds) {
+        if (userId === input.actorUserId) {
+          await lockActiveAccount(client, userId);
+        } else {
+          await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
+        }
+      }
+    } else {
+      await lockActiveAccount(client, input.actorUserId);
+    }
+    const actorRole = await loadLockedRole(client, input.actorUserId);
+    if (!actorRole) throw new SanctionPermissionError('You do not have permission to revoke sanctions.');
+
+    await client.query(
+      `DELETE FROM moderation_idempotency_keys
+        WHERE actor_user_id = $1 AND idempotency_key = $2 AND expires_at <= now()`,
+      [input.actorUserId, input.idempotencyKey]
+    );
+    await client.query(
+      `INSERT INTO moderation_idempotency_keys (actor_user_id, idempotency_key, request_fingerprint, expires_at)
+       VALUES ($1, $2, $3, now() + interval '24 hours')
+       ON CONFLICT (actor_user_id, idempotency_key) DO NOTHING`,
+      [input.actorUserId, input.idempotencyKey, input.fingerprint]
+    );
     const existing = await client.query<{ request_fingerprint: string; response: unknown }>(
       'SELECT request_fingerprint, response FROM moderation_idempotency_keys WHERE actor_user_id = $1 AND idempotency_key = $2 FOR UPDATE',
       [input.actorUserId, input.idempotencyKey]
@@ -297,13 +390,19 @@ export async function revokeSanction(input: { sanctionId: string; actorUserId: s
     if (existing.rows[0]) {
       if (existing.rows[0].request_fingerprint !== input.fingerprint) throw new IdempotencyConflictError('Idempotency-Key was already used with a different request.');
       if (existing.rows[0].response) { await client.query('COMMIT'); return { replayed: true as const, ...existing.rows[0].response as { sanction: Sanction } }; }
-    } else {
-      await client.query(
-        `INSERT INTO moderation_idempotency_keys (actor_user_id, idempotency_key, request_fingerprint, expires_at)
-         VALUES ($1, $2, $3, now() + interval '24 hours')`,
-        [input.actorUserId, input.idempotencyKey, input.fingerprint]
-      );
     }
+    const activeSanction = await client.query<SanctionRow>(
+      `SELECT id, user_id, case_id, type, status, reason, metadata, starts_at, expires_at, revoked_at, created_at
+         FROM sanctions
+        WHERE id = $1 AND status = 'active'
+        FOR UPDATE`,
+      [input.sanctionId]
+    );
+    const lockedSanction = activeSanction.rows[0];
+    if (!lockedSanction) throw new SanctionTargetNotFoundError('Active sanction was not found.');
+    const targetRole = lockedSanction.user_id ? await loadLockedRole(client, lockedSanction.user_id) : null;
+    assertCanRevokeSanction(input.actorUserId, actorRole, lockedSanction.type, lockedSanction.user_id, targetRole);
+
     const result = await client.query<SanctionRow>(
       `UPDATE sanctions SET status = 'revoked', revoked_at = now(), revoked_by_user_id = $1
         WHERE id = $2 AND status = 'active'
@@ -312,9 +411,15 @@ export async function revokeSanction(input: { sanctionId: string; actorUserId: s
     );
     if (!result.rows[0]) throw new SanctionTargetNotFoundError('Active sanction was not found.');
     const sanction = mapSanction(result.rows[0]);
+    if (sanction.type === 'strike') {
+      await client.query(
+        `UPDATE user_strikes SET status = 'revoked' WHERE sanction_id = $1 AND status = 'active'`,
+        [sanction.id]
+      );
+    }
     await recordAdminAudit(client, {
       actorUserId: input.actorUserId,
-      actorRole: input.actorRole,
+      actorRole,
       action: 'moderation.sanction_revoked',
       targetType: 'user',
       targetId: sanction.userId ?? input.actorUserId,

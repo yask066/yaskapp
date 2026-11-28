@@ -121,7 +121,8 @@ export async function dispatchPendingDeletionEvents(limit = 50) {
         scheduleRetry: async () => {
           await db.query(
             `UPDATE account_deletion_events
-             SET available_at = now() + interval '5 seconds', lease_owner = NULL, lease_until = NULL,
+             SET available_at = now() + (LEAST(300, 5 * POWER(2, GREATEST(attempts - 1, 0)))::text || ' seconds')::interval,
+                 lease_owner = NULL, lease_until = NULL,
                  last_error_code = 'realtime_unavailable'
              WHERE id = $1 AND lease_owner = $2`,
             [row.id, leaseOwner]

@@ -1,9 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 
-import { addRealtimeClient } from './realtime.hub.js';
-import { handleRealtimeMessage } from './realtime.hub.js';
+import { addRealtimeClient, handleRealtimeMessage } from './realtime.hub.js';
 import { authenticate } from '../modules/auth/auth.utils.js';
-import { isTrustedOrigin, sessionCookieName } from '../modules/auth/auth.cookies.js';
+import { isTrustedOrigin, parseCookieHeader, sessionCookieName } from '../modules/auth/auth.cookies.js';
 import { env } from '../config/env.js';
 import { rateLimit, type RateLimitOptions } from '../config/rate-limit.js';
 import { recordRateLimitResponse } from '../modules/notifications/notifications.metrics.js';
@@ -16,9 +15,13 @@ export function isRealtimeTokenInQuery(url: string) {
   return new URL(url, 'http://localhost').searchParams.has('token');
 }
 
-export function getRealtimeAuthMode(request: { headers?: { authorization?: string; cookie?: string } }) {
+export function getRealtimeAuthMode(request: {
+  cookies?: Record<string, string>;
+  headers?: { authorization?: string; cookie?: string };
+}) {
   if (/^Bearer\s/i.test(request.headers?.authorization ?? '')) return 'bearer' as const;
-  if (request.headers?.cookie?.includes(`${sessionCookieName}=`)) return 'cookie' as const;
+  const cookies = request.cookies ?? parseCookieHeader(request.headers?.cookie);
+  if (Boolean(cookies[sessionCookieName])) return 'cookie' as const;
   return 'none' as const;
 }
 
@@ -62,8 +65,15 @@ export function registerRealtimeRoutes(
   app: FastifyInstance,
   preHandlers = createRealtimeHandshakePreHandlers()
 ) {
-  app.get('/realtime', { websocket: true, preHandler: preHandlers }, (socket, request) => {
-    const removeClient = addRealtimeClient(socket, request.user.sub);
+  app.get('/realtime', { websocket: true, preHandler: preHandlers }, async (socket, request) => {
+    const currentUser = typeof request.getCurrentUser === 'function'
+      ? await request.getCurrentUser().catch(() => null)
+      : null;
+    const removeClient = addRealtimeClient(socket, request.user.sub, {
+      role: currentUser?.role,
+      sessionVersion: request.user.sessionVersion,
+      exp: request.user.exp
+    });
 
     socket.on('message', (message: Buffer | ArrayBuffer | Buffer[] | string) => {
       handleRealtimeMessage(socket, Array.isArray(message) ? Buffer.concat(message) : message);

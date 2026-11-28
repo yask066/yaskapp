@@ -971,8 +971,8 @@ test('uses private caching for protected poll images', async () => {
   });
 
   assert.equal(imageResponse.statusCode, 200, imageResponse.body);
-  assert.equal(imageResponse.headers['cache-control'], 'private, max-age=300');
-  assert.equal(imageResponse.headers.vary, 'Authorization');
+  assert.equal(imageResponse.headers['cache-control'], 'private, no-store');
+  assert.equal(imageResponse.headers.vary, 'Authorization, Cookie');
 });
 
 test('poll creation and voting require authentication', async () => {
@@ -3608,6 +3608,7 @@ test('poll comments return not found for missing deleted or non-public polls', a
 
   await db.query('UPDATE polls SET deleted_at = now() WHERE id = $1', [deletedPoll.id]);
 
+  const otherUser = await registerTestUser();
   const pollIds = [
     '00000000-0000-0000-0000-000000000000',
     privatePoll.id,
@@ -3625,7 +3626,7 @@ test('poll comments return not found for missing deleted or non-public polls', a
     const createResponse = await app.inject({
       method: 'POST',
       url: `/polls/${pollId}/comments`,
-      headers: bearer(registered.accessToken),
+      headers: bearer(otherUser.accessToken),
       payload: {
         body: 'This should not be created.'
       }
@@ -4165,7 +4166,11 @@ test('polls can be loaded by id only when the viewer can see them', async () => 
     method: 'GET',
     url: `/polls/${publicPollId}`
   });
-  assert.equal(anonymousPublicResponse.statusCode, 401, anonymousPublicResponse.body);
+  assert.equal(anonymousPublicResponse.statusCode, 200, anonymousPublicResponse.body);
+  assert.equal(
+    anonymousPublicResponse.json<PollResponse>().poll.question,
+    'A public notification target'
+  );
 
   const privatePollResponse = await app.inject({
     method: 'POST',
@@ -4179,6 +4184,12 @@ test('polls can be loaded by id only when the viewer can see them', async () => 
   });
   assert.equal(privatePollResponse.statusCode, 201, privatePollResponse.body);
   const privatePollId = privatePollResponse.json<PollResponse>().poll.id;
+
+  const anonymousPrivateResponse = await app.inject({
+    method: 'GET',
+    url: `/polls/${privatePollId}`
+  });
+  assert.equal(anonymousPrivateResponse.statusCode, 404, anonymousPrivateResponse.body);
 
   const hiddenResponse = await app.inject({
     method: 'GET',

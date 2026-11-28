@@ -11,7 +11,6 @@ import {
   listPollCommentReplyRecords,
   findViewablePollCommentRecordById,
   listNewestPublicPollPageRecords,
-  listPublicPollRecords,
   listVisiblePublicPollRecordsByIds,
   listSubscriptionPollRecords,
   findViewablePollRecordById,
@@ -132,14 +131,6 @@ export async function createPoll(input: CreatePollInput) {
   });
 }
 
-export async function listPublicPolls(
-  limit: number,
-  viewerId?: string,
-  sort: 'newest' | 'popular' = 'newest'
-) {
-  return listPublicPollRecords(limit, viewerId, sort);
-}
-
 export async function listNewestPublicPolls(input: {
   limit: number;
   viewerId?: string;
@@ -209,9 +200,11 @@ export async function deletePoll(input: { pollId: string; authorId: string }) {
     try {
       await deletePollImageObject(result.imageObjectKey);
     } catch (_) {
-      throw new PollImageStorageError('Poll image storage is temporarily unavailable.');
+      // Poll is already deleted in PostgreSQL; cleanup-poll-image-objects reclaims transient S3 failures.
     }
   }
+
+  return { visibility: result.visibility };
 }
 
 export async function listSubscriptionPolls(

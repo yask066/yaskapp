@@ -124,8 +124,10 @@ function isAnimatedAvatar(mimetype: string, body: Buffer) {
   return false;
 }
 
+const maxAvatarInputPixels = 25_000_000;
+
 export async function normalizeAvatar(body: Buffer) {
-  return sharp(body)
+  return sharp(body, { limitInputPixels: maxAvatarInputPixels, failOn: 'error' })
     .rotate()
     .resize({
       width: 512,
@@ -142,16 +144,12 @@ function isInvalidImageError(error: unknown) {
     return false;
   }
 
-  return /corrupt|invalid|unsupported|truncated|end of stream|input buffer/i.test(
+  return /corrupt|invalid|unsupported|truncated|end of stream|input buffer|pixel limit/i.test(
     error.message
   );
 }
 
 export async function uploadAvatar(userId: string, part: MultipartFile) {
-  return withActiveAccountTransaction(userId, async () => uploadAvatarWhileLocked(userId, part));
-}
-
-async function uploadAvatarWhileLocked(userId: string, part: MultipartFile) {
   if (part.fieldname !== 'avatar') {
     throw new AvatarUploadError('The avatar field is required.');
   }
@@ -161,12 +159,6 @@ async function uploadAvatarWhileLocked(userId: string, part: MultipartFile) {
       'Avatar file must be a JPEG, PNG, or WebP image.',
       'avatar_unsupported_type'
     );
-  }
-
-  const previousObjectKey = await findAvatarObjectKey(userId);
-
-  if (previousObjectKey === undefined) {
-    throw new AvatarUploadError('Profile was not found.');
   }
 
   const body = await part.toBuffer();
@@ -198,6 +190,7 @@ async function uploadAvatarWhileLocked(userId: string, part: MultipartFile) {
 
     throw new AvatarProcessingError('Avatar image could not be processed safely.');
   }
+
   const objectKey = createAvatarObjectKey(userId);
 
   try {
@@ -210,63 +203,65 @@ async function uploadAvatarWhileLocked(userId: string, part: MultipartFile) {
     throw new AvatarStorageError('Avatar storage is temporarily unavailable.');
   }
 
-  const updated = await updateAvatarObjectKey(userId, objectKey);
+  let previousObjectKey: string | null = null;
+  let user;
+  try {
+    const committed = await withActiveAccountTransaction(userId, async (client) => {
+      const currentKey = await findAvatarObjectKey(userId, client);
+      if (currentKey === undefined) {
+        throw new AvatarUploadError('Profile was not found.');
+      }
 
-  if (!updated) {
-    await deleteObject(objectKey);
-    throw new AvatarUploadError('Profile was not found.');
+      const updated = await updateAvatarObjectKey(userId, objectKey, client);
+      if (!updated) {
+        throw new AvatarUploadError('Profile was not found.');
+      }
+
+      const updatedUser = await findUserById(userId, client);
+      if (!updatedUser) {
+        throw new AvatarUploadError('Profile was not found.');
+      }
+
+      return { previousObjectKey: currentKey, user: updatedUser };
+    });
+    previousObjectKey = committed.previousObjectKey;
+    user = committed.user;
+  } catch (error) {
+    await deleteObject(objectKey).catch(() => undefined);
+    throw error;
   }
 
-  // Keep the old object until the new key is safely persisted in the profile.
+  // Delete the superseded avatar best-effort after commit; orphan cleanup reclaims transient failures.
   if (previousObjectKey !== null) {
-    try {
-      await deleteObject(previousObjectKey);
-    } catch (_) {
-      throw new AvatarStorageError('Avatar storage is temporarily unavailable.');
-    }
-  }
-
-  const user = await findUserById(userId);
-
-  if (!user) {
-    throw new AvatarUploadError('Profile was not found.');
+    await deleteObject(previousObjectKey).catch(() => undefined);
   }
 
   return user;
 }
 
 export async function deleteAvatar(userId: string) {
-  return withActiveAccountTransaction(userId, async () => deleteAvatarWhileLocked(userId));
-}
-
-async function deleteAvatarWhileLocked(userId: string) {
-  const objectKey = await findAvatarObjectKey(userId);
-
-  if (objectKey === undefined) {
-    throw new AvatarUploadError('Profile was not found.');
-  }
-
-  // A missing avatar is a successful no-op for repeated DELETE requests.
-  // Clear the database pointer only after the storage object is deleted.
-  if (objectKey !== null) {
-    try {
-      await deleteObject(objectKey);
-    } catch (_) {
-      throw new AvatarStorageError('Avatar storage is temporarily unavailable.');
+  const committed = await withActiveAccountTransaction(userId, async (client) => {
+    const objectKey = await findAvatarObjectKey(userId, client);
+    if (objectKey === undefined) {
+      throw new AvatarUploadError('Profile was not found.');
     }
+
+    const cleared = await clearAvatarObjectKey(userId, client);
+    if (!cleared) {
+      throw new AvatarUploadError('Profile was not found.');
+    }
+
+    const user = await findUserById(userId, client);
+    if (!user) {
+      throw new AvatarUploadError('Profile was not found.');
+    }
+
+    return { objectKey, user };
+  });
+
+  if (committed.objectKey !== null) {
+    await deleteObject(committed.objectKey).catch(() => undefined);
   }
 
-  const cleared = await clearAvatarObjectKey(userId);
-
-  if (!cleared) {
-    throw new AvatarUploadError('Profile was not found.');
-  }
-
-  const user = await findUserById(userId);
-
-  if (!user) {
-    throw new AvatarUploadError('Profile was not found.');
-  }
-
-  return user;
+  return committed.user;
 }

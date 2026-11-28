@@ -41,14 +41,15 @@ export function registerPollImageRoutes(app: FastifyInstance) {
         const object = await getObject(poll.image_object_key);
 
         reply.header('content-type', object.ContentType ?? 'image/webp');
+        reply.header('x-content-type-options', 'nosniff');
         const isPublic = poll.visibility === 'public';
         reply.header(
           'cache-control',
-          isPublic ? 'public, max-age=300' : 'private, max-age=300'
+          isPublic ? 'public, max-age=300' : 'private, no-store'
         );
 
         if (!isPublic) {
-          reply.header('vary', 'Authorization');
+          reply.header('vary', 'Authorization, Cookie');
         }
 
         if (object.ContentLength !== undefined) {
@@ -56,10 +57,21 @@ export function registerPollImageRoutes(app: FastifyInstance) {
         }
 
         return reply.send(object.Body);
-      } catch (_) {
-        return reply.status(404).send({
-          error: 'not_found',
-          message: 'Poll image not found.'
+      } catch (error) {
+        const errorName = typeof error === 'object' && error !== null && 'name' in error ? String(error.name) : '';
+        const statusCode = typeof error === 'object' && error !== null && '$metadata' in error
+          ? (error.$metadata as { httpStatusCode?: number } | undefined)?.httpStatusCode
+          : undefined;
+        if (errorName === 'NoSuchKey' || errorName === 'NotFound' || statusCode === 404) {
+          return reply.status(404).send({
+            error: 'not_found',
+            message: 'Poll image not found.'
+          });
+        }
+        request.log.error({ err: error }, 'Failed to fetch poll image from storage');
+        return reply.status(503).send({
+          error: 'storage_unavailable',
+          message: 'Media storage is temporarily unavailable.'
         });
       }
     }

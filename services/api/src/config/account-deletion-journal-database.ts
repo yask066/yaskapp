@@ -11,26 +11,34 @@ function unavailable(): Error & { code: string } {
   });
 }
 
-function createPool(connectionString: string) {
-  return new pg.Pool({
+function createPool(connectionString: string, label: string) {
+  const pool = new pg.Pool({
     connectionString,
     max: 5,
     idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 5_000
+    connectionTimeoutMillis: 5_000,
+    statement_timeout: 5_000,
+    query_timeout: 5_000
   });
+  pool.on('error', (error) => {
+    if (env.NODE_ENV !== 'test') {
+      console.error(`[${label}] Unexpected idle client error:`, error.message);
+    }
+  });
+  return pool;
 }
 
 export function getAccountDeletionJournalDatabase(): pg.Pool {
   const connectionString = env.ACCOUNT_DELETION_JOURNAL_DATABASE_URL;
   if (!connectionString) throw unavailable();
-  journalPool ??= createPool(connectionString);
+  journalPool ??= createPool(connectionString, 'account-deletion-journal-db');
   return journalPool;
 }
 
 export function getAccountDeletionJournalRetentionDatabase(): pg.Pool {
   const connectionString = env.ACCOUNT_DELETION_JOURNAL_RETENTION_DATABASE_URL;
   if (!connectionString) throw unavailable();
-  retentionPool ??= createPool(connectionString);
+  retentionPool ??= createPool(connectionString, 'account-deletion-journal-retention-db');
   return retentionPool;
 }
 

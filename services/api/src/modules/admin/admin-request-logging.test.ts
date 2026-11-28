@@ -8,6 +8,7 @@ import {
 
 test('admin failures produce a structured safe log entry', () => {
   assert.equal(isAdminFailureRequest('/admin/users', 403), true);
+  assert.equal(isAdminFailureRequest('/moderation/cases', 403), true);
   assert.equal(isAdminFailureRequest('/polls', 403), false);
   assert.equal(isAdminFailureRequest('/admin/users', 200), false);
 

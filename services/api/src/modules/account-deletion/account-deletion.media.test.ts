@@ -62,7 +62,7 @@ test('batch_delete_error_keeps_retrying', async () => {
   f.manifest.set('avatars/user-1/a.webp\0v1', { key: 'avatars/user-1/a.webp', versionId: 'v1' });
   f.failDelete(true);
   const result = await f.service.purgeAccountMedia('operation-1');
-  assert.deepEqual(result, { done: false });
+  assert.deepEqual(result, { done: false, retryAfterSeconds: 5, errorCode: 'storage_delete_failed' });
   assert.equal(f.manifest.size, 1);
 });
 

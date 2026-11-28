@@ -206,7 +206,7 @@ export function createAccountDeletionMediaService(dependencies: AccountDeletionM
       }
       return { done: true };
     },
-    async purgeAccountMedia(operationId: string): Promise<{ done: boolean }> {
+    async purgeAccountMedia(operationId: string): Promise<{ done: boolean; retryAfterSeconds?: number; errorCode?: string }> {
       const objects = await dependencies.repository.claimManifest(operationId, MEDIA_BATCH_SIZE);
       if (objects.length) {
         try {
@@ -214,11 +214,14 @@ export function createAccountDeletionMediaService(dependencies: AccountDeletionM
           await dependencies.repository.markManifestCompleted(operationId, objects);
         } catch {
           await dependencies.repository.markManifestRetrying(operationId, objects, 'storage_delete_failed');
-          return { done: false };
+          return { done: false, retryAfterSeconds: 5, errorCode: 'storage_delete_failed' };
         }
         return { done: false };
       }
-      return { done: !(await dependencies.repository.hasUncompletedManifest(operationId)) };
+      if (await dependencies.repository.hasUncompletedManifest(operationId)) {
+        return { done: false, retryAfterSeconds: 5, errorCode: 'media_retry_pending' };
+      }
+      return { done: true };
     },
     async verifyAccountMediaEmpty(operationId: string): Promise<boolean> {
       const userId = await dependencies.repository.getOwner(operationId);

@@ -50,10 +50,10 @@ async function validateUsers(client: PoolClient, blockerId: string, blockedId: s
   const blocker = users.get(blockerId);
   const target = users.get(blockedId);
 
-  if (!blocker || blocker.status === 'deleted' || blocker.deleted_at) {
+  if (!blocker || blocker.status !== 'active' || blocker.deleted_at) {
     throw new UserBlockNotFoundError();
   }
-  if (blocked && (!target || target.status === 'deleted' || target.deleted_at)) {
+  if (blocked && (!target || target.status !== 'active' || target.deleted_at)) {
     throw new UserBlockNotFoundError();
   }
 }
@@ -80,7 +80,7 @@ async function removeFollows(client: PoolClient, firstUserId: string, secondUser
     forUser(follow.follower_id).following += 1;
     forUser(follow.followee_id).followers += 1;
   }
-  for (const [userId, delta] of deltas) {
+  for (const [userId, delta] of [...deltas.entries()].sort(([left], [right]) => left.localeCompare(right))) {
     await client.query(
       `UPDATE profiles
        SET followers_count = GREATEST(followers_count - $2, 0),

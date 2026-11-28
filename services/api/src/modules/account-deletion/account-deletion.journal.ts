@@ -10,7 +10,7 @@ export type AccountDeletionJournalAcceptance = {
 
 export type AccountDeletionJournalEntry = {
   version: 1;
-  state: 'prepared' | 'accepted';
+  state: 'prepared' | 'accepted' | 'aborted';
   operationId: string;
   intentId: string;
   userId: string;
@@ -60,7 +60,7 @@ export function verifyJournalEntry(value: unknown, signingKey: string): value is
   const entry = value as Partial<AccountDeletionJournalEntry>;
   if (
     entry.version !== 1 ||
-    (entry.state !== 'prepared' && entry.state !== 'accepted') ||
+    (entry.state !== 'prepared' && entry.state !== 'accepted' && entry.state !== 'aborted') ||
     typeof entry.operationId !== 'string' ||
     typeof entry.intentId !== 'string' ||
     !/^[a-f0-9]{64}$/.test(entry.intentId) ||
@@ -105,6 +105,7 @@ export type AccountDeletionJournal = {
   assertReady(): Promise<void>;
   writePrepared(acceptance: AccountDeletionJournalAcceptance): Promise<void>;
   writeAccepted(acceptance: AccountDeletionJournalAcceptance): Promise<void>;
+  writeAborted(acceptance: AccountDeletionJournalAcceptance): Promise<void>;
   importEntry(entry: AccountDeletionJournalEntry): Promise<void>;
   cleanupStalePrepared(now: Date): Promise<number>;
   readInventory(): Promise<AccountDeletionJournalEntry[]>;
@@ -149,13 +150,27 @@ export function createAccountDeletionJournal(options: {
 
   async function insert(entry: AccountDeletionJournalEntry) {
     const existing = await rowsForOperation(entry.operationId);
-    if (entry.state === 'prepared' && existing.some((candidate) => !sameAcceptance(candidate, { ...entry, state: candidate.state }))) {
+    const abortedIntents = new Set(
+      existing.filter((candidate) => candidate.state === 'aborted').map((candidate) => candidate.intentId)
+    );
+    const activeExisting = existing.filter(
+      (candidate) => candidate.state !== 'aborted' && !abortedIntents.has(candidate.intentId)
+    );
+
+    if (
+      entry.state === 'prepared' &&
+      activeExisting.some((candidate) => !sameAcceptance(candidate, { ...entry, state: candidate.state }))
+    ) {
       throw new Error('account_deletion_journal_conflict');
+    }
+    if (entry.state === 'aborted') {
+      const hasAccepted = existing.some((candidate) => candidate.state === 'accepted' && candidate.intentId === entry.intentId);
+      if (hasAccepted) throw new Error('account_deletion_journal_conflict');
     }
     if (entry.state === 'accepted') {
       const prepared = existing.filter((candidate) => candidate.state === 'prepared' && candidate.intentId === entry.intentId);
       if (!prepared.some((candidate) => sameAcceptance(candidate, { ...entry, state: 'prepared' }))) {
-        throw new Error(existing.some((candidate) => candidate.state === 'prepared')
+        throw new Error(activeExisting.some((candidate) => candidate.state === 'prepared')
           ? 'account_deletion_journal_conflict'
           : 'account_deletion_journal_incomplete');
       }
@@ -191,9 +206,15 @@ export function createAccountDeletionJournal(options: {
     const result = await options.database.query<JournalRow>(`${JOURNAL_ENTRY_SELECT} ORDER BY operation_id, state, intent_id`);
     const entries = result.rows.map(parseRow);
     const prepared = new Map<string, AccountDeletionJournalEntry>();
+    const aborted = new Set<string>();
     const acceptedByOperation = new Map<string, AccountDeletionJournalEntry>();
     const identityByStateAndOperation = new Map<string, string>();
     for (const entry of entries) {
+      const key = `${entry.operationId}:${entry.intentId}`;
+      if (entry.state === 'aborted') {
+        aborted.add(key);
+        continue;
+      }
       const operationStateKey = `${entry.state}:${entry.operationId}`;
       const knownIntent = identityByStateAndOperation.get(operationStateKey);
       if (entry.state === 'accepted' && knownIntent && knownIntent !== entry.intentId) {
@@ -201,7 +222,6 @@ export function createAccountDeletionJournal(options: {
       }
       identityByStateAndOperation.set(operationStateKey, entry.intentId);
       if (entry.state === 'prepared') {
-        const key = `${entry.operationId}:${entry.intentId}`;
         if (prepared.has(key)) throw new Error('account_deletion_journal_conflict');
         prepared.set(key, entry);
       } else {
@@ -213,7 +233,8 @@ export function createAccountDeletionJournal(options: {
       const intent = prepared.get(`${accepted.operationId}:${accepted.intentId}`);
       if (!intent || !sameAcceptance(intent, accepted)) throw new Error('account_deletion_journal_incomplete');
     }
-    for (const intent of prepared.values()) {
+    for (const [key, intent] of prepared.entries()) {
+      if (aborted.has(key)) continue;
       const accepted = acceptedByOperation.get(intent.operationId);
       if (accepted && !sameAcceptance(intent, { ...accepted, state: 'prepared' })) {
         throw new Error('account_deletion_journal_incomplete');
@@ -224,9 +245,16 @@ export function createAccountDeletionJournal(options: {
 
   async function readAll(): Promise<AccountDeletionJournalEntry[]> {
     const entries = await readInventory();
+    const abortedKeys = new Set(
+      entries.filter((entry) => entry.state === 'aborted').map((entry) => `${entry.operationId}:${entry.intentId}`)
+    );
     const acceptedByOperation = new Map(entries.filter((entry) => entry.state === 'accepted')
       .map((entry) => [entry.operationId, entry]));
-    if (entries.some((entry) => entry.state === 'prepared' && !acceptedByOperation.has(entry.operationId))) {
+    if (entries.some((entry) =>
+      entry.state === 'prepared'
+      && !abortedKeys.has(`${entry.operationId}:${entry.intentId}`)
+      && !acceptedByOperation.has(entry.operationId)
+    )) {
       throw new Error('account_deletion_journal_incomplete');
     }
     return [...acceptedByOperation.values()];
@@ -254,6 +282,10 @@ export function createAccountDeletionJournal(options: {
     async writeAccepted(acceptance) {
       await assertReady();
       await insert(createJournalEntry(acceptance, options.signingKey, 'accepted'));
+    },
+    async writeAborted(acceptance) {
+      await assertReady();
+      await insert(createJournalEntry(acceptance, options.signingKey, 'aborted'));
     },
     async importEntry(entry) {
       await assertReady();
@@ -318,6 +350,13 @@ export async function acceptDeletionInJournal(acceptance: AccountDeletionJournal
     await journal.assertReady();
     await journal.writePrepared(acceptance);
     await journal.writeAccepted(acceptance);
+  });
+}
+
+export async function abortDeletionInJournal(acceptance: AccountDeletionJournalAcceptance) {
+  return withConfiguredJournal(async (journal) => {
+    await journal.assertReady();
+    await journal.writeAborted(acceptance);
   });
 }
 
@@ -393,12 +432,16 @@ export async function reconcileAccountDeletionJournal(
 }
 
 export async function cleanupExpiredCompletedDeletionJournal(operationIds: string[]) {
-  if (process.env.NODE_ENV === 'test' || process.env.NODE_TEST_CONTEXT) return { deleted: 0 };
-  if (operationIds.length === 0) return { deleted: 0 };
+  if (process.env.NODE_ENV === 'test' || process.env.NODE_TEST_CONTEXT) {
+    return { deleted: 0, prunedOperationIds: operationIds };
+  }
+  if (operationIds.length === 0) return { deleted: 0, prunedOperationIds: [] as string[] };
   const databaseConfig = await import('../../config/account-deletion-journal-database.js');
   const database = databaseConfig.getAccountDeletionJournalRetentionDatabase();
-  const result = await database.query<{ deleted: string | number }>(
-    'SELECT prune_completed_account_deletion_journal($1::text[]) AS deleted', [operationIds]
+  const result = await database.query<{ pruned_ids: string[] }>(
+    'SELECT prune_completed_account_deletion_journal_ids($1::text[]) AS pruned_ids',
+    [operationIds]
   );
-  return { deleted: Number(result.rows[0]?.deleted ?? 0) };
+  const prunedOperationIds = result.rows[0]?.pruned_ids ?? [];
+  return { deleted: prunedOperationIds.length, prunedOperationIds };
 }

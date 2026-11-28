@@ -2,6 +2,34 @@ import { isIP } from 'node:net';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Pool, PoolClient } from 'pg';
 import { db } from '../../config/database.js';
+import { lockActiveAccount } from './account-activity.guard.js';
+import { realtimeBus } from '../../realtime/realtime.bus.js';
+
+const ipBanCacheTtlMs = 30_000;
+const ipBanCache = new Map<string, { banned: boolean; expiresAt: number }>();
+
+export function invalidatePlatformIpBanCache() {
+  ipBanCache.clear();
+}
+
+async function isPlatformIpBanned(ip: string): Promise<boolean> {
+  if (!isIP(ip)) return false;
+  const now = Date.now();
+  const cached = ipBanCache.get(ip);
+  if (cached && cached.expiresAt > now) {
+    return cached.banned;
+  }
+  const result = await db.query(
+    'SELECT id FROM platform_ip_bans WHERE ip = normalize_account_ip($1::inet) AND revoked_at IS NULL',
+    [ip]
+  );
+  const banned = Boolean(result.rowCount);
+  if (ipBanCache.size >= 10_000) {
+    ipBanCache.clear();
+  }
+  ipBanCache.set(ip, { banned, expiresAt: now + ipBanCacheTtlMs });
+  return banned;
+}
 
 export async function recordAccountIp(userId: string, ip: string, executor: Pick<Pool | PoolClient, 'query'> = db) {
   if (!isIP(ip)) throw new Error('invalid_account_ip');
@@ -24,9 +52,7 @@ export async function enforcePlatformIpBan(request: FastifyRequest, reply: Fasti
     || (request.method === 'DELETE' && path === '/auth/me')
     || (request.method === 'POST' && path === '/auth/account-deletion/verification')
     || (request.method === 'GET' && path === '/auth/account-deletion/status')) return;
-  const result = await db.query(
-    'SELECT id FROM platform_ip_bans WHERE ip = normalize_account_ip($1::inet) AND revoked_at IS NULL', [request.ip]);
-  if (result.rowCount) {
+  if (await isPlatformIpBanned(request.ip)) {
     return reply.status(403).send({ error: 'ip_blocked', message: 'Access from this network address is blocked.' });
   }
 }
@@ -39,6 +65,7 @@ export async function banArchivedIp(input: { userId: string; ip: string; actorId
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, input.actorId);
     const archive = await client.query<{ ips: Array<{ ip: string }> }>(
       'SELECT ips FROM deleted_account_archives WHERE user_id=$1 AND expires_at > now() FOR SHARE', [input.userId]);
     if (!archive.rows[0]) throw new ArchiveIpBanError('not_found');
@@ -55,6 +82,8 @@ export async function banArchivedIp(input: { userId: string; ip: string; actorId
     await client.query(`INSERT INTO platform_ip_ban_events (ban_id, actor_user_id, action, reason) VALUES ($1, $2, 'created', $3)`, [result.rows[0].id, input.actorId, input.reason]);
     await client.query(`INSERT INTO deleted_account_archive_access (archived_user_id, actor_user_id, action) VALUES ($1, $2, 'ip_ban')`, [input.userId, input.actorId]);
     await client.query('COMMIT');
+    invalidatePlatformIpBanCache();
+    void realtimeBus.publishBroadcast({ type: 'ip_ban.changed', payload: {} }).catch(() => undefined);
     return result.rows[0];
   } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
 }
@@ -71,10 +100,15 @@ export async function revokePlatformIpBan(banId: string, actorId: string, reason
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await lockActiveAccount(client, actorId);
     const result = await client.query('UPDATE platform_ip_bans SET revoked_at=now() WHERE id=$1 AND revoked_at IS NULL RETURNING id', [banId]);
     if (result.rowCount) await client.query(`INSERT INTO platform_ip_ban_events (ban_id, actor_user_id, action, reason) VALUES ($1, $2, 'revoked', $3)`, [banId, actorId, reason]);
     const exists = await client.query('SELECT id FROM platform_ip_bans WHERE id=$1', [banId]);
     await client.query('COMMIT');
+    if (result.rowCount) {
+      invalidatePlatformIpBanCache();
+      void realtimeBus.publishBroadcast({ type: 'ip_ban.changed', payload: {} }).catch(() => undefined);
+    }
     return Boolean(exists.rowCount);
   } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
 }

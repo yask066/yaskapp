@@ -16,7 +16,7 @@ const app = buildApp();
 const createdUserIds = new Set<string>();
 
 type Auth = {
-  user: { id: string; role: 'user' | 'moderator' | 'superadmin' };
+  user: { id: string; username: string; role: 'user' | 'moderator' | 'superadmin' };
   accessToken: string;
 };
 
@@ -293,7 +293,15 @@ test('admin mutation transactions roll back state when audit insertion fails', a
   assert.equal((await db.query('SELECT user_id FROM deleted_account_archives WHERE user_id=$1', [target.user.id])).rowCount, 0,
     'failed admin deletion must roll back its private archive too');
 
-  const poll = await createPoll(target);
+  const relogin = await app.inject({
+    method: 'POST',
+    url: '/auth/login',
+    payload: { login: target.user.username, password: 'password123' }
+  });
+  assert.equal(relogin.statusCode, 200, relogin.body);
+  const refreshedTarget = relogin.json<Auth>();
+
+  const poll = await createPoll(refreshedTarget);
   await assert.rejects(() => adminRepository.deleteAdminPoll(poll.id, {
     actorUserId: actor.user.id, actorRole: 'superadmin', reason: ''
   }), 'poll audit insertion should fail');

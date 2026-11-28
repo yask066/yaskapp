@@ -21,8 +21,9 @@
     "account-deletion:journal-init": "tsx src/jobs/initialize-account-deletion-journal.ts",
     "account-deletion:journal-import-legacy": "tsx src/jobs/run-import-account-deletion-cloud-journal.ts",
     "account-deletion:journal-reapply": "tsx src/jobs/reapply-account-deletions.ts",
-    "test": "npm run db:migrate && node --import tsx --test --test-reporter spec $(find src -name '*.test.ts' | sort)",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "moderation-idempotency:cleanup": "tsx src/jobs/cleanup-moderation-idempotency.ts",
+    "test": "npm run db:migrate && node ../../scripts/run-api-tests.mjs",
+    "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
     "poll-feed-snapshots:cleanup": "tsx src/jobs/cleanup-poll-feed-snapshots.ts"
   },
   "dependencies": {
@@ -32,6 +33,7 @@
     "@fastify/multipart": "^10.1.1",
     "@fastify/websocket": "^11.3.0",
     "@yaskapp/shared": "0.1.0",
+    "bcryptjs": "^3.0.3",
     "dotenv": "^16.4.5",
     "fastify": "^5.10.0",
     "firebase-admin": "^14.3.0",

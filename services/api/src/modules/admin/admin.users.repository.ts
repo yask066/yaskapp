@@ -6,6 +6,11 @@ import { recordAdminAudit } from './audit.repository.js';
 import { decodeAdminCursor, pageWithCursor } from './pagination.js';
 import { lockSuperadminMutation } from '../account-deletion/account-activity.guard.js';
 import { snapshotDeletedAccount } from '../account-deletion/account-deletion.archive.js';
+import { enqueueAdminAccountDeletion } from '../account-deletion/account-deletion.service.js';
+
+function escapeLikePattern(value: string) {
+  return value.replace(/[\\%_]/g, '\\$&');
+}
 
 export type AdminUser = {
   id: string;
@@ -101,8 +106,8 @@ export async function listAdminUsers(input: {
   const conditions = ['TRUE'];
 
   if (input.query) {
-    values.push(`%${input.query}%`);
-    conditions.push(`(u.email::text ILIKE $${values.length} OR u.username::text ILIKE $${values.length} OR p.display_name ILIKE $${values.length})`);
+    values.push(`%${escapeLikePattern(input.query)}%`);
+    conditions.push(`(u.email::text ILIKE $${values.length} ESCAPE '\\' OR u.username::text ILIKE $${values.length} ESCAPE '\\' OR p.display_name ILIKE $${values.length} ESCAPE '\\')`);
   }
   if (input.status && input.status !== 'all') {
     values.push(input.status);
@@ -156,7 +161,7 @@ type AuditInput = {
 };
 
 type UserMutationResult =
-  | { status: 'updated' }
+  | { status: 'updated'; operationId?: string }
   | { status: 'already_active' | 'already_deleted' | 'unchanged' }
   | { status: 'not_found' | 'self' | 'protected' | 'last_superadmin' };
 
@@ -184,6 +189,9 @@ export async function unblockUser(actorId: string, targetId: string, audit: Audi
     await client.query('BEGIN');
     const { actor, target } = await lockedUsers(client, actorId, targetId);
     if (!actor || !target) return await rollback(client, 'not_found');
+    if (actor.status !== 'active' || actor.deleted_at || (actor.role !== 'moderator' && actor.role !== 'superadmin')) {
+      return await rollback(client, 'protected');
+    }
     if (actorId === targetId) return await rollback(client, 'self');
     if (target.deleted_at || target.status === 'deleted' || target.role === 'superadmin' || (actor.role === 'moderator' && target.role !== 'user')) {
       return await rollback(client, 'protected');
@@ -191,7 +199,7 @@ export async function unblockUser(actorId: string, targetId: string, audit: Audi
     if (target.status === 'active') return await commit(client, 'already_active');
 
     await client.query("UPDATE users SET status = 'active', updated_at = now() WHERE id = $1", [targetId]);
-    await recordAdminAudit(client, { ...audit, action: 'user.unblocked', targetType: 'user', targetId });
+    await recordAdminAudit(client, { ...audit, actorRole: actor.role, action: 'user.unblocked', targetType: 'user', targetId });
     await client.query('COMMIT');
     return { status: 'updated' };
   } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
@@ -204,15 +212,30 @@ export async function deleteAdminUser(actorId: string, targetId: string, audit: 
     await lockSuperadminMutation(client);
     const { actor, target } = await lockedUsers(client, actorId, targetId);
     if (!actor || !target) return await rollback(client, 'not_found');
+    if (actor.status !== 'active' || actor.deleted_at || actor.role !== 'superadmin') {
+      return await rollback(client, 'protected');
+    }
     if (actorId === targetId) return await rollback(client, 'self');
     if (target.role === 'superadmin' && await activeSuperadminCount(client) <= 1) return await rollback(client, 'last_superadmin');
     if (target.status === 'deleted' || target.deleted_at) return await commit(client, 'already_deleted');
 
-    await snapshotDeletedAccount(client, targetId, new Date(), 'admin');
-    await client.query("UPDATE users SET status = 'deleted', deleted_at = now(), updated_at = now() WHERE id = $1", [targetId]);
-    await recordAdminAudit(client, { ...audit, action: 'user.deleted', targetType: 'user', targetId });
+    const deletedAt = new Date();
+    await snapshotDeletedAccount(client, targetId, deletedAt, 'admin');
+    await client.query(
+      "UPDATE users SET status = 'deleted', deleted_at = $2, session_version = session_version + 1, updated_at = $2 WHERE id = $1",
+      [targetId, deletedAt]
+    );
+    const operationId = await enqueueAdminAccountDeletion(client, targetId, deletedAt);
+    await recordAdminAudit(client, {
+      ...audit,
+      actorRole: actor.role,
+      action: 'user.deleted',
+      targetType: 'user',
+      targetId,
+      metadata: { operationId }
+    });
     await client.query('COMMIT');
-    return { status: 'updated' };
+    return { status: 'updated', operationId };
   } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
 }
 
@@ -223,13 +246,16 @@ export async function changeUserRole(actorId: string, targetId: string, role: Us
     await lockSuperadminMutation(client);
     const { actor, target } = await lockedUsers(client, actorId, targetId);
     if (!actor || !target) return await rollback(client, 'not_found');
+    if (actor.status !== 'active' || actor.deleted_at || actor.role !== 'superadmin') {
+      return await rollback(client, 'protected');
+    }
     if (actorId === targetId) return await rollback(client, 'self');
     if (target.status === 'deleted' || target.deleted_at) return await rollback(client, 'protected');
     if (target.role === role) return await commit(client, 'unchanged');
     if (target.role === 'superadmin' && role !== 'superadmin' && await activeSuperadminCount(client) <= 1) return await rollback(client, 'last_superadmin');
 
     await client.query('UPDATE users SET role = $1, updated_at = now() WHERE id = $2', [role, targetId]);
-    await recordAdminAudit(client, { ...audit, action: 'user.role_changed', targetType: 'user', targetId, metadata: { fromRole: target.role, toRole: role } });
+    await recordAdminAudit(client, { ...audit, actorRole: actor.role, action: 'user.role_changed', targetType: 'user', targetId, metadata: { fromRole: target.role, toRole: role } });
     await client.query('COMMIT');
     return { status: 'updated' };
   } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }

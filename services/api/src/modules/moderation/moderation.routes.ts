@@ -6,11 +6,10 @@ import { authenticate, authenticateForAppeal } from '../auth/auth.utils.js';
 import { moderationPermissionsForRole, requirePermission } from '../auth/permissions.js';
 import { AdminCursorError } from '../admin/pagination.js';
 import { adminMutationRateLimit } from '../admin/admin.rate-limit.js';
+import { rateLimit } from '../../config/rate-limit.js';
 import {
   AdminCommentNotFoundError,
-  AdminPollNotFoundError,
-  deleteAdminComment,
-  deleteAdminPoll
+  AdminPollNotFoundError
 } from '../admin/admin.service.js';
 import {
   broadcastCommentDeleted,
@@ -18,11 +17,14 @@ import {
   broadcastModerationAppealCreated,
   broadcastModerationAppealResolved,
   broadcastModerationSanctionCreated,
-  broadcastModerationSanctionRevoked
+  broadcastModerationSanctionRevoked,
+  disconnectUser
 } from '../../realtime/realtime.hub.js';
+import { realtimeBus } from '../../realtime/realtime.bus.js';
 import {
   ModerationCaseConflictError,
   ModerationCaseNotFoundError,
+  removeModeratedContentAtomically,
   reportCategories,
   reportTargetTypes,
   ModerationTargetNotFoundError
@@ -30,9 +32,10 @@ import {
 import {
   IdempotencyConflictError,
   SanctionCaseConflictError,
+  SanctionPermissionError,
   SanctionTargetNotFoundError
 } from './sanctions.repository.js';
-import { AppealConflictError, AppealNotFoundError } from './appeals.repository.js';
+import { AppealConflictError, AppealNotFoundError, AppealPermissionError } from './appeals.repository.js';
 import {
   addModerationNote,
   assignModerationCase,
@@ -108,6 +111,25 @@ const policyBodySchema = z.object({
   }
 });
 
+const idempotencyKeySchema = z.string().trim().min(8).max(200);
+const reportRateLimit = rateLimit({
+  keyPrefix: 'reports-create',
+  limit: 20,
+  windowMs: 15 * 60_000,
+  keyBy: 'user'
+});
+const appealRateLimit = rateLimit({
+  keyPrefix: 'appeals-create',
+  limit: 10,
+  windowMs: 15 * 60_000,
+  keyBy: 'user'
+});
+
+function parseIdempotencyKey(header: unknown): string | null {
+  const parsed = idempotencyKeySchema.safeParse(header);
+  return parsed.success ? parsed.data : null;
+}
+
 function validationError(reply: FastifyReply) {
   return reply.status(400).send({
     error: 'validation_error',
@@ -120,6 +142,9 @@ function requestFingerprint(value: unknown) {
 }
 
 function moderationError(reply: FastifyReply, error: unknown) {
+  if (error instanceof SanctionPermissionError || error instanceof AppealPermissionError) {
+    return reply.status(403).send({ error: 'forbidden', message: error.message });
+  }
   if (error instanceof ModerationCaseNotFoundError || error instanceof ModerationTargetNotFoundError || error instanceof AdminPollNotFoundError || error instanceof AdminCommentNotFoundError) {
     return reply.status(404).send({ error: 'not_found', message: error.message });
   }
@@ -143,8 +168,8 @@ export function registerModerationRoutes(app: FastifyInstance) {
 
   app.patch('/moderation/policy', { preHandler: [authenticate, adminMutationRateLimit, requirePermission('moderation.policy.update')] }, async (request, reply) => {
     const parsedBody = policyBodySchema.safeParse(request.body);
-    const idempotencyKey = request.headers['idempotency-key'];
-    if (!parsedBody.success || typeof idempotencyKey !== 'string') return validationError(reply);
+    const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+    if (!parsedBody.success || !idempotencyKey) return validationError(reply);
     try {
       const actor = await actorContext(request);
       const result = await updateModerationPolicy({
@@ -152,9 +177,9 @@ export function registerModerationRoutes(app: FastifyInstance) {
         actorUserId: actor.actorId,
         actorRole: actor.actorRole,
         idempotencyKey,
-        fingerprint: requestFingerprint(parsedBody.data)
+        fingerprint: requestFingerprint({ route: 'PATCH /moderation/policy', body: parsedBody.data })
       });
-      return reply.status(result.replayed ? 200 : 200).send(result);
+      return reply.status(200).send(result);
     } catch (error) {
       return moderationError(reply, error);
     }
@@ -190,10 +215,10 @@ export function registerModerationRoutes(app: FastifyInstance) {
       async (request, reply) => {
         const parsedParams = userParamsSchema.safeParse(request.params);
         const parsedBody = sanctionBodySchema.safeParse(request.body);
-        const idempotencyKey = request.headers['idempotency-key'];
-        if (!parsedParams.success || !parsedBody.success || typeof idempotencyKey !== 'string') return validationError(reply);
+        const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+        if (!parsedParams.success || !parsedBody.success || !idempotencyKey) return validationError(reply);
         const type = action === 'temporary-ban' ? 'temporary_ban' : action === 'permanent-ban' ? 'permanent_ban' : action === 'restriction' ? parsedBody.data.restrictionType ?? 'posting_restriction' : action as 'warning' | 'strike';
-        if ((type === 'posting_restriction' || type === 'temporary_ban') && !parsedBody.data.durationHours) return validationError(reply);
+        if ((type === 'posting_restriction' || type === 'comment_restriction' || type === 'temporary_ban') && !parsedBody.data.durationHours) return validationError(reply);
         try {
           const actor = await actorContext(request);
           const result = await issueSanction({
@@ -205,15 +230,27 @@ export function registerModerationRoutes(app: FastifyInstance) {
             reason: parsedBody.data.reason,
             expiresAt: parsedBody.data.durationHours ? new Date(Date.now() + parsedBody.data.durationHours * 60 * 60 * 1000) : undefined,
             idempotencyKey,
-            fingerprint: requestFingerprint({ action, params: parsedParams.data, body: parsedBody.data })
+            fingerprint: requestFingerprint({ route: `POST /moderation/users/:userId/${action}`, params: parsedParams.data, body: parsedBody.data })
           });
-          if (!result.replayed) broadcastModerationSanctionCreated({
-            sanctionId: result.sanction.id,
-            userId: result.sanction.userId ?? parsedParams.data.userId,
-            sanctionType: result.sanction.type,
-            status: result.sanction.status
+          if (!result.replayed) {
+            const targetUserId = result.sanction.userId ?? parsedParams.data.userId;
+            broadcastModerationSanctionCreated({
+              sanctionId: result.sanction.id,
+              userId: targetUserId,
+              sanctionType: result.sanction.type,
+              status: result.sanction.status
+            });
+            if (result.sessionRevoked) {
+              disconnectUser(targetUserId, 'session_revoked');
+              void realtimeBus
+                .publish(targetUserId, { type: 'session.revoked', payload: { userId: targetUserId, reason: 'sanctioned' } })
+                .catch(() => undefined);
+            }
+          }
+          return reply.status(result.replayed ? 200 : 201).send({
+            replayed: result.replayed,
+            sanction: result.sanction
           });
-          return reply.status(result.replayed ? 200 : 201).send(result);
         } catch (error) {
           return moderationError(reply, error);
         }
@@ -227,8 +264,8 @@ export function registerModerationRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const parsedParams = revokeParamsSchema.safeParse(request.params);
       const parsedBody = z.object({ reason: z.string().trim().min(1).max(500) }).strict().safeParse(request.body);
-      const idempotencyKey = request.headers['idempotency-key'];
-      if (!parsedParams.success || !parsedBody.success || typeof idempotencyKey !== 'string') return validationError(reply);
+      const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+      if (!parsedParams.success || !parsedBody.success || !idempotencyKey) return validationError(reply);
       try {
         const actor = await actorContext(request);
         const result = await revokeSanction({
@@ -237,14 +274,14 @@ export function registerModerationRoutes(app: FastifyInstance) {
           actorRole: actor.actorRole,
           reason: parsedBody.data.reason,
           idempotencyKey,
-          fingerprint: requestFingerprint({ params: parsedParams.data, body: parsedBody.data })
+          fingerprint: requestFingerprint({ route: 'POST /moderation/sanctions/:sanctionId/revoke', params: parsedParams.data, body: parsedBody.data })
         });
         if (!result.replayed) broadcastModerationSanctionRevoked({
           sanctionId: result.sanction.id,
           userId: result.sanction.userId ?? actor.actorId,
           sanctionType: result.sanction.type
         });
-        return reply.status(result.replayed ? 200 : 200).send(result);
+        return reply.status(200).send(result);
       } catch (error) {
         return moderationError(reply, error);
       }
@@ -253,18 +290,18 @@ export function registerModerationRoutes(app: FastifyInstance) {
 
   app.post(
     '/appeals',
-    { preHandler: [authenticateForAppeal] },
+    { preHandler: [authenticateForAppeal, appealRateLimit] },
     async (request, reply) => {
       const parsedBody = appealBodySchema.safeParse(request.body);
-      const idempotencyKey = request.headers['idempotency-key'];
-      if (!parsedBody.success || typeof idempotencyKey !== 'string') return validationError(reply);
+      const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+      if (!parsedBody.success || !idempotencyKey) return validationError(reply);
       try {
         const result = await createAppeal({
           sanctionId: parsedBody.data.sanctionId,
           userId: request.user.sub,
           reason: parsedBody.data.reason,
           idempotencyKey,
-          fingerprint: requestFingerprint(parsedBody.data)
+          fingerprint: requestFingerprint({ route: 'POST /appeals', body: parsedBody.data })
         });
         if (!result.replayed) broadcastModerationAppealCreated({
           appealId: result.appeal.id,
@@ -299,8 +336,8 @@ export function registerModerationRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const parsedParams = appealParamsSchema.safeParse(request.params);
       const parsedBody = appealDecisionSchema.safeParse(request.body);
-      const idempotencyKey = request.headers['idempotency-key'];
-      if (!parsedParams.success || !parsedBody.success || typeof idempotencyKey !== 'string') return validationError(reply);
+      const idempotencyKey = parseIdempotencyKey(request.headers['idempotency-key']);
+      if (!parsedParams.success || !parsedBody.success || !idempotencyKey) return validationError(reply);
       try {
         const actor = await actorContext(request);
         const result = await resolveAppeal({
@@ -310,7 +347,7 @@ export function registerModerationRoutes(app: FastifyInstance) {
           status: parsedBody.data.status,
           decisionNote: parsedBody.data.decisionNote,
           idempotencyKey,
-          fingerprint: requestFingerprint({ params: parsedParams.data, body: parsedBody.data })
+          fingerprint: requestFingerprint({ route: 'POST /moderation/appeals/:appealId/resolve', params: parsedParams.data, body: parsedBody.data })
         });
         if (!result.replayed) broadcastModerationAppealResolved({
           appealId: result.appeal.id,
@@ -327,41 +364,29 @@ export function registerModerationRoutes(app: FastifyInstance) {
 
   app.post(
     '/moderation/content/:type/:id/remove',
-    { preHandler: [authenticate, requirePermission('moderation.content.delete')] },
+    { preHandler: [authenticate, adminMutationRateLimit, requirePermission('moderation.content.delete')] },
     async (request, reply) => {
       const parsedParams = contentParamsSchema.safeParse(request.params);
       const parsedBody = removeContentBodySchema.safeParse(request.body);
       if (!parsedParams.success || !parsedBody.success) return validationError(reply);
 
       try {
-        const moderationCase = await getModerationCase(parsedBody.data.caseId);
-        if (moderationCase.case.targetType !== parsedParams.data.type || moderationCase.case.targetId !== parsedParams.data.id) {
-          return reply.status(409).send({ error: 'moderation_conflict', message: 'Case target does not match content target.' });
-        }
         const actor = await actorContext(request);
-        if (parsedParams.data.type === 'poll') {
-          const status = await deleteAdminPoll({
-            pollId: parsedParams.data.id,
-            actorUserId: actor.actorId,
-            actorRole: actor.actorRole,
-            reason: parsedBody.data.reason,
-            requestId: request.id
-          });
-          if (status === 'deleted') broadcastPollDeleted({ pollId: parsedParams.data.id });
-          if (status === 'deleted') await transitionModerationCase(parsedBody.data.caseId, actor.actorId, actor.actorRole, 'resolve', { resolutionCode: 'content_removed', note: parsedBody.data.reason });
-          return reply.status(204).send();
-        }
-
-        const result = await deleteAdminComment({
-          commentId: parsedParams.data.id,
+        const removed = await removeModeratedContentAtomically({
+          caseId: parsedBody.data.caseId,
+          targetType: parsedParams.data.type,
+          targetId: parsedParams.data.id,
           actorUserId: actor.actorId,
           actorRole: actor.actorRole,
           reason: parsedBody.data.reason,
           requestId: request.id
         });
-        if (result.status === 'deleted') {
-          broadcastCommentDeleted({ commentId: parsedParams.data.id, pollId: result.pollId });
-          await transitionModerationCase(parsedBody.data.caseId, actor.actorId, actor.actorRole, 'resolve', { resolutionCode: 'content_removed', note: parsedBody.data.reason });
+        if (removed.status === 'deleted') {
+          if (removed.targetType === 'poll' && removed.visibility === 'public') {
+            broadcastPollDeleted({ pollId: parsedParams.data.id });
+          } else if (removed.targetType === 'comment') {
+            broadcastCommentDeleted({ commentId: parsedParams.data.id, pollId: removed.pollId });
+          }
         }
         return reply.status(204).send();
       } catch (error) {
@@ -386,7 +411,7 @@ export function registerModerationRoutes(app: FastifyInstance) {
 
   app.post(
     '/moderation/cases/:caseId/assign',
-    { preHandler: [authenticate, requirePermission('moderation.case.assign')] },
+    { preHandler: [authenticate, adminMutationRateLimit, requirePermission('moderation.case.assign')] },
     async (request, reply) => {
       const parsedParams = caseParamsSchema.safeParse(request.params);
       if (!parsedParams.success) return validationError(reply);
@@ -401,7 +426,7 @@ export function registerModerationRoutes(app: FastifyInstance) {
 
   app.post(
     '/moderation/cases/:caseId/takeover',
-    { preHandler: [authenticate, requirePermission('moderation.case.assign')] },
+    { preHandler: [authenticate, adminMutationRateLimit, requirePermission('moderation.case.assign')] },
     async (request, reply) => {
       const parsedParams = caseParamsSchema.safeParse(request.params);
       if (!parsedParams.success) return validationError(reply);
@@ -416,7 +441,7 @@ export function registerModerationRoutes(app: FastifyInstance) {
 
   app.post(
     '/moderation/cases/:caseId/notes',
-    { preHandler: [authenticate, requirePermission('moderation.case.resolve')] },
+    { preHandler: [authenticate, adminMutationRateLimit, requirePermission('moderation.case.resolve')] },
     async (request, reply) => {
       const parsedParams = caseParamsSchema.safeParse(request.params);
       const parsedBody = noteBodySchema.safeParse(request.body);
@@ -433,7 +458,7 @@ export function registerModerationRoutes(app: FastifyInstance) {
   for (const transition of ['resolve', 'dismiss', 'escalate'] as const) {
     app.post(
       `/moderation/cases/:caseId/${transition}`,
-      { preHandler: [authenticate, requirePermission('moderation.case.resolve')] },
+      { preHandler: [authenticate, adminMutationRateLimit, requirePermission('moderation.case.resolve')] },
       async (request, reply) => {
         const parsedParams = caseParamsSchema.safeParse(request.params);
         const parsedBody = transitionBodySchema.safeParse(request.body);
@@ -450,7 +475,7 @@ export function registerModerationRoutes(app: FastifyInstance) {
 
   app.post(
     '/reports',
-    { preHandler: [authenticate] },
+    { preHandler: [authenticate, reportRateLimit] },
     async (request, reply) => {
       const parsedBody = reportBodySchema.safeParse(request.body);
       if (!parsedBody.success) return validationError(reply);

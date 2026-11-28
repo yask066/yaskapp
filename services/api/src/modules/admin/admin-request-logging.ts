@@ -8,7 +8,12 @@ export type AdminFailureLogInput = {
 
 export function isAdminFailureRequest(url: string, statusCode: number) {
   const path = url.split('?', 1)[0];
-  return (path === '/admin' || path.startsWith('/admin/')) && statusCode >= 400;
+  return (
+    path === '/admin' ||
+    path.startsWith('/admin/') ||
+    path === '/moderation' ||
+    path.startsWith('/moderation/')
+  ) && statusCode >= 400;
 }
 
 export function buildAdminFailureLog(input: AdminFailureLogInput) {

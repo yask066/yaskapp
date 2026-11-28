@@ -1,9 +1,9 @@
 import {
-  findProfileCountryCode,
   findPublicProfileRecord,
   listFollowerRecords,
   listFollowingRecords,
   listPopularProfileRecords,
+  ProfileCountryClearNotAllowedError,
   updateProfileRecord
 } from './profiles.repository.js';
 import {
@@ -13,7 +13,7 @@ import {
 } from './follows.repository.js';
 import {
   listPollRecordsByAuthor,
-  listPublicPollRecordsByAuthor
+  listViewablePollRecordsByAuthor
 } from '../polls/polls.repository.js';
 
 export class ProfileNotFoundError extends Error {}
@@ -51,28 +51,22 @@ function normalizeCountryCode(value: string | null | undefined) {
 }
 
 export async function updateProfile(input: UpdateProfileInput) {
-  if ('countryCode' in input && input.countryCode === null) {
-    const currentCountryCode = await findProfileCountryCode(input.userId);
-
-    if (currentCountryCode === undefined) {
-      throw new ProfileNotFoundError('Profile was not found.');
+  let user;
+  try {
+    user = await updateProfileRecord({
+      userId: input.userId,
+      displayName: normalizeOptionalText(input.displayName),
+      ...('bio' in input ? { bio: normalizeNullableText(input.bio) ?? null } : {}),
+      ...('countryCode' in input
+        ? { countryCode: normalizeCountryCode(input.countryCode) ?? null }
+        : {})
+    });
+  } catch (error) {
+    if (error instanceof ProfileCountryClearNotAllowedError) {
+      throw new CountryClearNotAllowedError(error.message);
     }
-
-    if (currentCountryCode !== null) {
-      throw new CountryClearNotAllowedError(
-        'Country cannot be cleared after it has been selected.'
-      );
-    }
+    throw error;
   }
-
-  const user = await updateProfileRecord({
-    userId: input.userId,
-    displayName: normalizeOptionalText(input.displayName),
-    ...('bio' in input ? { bio: normalizeNullableText(input.bio) ?? null } : {}),
-    ...('countryCode' in input
-      ? { countryCode: normalizeCountryCode(input.countryCode) ?? null }
-      : {})
-  });
 
   if (!user) {
     throw new ProfileNotFoundError('Profile was not found.');
@@ -128,7 +122,7 @@ export async function listUserPolls(
     throw new ProfileNotFoundError('Profile was not found.');
   }
 
-  return listPublicPollRecordsByAuthor(userId, limit, viewerId);
+  return listViewablePollRecordsByAuthor(userId, limit, viewerId);
 }
 
 export async function followUser(followerId: string, followeeId: string) {

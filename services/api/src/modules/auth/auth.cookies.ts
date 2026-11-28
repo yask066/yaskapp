@@ -52,3 +52,28 @@ export function isTrustedOrigin(origin: string | undefined, configuredOrigins: s
 
   return false;
 }
+
+export function isTrustedCookieMutationRequest(
+  headers: { origin?: string; referer?: string; 'sec-fetch-site'?: string | string[] },
+  configuredOrigins: string,
+  stagingPublicIp?: string
+): boolean {
+  if (headers.origin) {
+    return isTrustedOrigin(headers.origin, configuredOrigins, stagingPublicIp);
+  }
+  if (headers.referer) {
+    try {
+      const refererOrigin = new URL(headers.referer).origin;
+      return isTrustedOrigin(refererOrigin, configuredOrigins, stagingPublicIp);
+    } catch {
+      return false;
+    }
+  }
+  const fetchSite = Array.isArray(headers['sec-fetch-site'])
+    ? headers['sec-fetch-site'][0]
+    : headers['sec-fetch-site'];
+  if (fetchSite === 'same-origin') {
+    return true;
+  }
+  return false;
+}

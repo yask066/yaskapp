@@ -1,7 +1,7 @@
 import { db } from '../config/database.js';
+import { lockSuperadminMutation } from '../modules/account-deletion/account-activity.guard.js';
 
 const usage = 'Usage: npm run db:bootstrap-superadmin -- --login <email-or-username>';
-const bootstrapLockId = 7_455_292;
 
 export function parseBootstrapArgs(args: string[]) {
   let login: string | undefined;
@@ -40,7 +40,7 @@ export async function bootstrapSuperadmin(login: string) {
 
   try {
     await client.query('BEGIN');
-    await client.query('SELECT pg_advisory_xact_lock($1::bigint)', [bootstrapLockId]);
+    await lockSuperadminMutation(client);
 
     const targetResult = await client.query<{
       id: string;

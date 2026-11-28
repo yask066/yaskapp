@@ -6,12 +6,18 @@ import { env } from '../../config/env.js';
 import { db } from '../../config/database.js';
 import { rateLimit } from '../../config/rate-limit.js';
 import { findUserByEmailOrUsername, findUserByIdWithPassword } from '../auth/auth.repository.js';
-import { isTrustedOrigin, serializeSessionCookie, sessionCookieName } from '../auth/auth.cookies.js';
+import {
+  isTrustedCookieMutationRequest,
+  serializeSessionCookie,
+  sessionCookieName
+} from '../auth/auth.cookies.js';
 import { authenticate } from '../auth/auth.utils.js';
 import { verifyPassword } from '../auth/password.js';
 import {
   getDeletionOperation,
   getDeletionPermission,
+  isOperationJournalConfirmed,
+  markOperationJournalConfirmed,
   prepareDeletionOperation
 } from './account-deletion.repository.js';
 import {
@@ -24,10 +30,15 @@ import { AccountDeletionAcceptanceError, acceptAccountDeletion } from './account
 import { acceptDeletionInJournal, prepareDeletionInJournal } from './account-deletion.journal.js';
 import { recordAccountIp } from './account-deletion.ip.js';
 
-const verificationSchema = z.object({ password: z.string().min(1).max(128) }).strict();
+const maxBcryptBytes = 72;
+const verificationPasswordSchema = z.string().min(1).max(128).refine(
+  (value) => Buffer.byteLength(value, 'utf8') <= maxBcryptBytes,
+  'Password must be 72 UTF-8 bytes or fewer.'
+);
+const verificationSchema = z.object({ password: verificationPasswordSchema }).strict();
 const loginVerificationSchema = z.object({
   login: z.string().trim().min(3).max(320),
-  password: z.string().min(1).max(128)
+  password: verificationPasswordSchema
 }).strict();
 const acceptanceSchema = z.object({ confirm: z.literal(true) }).strict();
 const bearerTokenPattern = /^Bearer\s+(\S+)$/i;
@@ -48,14 +59,14 @@ function hasLoginCredentials(body: unknown) {
 
 async function authenticateIfPresent(request: FastifyRequest, reply: FastifyReply) {
   const hasCookie = Boolean(request.cookies?.[sessionCookieName]);
-  if (hasCookie && !isTrustedOrigin(request.headers.origin, env.CORS_ORIGINS, env.STAGING_PUBLIC_IP)) {
+  const hasBearer = /^Bearer\s/i.test(request.headers.authorization ?? '');
+  if (hasCookie && !hasBearer && !isTrustedCookieMutationRequest(request.headers, env.CORS_ORIGINS, env.STAGING_PUBLIC_IP)) {
     return reply.status(403).send({
       error: 'csrf_origin_rejected',
       message: 'The request origin is not trusted.'
     });
   }
 
-  const hasBearer = /^Bearer\s/i.test(request.headers.authorization ?? '');
   // Login/password is the deletion-only path and is needed for blocked users
   // whose old cookie no longer represents an active session.
   if (hasLoginCredentials(request.body) && !hasBearer) return;
@@ -169,10 +180,16 @@ export function registerAccountDeletionRoutes(app: FastifyInstance, journal?: Ac
       deletionTokenExpiresAt: tokenPair.deletionTokenExpiresAt.toISOString(),
       statusTokenExpiresAt: tokenPair.statusTokenExpiresAt.toISOString()
     };
+    reply.header('cache-control', 'no-store');
     return reply.status(200).send(response);
   });
 
-  app.get('/auth/account-deletion/status', async (request, reply) => {
+  app.get('/auth/account-deletion/status', {
+    preHandler: [
+      rateLimit({ keyPrefix: 'account-deletion-status-ip', limit: 30, windowMs: 60_000 })
+    ]
+  }, async (request, reply) => {
+    reply.header('cache-control', 'no-store');
     const authorization = request.headers.authorization ?? '';
     const token = bearerTokenPattern.exec(authorization)?.[1];
     if (!token) return sendUnauthorized(reply);
@@ -183,22 +200,31 @@ export function registerAccountDeletionRoutes(app: FastifyInstance, journal?: Ac
     const operation = await getDeletionOperation(permission.operationId);
     if (!operation) return sendUnauthorized(reply);
     if (useJournal && operation.acceptedAt && operation.deadlineAt) {
-      try {
-        await accept({
-          operationId: operation.operationId,
-          userId: permission.userId,
-          acceptedAt: new Date(operation.acceptedAt),
-          deadlineAt: new Date(operation.deadlineAt)
-        });
-      } catch (error) {
-        request.log.error({ err: error }, 'Account deletion status journal confirmation failed');
-        return reply.status(503).send({ error: 'account_deletion_unavailable', message: 'Account deletion status is temporarily unavailable.' });
+      const alreadyConfirmed = await isOperationJournalConfirmed(operation.operationId).catch(() => false);
+      if (!alreadyConfirmed) {
+        try {
+          await accept({
+            operationId: operation.operationId,
+            userId: permission.userId,
+            acceptedAt: new Date(operation.acceptedAt),
+            deadlineAt: new Date(operation.deadlineAt)
+          });
+          await markOperationJournalConfirmed(operation.operationId).catch(() => undefined);
+        } catch (error) {
+          request.log.error({ err: error }, 'Account deletion status journal confirmation failed');
+          return reply.status(503).send({ error: 'account_deletion_unavailable', message: 'Account deletion status is temporarily unavailable.' });
+        }
       }
     }
     return reply.status(200).send(operation satisfies AccountDeletionStatusResponse);
   });
 
-  app.delete('/auth/me', async (request, reply) => {
+  app.delete('/auth/me', {
+    preHandler: [
+      rateLimit({ keyPrefix: 'account-deletion-accept-ip', limit: 10, windowMs: 15 * 60_000 })
+    ]
+  }, async (request, reply) => {
+    reply.header('cache-control', 'no-store');
     if (!env.ACCOUNT_DELETION_ENABLED) {
       return reply.status(503).send({ error: 'account_deletion_disabled', message: 'Account deletion is temporarily unavailable.' });
     }

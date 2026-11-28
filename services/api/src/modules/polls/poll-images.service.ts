@@ -4,9 +4,10 @@ import sharp, { type Metadata } from 'sharp';
 
 import { deleteObject, putObject } from '../../config/storage.js';
 import { db } from '../../config/database.js';
-import { withActiveAccountTransaction } from '../account-deletion/account-activity.guard.js';
+import { InactiveAccountError, isActiveAccount } from '../account-deletion/account-activity.guard.js';
 
 const maxPollImageBytes = 5 * 1024 * 1024;
+const maxPollImageInputPixels = 25_000_000;
 
 export const allowedPollImageMimeTypes = new Set([
   'image/jpeg',
@@ -82,7 +83,7 @@ export function validatePollImageBytes(mimetype: string, body: Buffer) {
 }
 
 export async function normalizePollImage(body: Buffer) {
-  return sharp(body)
+  return sharp(body, { limitInputPixels: maxPollImageInputPixels, failOn: 'error' })
     .rotate()
     .resize({
       width: 1600,
@@ -99,7 +100,7 @@ function isInvalidImageError(error: unknown) {
     return false;
   }
 
-  return /corrupt|invalid|unsupported|truncated|end of stream|input buffer/i.test(
+  return /corrupt|invalid|unsupported|truncated|end of stream|input buffer|pixel limit/i.test(
     error.message
   );
 }
@@ -107,10 +108,10 @@ function isInvalidImageError(error: unknown) {
 type PollImagePart = Pick<MultipartFile, 'fieldname' | 'mimetype' | 'toBuffer'>;
 
 export async function processPollImage(authorId: string, part: PollImagePart) {
-  return withActiveAccountTransaction(authorId, async () => processPollImageWhileLocked(authorId, part));
-}
+  if (!(await isActiveAccount(authorId))) {
+    throw new InactiveAccountError();
+  }
 
-async function processPollImageWhileLocked(authorId: string, part: PollImagePart) {
   if (part.fieldname !== 'image') {
     throw new PollImageUploadError('The image field is required.');
   }
@@ -122,13 +123,23 @@ async function processPollImageWhileLocked(authorId: string, part: PollImagePart
   let normalizedBody: Buffer;
 
   try {
-    metadata = await sharp(body).metadata();
+    const pipeline = sharp(body, { limitInputPixels: maxPollImageInputPixels, failOn: 'error' });
+    metadata = await pipeline.metadata();
 
     if ((metadata.pages ?? 1) > 1) {
       throw new PollImageUploadError('Animated poll images are not supported.');
     }
 
-    normalizedBody = await normalizePollImage(body);
+    normalizedBody = await pipeline
+      .rotate()
+      .resize({
+        width: 1600,
+        height: 1600,
+        fit: 'inside',
+        withoutEnlargement: true
+      })
+      .webp()
+      .toBuffer();
   } catch (error) {
     if (error instanceof PollImageUploadError) {
       throw error;

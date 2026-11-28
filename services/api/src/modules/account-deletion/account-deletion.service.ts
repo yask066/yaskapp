@@ -7,13 +7,14 @@ import {
   acceptDeletionOperation,
   consumeDeletionPermission,
   getDeletionOperation,
-  getDeletionPermission
+  getDeletionPermission,
+  markOperationJournalConfirmed
 } from './account-deletion.repository.js';
 import { hashDeletionToken } from './account-deletion.verification.js';
 import { lockSuperadminMutation } from './account-activity.guard.js';
 import { dispatchPendingDeletionEvents } from './account-deletion.events.js';
 import { disconnectUser } from '../../realtime/realtime.hub.js';
-import { acceptDeletionInJournal, prepareDeletionInJournal } from './account-deletion.journal.js';
+import { abortDeletionInJournal, acceptDeletionInJournal, prepareDeletionInJournal } from './account-deletion.journal.js';
 import { commitJournaledAcceptance } from './account-deletion.acceptance-protocol.js';
 import { snapshotDeletedAccount } from './account-deletion.archive.js';
 
@@ -25,7 +26,7 @@ export class AccountDeletionAcceptanceError extends Error {
   }
 }
 
-async function snapshotDeletionWork(client: PoolClient, operationId: string, userId: string) {
+export async function snapshotDeletionWork(client: PoolClient, operationId: string, userId: string) {
   await client.query(
     `INSERT INTO account_deletion_steps (operation_id, step_key, position)
      SELECT $1, step_key, (position - 1)::int
@@ -53,15 +54,53 @@ async function snapshotDeletionWork(client: PoolClient, operationId: string, use
   );
 }
 
+export async function enqueueAdminAccountDeletion(
+  client: PoolClient,
+  userId: string,
+  deletedAt: Date
+): Promise<string> {
+  const existing = await client.query<{ id: string }>(
+    `SELECT id FROM account_deletion_operations
+      WHERE user_id = $1 AND status <> 'not_started'
+      ORDER BY created_at DESC LIMIT 1`,
+    [userId]
+  );
+  if (existing.rows[0]) {
+    return existing.rows[0].id;
+  }
+
+  await client.query(
+    "DELETE FROM account_deletion_operations WHERE user_id = $1 AND status = 'not_started'",
+    [userId]
+  );
+  const deadlineAt = new Date(deletedAt.getTime() + 24 * 60 * 60_000);
+  const inserted = await client.query<{ id: string }>(
+    `INSERT INTO account_deletion_operations (
+       user_id, status, accepted_at, deadline_at, available_at, updated_at
+     )
+     VALUES ($1, 'pending', $2, $3, $2, $2)
+     RETURNING id`,
+    [userId, deletedAt, deadlineAt]
+  );
+  const operationId = inserted.rows[0]?.id;
+  if (!operationId) {
+    throw new Error('Failed to create admin account deletion operation.');
+  }
+  await snapshotDeletionWork(client, operationId, userId);
+  return operationId;
+}
+
 export async function acceptAccountDeletion(
   deletionToken: string,
   confirm: true,
   journal: {
     writePrepared: typeof prepareDeletionInJournal;
     writeAccepted: typeof acceptDeletionInJournal;
+    writeAborted?: typeof abortDeletionInJournal;
   } | undefined = env.ACCOUNT_DELETION_JOURNAL_ENABLED ? {
     writePrepared: prepareDeletionInJournal,
-    writeAccepted: acceptDeletionInJournal
+    writeAccepted: acceptDeletionInJournal,
+    writeAborted: abortDeletionInJournal
   } : undefined
 ): Promise<AccountDeletionStatusResponse> {
   if (confirm !== true || !deletionToken) {
@@ -94,23 +133,34 @@ export async function acceptAccountDeletion(
       return operation;
     }
 
-    await lockSuperadminMutation(client);
-    const accountResult = await client.query<{
+    let accountResult = await client.query<{
       role: string;
       status: string;
       deleted_at: Date | null;
     }>('SELECT role, status, deleted_at FROM users WHERE id = $1 FOR UPDATE', [permission.userId]);
-    const account = accountResult.rows[0];
+    let account = accountResult.rows[0];
     if (!account || account.status === 'deleted' || account.deleted_at) {
       throw new AccountDeletionAcceptanceError('account_deletion_conflict');
     }
     if (account.role === 'superadmin') {
-      const countResult = await client.query<{ count: string }>(
-        `SELECT count(*)::text AS count FROM users
-         WHERE role = 'superadmin' AND status <> 'deleted' AND deleted_at IS NULL`
-      );
-      if (Number(countResult.rows[0]?.count ?? 0) <= 1) {
-        throw new AccountDeletionAcceptanceError('last_superadmin');
+      await lockSuperadminMutation(client);
+      accountResult = await client.query<{
+        role: string;
+        status: string;
+        deleted_at: Date | null;
+      }>('SELECT role, status, deleted_at FROM users WHERE id = $1 FOR UPDATE', [permission.userId]);
+      account = accountResult.rows[0];
+      if (!account || account.status === 'deleted' || account.deleted_at) {
+        throw new AccountDeletionAcceptanceError('account_deletion_conflict');
+      }
+      if (account.role === 'superadmin') {
+        const countResult = await client.query<{ count: string }>(
+          `SELECT count(*)::text AS count FROM users
+           WHERE role = 'superadmin' AND status <> 'deleted' AND deleted_at IS NULL`
+        );
+        if (Number(countResult.rows[0]?.count ?? 0) <= 1) {
+          throw new AccountDeletionAcceptanceError('last_superadmin');
+        }
       }
     }
 
@@ -152,7 +202,11 @@ export async function acceptAccountDeletion(
       await commitJournaledAcceptance({
         writePrepared: () => journal.writePrepared(journalAcceptance),
         commitDatabase,
-        writeAccepted: () => journal.writeAccepted(journalAcceptance)
+        writeAccepted: async () => {
+          await journal.writeAccepted(journalAcceptance);
+          await markOperationJournalConfirmed(permission.operationId).catch(() => undefined);
+        },
+        writeAborted: journal.writeAborted ? () => journal.writeAborted!(journalAcceptance) : undefined
       });
     } else {
       await commitDatabase();

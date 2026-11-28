@@ -55,6 +55,22 @@ export async function updateModerationPolicy(input: {
   try {
     await client.query('BEGIN');
     await lockActiveAccount(client, input.actorUserId);
+    const actorRow = await client.query<{ role: UserRole }>(
+      'SELECT role FROM users WHERE id = $1 AND deleted_at IS NULL',
+      [input.actorUserId]
+    );
+    const actorRole = actorRow.rows[0]?.role ?? input.actorRole;
+    await client.query(
+      `DELETE FROM moderation_idempotency_keys
+        WHERE actor_user_id = $1 AND idempotency_key = $2 AND expires_at <= now()`,
+      [input.actorUserId, input.idempotencyKey]
+    );
+    await client.query(
+      `INSERT INTO moderation_idempotency_keys (actor_user_id, idempotency_key, request_fingerprint, expires_at)
+       VALUES ($1, $2, $3, now() + interval '24 hours')
+       ON CONFLICT (actor_user_id, idempotency_key) DO NOTHING`,
+      [input.actorUserId, input.idempotencyKey, input.fingerprint]
+    );
     const existing = await client.query<{ request_fingerprint: string; response: { policy: ReturnType<typeof mapPolicy> } | null }>(
       'SELECT request_fingerprint, response FROM moderation_idempotency_keys WHERE actor_user_id = $1 AND idempotency_key = $2 FOR UPDATE',
       [input.actorUserId, input.idempotencyKey]
@@ -65,12 +81,6 @@ export async function updateModerationPolicy(input: {
         await client.query('COMMIT');
         return { ...existing.rows[0].response, replayed: true };
       }
-    } else {
-      await client.query(
-        `INSERT INTO moderation_idempotency_keys (actor_user_id, idempotency_key, request_fingerprint, expires_at)
-         VALUES ($1, $2, $3, now() + interval '24 hours')`,
-        [input.actorUserId, input.idempotencyKey, input.fingerprint]
-      );
     }
 
     const result = await client.query<PolicyRow>(
@@ -90,7 +100,7 @@ export async function updateModerationPolicy(input: {
     const response = { policy: mapPolicy(result.rows[0]) };
     await recordAdminAudit(client, {
       actorUserId: input.actorUserId,
-      actorRole: input.actorRole,
+      actorRole,
       action: 'moderation.policy_updated',
       targetType: 'case',
       targetId: input.actorUserId,
